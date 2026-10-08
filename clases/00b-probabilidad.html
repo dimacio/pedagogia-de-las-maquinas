@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Probabilidad con piso resbaloso · RL a ciegas</title>
+<meta name="description" content="Nivelación · 0b: frecuencias que convergen a P(s'|s,a), variables aleatorias, la geométrica, Bayes para saber dónde estoy y la esperanza del retorno.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .lienzo { min-width: 0; }
+  .ctls { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .flechas { display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(2, 40px); gap: 6px; }
+  .flechas .btn { padding: 0; font-size: 18px; }
+  .flechas .up { grid-column: 2; } .flechas .left { grid-column: 1; grid-row: 2; } .flechas .down { grid-column: 2; grid-row: 2; } .flechas .right { grid-column: 3; grid-row: 2; }
+  .seg button { font-size: 16px; }
+  .seg.txt button { font-size: 13.5px; }
+  .ley { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  .ley i { display: inline-block; width: 10px; height: 10px; margin-right: 5px; vertical-align: -1px; border-radius: 1px; }
+  .ensenar { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .ensenar > div { background: var(--rock); border: 1px solid var(--rock-2); border-radius: 4px; padding: 14px; display: grid; gap: 6px; align-content: start; }
+  .ensenar h3 { font-family: var(--display); font-weight: 400; font-size: 14px; color: var(--lamp); letter-spacing: .04em; }
+  .obs { font-family: var(--mono); font-size: 13px; }
+  .obs.si { color: var(--ember); } .obs.no { color: var(--exit); }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Nivelación · 0b</div>
+    <h1>Probabilidad con piso <span class="g">resbaloso</span></h1>
+    <p class="thesis">Si el piso resbala, un paso ya no tiene un resultado sino una distribución: la probabilidad es la herramienta para razonar cuando el mismo gesto no siempre da lo mismo.</p>
+  </section>
+
+  <!-- 1. Un paso en piso resbaloso -->
+  <section class="bloque">
+    <div class="stage">
+      <div class="lienzo"><canvas id="cv1" aria-label="Histograma de destinos sobre la cueva; tocá una casilla para cambiar el origen"></canvas></div>
+      <div class="ley"><span><i style="background:var(--sonar)"></i>frecuencia observada</span><span><i style="background:var(--lamp)"></i>P(s′|s,a) exacta</span><span><i style="border:1px dashed var(--muted)"></i>origen s</span></div>
+      <div class="seg" role="group" aria-label="Acción" id="acc1">
+        <button data-a="0" aria-pressed="false" aria-label="Arriba">↑</button><button data-a="1" aria-pressed="false" aria-label="Derecha">→</button><button data-a="2" aria-pressed="true" aria-label="Abajo">↓</button><button data-a="3" aria-pressed="false" aria-label="Izquierda">←</button>
+      </div>
+      <div class="ctl"><label for="slip1">slip (probabilidad de resbalar) <output id="o1"></output></label><input type="range" id="slip1" min="0" max="0.9" step="0.05" value="0.2"></div>
+      <div class="row"><span class="small muted">Tirar</span><button class="btn" id="b1n1">1 paso</button><button class="btn" id="b1n100">100</button><button class="btn primary" id="b1n10000">10 000</button><button class="btn" id="b1cero">Borrar</button></div>
+      <div class="hud" id="hud1"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 1</div>
+      <h2>Un paso, muchos destinos</h2>
+      <p>Con piso resbaloso el agente va adonde quiere con probabilidad 1 − slip, y si no, resbala a uno de los dos costados (si hay pared, choca y se queda). Tirá el mismo paso muchas veces desde la misma casilla: las barras celestes son frecuencias y las marcas ámbar, la probabilidad exacta. Tocá la cueva para cambiar el origen.</p>
+      <div class="eq">frecuencia(s′) = n(s′) / n  →  P(s′ | s, a)&emsp;&emsp;cuando n → ∞</div>
+      <p class="nota pregunta">Con 100 tiradas, ¿cuánto se equivoca la frecuencia? ¿Y con 10 000? ¿Cada cuántas tiradas más se reduce el error a la mitad?</p>
+    </div>
+  </section>
+
+  <!-- 2. Variable aleatoria: pasos hasta salir -->
+  <section class="bloque">
+    <div class="stage">
+      <div class="lienzo"><canvas id="cv2" aria-label="Histograma de pasos hasta la salida"></canvas></div>
+      <div class="lienzo"><canvas id="cv2b" aria-label="Política óptima y una partida con resbalones; tocá para otra partida"></canvas></div>
+      <div class="ctl"><label for="slip2">slip <output id="o2"></output></label><input type="range" id="slip2" min="0" max="0.6" step="0.05" value="0.2"></div>
+      <div class="hud" id="hud2"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 2</div>
+      <h2>Pasos hasta salir</h2>
+      <p>El agente sigue siempre las flechas óptimas, pero el piso decide. El número de pasos <code>T</code> hasta la salida es una variable aleatoria (<i>random variable</i>): cada partida da un valor distinto. Arriba, el histograma de 3000 partidas; abajo, una de ellas (tocala para ver otra).</p>
+      <div class="eq">E[T] = Σ t·P(T=t)&emsp;&emsp;Var[T] = E[(T−E[T])²]</div>
+      <p class="nota pregunta">Sin resbalar, T vale siempre 20. ¿Qué crece más rápido con el slip, la media o la varianza? ¿Por qué el histograma tiene cola a la derecha y no a la izquierda?</p>
+    </div>
+  </section>
+
+  <!-- 3. Bernoulli y geométrica -->
+  <section class="bloque">
+    <div class="stage">
+      <div class="lienzo"><canvas id="cv3" aria-label="Experimentos de intentar hasta no resbalar e histograma del número de intentos"></canvas></div>
+      <div class="ctl"><label for="slip3">slip <output id="o3"></output></label><input type="range" id="slip3" min="0.05" max="0.9" step="0.05" value="0.5"></div>
+      <div class="row"><button class="btn primary" id="b3">Tirar 200 experimentos</button></div>
+      <div class="hud" id="hud3"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 3</div>
+      <h2>¿Cuántos intentos hasta no resbalar?</h2>
+      <p>Cada intento es una moneda cargada (Bernoulli): sale bien con probabilidad <code>p = 1 − slip</code>. Contar los intentos hasta el primer éxito da la distribución geométrica. Arriba, cada fila es un experimento (rojo: resbaló; verde: salió bien); abajo, cuántos intentos hicieron falta.</p>
+      <div class="eq">P(K = k) = (1 − p)^(k−1) · p&emsp;&emsp;E[K] = 1/p</div>
+      <p class="nota pregunta">Si el piso resbala la mitad de las veces, ¿cuántos intentos esperás en promedio? ¿Y si resbala 9 de cada 10?</p>
+    </div>
+  </section>
+
+  <!-- 4. Bayes: ¿dónde estoy? -->
+  <section class="bloque">
+    <div class="stage">
+      <div class="lienzo"><canvas id="cv4" aria-label="Creencia sobre la posición del agente como mapa de calor"></canvas></div>
+      <div class="row" style="justify-content:space-between;align-items:end">
+        <div class="flechas" role="group" aria-label="Acciones" id="acc4">
+          <button class="btn up" data-a="0" aria-label="Arriba">↑</button>
+          <button class="btn left" data-a="3" aria-label="Izquierda">←</button>
+          <button class="btn down" data-a="2" aria-label="Abajo">↓</button>
+          <button class="btn right" data-a="1" aria-label="Derecha">→</button>
+        </div>
+        <div style="display:grid;gap:8px;justify-items:start">
+          <label class="check"><input type="checkbox" id="bigotes"> sentir paredes con bigotes</label>
+          <label class="check"><input type="checkbox" id="verdad"> mostrar dónde está</label>
+          <button class="btn" id="b4reset">Perderlo de nuevo</button>
+        </div>
+      </div>
+      <div class="hud" id="hud4" aria-live="polite"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 4</div>
+      <h2>¿Dónde estoy?</h2>
+      <p>El agente conoce el mapa pero no sabe dónde está: su creencia (<i>belief</i>) empieza pareja sobre todas las casillas. Elegí acciones: después de cada una el agente informa si chocó. Las casillas donde ese resultado era imposible pierden probabilidad y el resto se reparte lo que queda.</p>
+      <div class="eq">P(s | obs) ∝ P(obs | s) · P(s)</div>
+      <p>Activá los bigotes para que, además, sienta qué vecinas son pared. Así funciona la localización de un robot.</p>
+      <p class="nota pregunta">¿Qué acción conviene elegir para enterarse más rápido? ¿Chocar es malo o es información?</p>
+    </div>
+  </section>
+
+  <!-- 5. Esperanza de una suma -->
+  <section class="bloque">
+    <div class="stage">
+      <div class="lienzo"><canvas id="cv5" aria-label="Recompensas descontadas paso a paso y su suma"></canvas></div>
+      <div class="seg txt" role="group" aria-label="Largo de la partida" id="modo5">
+        <button data-m="fijo" aria-pressed="true">Largo fijo</button><button data-m="azar" aria-pressed="false">Largo al azar (slip del paso 2)</button>
+      </div>
+      <div class="ctls">
+        <div class="ctl"><label for="g5">γ (descuento) <output id="og5"></output></label><input type="range" id="g5" min="0.5" max="1" step="0.01" value="0.9"></div>
+        <div class="ctl"><label for="L5">largo (pasos) <output id="oL5"></output></label><input type="range" id="L5" min="1" max="60" step="1" value="20"></div>
+      </div>
+      <label class="check"><input type="checkbox" id="costo5"> costo de −0.02 por paso</label>
+      <div class="hud" id="hud5"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 5</div>
+      <h2>La esperanza de una suma</h2>
+      <p>El retorno (<i>return</i>) es la suma de las recompensas, cada una achicada por γ elevado al tiempo que tardó en llegar. Con +1 en la salida y 20 pasos, el retorno es γ<sup>19</sup>. Si el largo es al azar, la esperanza de la suma es la suma de las esperanzas: cada barra pasa a ser γ<sup>t</sup>·E[r<sub>t+1</sub>].</p>
+      <div class="eq">G = Σ γᵗ·r[t+1]&emsp;&emsp;E[G] = Σ γᵗ·E[r[t+1]]</div>
+      <p class="nota pregunta">En modo al azar, ¿E[G] es igual al retorno de una partida que dura exactamente E[T] pasos? Compará los dos números de abajo: ¿cuál es más grande y por qué?</p>
+    </div>
+  </section>
+
+  <section class="bloque full">
+    <div class="texto">
+      <div class="paso">Para enseñarlo</div>
+      <h2>Contalo en una oración</h2>
+    </div>
+    <div class="ensenar">
+      <div><h3>La oración</h3><p>Cuando el mismo paso puede terminar en lugares distintos, no preguntamos adónde voy sino con qué probabilidad voy a cada lado, y la medimos repitiendo.</p></div>
+      <div><h3>La pregunta</h3><p>Si tirás un paso 10 veces y resbalaste 3, ¿podés decir que el slip es 0.3? ¿Cuántas tiradas te harían sentir seguro?</p></div>
+      <div><h3>Ejercicio de 5 minutos</h3><p>Una persona piensa una casilla de una cueva dibujada en el pizarrón y solo contesta "choqué" o "no choqué" a las flechas que le dicta el grupo. El grupo tacha casillas imposibles en cada paso. Gana quien la encuentra con menos preguntas.</p></div>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(() => {
+  const col = Cueva.COL();
+  const env = Cueva.makeEnv(Cueva.MAPS.chica);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = id => document.getElementById(id);
+  const fmt = (x, d = 3) => x.toFixed(d);
+  const anchoDe = cv => Math.max(120, cv.parentElement.clientWidth);
+  function ajustar(cv, w, h) {
+    const dpr = window.devicePixelRatio || 1, ctx = cv.getContext("2d");
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.width = w + "px"; cv.style.height = h + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return ctx;
+  }
+  // un paso con resbalón (misma regla que Cueva.transiciones)
+  function pasoSlip(s, a, slip, rnd) {
+    if (slip > 0 && rnd() < slip) a = (a + (rnd() < .5 ? 1 : 3)) % 4;
+    return env.move(s, a);
+  }
+  const ARR = Cueva.ARROW;
+
+  // ---------- 1. Un paso en piso resbaloso ----------
+  const cv1 = $("cv1"), hud1 = $("hud1"), T1 = Cueva.tablero(cv1, env, { maxCell: 40 });
+  let s1 = env.idx["1,11"], a1 = 2, cuenta1 = {}, n1 = 0, rnd1 = Cueva.rng(11);
+  const slip1 = () => +$("slip1").value;
+  function tirar1(n) { for (let i = 0; i < n; i++) { const [s2] = pasoSlip(s1, a1, slip1(), rnd1); cuenta1[s2] = (cuenta1[s2] || 0) + 1; } n1 += n; dibujar1(); }
+  function dibujar1() {
+    $("o1").textContent = slip1().toFixed(2);
+    T1.medir().fondo().paredes().salida().grilla();
+    const ctx = T1.ctx, cell = T1.cell, P = Cueva.transiciones(env, slip1())[s1][a1];
+    const [r0, c0] = env.free[s1];
+    ctx.strokeStyle = col.muted; ctx.setLineDash([3, 3]); ctx.lineWidth = 1.5; ctx.strokeRect(c0 * cell + 2, r0 * cell + 2, cell - 4, cell - 4); ctx.setLineDash([]);
+    // flecha de la acción
+    ctx.fillStyle = col.ink; ctx.font = `600 ${Math.round(cell * .42)}px ${col.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(ARR[a1], c0 * cell + cell / 2, r0 * cell + 3);
+    const destinos = new Set([...P.map(p => p[0]), ...Object.keys(cuenta1).map(Number)]);
+    let err = 0;
+    for (const d of destinos) {
+      const [r, c] = env.free[d], f = n1 ? (cuenta1[d] || 0) / n1 : 0, p = (P.find(x => x[0] === d) || [0, 0])[1];
+      err = Math.max(err, Math.abs(f - p));
+      const x = c * cell + cell * .25, w = cell * .5, base = r * cell + cell - 3, alto = cell - 8;
+      ctx.fillStyle = "rgba(94,200,216,.18)"; ctx.fillRect(x, base - alto, w, alto);
+      ctx.fillStyle = col.sonar; ctx.fillRect(x, base - alto * f, w, alto * f);
+      ctx.fillStyle = col.lamp; ctx.fillRect(x - 3, base - alto * p - 1, w + 6, 2.5);
+    }
+    const filas = P.map(([d, p]) => { const [r, c] = env.free[d]; return `<span>(${r},${c}) <b>${n1 ? fmt((cuenta1[d] || 0) / n1) : "–"}</b> vs ${fmt(p, 2)}</span>`; }).join("");
+    hud1.innerHTML = `<span>n = <b>${n1.toLocaleString("es-AR")}</b></span>${filas}<span>error máx <b>${n1 ? fmt(err) : "–"}</b></span>`;
+  }
+  cv1.addEventListener("pointerdown", ev => { const [r, c] = T1.celdaEn(ev), s = env.idx[r + "," + c]; if (s !== undefined && s !== env.goal) { s1 = s; cuenta1 = {}; n1 = 0; tirar1(100); } });
+  document.querySelectorAll("#acc1 button").forEach(b => b.onclick = () => { a1 = +b.dataset.a; document.querySelectorAll("#acc1 button").forEach(x => x.setAttribute("aria-pressed", x === b)); cuenta1 = {}; n1 = 0; tirar1(100); });
+  $("slip1").addEventListener("input", () => { cuenta1 = {}; n1 = 0; tirar1(100); });
+  $("b1n1").onclick = () => tirar1(1); $("b1n100").onclick = () => tirar1(100); $("b1n10000").onclick = () => tirar1(10000);
+  $("b1cero").onclick = () => { cuenta1 = {}; n1 = 0; dibujar1(); };
+  tirar1(100);
+
+  // ---------- 2. Pasos hasta salir ----------
+  const cv2 = $("cv2"), cv2b = $("cv2b"), hud2 = $("hud2"), T2 = Cueva.tablero(cv2b, env, { maxCell: 30 });
+  const LIM2 = 1000, NP = 3000; let largos2 = [], pol2 = null, ej2 = [], semilla2 = 3;
+  const slip2 = () => +$("slip2").value;
+  function partida2(rnd, guardar) {
+    let s = env.start, t = 0; const camino = guardar ? [s] : null;
+    while (s !== env.goal && t < LIM2) { s = pasoSlip(s, pol2[s], slip2(), rnd)[0]; t++; if (guardar) camino.push(s); }
+    return guardar ? camino : t;
+  }
+  function simular2() {
+    const sl = slip2(), { V } = Cueva.iteracionValor(env, { gamma: .99, slip: sl, iters: 300 });
+    pol2 = Cueva.politicaGreedy(env, V, { gamma: .99, slip: sl });
+    const rnd = Cueva.rng(1234); largos2 = []; for (let i = 0; i < NP; i++) largos2.push(partida2(rnd, false));
+    ej2 = partida2(Cueva.rng(semilla2), true);
+  }
+  const stats = xs => { const m = xs.reduce((a, b) => a + b, 0) / xs.length, v = xs.reduce((a, b) => a + (b - m) ** 2, 0) / xs.length; return { m, v }; };
+  function dibujar2() {
+    $("o2").textContent = slip2().toFixed(2);
+    const w = anchoDe(cv2), h = 170, ctx = ajustar(cv2, w, h), ml = 34, mb = 22, mt = 10, pw = w - ml - 8, ph = h - mb - mt;
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    const ord = largos2.slice().sort((a, b) => a - b), lo = 20, hi = Math.max(40, Math.ceil(ord[Math.floor(ord.length * .995)] / 10) * 10), nb = hi - lo + 1, cnt = new Array(nb + 1).fill(0);
+    for (const t of largos2) cnt[Math.min(nb, t - lo)]++;
+    const ymax = Math.max(...cnt) / NP, X = t => ml + (t - lo) * pw / (nb + 1), bw = pw / (nb + 1);
+    const Y = f => mt + ph - (f / ymax) * ph;
+    const { m, v } = stats(largos2), sd = Math.sqrt(v);
+    ctx.fillStyle = "rgba(242,179,90,.12)"; ctx.fillRect(X(Math.max(lo, m - sd)), mt, X(Math.min(hi + 1, m + sd)) - X(Math.max(lo, m - sd)), ph);
+    cnt.forEach((k, i) => { ctx.fillStyle = i === nb ? col.ember : col.sonar; ctx.fillRect(ml + i * bw + .5, Y(k / NP), Math.max(1, bw - 1), Y(0) - Y(k / NP)); });
+    ctx.strokeStyle = col.lamp; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(m) + bw / 2, mt); ctx.lineTo(X(m) + bw / 2, mt + ph); ctx.stroke();
+    ctx.font = `10px ${col.mono}`; ctx.fillStyle = col.muted; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    const paso = hi - lo > 80 ? 20 : 10; for (let t = lo; t <= hi; t += paso) ctx.fillText(t === hi ? hi + "+" : t, X(t) + bw / 2, h - 8);
+    ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(fmt(ymax, 2), ml - 4, mt + 4); ctx.fillText("0", ml - 4, mt + ph);
+    ctx.fillStyle = col.lamp; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText("media", Math.min(X(m) + bw / 2 + 4, w - 40), mt);
+    T2.medir().fondo().paredes().flechas(pol2, "rgba(232,230,223,.35)").trayecto(ej2, col.sonar, .08).salida().entrada();
+    hud2.innerHTML = `<span>E[T] ≈ <b>${m.toFixed(1)}</b></span><span>Var[T] ≈ <b>${v.toFixed(1)}</b></span><span>desvío <b>${sd.toFixed(1)}</b></span><span>mín <b>${Math.min(...largos2)}</b></span><span>esta partida: <b>${ej2.length - 1}</b> pasos</span>`;
+  }
+  $("slip2").addEventListener("input", () => { simular2(); dibujar2(); dibujar5(); });
+  cv2b.addEventListener("pointerdown", () => { semilla2++; ej2 = partida2(Cueva.rng(semilla2), true); dibujar2(); });
+  simular2();
+
+  // ---------- 3. Bernoulli y geométrica ----------
+  const cv3 = $("cv3"), hud3 = $("hud3");
+  let exps3 = [], anim3 = 0, rnd3 = Cueva.rng(5);
+  const slip3 = () => +$("slip3").value;
+  function experimento() { const seq = []; while (true) { const ok = rnd3() >= slip3(); seq.push(ok); if (ok || seq.length > 60) return seq; } }
+  function dibujar3() {
+    $("o3").textContent = slip3().toFixed(2);
+    const p = 1 - slip3(), w = anchoDe(cv3), filas = 10, sq = Math.max(8, Math.min(16, Math.floor((w - 60) / 24))), hTop = filas * (sq + 3) + 18;
+    const hH = 130, h = hTop + hH + 30, ctx = ajustar(cv3, w, h);
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    ctx.font = `10px ${col.mono}`; ctx.fillStyle = col.muted; ctx.textAlign = "left"; ctx.textBaseline = "top";
+    ctx.fillText(`últimos ${Math.min(filas, exps3.length)} experimentos (cada cuadrado es un intento)`, 0, 0);
+    const ult = exps3.slice(-filas);
+    ult.forEach((seq, i) => {
+      const y = 16 + i * (sq + 3), max = Math.floor((w - 40) / (sq + 3));
+      seq.slice(0, max).forEach((ok, j) => { ctx.fillStyle = ok ? col.exit : col.ember; ctx.fillRect(j * (sq + 3), y, sq, sq); });
+      ctx.fillStyle = col.muted; ctx.textBaseline = "middle"; ctx.fillText(`K=${seq.length}`, Math.min(seq.length, max) * (sq + 3) + 4, y + sq / 2); ctx.textBaseline = "top";
+    });
+    // histograma de K vs geométrica
+    const kmax = 12, ml = 30, pw = w - ml - 6, y0 = hTop + hH, cnt = new Array(kmax + 1).fill(0);
+    for (const s of exps3) cnt[Math.min(kmax, s.length)]++;
+    const teo = k => k < kmax ? Math.pow(1 - p, k - 1) * p : Math.pow(1 - p, kmax - 1);
+    const n = exps3.length || 1, ymax = Math.max(teo(1), ...cnt.map(c => c / n)) * 1.08, bw = pw / kmax;
+    for (let k = 1; k <= kmax; k++) {
+      const x = ml + (k - 1) * bw, f = cnt[k] / n, ft = teo(k);
+      ctx.fillStyle = col.sonar; ctx.fillRect(x + bw * .15, y0 - f / ymax * hH, bw * .7, f / ymax * hH);
+      ctx.fillStyle = col.lamp; ctx.fillRect(x + bw * .08, y0 - ft / ymax * hH - 1, bw * .84, 2.5);
+      ctx.fillStyle = col.muted; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(k === kmax ? kmax + "+" : k, x + bw / 2, y0 + 4);
+    }
+    ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(ymax.toFixed(2), ml - 4, hTop + 4); ctx.fillText("0", ml - 4, y0);
+    ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("K = intentos hasta el primer éxito", ml + pw / 2, y0 + 16);
+    const m = exps3.length ? exps3.reduce((a, s) => a + s.length, 0) / exps3.length : 0;
+    hud3.innerHTML = `<span>experimentos <b>${exps3.length}</b></span><span>media de K <b>${m.toFixed(2)}</b></span><span>1/p = <b>${(1 / p).toFixed(2)}</b></span><span>celeste: frecuencia · ámbar: geométrica</span>`;
+  }
+  function tirar3(animar) {
+    cancelAnimationFrame(anim3); exps3 = [];
+    if (!animar || reduce) { for (let i = 0; i < 200; i++) exps3.push(experimento()); dibujar3(); return; }
+    const tick = () => { for (let i = 0; i < 5 && exps3.length < 200; i++) exps3.push(experimento()); dibujar3(); if (exps3.length < 200) anim3 = requestAnimationFrame(tick); };
+    tick();
+  }
+  $("b3").onclick = () => tirar3(true);
+  $("slip3").addEventListener("input", () => tirar3(false));
+  tirar3(false);
+
+  // ---------- 4. Bayes: ¿dónde estoy? ----------
+  const cv4 = $("cv4"), hud4 = $("hud4"), T4 = Cueva.tablero(cv4, env, { maxCell: 40 });
+  let cree = [], verdad = 0, hist4 = [], semilla4 = 21;
+  const bigotes = s => { const [r, c] = env.free[s]; return Cueva.DR.map(([dr, dc]) => env.isWall(r + dr, c + dc) ? 1 : 0); };
+  const igual = (x, y) => x.every((v, i) => v === y[i]);
+  function perder() {
+    const rnd = Cueva.rng(semilla4++); do { verdad = Math.floor(rnd() * env.nS); } while (verdad === env.goal);
+    cree = new Array(env.nS).fill(1 / env.nS); hist4 = []; dibujar4();
+  }
+  function actuar4(a) {
+    const [s2, choque] = env.move(verdad, a), usaB = $("bigotes").checked, obsB = bigotes(s2);
+    const nueva = new Array(env.nS).fill(0);
+    for (let s = 0; s < env.nS; s++) {
+      if (!cree[s]) continue;
+      const [t2, ch2] = env.move(s, a);           // predicción: adónde iría si estuviera en s
+      if (ch2 !== choque) continue;               // verosimilitud del "choqué / no choqué"
+      if (usaB && !igual(bigotes(t2), obsB)) continue;   // y de los bigotes
+      nueva[t2] += cree[s];
+    }
+    const z = nueva.reduce((x, y) => x + y, 0); cree = nueva.map(x => x / z);
+    verdad = s2; hist4.push({ a, choque, b: usaB ? obsB : null }); dibujar4();
+  }
+  function dibujar4() {
+    T4.medir().fondo().paredes();
+    const mx = Math.max(...cree);
+    T4.valores(cree, { rampa: "visitas", lo: 0, hi: Math.max(mx, .08), omitirMeta: false });
+    const cell = T4.cell, ctx = T4.ctx;
+    if (cell >= 22) for (let s = 0; s < env.nS; s++) if (cree[s] >= .05) T4.texto(s, Math.round(cree[s] * 100) + "%", cree[s] / Math.max(mx, .08) > .55 ? "#0b0d12" : col.ink, .3);
+    const [gr, gc] = env.free[env.goal]; ctx.strokeStyle = col.exit; ctx.lineWidth = 2; ctx.strokeRect(gc * cell + 2, gr * cell + 2, cell - 4, cell - 4);
+    if ($("verdad").checked) { const [r, c] = env.free[verdad]; ctx.strokeStyle = col.lamp; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(c * cell + cell / 2, r * cell + cell / 2, cell * .42, 0, 7); ctx.stroke(); }
+    const posibles = cree.filter(x => x > 1e-12).length, ult = hist4[hist4.length - 1];
+    const obs = ult ? `<span>${ARR[ult.a]}: <span class="obs ${ult.choque ? "si" : "no"}">${ult.choque ? "choqué" : "no choqué"}</span>${ult.b ? " · bigotes " + ult.b.map((v, i) => v ? ARR[i] : "").join("") + (ult.b.some(v => v) ? " pared" : "nada") : ""}</span>` : `<span>creencia uniforme: 1/${env.nS} en cada casilla</span>`;
+    hud4.innerHTML = `${obs}<span>pasos <b>${hist4.length}</b></span><span>casillas posibles <b>${posibles}</b></span><span>P(más probable) <b>${(mx * 100).toFixed(0)}%</b></span>`;
+  }
+  document.querySelectorAll("#acc4 .btn").forEach(b => b.onclick = () => actuar4(+b.dataset.a));
+  $("b4reset").onclick = perder; $("verdad").onchange = dibujar4;
+  perder();
+
+  // ---------- 5. Esperanza de una suma ----------
+  const cv5 = $("cv5"), hud5 = $("hud5"); let modo5 = "fijo";
+  function dibujar5() {
+    const g = +$("g5").value, L = +$("L5").value, c = $("costo5").checked ? -.02 : 0;
+    $("og5").textContent = g.toFixed(2); $("oL5").textContent = L; $("L5").disabled = modo5 !== "fijo";
+    // r[t] = recompensa esperada del paso t+1
+    let r = [], tmax;
+    if (modo5 === "fijo") { tmax = L; for (let t = 0; t < L; t++) r.push(t === L - 1 ? 1 : c); }
+    else {   // con T al azar: E[r_{t+1}] = P(T = t+1)·1 + P(T > t+1)·c
+      tmax = 90; const n = largos2.length, cntT = new Array(tmax + 2).fill(0);
+      for (const T of largos2) { if (T <= tmax) cntT[T]++; }
+      const sup = t => largos2.filter(T => T > t).length / n;   // P(T > t)
+      for (let t = 0; t < tmax; t++) r.push(cntT[t + 1] / n + c * sup(t + 1));
+    }
+    const d = r.map((x, t) => Math.pow(g, t) * x), G = d.reduce((a, b) => a + b, 0);
+    const w = anchoDe(cv5), h = 190, ctx = ajustar(cv5, w, h), ml = 38, mb = 22, mt = 12, pw = w - ml - 8, ph = h - mb - mt;
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    const top = Math.max(...r.map(Math.abs), .02), bot = c < 0 ? Math.max(.005, -Math.min(...r)) * 1.15 : 0;
+    const Y = v => mt + (top - v) / (top + bot) * ph, bw = pw / tmax;
+    ctx.strokeStyle = "rgba(141,147,163,.3)"; ctx.beginPath(); ctx.moveTo(ml, Y(0) + .5); ctx.lineTo(w - 8, Y(0) + .5); ctx.stroke();
+    // curva γ^t (escala del máximo)
+    ctx.strokeStyle = "rgba(242,179,90,.35)"; ctx.setLineDash([3, 3]); ctx.beginPath();
+    for (let t = 0; t < tmax; t++) { const x = ml + (t + .5) * bw, y = Y(top * Math.pow(g, t)); t ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); ctx.setLineDash([]);
+    for (let t = 0; t < tmax; t++) {
+      const x = ml + t * bw + bw * .12, ww = Math.max(1, bw * .76);
+      ctx.strokeStyle = "rgba(232,230,223,.45)"; ctx.lineWidth = 1; if (Math.abs(r[t]) > 1e-9) ctx.strokeRect(x + .5, Math.min(Y(r[t]), Y(0)) + .5, ww - 1, Math.abs(Y(r[t]) - Y(0)));
+      ctx.fillStyle = d[t] >= 0 ? col.exit : col.ember; ctx.fillRect(x, Math.min(Y(d[t]), Y(0)), ww, Math.abs(Y(d[t]) - Y(0)));
+    }
+    ctx.font = `10px ${col.mono}`; ctx.fillStyle = col.muted; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    ctx.fillText(top.toFixed(top < .1 ? 3 : 2), ml - 4, Y(top)); ctx.fillText("0", ml - 4, Y(0));
+    ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText("t (paso)", ml + pw / 2, h - 4);
+    ctx.textAlign = "left"; ctx.fillText("0", ml, h - 4); ctx.textAlign = "right"; ctx.fillText(tmax - 1, w - 8, h - 4);
+    ctx.fillStyle = "rgba(242,179,90,.8)"; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillText("γᵗ", ml + bw + 4, Y(top * g) - 2);
+    if (modo5 === "fijo") hud5.innerHTML = `<span>G = <b>${G.toFixed(4)}</b></span><span>γ^(L−1) = <b>${Math.pow(g, L - 1).toFixed(4)}</b></span><span>contorno: r · relleno: γᵗ r</span>`;
+    else { const mT = largos2.reduce((a, b) => a + b, 0) / largos2.length;
+      const Lm = Math.round(mT); let Gm = Math.pow(g, Lm - 1); for (let t = 0; t < Lm - 1; t++) Gm += Math.pow(g, t) * c;
+      hud5.innerHTML = `<span>E[G] = <b>${G.toFixed(4)}</b></span><span>G de una partida de ${Lm} pasos = <b>${Gm.toFixed(4)}</b></span><span>slip ${slip2().toFixed(2)}, E[T] ≈ ${mT.toFixed(1)}</span>`; }
+  }
+  ["g5", "L5"].forEach(id => $(id).addEventListener("input", dibujar5)); $("costo5").onchange = dibujar5;
+  document.querySelectorAll("#modo5 button").forEach(b => b.onclick = () => { modo5 = b.dataset.m; document.querySelectorAll("#modo5 button").forEach(x => x.setAttribute("aria-pressed", x === b)); dibujar5(); });
+
+  function todo() { dibujar1(); dibujar2(); dibujar3(); dibujar4(); dibujar5(); }
+  todo();
+  let rz = 0; addEventListener("resize", () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(todo); });
+  if (document.fonts) document.fonts.ready.then(todo);
+
+  Cueva.pagina("0b", { lecturas: [
+    { texto: "Sutton y Barto, cap. 2–3 (probabilidad en bandits y MDP)", url: "http://incompleteideas.net/book/the-book-2nd.html" },
+    { texto: "Thrun, Burgard y Fox, Probabilistic Robotics, cap. 7–8 (localización)", url: "http://www.probabilistic-robotics.org/" },
+    { texto: "Seeing Theory: probabilidad visual (Brown University)", url: "https://seeing-theory.brown.edu/" }
+  ] });
+})();
+</script>
+</body>
+</html>

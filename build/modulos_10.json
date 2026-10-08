@@ -1,0 +1,74 @@
+{
+  "10": {
+    "objetivos": [
+      "Describir un modelo de lenguaje como política: estado = texto hasta ahora, acción = próximo token, episodio = respuesta, recompensa al final.",
+      "Explicar cómo la temperatura cambia la política y por qué muestrear es explorar.",
+      "Distinguir RLHF (modelo de recompensa aprendido con comparaciones humanas) de las recompensas verificables, y calcular las ventajas de GRPO de un grupo de respuestas.",
+      "Reconocer las piezas de un agente de lenguaje (modelo, arnés, herramientas, ventana de contexto) y los riesgos de optimizar una recompensa que se puede engañar."
+    ],
+    "tiempo": { "pagina": 40, "notebook": 60 },
+    "previos": ["7", "8", "9"],
+    "requisitos": ["Para el notebook: Colab (sin token ni licencia; descarga un modelo abierto de ≈1 GB). Con GPU tarda uno o dos minutos; en CPU, entre 3 y 8."],
+    "cuestionario": [
+      {
+        "pregunta": "Si un modelo de lenguaje es una política, ¿qué es el estado?",
+        "opciones": [
+          { "texto": "Todo el texto hasta ahora: la conversación y lo que el modelo ya respondió.", "explicacion": "Correcto. Cada token nuevo se agrega al estado; por eso el proceso es de Markov por construcción, a cambio de que el estado crezca." },
+          { "texto": "La última palabra que escribió el modelo.", "explicacion": "No: con solo la última palabra no alcanza para decidir la siguiente. El modelo lee toda la ventana." },
+          { "texto": "Los pesos del modelo.", "explicacion": "No: los pesos son la política (la regla que elige), no el estado sobre el que decide." },
+          { "texto": "La recompensa que recibió en el paso anterior.", "explicacion": "No: en un modelo de lenguaje la recompensa llega recién al final de la respuesta." }
+        ],
+        "correcta": 0
+      },
+      {
+        "pregunta": "¿Qué hace subir la temperatura T al muestrear el próximo token?",
+        "opciones": [
+          { "texto": "Hace al modelo más preciso.", "explicacion": "No: con T alta aparecen tokens poco probables, y con T muy alta, texto sin sentido." },
+          { "texto": "Aplana la distribución: la política explora más.", "explicacion": "Correcto. Divide los logits por T antes del softmax; con T chica la política es casi greedy." },
+          { "texto": "Agranda la ventana de contexto.", "explicacion": "No: la ventana es un límite del modelo y del arnés, no de la temperatura." },
+          { "texto": "Cambia los pesos del modelo.", "explicacion": "No: la temperatura solo cambia cómo se muestrea de la misma política." }
+        ],
+        "correcta": 1
+      },
+      {
+        "pregunta": "GRPO muestrea 8 respuestas a una cuenta y el verificador da 1 a las 8. ¿Qué ventajas reciben?",
+        "opciones": [
+          { "texto": "Todas positivas: el modelo acertó.", "explicacion": "No: la ventaja es relativa al grupo, y nadie fue mejor que el promedio." },
+          { "texto": "Todas cero: la pregunta no aporta señal para el paso de actualización.", "explicacion": "Correcto. (r − media) / desvío vale 0 si todas son iguales. Pasa lo mismo si todas valen 0: es la recompensa escasa de la clase 5." },
+          { "texto": "La primera +1 y el resto −1.", "explicacion": "No: el orden en que se muestrearon no importa." },
+          { "texto": "No se pueden calcular sin un crítico que estime V(s).", "explicacion": "No: justamente GRPO no usa crítico; el grupo hace de línea de base." }
+        ],
+        "correcta": 1
+      },
+      {
+        "pregunta": "En el bucle de agente de la clase, el modelo pidió calcular(\"2026 - year_of_publication\"). ¿Qué pasó?",
+        "opciones": [
+          { "texto": "La calculadora adivinó el año y respondió 5.", "explicacion": "No: la herramienta no adivina; solo acepta números." },
+          { "texto": "El arnés devolvió un error legible y el modelo de 500 millones respondió solo la mitad de la pregunta.", "explicacion": "Correcto. El arnés valida y acota el daño, pero no hace al modelo más inteligente: encadenar dos herramientas le quedó grande." },
+          { "texto": "El modelo recordó el año de una conversación anterior.", "explicacion": "No: el modelo no tiene memoria entre llamadas; solo ve lo que el arnés pone en la ventana." },
+          { "texto": "El arnés cortó por llegar al límite de pasos.", "explicacion": "No: respondió en el paso 2 de 4, sin el cálculo." }
+        ],
+        "correcta": 1
+      },
+      {
+        "pregunta": "Un verificador da recompensa 1 si el número correcto aparece en algún lugar de la respuesta. ¿Qué riesgo tiene entrenar con él?",
+        "opciones": [
+          { "texto": "Ninguno: si el número aparece, la respuesta es correcta.", "explicacion": "No: \"puede ser 40, 41, 42, 43 o 44\" contiene el 42 y no sabe sumar." },
+          { "texto": "Que la política aprenda a listar muchos números y cobre sin saber resolver: reward hacking.", "explicacion": "Correcto. GRPO le daría ventaja positiva a la trampa. Por eso: verificadores estrictos, otro modelo como juez y un humano que mire muestras." },
+          { "texto": "Que el entrenamiento sea más lento.", "explicacion": "No es el problema principal: el problema es qué aprende, no cuánto tarda." },
+          { "texto": "Que la temperatura deje de importar.", "explicacion": "No: la temperatura sigue controlando la exploración; lo que falla es la recompensa." }
+        ],
+        "correcta": 1
+      }
+    ],
+    "actividad": {
+      "titulo": "Diseñar la recompensa de un agente de lenguaje",
+      "consigna": "Elegí una tarea que te gustaría delegar en un agente de lenguaje (por ejemplo, corregir ejercicios, contestar consultas de un comercio o resumir papers). Describí: el estado (qué entra en la ventana), las herramientas que necesita, el límite de pasos y qué valida el arnés. Proponé una recompensa verificable o, si no la hay, quién compara respuestas. Después escribí una respuesta trampa que cobraría con tu recompensa sin hacer bien la tarea, y cómo la detectarías. Publicalo y devolvé la propuesta de otra persona buscándole una trampa nueva.",
+      "rubrica": [
+        "Estado, herramientas, límite de pasos y validaciones del arnés están descritos y son coherentes con la tarea.",
+        "La recompensa está bien definida: se dice quién o qué la calcula y cuándo llega.",
+        "La respuesta trampa es plausible y se propone una forma concreta de detectarla (verificador más estricto, otro juez o un humano que mire muestras)."
+      ]
+    }
+  }
+}

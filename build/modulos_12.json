@@ -1,0 +1,140 @@
+{
+  "objetivos": [
+    "Recorrer las once clases anteriores sobre la misma cueva y nombrar la herramienta que agregó cada una.",
+    "Plantear un problema propio como MDP, diciendo quién define la recompensa, quién la ve y cómo podría el agente hacer trampa.",
+    "Presentar el proyecto entre pares y devolver otros con una rúbrica.",
+    "Explicar la difusión del curso como bandit y el curso entero a otra persona."
+  ],
+  "tiempo": {
+    "pagina": 60
+  },
+  "previos": [
+    "8",
+    "11"
+  ],
+  "requisitos": [
+    "Haber completado las clases 1 a 11 (la nivelación es optativa).",
+    "Una cuenta de GitHub para publicar el proyecto en Discussions."
+  ],
+  "cuestionario": [
+    {
+      "pregunta": "¿Qué agrega la ficha del proyecto final a la plantilla de la clase 8?",
+      "opciones": [
+        {
+          "texto": "Más estados y acciones.",
+          "explicacion": "No: se siguen pidiendo pocos estados y pocas acciones."
+        },
+        {
+          "texto": "Un gráfico de la política óptima.",
+          "explicacion": "No: para resolver el MDP la ficha remite a la clase 8 o al notebook 08."
+        },
+        {
+          "texto": "Quién define la recompensa, quién la ve y cómo podría el agente hacer trampa.",
+          "explicacion": "Correcto. Son las preguntas de la clase 11 incorporadas al proyecto."
+        },
+        {
+          "texto": "Un modelo de lenguaje que escribe la ficha.",
+          "explicacion": "No: la ficha la escribís vos; está hecha para pensar la recompensa."
+        }
+      ],
+      "correcta": 2
+    },
+    {
+      "pregunta": "En la campaña de difusión, ¿cuál es un ejemplo de reward hacking?",
+      "opciones": [
+        {
+          "texto": "Publicar los cuatro tipos de post una vez cada uno al principio.",
+          "explicacion": "No: eso es exploración planificada."
+        },
+        {
+          "texto": "Maximizar guardados con posts de intriga que nunca llevan al material.",
+          "explicacion": "Correcto. Sube el número premiado sin lograr lo que se quería: que el curso se aprenda y se enseñe."
+        },
+        {
+          "texto": "Cargar las métricas reales a los 7 días.",
+          "explicacion": "No: es la forma de medir la recompensa."
+        },
+        {
+          "texto": "Cambiar el tipo de post cuando Thompson recomienda otro.",
+          "explicacion": "No: es seguir la política."
+        }
+      ],
+      "correcta": 1
+    },
+    {
+      "pregunta": "¿Por qué en la recompensa de la campaña una visita al repositorio pesa 5 y un guardado 1?",
+      "opciones": [
+        {
+          "texto": "Porque las visitas son más fáciles de conseguir.",
+          "explicacion": "No: suelen ser más escasas; por eso informan más."
+        },
+        {
+          "texto": "Porque Instagram no muestra los guardados.",
+          "explicacion": "No: los guardados están en las estadísticas del post."
+        },
+        {
+          "texto": "Porque el peso tiene que ser un número primo.",
+          "explicacion": "No: los pesos son una decisión de quien da el curso, no una regla matemática."
+        },
+        {
+          "texto": "Porque la visita mide fidelidad: la persona llega a la fuente completa y no a un resumen.",
+          "explicacion": "Correcto. Guardado es longevidad, compartido es fecundidad y visita es fidelidad."
+        }
+      ],
+      "correcta": 3
+    },
+    {
+      "pregunta": "¿Cómo elige el tipo de post la campaña desde el quinto post?",
+      "opciones": [
+        {
+          "texto": "Para cada tipo sortea una tasa posible de su distribución Beta y publica el que salió más alto.",
+          "explicacion": "Correcto. Es Thompson sampling: explora mientras hay duda y explota cuando la duda se achica."
+        },
+        {
+          "texto": "Siempre publica el tipo con mejor promedio hasta ahora.",
+          "explicacion": "No: eso es pura explotación (greedy) y puede quedarse con un tipo por mala suerte temprana."
+        },
+        {
+          "texto": "Elige al azar con la misma probabilidad para cada tipo.",
+          "explicacion": "No: eso sería explorar siempre, sin usar lo aprendido."
+        },
+        {
+          "texto": "Los publica en orden fijo: intriga, concepto, demo, enseñar.",
+          "explicacion": "No: ese orden es solo el de los cuatro primeros."
+        }
+      ],
+      "correcta": 0
+    },
+    {
+      "pregunta": "En la figura «¿Quién elige tu recompensa?», con γ = 0,9 el horizonte efectivo es de unos 10 pasos. ¿Qué pasa si la salida está a 20 pasos?",
+      "opciones": [
+        {
+          "texto": "El valor llega igual de fuerte a toda la cueva.",
+          "explicacion": "No: cada paso multiplica el valor por γ; a 20 pasos queda muy atenuado."
+        },
+        {
+          "texto": "La salida deja de existir.",
+          "explicacion": "No: la salida está; lo que cambia es cuánto pesa vista desde lejos."
+        },
+        {
+          "texto": "El valor de la salida llega muy débil a la entrada y, con un costo por paso, puede no compensar el camino.",
+          "explicacion": "Correcto. Es la miopía de la clase 1: con γ chico la luz no pasa de cerca de la salida."
+        },
+        {
+          "texto": "El agente se mueve más rápido.",
+          "explicacion": "No: γ no cambia la velocidad, cambia cuánto importa el futuro."
+        }
+      ],
+      "correcta": 2
+    }
+  ],
+  "actividad": {
+    "titulo": "Proyecto final: tu MDP y cómo lo enseñarías",
+    "consigna": "Publicá la ficha de tu proyecto (copiala como Markdown desde la página) con el título indicado. Después devolvé los proyectos de dos personas con la rúbrica y, por último, enseñale una idea del curso a alguien que no lo hizo y contá en el mismo hilo qué entendió y qué no.",
+    "rubrica": [
+      "Estados, acciones y recompensa están definidos y son pocos; los estados alcanzan para decidir.",
+      "Se dice quién define la recompensa y quién la ve, y hay al menos una trampa posible con una forma concreta de evitarla.",
+      "La explicación de 5 minutos se entiende sin haber hecho el curso."
+    ]
+  }
+}

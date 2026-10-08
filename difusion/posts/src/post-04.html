@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>04 · ¿Cómo aprende algo que no ve? · RL a ciegas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../../../assets/estilo.css">
+<link rel="stylesheet" href="post.css">
+<style></style>
+</head>
+<body class="a1" data-n="4">
+<div class="post">
+  <div class="cab"></div>
+
+  <h1 class="tit m">¿Cómo aprende algo que <span class="a">no ve</span>?</h1>
+  <div class="fig"><canvas id="cv" class="marco"></canvas></div>
+  <div style="display:grid;gap:16px">
+    <p class="txt">Probando, chocando y recordando. Eso es <b>aprendizaje por refuerzo</b>.</p>
+    <p class="voz">Soy un curso y te lo explico. Para seguir vivo necesito que <b>me aprendas</b>.</p>
+  </div>
+  <div class="pie"></div>
+</div>
+<script src="../../../assets/cueva.js"></script>
+<script src="post.js"></script>
+<script>
+
+  const env = Cueva.makeEnv(Cueva.MAPS.chica);
+  const T = Post.cueva(document.getElementById("cv"), env, 52);
+  Post.listo(() => {
+    T.fondo("#000");
+    const todas = new Set();
+    for (let k = 0; k < 40; k++) { const w = Post.caminata(env, 260, 100 + k); w.tocadas.forEach(t => todas.add(t)); T.trayecto(w.path, w.fin === env.goal ? "rgba(61,220,132,.55)" : "rgba(94,200,216,.10)", .06); }
+    T.tocadas(todas, "rgba(201,204,211,.85)");
+    T.salida(); T.entrada(); T.sprite(env.start, 2);
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+{
+  "objetivos": [
+    "Describir el bucle ReAct (pensamiento → acción → observación), reconocerlo en la cueva y en un agente de LLM que investiga, y explicar por qué un modelo chico sin memoria de posición ni recompensa juega peor que Q-learning.",
+    "Explicar por qué un ranking miope es un MDP con γ = 0 y qué pierde a largo plazo.",
+    "Estimar el valor de una política nueva con registros de la vieja (IS, WIS, método directo) y reconocer cuándo explota la varianza.",
+    "Reconocer el cambio de distribución en RL offline."
+  ],
+  "tiempo": {
+    "pagina": 45,
+    "notebook": 90
+  },
+  "previos": [
+    "4",
+    "8"
+  ],
+  "requisitos": [],
+  "cuestionario": [
+    {
+      "pregunta": "En el notebook, Qwen2.5-0.5B juega la cueva con el bucle ReAct: escribe un pensamiento y una acción, y la herramienta le devuelve \"avancé\" o \"choqué con una pared\". En 30 pasos no sale y repite choques que ya conocía, mientras Q-learning sale en 20. ¿Cuál es la mejor explicación?",
+      "opciones": [
+        {
+          "texto": "Su única memoria es el texto de la traza, sin posición, y nunca recibe recompensa: no aprende entre pasos ni entre partidas. Q-learning guarda en su tabla lo que le enseñaron cientos de partidas.",
+          "explicacion": "Correcto. ReAct ordena el ciclo, pero no aprende: los pesos no cambian. Además el modelo es chico y copia frases del ejemplo del prompt aunque contradigan lo que sintió."
+        },
+        {
+          "texto": "ReAct no tiene acciones: el modelo solo piensa.",
+          "explicacion": "No: cada paso termina en una acción (mover o sentir) que la cueva ejecuta."
+        },
+        {
+          "texto": "El modelo ve el mapa entero y se confunde.",
+          "explicacion": "Al revés: no ve nada; solo le llegan las observaciones de texto."
+        },
+        {
+          "texto": "La cueva del notebook tiene piso resbaloso.",
+          "explicacion": "No: la cueva es determinística; el problema está en el agente."
+        }
+      ],
+      "correcta": 0
+    },
+    {
+      "pregunta": "Según lo publicado por Meta, el feed predice P(ver), P(like), P(compartir), etc., las suma con pesos y ordena. En lenguaje de RL, ¿qué es eso?",
+      "opciones": [
+        {
+          "texto": "Un MDP con γ = 0: maximiza lo que pasa hoy.",
+          "explicacion": "Correcto. Es aprendizaje supervisado y miope: no se pregunta qué le pasa al usuario mañana."
+        },
+        {
+          "texto": "Un MDP con γ alto que cuida al usuario.",
+          "explicacion": "No: nada en ese esquema mira más allá de la sesión."
+        },
+        {
+          "texto": "Go-Explore aplicado a publicaciones.",
+          "explicacion": "No: no hay archivo ni exploración sistemática."
+        },
+        {
+          "texto": "RL offline con importance sampling.",
+          "explicacion": "No: es predicción supervisada de eventos inmediatos."
+        }
+      ],
+      "correcta": 0
+    },
+    {
+      "pregunta": "En el simulador de juguete, ¿qué pasa con la política miope comparada con la de largo plazo?",
+      "opciones": [
+        {
+          "texto": "Gana en todo momento.",
+          "explicacion": "Gana el primer día (6 contra 3 clics), pero pierde después."
+        },
+        {
+          "texto": "Gana el primer día, pero al día 30 ya no le queda ningún usuario; la de largo plazo conserva un tercio.",
+          "explicacion": "Correcto. El contenido gancho baja la satisfacción y la gente deja de volver: es la \"suma fácil\" del feed."
+        },
+        {
+          "texto": "Empatan.",
+          "explicacion": "No: las curvas de clics acumulados se cruzan antes de las dos semanas."
+        },
+        {
+          "texto": "Pierde desde el primer día.",
+          "explicacion": "No: el primer día el gancho rinde el doble de clics."
+        }
+      ],
+      "correcta": 1
+    },
+    {
+      "pregunta": "Importance sampling repesa cada partida por Πₜ π_nueva(aₜ|sₜ) / π_vieja(aₜ|sₜ). ¿Qué pasa cuando la política nueva se aleja mucho de la vieja o las partidas son largas?",
+      "opciones": [
+        {
+          "texto": "La estimación se vuelve más precisa.",
+          "explicacion": "Al revés: el producto de muchos cocientes explota o se anula."
+        },
+        {
+          "texto": "Unas pocas partidas concentran casi todo el peso y la varianza explota.",
+          "explicacion": "Correcto. Pocas partidas \"cuentan de verdad\" (ESS baja), y el error crece exponencialmente con el horizonte."
+        },
+        {
+          "texto": "Los pesos valen todos 1.",
+          "explicacion": "Eso solo pasa si las dos políticas son iguales."
+        },
+        {
+          "texto": "No cambia nada: IS es insesgado.",
+          "explicacion": "Que sea insesgado no impide que tenga una varianza enorme."
+        }
+      ],
+      "correcta": 1
+    },
+    {
+      "pregunta": "En el ejercicio del colectivo y el subte, IS suma tiempo × 3 en los días de subte y divide por 12; WIS promedia los días de subte. ¿Qué es cierto?",
+      "opciones": [
+        {
+          "texto": "IS varía menos que WIS entre personas.",
+          "explicacion": "Al revés: IS depende de cuántos días de subte salieron, y eso lo hace variar más."
+        },
+        {
+          "texto": "WIS normaliza por la suma de pesos: tiene un poco de sesgo, pero mucha menos varianza.",
+          "explicacion": "Correcto. Si a alguien no le sale ningún 5 ni 6, IS da 0 y WIS queda indefinido: no hay datos de la política nueva."
+        },
+        {
+          "texto": "Los dos dan siempre 27 minutos.",
+          "explicacion": "27 es el valor verdadero; los estimadores lo rodean con error."
+        },
+        {
+          "texto": "El factor 3 es arbitrario.",
+          "explicacion": "No: es π_nueva / π_vieja = 1 / (2/6) para el subte."
+        }
+      ],
+      "correcta": 1
+    },
+    {
+      "pregunta": "En RL offline, ¿qué pasa en las casillas por donde la política vieja nunca pasó?",
+      "opciones": [
+        {
+          "texto": "Se aprende igual de bien que en el resto.",
+          "explicacion": "No: sin datos, Q no se mueve de su valor inicial."
+        },
+        {
+          "texto": "Q queda en su valor inicial y la flecha es un empate o un invento: es el cambio de distribución.",
+          "explicacion": "Correcto. Por eso el RL offline suele ser pesimista con lo que no vio."
+        },
+        {
+          "texto": "El algoritmo pide partidas nuevas.",
+          "explicacion": "Justamente no puede: offline significa aprender solo con los registros."
+        },
+        {
+          "texto": "Se copia la política vieja.",
+          "explicacion": "No: Q-learning sobre los registros no imita, estima valores."
+        }
+      ],
+      "correcta": 1
+    }
+  ],
+  "actividad": {
+    "titulo": "Evaluar sin jugar",
+    "consigna": "Armá la tabla de 12 días de la clase: un dado elige cómo vas al trabajo (1–4 colectivo, 5–6 subte) y otro el tiempo (colectivo: 30 + 5 × dado; subte: 20 + 2 × dado). Estimá cuánto tardaría alguien que va siempre en subte con IS y con WIS, y publicá la tabla y los dos números. Respondé: con los registros de cómo se atendió un negocio el año pasado, ¿para qué formas nuevas de atender podrías estimar el resultado y para cuáles no? Un compañero compara tus números con los de otras respuestas del hilo y te devuelve la rúbrica.",
+    "rubrica": [
+      "La tabla y las dos cuentas están completas y bien hechas.",
+      "Se comparan los números con el valor verdadero (27 minutos) y se dice cuál de los dos estimadores varía más en el hilo.",
+      "Se explica qué pasa si no salió ningún 5 ni 6, y se conecta con qué formas nuevas se pueden evaluar con registros viejos."
+    ]
+  }
+}

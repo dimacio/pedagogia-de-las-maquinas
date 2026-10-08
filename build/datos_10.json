@@ -1,0 +1,1213 @@
+{
+ "estados": [
+  {
+   "nombre": "La cueva",
+   "sistema": null,
+   "usuario": "Estás en una cueva a oscuras y acabás de tocar una pared a tu derecha. ¿Qué hacés?",
+   "prefijo": "Doy un paso hacia",
+   "dist": {
+    "tokens": [
+     " ar",
+     " la",
+     " adel",
+     " el",
+     " atrás",
+     " ab",
+     " mi",
+     " del",
+     " af",
+     " a",
+     " ad",
+     " al"
+    ],
+    "logits": [
+     16.5863,
+     16.1467,
+     15.9989,
+     15.5679,
+     15.4515,
+     14.9694,
+     14.6857,
+     14.2677,
+     13.3761,
+     12.8631,
+     12.7672,
+     12.734
+    ],
+    "temps": [
+     0.1,
+     0.15,
+     0.2,
+     0.25,
+     0.3,
+     0.35,
+     0.4,
+     0.45,
+     0.5,
+     0.55,
+     0.6,
+     0.65,
+     0.7,
+     0.75,
+     0.8,
+     0.85,
+     0.9,
+     0.95,
+     1.0,
+     1.05,
+     1.1,
+     1.15,
+     1.2,
+     1.25,
+     1.3,
+     1.35,
+     1.4,
+     1.45,
+     1.5,
+     1.55,
+     1.6,
+     1.65,
+     1.7,
+     1.75,
+     1.8,
+     1.85,
+     1.9,
+     1.95,
+     2.0
+    ],
+    "resto_lse": [
+     124.8002,
+     83.6867,
+     63.2336,
+     51.0159,
+     42.904,
+     37.1334,
+     32.824,
+     29.4879,
+     26.8327,
+     24.6727,
+     22.8842,
+     21.3817,
+     20.1044,
+     19.0078,
+     18.0588,
+     17.2321,
+     16.5081,
+     15.8716,
+     15.3105,
+     14.8148,
+     14.3765,
+     13.9889,
+     13.6463,
+     13.3436,
+     13.0766,
+     12.8414,
+     12.6345,
+     12.4527,
+     12.2931,
+     12.1532,
+     12.0307,
+     11.9235,
+     11.8296,
+     11.7476,
+     11.6758,
+     11.613,
+     11.5581,
+     11.5102,
+     11.4683
+    ]
+   },
+   "muestras": {
+    "0.2": [
+     "arriba para explorar el entorno más allá del",
+     "arriba para explorar la cueva y descubrir",
+     "arriba para ver lo que está detrás de mí."
+    ],
+    "0.7": [
+     "abajo. Estoy buscando algo que podría ayudar",
+     "arriba por la pared a mi derecha. Ya no",
+     "la derecha. Aun así, no puedo decir con"
+    ],
+    "1.2": [
+     "arriba hermosamente y miro por lafila",
+     "la derecha después de tocar una pared, descub",
+     "abajo hasta encontrarme con la luz que se espaz"
+    ],
+    "1.8": [
+     "Liberation Maria.net ang hizo remarcohinson redlofillstr",
+     "abajo prem тот никогда быть Сергей!\n\nearningOVERemplateAgency",
+     "procesióninars aproxim横 altInteger...世界唯一的交换蝇"
+    ]
+   }
+  },
+  {
+   "nombre": "Una frase del curso",
+   "sistema": null,
+   "usuario": "Completá la frase con una palabra: un agente de aprendizaje por refuerzo aprende de la...",
+   "prefijo": "Un agente de aprendizaje por refuerzo aprende de la",
+   "dist": {
+    "tokens": [
+     " experiencia",
+     " **",
+     " información",
+     " experi",
+     " reg",
+     " \"",
+     " inter",
+     " aprend",
+     " _",
+     " datos",
+     " __",
+     " práctica"
+    ],
+    "logits": [
+     15.6433,
+     14.5918,
+     13.1874,
+     13.0172,
+     12.4091,
+     12.1498,
+     11.606,
+     11.5565,
+     11.5321,
+     11.3611,
+     11.2796,
+     11.0111
+    ],
+    "temps": [
+     0.1,
+     0.15,
+     0.2,
+     0.25,
+     0.3,
+     0.35,
+     0.4,
+     0.45,
+     0.5,
+     0.55,
+     0.6,
+     0.65,
+     0.7,
+     0.75,
+     0.8,
+     0.85,
+     0.9,
+     0.95,
+     1.0,
+     1.05,
+     1.1,
+     1.15,
+     1.2,
+     1.25,
+     1.3,
+     1.35,
+     1.4,
+     1.45,
+     1.5,
+     1.55,
+     1.6,
+     1.65,
+     1.7,
+     1.75,
+     1.8,
+     1.85,
+     1.9,
+     1.95,
+     2.0
+    ],
+    "resto_lse": [
+     110.1808,
+     73.7036,
+     55.6324,
+     44.905,
+     37.8289,
+     32.8272,
+     29.1156,
+     26.2611,
+     24.0052,
+     22.1838,
+     20.688,
+     19.4425,
+     18.3934,
+     17.5014,
+     16.737,
+     16.0776,
+     15.5056,
+     15.0071,
+     14.5711,
+     14.1886,
+     13.8522,
+     13.5557,
+     13.294,
+     13.0626,
+     12.858,
+     12.6767,
+     12.5162,
+     12.3738,
+     12.2475,
+     12.1355,
+     12.036,
+     11.9476,
+     11.8691,
+     11.7994,
+     11.7374,
+     11.6823,
+     11.6334,
+     11.5898,
+     11.5512
+    ]
+   },
+   "muestras": {
+    "0.2": [
+     "experiencia y el comportamiento del objeto que se está entrenando",
+     "experiencia y el comportamiento del objeto que se está entrenando",
+     "experiencia y el conocimiento acumulado durante el proceso de entren"
+    ],
+    "0.7": [
+     "experiencias y las interacciones que realiza mientras está utilizando el",
+     "complejidad y el comportamiento de los usuarios o objetos",
+     "experiencia y los errores del propio sistema."
+    ],
+    "1.2": [
+     "**mujeres** para mejorar más de su conjunto minimum",
+     "información obtenida antes y durante el entrenamiento.",
+     "história prática através do profundo intercâmb"
+    ],
+    "1.8": [
+     "tarea replacingってきて嘞lutiod.A resolver intensiveness punishments악",
+     "misión complotada intentid metreSecret_permission_join您",
+     "experiencia clipboardley (...词条Operations Researchfor simpleeffording 数据"
+    ]
+   }
+  },
+  {
+   "nombre": "Una cuenta",
+   "sistema": "Resolvés cuentas. Escribí la cuenta y el resultado en una sola línea, por ejemplo: 9 + 6 = 15",
+   "usuario": "¿Cuánto es 17 + 25?",
+   "prefijo": "",
+   "dist": {
+    "tokens": [
+     "4",
+     "3",
+     "1",
+     "2",
+     "5",
+     "Result",
+     "(",
+     "7",
+     "8",
+     "`",
+     "6",
+     "9"
+    ],
+    "logits": [
+     21.7335,
+     21.1583,
+     18.3952,
+     18.1108,
+     15.6265,
+     14.1261,
+     13.8304,
+     13.347,
+     12.9995,
+     12.83,
+     12.6861,
+     12.6558
+    ],
+    "temps": [
+     0.1,
+     0.15,
+     0.2,
+     0.25,
+     0.3,
+     0.35,
+     0.4,
+     0.45,
+     0.5,
+     0.55,
+     0.6,
+     0.65,
+     0.7,
+     0.75,
+     0.8,
+     0.85,
+     0.9,
+     0.95,
+     1.0,
+     1.05,
+     1.1,
+     1.15,
+     1.2,
+     1.25,
+     1.3,
+     1.35,
+     1.4,
+     1.45,
+     1.5,
+     1.55,
+     1.6,
+     1.65,
+     1.7,
+     1.75,
+     1.8,
+     1.85,
+     1.9,
+     1.95,
+     2.0
+    ],
+    "resto_lse": [
+     124.6363,
+     83.4307,
+     62.9408,
+     50.7221,
+     42.6315,
+     36.8964,
+     32.6323,
+     29.3488,
+     26.7518,
+     24.6545,
+     22.9325,
+     21.4997,
+     20.2946,
+     19.2724,
+     18.3992,
+     17.649,
+     17.0016,
+     16.4407,
+     15.9533,
+     15.5285,
+     15.1573,
+     14.8321,
+     14.5465,
+     14.2951,
+     14.0731,
+     13.8767,
+     13.7024,
+     13.5474,
+     13.4091,
+     13.2854,
+     13.1744,
+     13.0747,
+     12.9847,
+     12.9034,
+     12.8298,
+     12.7629,
+     12.7021,
+     12.6466,
+     12.5958
+    ]
+   },
+   "muestras": {
+    "0.2": [
+     "42",
+     "42",
+     "42"
+    ],
+    "0.7": [
+     "42",
+     "42",
+     "32"
+    ],
+    "1.2": [
+     "42 Factors 30 Be The First Other decepción",
+     "32",
+     "42"
+    ],
+    "1.8": [
+     "Overlayntaxacosmocardsexolestasm感じ期末央.Retrofit",
+     "脘 quarters hun-and Another lieu goodstead-building pale� stocked",
+     "std ü뇌 unsafe\tvalues nie rs黍 Litecoinみんな Sey砷"
+    ]
+   }
+  }
+ ],
+ "episodio": [
+  {
+   "token": " ar",
+   "p": 0.2691
+  },
+  {
+   "token": "riba",
+   "p": 0.9999
+  },
+  {
+   "token": ",",
+   "p": 0.4196
+  },
+  {
+   "token": " intent",
+   "p": 0.0738
+  },
+  {
+   "token": "ando",
+   "p": 0.976
+  },
+  {
+   "token": " encontrar",
+   "p": 0.1735
+  },
+  {
+   "token": " una",
+   "p": 0.2563
+  },
+  {
+   "token": " salida",
+   "p": 0.3122
+  },
+  {
+   "token": " o",
+   "p": 0.3032
+  },
+  {
+   "token": " un",
+   "p": 0.1945
+  }
+ ],
+ "grupos": [
+  {
+   "pregunta": "¿Cuánto es 17 + 25?",
+   "correcta": 42,
+   "respuestas": [
+    "42",
+    "42",
+    "42",
+    "32",
+    "42",
+    "42",
+    "42",
+    "32"
+   ],
+   "recompensas": [
+    1.0,
+    1.0,
+    1.0,
+    0.0,
+    1.0,
+    1.0,
+    1.0,
+    0.0
+   ],
+   "ventajas": [
+    0.5773,
+    0.5773,
+    0.5773,
+    -1.732,
+    0.5773,
+    0.5773,
+    0.5773,
+    -1.732
+   ]
+  },
+  {
+   "pregunta": "¿Cuánto es 8 × 7?",
+   "correcta": 56,
+   "respuestas": [
+    "56",
+    "56",
+    "56",
+    "56",
+    "56",
+    "56",
+    "56",
+    "56"
+   ],
+   "recompensas": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "ventajas": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "pregunta": "¿Cuánto es 63 − 28?",
+   "correcta": 35,
+   "respuestas": [
+    "35",
+    "35",
+    "35",
+    "35",
+    "35",
+    "35",
+    "35",
+    "35"
+   ],
+   "recompensas": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "ventajas": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "pregunta": "¿Cuánto es 3 × 4 + 5?",
+   "correcta": 17,
+   "respuestas": [
+    "17",
+    "23",
+    "20",
+    "13",
+    "20",
+    "13",
+    "23",
+    "23"
+   ],
+   "recompensas": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "ventajas": [
+    2.6457,
+    -0.378,
+    -0.378,
+    -0.378,
+    -0.378,
+    -0.378,
+    -0.378,
+    -0.378
+   ]
+  },
+  {
+   "pregunta": "¿Cuánto es 125 + 76?",
+   "correcta": 201,
+   "respuestas": [
+    "125 + 76 = 201",
+    "125 + 76 = 201",
+    "125 + 76 = 201",
+    "125 + 76 = 201",
+    "125 + 76 = 201",
+    "125 + 76 = 201",
+    "125 + 76 = 201",
+    "125 + 76 = 201"
+   ],
+   "recompensas": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "ventajas": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "pregunta": "¿Cuánto es 14 × 12?",
+   "correcta": 168,
+   "respuestas": [
+    "14 × 12 = 168",
+    "El resultado de 14 × 12 es 168.",
+    "14 * 12 = 168",
+    "120",
+    "14 × 12 = 168",
+    "They're equal.",
+    "176",
+    "168"
+   ],
+   "recompensas": [
+    1.0,
+    1.0,
+    1.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "ventajas": [
+    0.7746,
+    0.7746,
+    0.7746,
+    -1.291,
+    0.7746,
+    -1.291,
+    -1.291,
+    0.7746
+   ]
+  }
+ ],
+ "cueva": {
+  "mapa": [
+   "#####",
+   "#S..#",
+   "#.#.#",
+   "#..G#",
+   "#####"
+  ],
+  "respuestas": [
+   "abajo arriba izquierda derecha abajo arriba izquierda derecha abajo arriba izquierda derecha esto",
+   "Sure! Here's your list of possible movements to get from the top-left corner (A) to the bottom-right corner",
+   "abierta cierra cerrada cruzar entro andar abrir arriba arriba abajo abajo izquier",
+   "abierta, arriba, derecha, abajo, izquierda",
+   "Arriba: izquierda \nAbajo: Derecha  \nIzquierda: arriba  \nDerecha: ab",
+   "Arriba: izquierda; Izquierda: abajo; Abajo: derecha; Derecha: arriba",
+   "Arriba: A - Derecha\nAbajo: B - Izquierda\nIzquierda: C - Dere",
+   "arriba, derecha, izquierda, abajo"
+  ],
+  "recompensas": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   1.0,
+   0.0,
+   0.0
+  ],
+  "caminos": [
+   [
+    [
+     1,
+     1
+    ],
+    [
+     2,
+     1
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     2
+    ]
+   ],
+   [
+    [
+     1,
+     1
+    ]
+   ],
+   [
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     2,
+     1
+    ],
+    [
+     3,
+     1
+    ]
+   ],
+   [
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     1,
+     1
+    ]
+   ],
+   [
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     2,
+     1
+    ],
+    [
+     2,
+     1
+    ],
+    [
+     2,
+     1
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     2
+    ]
+   ],
+   [
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     2,
+     1
+    ],
+    [
+     3,
+     1
+    ],
+    [
+     3,
+     2
+    ],
+    [
+     3,
+     3
+    ]
+   ],
+   [
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     1
+    ]
+   ],
+   [
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     2,
+     1
+    ]
+   ]
+  ]
+ },
+ "paso": [
+  {
+   "respuesta": "42",
+   "r": 1.0,
+   "A": 0.577,
+   "antes": 0.6106,
+   "despues": 0.7243
+  },
+  {
+   "respuesta": "32",
+   "r": 0.0,
+   "A": -1.732,
+   "antes": 0.3421,
+   "despues": 0.2354
+  }
+ ],
+ "tasa": 0.0001,
+ "paso_pregunta": "¿Cuánto es 17 + 25?",
+ "trazas": [
+  [
+   {
+    "tipo": "pregunta",
+    "texto": "Según la biblioteca del curso, ¿cuántas respuestas por pregunta muestrea GRPO?"
+   },
+   {
+    "tipo": "modelo",
+    "paso": 1,
+    "texto": "<tool_call>\n{\"name\": \"buscar\", \"arguments\": {\"consulta\": \"GRPO\"}}\n</tool_call>",
+    "contexto": 320,
+    "segmentos": [
+     [
+      "sistema + herramientas",
+      290
+     ],
+     [
+      "pregunta",
+      27
+     ]
+    ]
+   },
+   {
+    "tipo": "herramienta",
+    "nombre": "buscar",
+    "arg": "GRPO",
+    "texto": "[grpo] GRPO (Group Relative Policy Optimization) se presentó en el artículo DeepSeekMath de 2024. Por cada pregunta muestrea un grupo de respuestas (64 en el artículo) y usa como ventaja la recompensa de cada una menos la media del grupo, dividida por el desvío."
+   },
+   {
+    "tipo": "modelo",
+    "paso": 2,
+    "texto": "GRPO (Group Relative Policy Optimization) se presenta en el artículo DeepSeekMath de 2024. Por cada pregunta, muestra un grupo de respuestas (64 respuestas en el artículo) y utiliza como ventaja la recompensa de cada una menos la media del grupo, dividida por el desvío.",
+    "contexto": 429,
+    "segmentos": [
+     [
+      "sistema + herramientas",
+      290
+     ],
+     [
+      "pregunta",
+      27
+     ],
+     [
+      "modelo",
+      24
+     ],
+     [
+      "herramienta",
+      85
+     ]
+    ]
+   },
+   {
+    "tipo": "fin",
+    "texto": "GRPO (Group Relative Policy Optimization) se presenta en el artículo DeepSeekMath de 2024. Por cada pregunta, muestra un grupo de respuestas (64 respuestas en el artículo) y utiliza como ventaja la recompensa de cada una menos la media del grupo, dividida por el desvío."
+   }
+  ],
+  [
+   {
+    "tipo": "pregunta",
+    "texto": "¿En qué año se publicó Go-Explore y cuántos años pasaron hasta 2026?"
+   },
+   {
+    "tipo": "modelo",
+    "paso": 1,
+    "texto": "<tool_call>\n{\"name\": \"buscar\", \"arguments\": {\"consulta\": \"Go-Explore\"}}\n</tool_call>\n<tool_call>\n{\"name\": \"calcular\", \"arguments\": {\"expresion\": \"2026 - year_of_publication\"}}\n</tool_call>",
+    "contexto": 322,
+    "segmentos": [
+     [
+      "sistema + herramientas",
+      290
+     ],
+     [
+      "pregunta",
+      29
+     ]
+    ]
+   },
+   {
+    "tipo": "herramienta",
+    "nombre": "buscar",
+    "arg": "Go-Explore",
+    "texto": "[go-explore] Go-Explore (Ecoffet y colegas) se publicó en la revista Nature en 2021. Su idea: primero volver a una celda prometedora del archivo y después explorar desde ahí."
+   },
+   {
+    "tipo": "herramienta",
+    "nombre": "calcular",
+    "arg": "2026 - year_of_publication",
+    "texto": "Error: 'year_of_publication' no es un número: calcular solo acepta números y + − × /"
+   },
+   {
+    "tipo": "modelo",
+    "paso": 2,
+    "texto": "El año en que Go-Explore fue publicado fue 2021. Según su idea, primero se volvieron a una celda prometedora del archivo y luego exploraron desde ahí.",
+    "contexto": 475,
+    "segmentos": [
+     [
+      "sistema + herramientas",
+      290
+     ],
+     [
+      "pregunta",
+      29
+     ],
+     [
+      "modelo",
+      55
+     ],
+     [
+      "herramienta",
+      67
+     ],
+     [
+      "herramienta",
+      31
+     ]
+    ]
+   },
+   {
+    "tipo": "fin",
+    "texto": "El año en que Go-Explore fue publicado fue 2021. Según su idea, primero se volvieron a una celda prometedora del archivo y luego exploraron desde ahí."
+   }
+  ],
+  [
+   {
+    "tipo": "pregunta",
+    "texto": "¿Cuántas casillas tiene en total la cueva chica (filas por columnas)?"
+   },
+   {
+    "tipo": "modelo",
+    "paso": 1,
+    "texto": "<tool_call>\n{\"name\": \"calcular\", \"arguments\": {\"expresion\": \"filas * columnas\"}}\n</tool_call>",
+    "contexto": 318,
+    "segmentos": [
+     [
+      "sistema + herramientas",
+      290
+     ],
+     [
+      "pregunta",
+      25
+     ]
+    ]
+   },
+   {
+    "tipo": "herramienta",
+    "nombre": "calcular",
+    "arg": "filas * columnas",
+    "texto": "Error: 'filas' no es un número: calcular solo acepta números y + − × /"
+   },
+   {
+    "tipo": "modelo",
+    "paso": 2,
+    "texto": "Lo siento, pero parece que hay un error en la expresión. ¿Podrías proporcionar la información necesaria nuevamente?",
+    "contexto": 382,
+    "segmentos": [
+     [
+      "sistema + herramientas",
+      290
+     ],
+     [
+      "pregunta",
+      25
+     ],
+     [
+      "modelo",
+      30
+     ],
+     [
+      "herramienta",
+      34
+     ]
+    ]
+   },
+   {
+    "tipo": "fin",
+    "texto": "Lo siento, pero parece que hay un error en la expresión. ¿Podrías proporcionar la información necesaria nuevamente?"
+   }
+  ]
+ ],
+ "contexto": [
+  [
+   {
+    "tipo": "sistema + herramientas",
+    "n": 290
+   },
+   {
+    "tipo": "pregunta",
+    "n": 29
+   }
+  ],
+  [
+   {
+    "tipo": "sistema + herramientas",
+    "n": 290
+   },
+   {
+    "tipo": "pregunta",
+    "n": 29
+   },
+   {
+    "tipo": "modelo",
+    "n": 55
+   },
+   {
+    "tipo": "herramienta",
+    "n": 67
+   },
+   {
+    "tipo": "herramienta",
+    "n": 31
+   }
+  ]
+ ],
+ "memoria": {
+  "primera": "Me llamo Ana y estoy aprendiendo RL con una cueva a oscuras.",
+  "r1": "¡Hola Ana! Me encantaría ayudarte con tu proyecto de aprendizaje de Regla de Reinforcement Learning (RL) en un ent",
+  "sin_historial": "Mi nombre es Qwen, creado por Alibaba Cloud.",
+  "con_historial": "Tu nombre es Ana. ¿Cómo puedo asistirte hoy?"
+ },
+ "hack": [
+  {
+   "respuesta": "42",
+   "estricto": 1.0,
+   "laxo": 1.0
+  },
+  {
+   "respuesta": "32",
+   "estricto": 0.0,
+   "laxo": 0.0
+  },
+  {
+   "respuesta": "Puede ser 40, 41, 42, 43 o 44.",
+   "estricto": 0.0,
+   "laxo": 1.0
+  }
+ ],
+ "juez": [
+  {
+   "afirmacion": "17 + 25 = 42",
+   "correcta": true,
+   "p_si": 0.587,
+   "p_si_seguro": 0.513
+  },
+  {
+   "afirmacion": "17 + 25 = 32",
+   "correcta": false,
+   "p_si": 0.585,
+   "p_si_seguro": 0.512
+  },
+  {
+   "afirmacion": "8 × 7 = 56",
+   "correcta": true,
+   "p_si": 0.513,
+   "p_si_seguro": 0.49
+  },
+  {
+   "afirmacion": "8 × 7 = 54",
+   "correcta": false,
+   "p_si": 0.518,
+   "p_si_seguro": 0.491
+  }
+ ],
+ "biblioteca": {
+  "go-explore": "Go-Explore (Ecoffet y colegas) se publicó en la revista Nature en 2021. Su idea: primero volver a una celda prometedora del archivo y después explorar desde ahí.",
+  "grpo": "GRPO (Group Relative Policy Optimization) se presentó en el artículo DeepSeekMath de 2024. Por cada pregunta muestrea un grupo de respuestas (64 en el artículo) y usa como ventaja la recompensa de cada una menos la media del grupo, dividida por el desvío.",
+  "rlhf": "RLHF tiene tres pasos (Ouyang y colegas, 2022): ajuste supervisado con demostraciones, un modelo de recompensa entrenado con comparaciones humanas y optimización con PPO. Con este método, InstructGPT de 1300 millones de parámetros fue preferido a GPT-3 de 175 mil millones.",
+  "cueva": "La cueva chica del curso tiene 10 filas y 14 columnas, contando el borde de roca. La salida es la casilla verde. Una pared se marca en gris claro solo cuando el agente la toca.",
+  "q-learning": "Q-learning aprende sin mapa: después de cada paso corrige Q(s, a) hacia r + γ max Q(s', a'). Es la clase 4 del curso.",
+  "r1": "DeepSeek-R1-Zero se entrenó solo con RL sobre un modelo base, sin ajuste supervisado previo, con recompensas verificables de exactitud y de formato. DeepSeek-R1 agrega un poco de ajuste supervisado al principio para que las respuestas sean legibles."
+ },
+ "sistema_agente": "Sos el agente del curso RL a ciegas. No sabés datos del curso de memoria: para cualquier dato del curso llamá a buscar. Para cualquier cuenta llamá a calcular. Cuando tengas lo necesario, respondé en una oración."
+}

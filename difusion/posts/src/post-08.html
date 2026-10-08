@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>08 · De la tabla a la red · RL a ciegas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../../../assets/estilo.css">
+<link rel="stylesheet" href="post.css">
+<style>
+  .flujo { display:grid; grid-template-columns: auto auto auto; align-items:center; gap: 22px; width: 900px; justify-content: space-between; }
+  table.q { border-collapse: collapse; font-family: var(--mono); font-size: 24px; color: var(--ink); }
+  table.q th { color: var(--muted); font-weight: 400; padding: 4px 7px; }
+  table.q td { padding: 5px 7px; border: 1px solid var(--rock-2); text-align: right; font-variant-numeric: tabular-nums; }
+  table.q td.max { color: var(--cave); background: var(--lamp); }
+  .col { display:grid; gap: 12px; justify-items:center; }
+</style>
+</head>
+<body class="a2" data-n="8">
+<div class="post">
+  <div class="cab"></div>
+
+  <h1 class="tit">De la tabla a la <span class="a">red</span>.</h1>
+  <div class="fig"><div class="flujo">
+    <div class="col"><table class="q" id="tq"></table><span class="etq">una fila por casilla</span></div>
+    <div class="col"><canvas id="net"></canvas><span class="etq">una red que generaliza</span></div>
+  </div></div>
+  <div style="display:grid;gap:16px">
+    <p class="txt">60 casillas entran en una tabla. Una cámara tiene <b>millones de estados</b>: hace falta una red.</p>
+    <p class="voz">Así jugó Atari una máquina en 2015: DQN.</p>
+  </div>
+  <div class="pie"></div>
+</div>
+<script src="../../../assets/cueva.js"></script>
+<script src="post.js"></script>
+<script>
+
+  const env = Cueva.makeEnv(Cueva.MAPS.chica);
+  const { V } = Cueva.iteracionValor(env, { gamma: .95, iters: 300 });
+  const P = Cueva.transiciones(env), Q = s => [0,1,2,3].map(a => P[s][a].reduce((t, [s2, p]) => t + p * ((s2 === env.goal ? 1 : 0) + .95 * (s2 === env.goal ? 0 : V[s2])), 0));
+  const filas = [0, 1, 2, 5, 9, 14, 20, 27];
+  let h = "<tr><th>s</th>" + Cueva.ARROW.map(a => `<th>${a}</th>`).join("") + "</tr>";
+  for (const s of filas) { const q = Q(s), m = Math.max(...q); h += `<tr><th>${s}</th>` + q.map(v => `<td class="${v === m ? "max" : ""}">${v.toFixed(2).replace(/^0/, "")}</td>`).join("") + "</tr>"; }
+  h += `<tr><th>…</th><td colspan="4" style="text-align:center;color:var(--muted)">60 filas</td></tr>`;
+  document.getElementById("tq").innerHTML = h;
+  const cv = document.getElementById("net"), W = 470, H = 520; cv.width = W; cv.height = H; const ctx = cv.getContext("2d");
+  Post.listo(() => {
+    // entrada: la cueva como imagen (mini mapa de calor) → capas → 4 valores Q
+    const cell = 11, mapW = env.W * cell, mapH = env.H * cell, mx = 10, my = (H - mapH) / 2;
+    const lo = Math.min(...V.filter((_, s) => s !== env.goal)), hi = Math.max(...V);
+    ctx.fillStyle = "#000"; ctx.fillRect(mx - 3, my - 3, mapW + 6, mapH + 6);
+    for (let r = 0; r < env.H; r++) for (let c = 0; c < env.W; c++) { const s = env.idx[r + "," + c]; ctx.fillStyle = s === undefined ? "#1e2331" : Cueva.rampa("valor", (V[s] - lo) / (hi - lo)); ctx.fillRect(mx + c * cell, my + r * cell, cell, cell); }
+    const capas = [[mx + mapW + 60, 7], [mx + mapW + 170, 7], [W - 40, 4]];
+    const nodos = capas.map(([x, n]) => Array.from({ length: n }, (_, i) => [x, H / 2 + (i - (n - 1) / 2) * (n === 4 ? 70 : 58)]));
+    const ent = Array.from({ length: 7 }, (_, i) => [mx + mapW + 2, my + (i + .5) * mapH / 7]);
+    const lineas = (A, B, a) => { ctx.strokeStyle = `rgba(141,147,163,${a})`; ctx.lineWidth = 1.2; for (const p of A) for (const q of B) { ctx.beginPath(); ctx.moveTo(...p); ctx.lineTo(...q); ctx.stroke(); } };
+    lineas(ent, nodos[0], .22); lineas(nodos[0], nodos[1], .3); lineas(nodos[1], nodos[2], .4);
+    nodos.forEach((L, k) => L.forEach(([x, y], i) => { ctx.beginPath(); ctx.arc(x, y, k === 2 ? 17 : 13, 0, 7); ctx.fillStyle = k === 2 ? (i === 2 ? "#f2b35a" : "#2c3346") : "#1e2331"; ctx.fill(); ctx.strokeStyle = k === 2 ? "#f2b35a" : "#8d93a3"; ctx.lineWidth = 2; ctx.stroke(); }));
+    ctx.font = '600 22px "JetBrains Mono"'; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    nodos[2].forEach(([x, y], i) => { ctx.fillStyle = i === 2 ? "#0b0d12" : "#e8e6df"; ctx.fillText(Cueva.ARROW[i], x, y + 1); });
+  });
+</script>
+</body>
+</html>

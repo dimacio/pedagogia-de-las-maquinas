@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cómo se propaga · RL a ciegas</title>
+<meta name="description" content="La campaña de difusión del curso planteada como problema de RL: un bandit de cuatro tipos de post, recompensa de meme y Thompson sampling con tus métricas reales.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .supuesto { display: inline-block; font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--cave); background: var(--lamp); padding: 1px 6px; border-radius: 2px; vertical-align: 2px; }
+  .mdp td:first-child { color: var(--muted); font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px 14px; font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+  .chips span { display: inline-flex; align-items: center; gap: 6px; }
+  .chips i { width: 11px; height: 11px; display: inline-block; border-radius: 2px; }
+  .metricas input[type=number] { width: 100%; min-width: 64px; font-family: var(--mono); font-size: 13.5px; padding: 5px 6px; }
+  .metricas select { width: 100%; min-width: 96px; font-size: 13.5px; padding: 5px 4px; }
+  .metricas td, .metricas th { padding: 5px 6px; }
+  .metricas td:first-child { font-family: var(--mono); color: var(--muted); }
+  .veredicto { background: var(--rock); border: 1px solid var(--rock-2); border-left: 3px solid var(--exit); padding: 12px 14px; border-radius: 3px; display: grid; gap: 6px; }
+  .veredicto b.g { color: var(--exit); }
+  .resumen td.num b { color: var(--exit); }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+  @media (max-width: 820px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+  .posts-img { width: 100%; height: auto; display: block; border: 1px solid var(--rock-2); }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="wrap"><a class="brand" href="../index.html">RL <span class="g">a ciegas</span></a>
+  <nav aria-label="Secciones"><a href="../clases/01-introduccion.html">Inicio</a><a href="../index.html#clases">Clases</a><a href="../juego/la-cueva-a-ciegas.html">Juego</a><a href="estrategia.html" aria-current="page">Difusión</a><a id="gh" href="#">GitHub</a></nav></div></header>
+
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Epílogo · Difusión</div>
+    <h1>Cómo se <span class="g">propaga</span> este curso</h1>
+    <p class="thesis">Este curso es un replicador: vive solo si alguien lo aprende y se lo enseña a otra persona. Su campaña de difusión es el ejemplo resuelto del proyecto final, una estrategia de marketing planteada como problema de RL.</p>
+  </section>
+
+  <!-- 1. El organismo -->
+  <section class="bloque">
+    <div class="stage">
+      <canvas id="cvOrg" aria-label="Red de personas que crece casilla por casilla a medida que cada alumno enseña a otros"></canvas>
+      <div class="hud" id="hudOrg"></div>
+      <div class="ctl"><label for="sR">Fecundidad: a cuántas personas enseña cada alumno <output id="oR"></output></label><input type="range" id="sR" min="0.3" max="3" step="0.1" value="1.6"></div>
+      <div class="ctl"><label for="sF">Fidelidad: probabilidad de copiarlo bien <output id="oF"></output></label><input type="range" id="sF" min="0.3" max="1" step="0.05" value="0.8"></div>
+      <div class="ctl"><label for="sL">Longevidad: generaciones que sigue enseñando <output id="oL"></output></label><input type="range" id="sL" min="1" max="3" step="1" value="1"></div>
+      <div class="row"><button class="btn primary" id="bOrg">Sembrar de nuevo</button><button class="btn" id="bOrgPaso">Una generación</button></div>
+      <div class="chips"><span><i style="background:var(--exit)"></i>enseña ahora</span><span><i style="background:var(--chalk)"></i>aprendió</span><span><i style="background:var(--ember)"></i>copia infiel (no enseña)</span></div>
+    </div>
+    <div class="texto">
+      <div class="paso">1 · El organismo</div>
+      <h2>Una cueva que se ilumina de persona en persona</h2>
+      <p>Cada casilla es una persona. La del centro (el sprite) aprendió el curso y se lo enseña a otras; si se lo copiaron bien, ellas siguen enseñando. Es la teoría de memes de Dawkins: un replicador sobrevive si se copia con <b>fidelidad</b>, con <b>fecundidad</b> y con <b>longevidad</b>.</p>
+      <div class="eq">R efectivo = fecundidad × fidelidad × longevidad</div>
+      <p>Con R efectivo menor que 1 la luz se apaga en pocas generaciones; mayor que 1, la cueva se ilumina entera.</p>
+      <p class="nota pregunta">¿Cuál de las tres perillas depende más de cómo está escrito el material, y cuál de las personas?</p>
+    </div>
+  </section>
+
+  <!-- 2. La recompensa -->
+  <section class="bloque">
+    <div class="stage">
+      <canvas id="cvRec" aria-label="Recompensa por cada mil personas alcanzadas para cada tipo de post, según los pesos elegidos"></canvas>
+      <div class="hud" id="hudRec"></div>
+      <div class="ctl"><label for="wG">Peso de un guardado (longevidad) <output id="oG"></output></label><input type="range" id="wG" min="0" max="10" step="0.5" value="1"></div>
+      <div class="ctl"><label for="wC">Peso de un compartido (fecundidad) <output id="oC"></output></label><input type="range" id="wC" min="0" max="10" step="0.5" value="3"></div>
+      <div class="ctl"><label for="wV">Peso de una visita al repo (fidelidad) <output id="oV"></output></label><input type="range" id="wV" min="0" max="10" step="0.5" value="5"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">2 · El problema</div>
+      <h2>La campaña como un MDP de un paso</h2>
+      <div class="tabla"><table class="mdp">
+        <tr><td>agente</td><td>el curso, un replicador que elige qué publicar</td></tr>
+        <tr><td>acciones</td><td>cuatro tipos de post: intriga, concepto, demo interactiva, invitación a enseñar</td></tr>
+        <tr><td>estado</td><td>el acto de la campaña (I, II, III) y la audiencia ya alcanzada</td></tr>
+        <tr><td>recompensa</td><td>propagación por cada mil personas alcanzadas</td></tr>
+      </table></div>
+      <p>Los pesos dicen qué es propagarse. Un guardado es <b>longevidad</b> (vuelve a mirarlo); un compartido es <b>fecundidad</b> (llega a alguien más); una visita al repositorio es <b>fidelidad</b> (va a la fuente completa, no a un resumen). Por eso pesa más.</p>
+      <div class="eq">r = 1000 · (wg·g + wc·c + wv·v) / alcance</div>
+      <p class="small muted"><span class="supuesto">supuesto</span> Las tasas de las barras son inventadas para ilustrar; el docente las reemplaza con las de Instagram en el bloque 4.</p>
+      <p class="nota pregunta">Si el peso del guardado fuera 10 y el resto 0, ¿qué tipo de post ganaría? ¿Sería un curso que se propaga o uno que se acumula?</p>
+    </div>
+  </section>
+
+  <!-- 3. Thompson -->
+  <section class="bloque">
+    <div class="stage">
+      <canvas id="cvTS" aria-label="Distribuciones de creencia de cada tipo de post y secuencia de posts elegidos por Thompson sampling"></canvas>
+      <div class="hud" id="hudTS"></div>
+      <div class="row"><button class="btn primary" id="bTS1">Publicar un post</button><button class="btn" id="bTS12">Publicar hasta 12</button><button class="btn" id="bTS36">Seguir hasta 36</button><button class="btn" id="bTS0">Reiniciar</button></div>
+    </div>
+    <div class="texto">
+      <div class="paso">3 · La política</div>
+      <h2>Explorar cuatro, después explotar</h2>
+      <p>Los primeros cuatro posts son uno de cada tipo: exploración pura, como mover cada palanca una vez. Desde el quinto, <b>Thompson sampling</b>: para cada tipo se sortea una tasa posible según lo observado (una curva Beta) y se publica el que salió más alto.</p>
+      <p>Las curvas anchas son dudas; las angostas, certezas. Mientras dos tipos se superponen, los dos se siguen probando.</p>
+      <div class="eq">a = argmax  θ ~ Beta(1 + éxitos, 1 + fracasos)</div>
+      <p class="small muted"><span class="supuesto">supuesto</span> Cada post alcanza a unas 500 personas y las tasas reales están inventadas. Los éxitos son la recompensa ponderada dividida por el peso mayor.</p>
+      <p class="nota pregunta">Con 12 posts, ¿alcanza para distinguir el mejor tipo del segundo? ¿Qué cambia si cada post llega a 5.000 personas?</p>
+    </div>
+  </section>
+
+  <!-- 4. Métricas reales -->
+  <section class="bloque full">
+    <div class="texto">
+      <div class="paso">4 · Los datos</div>
+      <h2>Tus métricas reales</h2>
+      <p class="prose">Cargá lo que muestra Instagram para cada post (estadísticas del post, a los 7 días): alcance, guardados y compartidos; las visitas al repositorio salen de GitHub (Insights → Traffic) o de un link con parámetro. La página recalcula la recompensa con los pesos del bloque 2 y estima, con Thompson sampling, qué tipo conviene repetir. Los valores quedan guardados en este navegador.</p>
+    </div>
+    <div class="grid2">
+      <div class="tabla metricas"><table id="tablaM">
+        <thead><tr><th>#</th><th>tipo</th><th>alcance</th><th>guardados</th><th>compartidos</th><th>visitas repo</th><th class="num">r / 1000</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <div class="texto">
+        <div class="veredicto" id="veredicto"></div>
+        <div class="tabla resumen"><table id="tablaR"><thead><tr><th>tipo</th><th>posts</th><th class="num">r medio</th><th class="num">P(mejor)</th></tr></thead><tbody></tbody></table></div>
+        <div class="row"><button class="btn" id="bEj">Cargar ejemplo (supuesto)</button><button class="btn" id="bBorrar">Borrar todo</button><button class="btn" id="bCopiar">Copiar para el notebook</button></div>
+        <textarea id="taNb" rows="6" readonly aria-label="Métricas en formato Python para pegar en el notebook 08" hidden></textarea>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Para enseñarlo -->
+  <section class="bloque full">
+    <div class="texto prose">
+      <div class="paso">Para enseñarlo</div>
+      <h2>Difundir es un bandit</h2>
+      <p><b>En una oración:</b> difundir algo es un bandit, porque cada publicación es una palanca con una tasa de éxito que nadie conoce, y la única forma de saberla es probar sin dejar de aprovechar lo que ya funciona.</p>
+      <p class="nota pregunta">Pregunta para hacer: si medís el éxito de un curso por "me gusta", ¿qué tipo de publicación vas a terminar repitiendo, y qué le pasa al curso?</p>
+      <p><b>Ejercicio de 5 minutos:</b> en grupos, elijan algo que quieran que se propague (un hábito, una idea, un proyecto). Escriban sus cuatro "brazos" (tipos de mensaje), una recompensa con tres pesos (uno por fidelidad, fecundidad y longevidad) y qué harían en el post número 5. Comparen recompensas entre grupos: ¿alguna se puede hackear?</p>
+    </div>
+  </section>
+
+  <section class="material" aria-label="Material de la difusión">
+    <div class="item"><h3>Los 12 posts</h3><a href="posts/grilla.png"><img class="posts-img" src="posts/grilla.png" alt="Grilla de perfil con los 12 posts de la campaña, del 12 arriba a la izquierda al 1 abajo a la derecha" loading="lazy" width="1080" height="1800"></a><p class="small">Imágenes de 1080×1350 en <code>difusion/posts/</code>.</p></div>
+    <div class="item"><h3>Textos y calendario</h3><p class="small">Pie de cada post, hashtags, texto alternativo y el tipo de acción del bandit; 12 posts en 4 semanas.</p><p class="small"><a id="lnTextos" href="textos.md">Abrir textos.md</a></p></div>
+    <div class="item"><h3>Notebook</h3><p class="small">Clase 8, sección final: la difusión de este curso como bandit, con una celda para pegar las métricas reales.</p><p class="row small"><a id="lnColab" href="#">Abrir en Colab</a><a id="lnNb" href="#">Ver en GitHub</a></p></div>
+  </section>
+
+  <nav class="pager" aria-label="Clases">
+    <a href="../clases/11-agentes-aplicados.html"><span>← Clase 11</span><b>Agentes aplicados</b></a>
+    <a class="next" href="../index.html"><span>Volver →</span><b>Portada</b></a>
+  </nav>
+</main>
+<footer class="site wrap">RL a ciegas · material libre para enseñar a las máquinas y a las personas. Basado en Stanford CS234 y Sutton &amp; Barto.</footer>
+
+<script src="../assets/cueva.js"></script>
+<script>
+(() => {
+  const COL = Cueva.COL();
+  const quieto = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.getElementById("gh").href = "https://github.com/" + Cueva.REPO;
+  document.getElementById("lnColab").href = Cueva.colab("08-aplicaciones.ipynb");
+  document.getElementById("lnNb").href = Cueva.github("notebooks/08-aplicaciones.ipynb");
+  document.getElementById("lnTextos").href = Cueva.github("difusion/textos.md");
+  const $ = id => document.getElementById(id);
+  const fmt = (x, d = 1) => x.toLocaleString("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d });
+
+  // ---------- muestreo (Beta vía Gamma, Marsaglia–Tsang) ----------
+  function normal(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  function gamma(k, r) {
+    if (k < 1) return gamma(k + 1, r) * Math.pow(r() || 1e-12, 1 / k);
+    const d = k - 1 / 3, c = 1 / Math.sqrt(9 * d);
+    for (;;) { let x, v; do { x = normal(r); v = 1 + c * x; } while (v <= 0); v = v * v * v; const u = r();
+      if (u < 1 - .0331 * x ** 4 || Math.log(u) < .5 * x * x + d * (1 - v + Math.log(v))) return d * v; }
+  }
+  const beta = (a, b, r) => { const x = gamma(a, r), y = gamma(b, r); return x / (x + y); };
+  function lgam(z) { const c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+    if (z < .5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - lgam(1 - z); z -= 1; let x = c[0]; for (let i = 1; i < 9; i++) x += c[i] / (z + i); const t = z + 7.5; return .5 * Math.log(2 * Math.PI) + (z + .5) * Math.log(t) - t + Math.log(x); }
+  const betaPdf = (x, a, b) => Math.exp((a - 1) * Math.log(x) + (b - 1) * Math.log(1 - x) + lgam(a + b) - lgam(a) - lgam(b));
+  function binom(n, p, r) { // normal aproximada si n grande; exacta si chica
+    if (n * p < 30) { let k = 0; for (let i = 0; i < n; i++) if (r() < p) k++; return k; }
+    return Math.max(0, Math.round(n * p + Math.sqrt(n * p * (1 - p)) * normal(r)));
+  }
+
+  // ---------- brazos y tasas SUPUESTAS (por persona alcanzada) ----------
+  const TIPOS = [
+    { id: "intriga", nombre: "Intriga", col: COL.chalk, tasas: [.015, .006, .002] },
+    { id: "concepto", nombre: "Concepto", col: COL.lamp, tasas: [.030, .005, .004] },
+    { id: "demo", nombre: "Demo interactiva", col: COL.exit, tasas: [.025, .012, .008] },
+    { id: "ensenar", nombre: "Invitación a enseñar", col: COL.sonar, tasas: [.018, .015, .006] }
+  ];
+  const PESOS = () => [+$("wG").value, +$("wC").value, +$("wV").value];
+  const rPor1000 = (tasas, w) => 1000 * (w[0] * tasas[0] + w[1] * tasas[1] + w[2] * tasas[2]);
+
+  // =========================================================== 1. organismo
+  const cvO = $("cvOrg"), ctxO = cvO.getContext("2d");
+  let org = null, cellO = 20, GW = 28, GH = 16, animO = null;
+  function medirOrg() {
+    const ancho = cvO.parentElement.clientWidth - 22, dpr = devicePixelRatio || 1;
+    GW = ancho < 520 ? 18 : 28; GH = ancho < 520 ? 14 : 16; cellO = Math.floor(ancho / GW);
+    cvO.width = GW * cellO * dpr; cvO.height = GH * cellO * dpr; cvO.style.width = GW * cellO + "px"; cvO.style.height = GH * cellO + "px";
+    ctxO.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function sembrar(seed) {
+    const r = Cueva.rng(seed), cy = GH >> 1, cx = GW >> 1;
+    org = { r, gen: 0, nodos: new Map(), edges: [], activos: [[cy, cx]], cy, cx };
+    org.nodos.set(cy + "," + cx, { g: 0, fiel: true, vida: +$("sL").value });
+  }
+  function poisson(l, r) { const L = Math.exp(-l); let k = 0, p = 1; do { k++; p *= r(); } while (p > L); return k - 1; }
+  function generacion() {
+    if (!org.activos.length) return false;
+    const R = +$("sR").value, F = +$("sF").value, Lg = +$("sL").value, r = org.r, nuevos = [];
+    org.gen++;
+    for (const [y, x] of org.activos) {
+      const k = poisson(R, r);
+      for (let i = 0, t = 0; i < k && t < 20; t++) {
+        const ny = y + Math.round((r() - .5) * 5), nx = x + Math.round((r() - .5) * 5), key = ny + "," + nx;
+        if (ny < 0 || nx < 0 || ny >= GH || nx >= GW || org.nodos.has(key)) continue;
+        const fiel = r() < F; org.nodos.set(key, { g: org.gen, fiel, vida: fiel ? Lg : 0 }); org.edges.push([y, x, ny, nx, fiel]); if (fiel) nuevos.push([ny, nx]); i++;
+      }
+      const n = org.nodos.get(y + "," + x); n.vida--; if (n.vida > 0) nuevos.push([y, x]);
+    }
+    org.activos = nuevos; return true;
+  }
+  function dibujarOrg() {
+    const c = cellO; ctxO.fillStyle = "#000"; ctxO.fillRect(0, 0, GW * c, GH * c);
+    ctxO.fillStyle = "#0e1118"; for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (!org.nodos.has(y + "," + x)) ctxO.fillRect(x * c + 2, y * c + 2, c - 4, c - 4);
+    ctxO.lineCap = "round";
+    for (const [y, x, ny, nx, fiel] of org.edges) { ctxO.strokeStyle = fiel ? "rgba(61,220,132,.45)" : "rgba(224,100,90,.35)"; ctxO.lineWidth = Math.max(1.5, c * .1); ctxO.beginPath(); ctxO.moveTo(x * c + c / 2, y * c + c / 2); ctxO.lineTo(nx * c + c / 2, ny * c + c / 2); ctxO.stroke(); }
+    const activos = new Set(org.activos.map(([y, x]) => y + "," + x));
+    for (const [k, n] of org.nodos) { const [y, x] = k.split(",").map(Number);
+      if (!n.fiel) { ctxO.fillStyle = COL.ember; ctxO.fillRect(x * c + c * .3, y * c + c * .3, c * .4, c * .4); continue; }
+      ctxO.save(); if (activos.has(k)) { ctxO.shadowColor = COL.exit; ctxO.shadowBlur = c * .6; ctxO.fillStyle = COL.exit; } else ctxO.fillStyle = COL.chalk;
+      const ins = Math.max(2, c * .14); ctxO.fillRect(x * c + ins, y * c + ins, c - 2 * ins, c - 2 * ins); ctxO.restore(); }
+    // sprite en la primera persona
+    if (spr.complete && spr.naturalWidth) { ctxO.imageSmoothingEnabled = false; ctxO.drawImage(spr, org.cx * c - c * .1, org.cy * c - c * .1, c * 1.2, c * 1.2); }
+    const fieles = [...org.nodos.values()].filter(n => n.fiel).length, Ref = +$("sR").value * +$("sF").value * +$("sL").value;
+    $("hudOrg").innerHTML = `generación <b>${org.gen}</b> · personas que aprendieron <b>${fieles}</b> · enseñando ahora <b>${org.activos.length}</b> · R efectivo <b>${fmt(Ref, 2)}</b>` + (org.activos.length ? "" : ` · <b style="color:var(--muted)">${fieles >= GW * GH * .5 ? "cueva iluminada" : "se apagó"}</b>`);
+  }
+  const spr = new Image(); spr.src = "../assets/sprites/boy_down_1.png"; spr.onload = () => org && dibujarOrg();
+  let semilla = 7;
+  function correrOrg(animar = true) {
+    cancelAnimationFrame(animO); sembrar(semilla); dibujarOrg();
+    if (!animar || quieto) { let n = 0; while (generacion() && n++ < 60); dibujarOrg(); return; }
+    let t0 = 0;
+    const paso = t => { if (t - t0 > 380) { t0 = t; const sigue = generacion(); dibujarOrg(); if (!sigue || org.gen > 60) return; } animO = requestAnimationFrame(paso); };
+    animO = requestAnimationFrame(paso);
+  }
+  [["sR", "oR", v => fmt(+v, 1)], ["sF", "oF", v => Math.round(v * 100) + "%"], ["sL", "oL", v => v]].forEach(([s, o, f]) => {
+    const upd = () => { $(o).textContent = f($(s).value); }; upd();
+    $(s).addEventListener("input", upd); $(s).addEventListener("change", () => correrOrg(true));
+  });
+  $("bOrg").onclick = () => { semilla++; correrOrg(true); };
+  $("bOrgPaso").onclick = () => { cancelAnimationFrame(animO); generacion(); dibujarOrg(); };
+
+  // =========================================================== 2. recompensa
+  const ajRec = Cueva.lienzo($("cvRec"), 230);
+  function dibujarRec() {
+    const { w, h, ctx } = ajRec(), pesos = PESOS(), vals = TIPOS.map(t => rPor1000(t.tasas, pesos)), mx = Math.max(...vals, 1), best = vals.indexOf(Math.max(...vals));
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    const L = Math.min(170, w * .38), R = w - 54, rowH = (h - 20) / 4;
+    TIPOS.forEach((t, i) => {
+      const y = 10 + i * rowH, bw = (R - L) * vals[i] / mx;
+      ctx.fillStyle = COL.muted; ctx.font = `13px ${COL.mono}`; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      ctx.fillText(w < 420 && t.id === "ensenar" ? "Enseñar" : w < 420 && t.id === "demo" ? "Demo" : t.nombre, L - 10, y + rowH / 2);
+      // barras apiladas por componente (guardado, compartido, repo)
+      let x = L; [0, 1, 2].forEach(k => { const part = (R - L) * 1000 * pesos[k] * t.tasas[k] / mx; ctx.fillStyle = t.col; ctx.globalAlpha = [.45, .75, 1][k]; ctx.fillRect(x, y + rowH * .2, Math.max(0, part - 1), rowH * .6); x += part; });
+      ctx.globalAlpha = 1;
+      if (i === best) { ctx.strokeStyle = COL.exit; ctx.lineWidth = 2; ctx.strokeRect(L - .5, y + rowH * .2 - 3, bw + 1, rowH * .6 + 6); }
+      ctx.fillStyle = COL.ink; ctx.textAlign = "left"; ctx.font = `600 13px ${COL.mono}`; ctx.fillText(fmt(vals[i], 1), Math.min(L + bw + 6, w - 48), y + rowH / 2);
+    });
+    $("hudRec").innerHTML = `mejor tipo con estos pesos: <b>${TIPOS[best].nombre}</b> · tramos de cada barra: guardado · compartido · repo`;
+  }
+  ["wG", "wC", "wV"].forEach((id, k) => { const o = ["oG", "oC", "oV"][k]; const upd = () => { $(o).textContent = fmt(+$(id).value, 1); dibujarRec(); reiniciarTS(); recalcular(); }; $(id).addEventListener("input", upd); $(o).textContent = fmt(+$(id).value, 1); });
+
+  // =========================================================== 3. Thompson sampling
+  const ajTS = Cueva.lienzo($("cvTS"), 300), ALC = 500;
+  let ts = null;
+  function reiniciarTS() { ts = { r: Cueva.rng(2026), a: TIPOS.map(() => 1), b: TIPOS.map(() => 1), hist: [], total: 0, totalOpt: 0 }; dibujarTS(); }
+  function publicar() {
+    const pesos = PESOS(), wmax = Math.max(...pesos, 1e-9), n = ts.hist.length, r = ts.r;
+    let a;
+    if (n < 4) a = n; // explorar: uno de cada tipo
+    else { let best = -1; TIPOS.forEach((_, i) => { const th = beta(ts.a[i], ts.b[i], r); if (th > best) { best = th; a = i; } }); }
+    const t = TIPOS[a], cnt = t.tasas.map(p => binom(ALC, p, r));
+    const exitos = (pesos[0] * cnt[0] + pesos[1] * cnt[1] + pesos[2] * cnt[2]) / wmax;
+    ts.a[a] += exitos; ts.b[a] += Math.max(0, ALC - exitos);
+    const rew = 1000 * exitos * wmax / ALC; ts.total += rew;
+    ts.totalOpt += Math.max(...TIPOS.map(tt => rPor1000(tt.tasas, pesos)));
+    ts.hist.push({ a, rew });
+  }
+  function dibujarTS() {
+    const { w, h, ctx } = ajTS(); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    const L = 8, R = w - 8, T0 = 12, B = h - 80;
+    // eje x: tasa compuesta (éxitos ponderados por persona)
+    const medias = TIPOS.map((_, i) => ts.a[i] / (ts.a[i] + ts.b[i]));
+    const xmax = Math.max(.04, ...TIPOS.map((t, i) => (ts.hist.length ? medias[i] * 2.2 : 0)), ...TIPOS.map(t => rPor1000(t.tasas, PESOS()) / 1000 / Math.max(...PESOS(), 1e-9) * 1.6));
+    let ymax = 0; const curvas = TIPOS.map((_, i) => { const pts = []; for (let k = 1; k < 240; k++) { const x = xmax * k / 240, y = betaPdf(x, ts.a[i], ts.b[i]); pts.push([x, y]); if (isFinite(y)) ymax = Math.max(ymax, y); } return pts; });
+    ctx.strokeStyle = COL.rock2; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(L, B + .5); ctx.lineTo(R, B + .5); ctx.stroke();
+    if (!ts.hist.length) { ctx.fillStyle = COL.muted; ctx.font = `14px ${COL.body || "sans-serif"}`; ctx.textAlign = "center"; ctx.fillText("Sin datos: las cuatro creencias son planas.", w / 2, B / 2); }
+    else curvas.forEach((pts, i) => { ctx.beginPath(); pts.forEach(([x, y], k) => { const px = L + (R - L) * x / xmax, py = B - (B - T0) * Math.min(1, y / ymax); k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }); ctx.strokeStyle = TIPOS[i].col; ctx.lineWidth = 2.5; ctx.stroke(); });
+    ctx.fillStyle = COL.muted; ctx.font = `12px ${COL.mono}`; ctx.textAlign = "right"; ctx.fillText("tasa de propagación por persona →", R, B + 16);
+    // tira de posts
+    const n = Math.max(12, ts.hist.length > 12 ? 36 : 12), sw = (R - L) / n, yS = h - 46;
+    for (let k = 0; k < n; k++) { const p = ts.hist[k]; ctx.fillStyle = p ? TIPOS[p.a].col : COL.rock2; ctx.globalAlpha = p ? 1 : .6; ctx.fillRect(L + k * sw + 1, yS, sw - 2, 22); }
+    ctx.globalAlpha = 1; ctx.strokeStyle = COL.ink; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(L + 4 * sw + .5, yS - 6); ctx.lineTo(L + 4 * sw + .5, yS + 28); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = COL.muted; ctx.textAlign = "left"; ctx.fillText("← explorar", L, yS + 38); ctx.textAlign = "right"; ctx.fillText("explotar (Thompson) →", R, yS + 38);
+    const k = ts.hist.length, last = ts.hist[k - 1];
+    const cuenta = TIPOS.map((_, i) => ts.hist.filter(p => p.a === i).length);
+    $("hudTS").innerHTML = `post <b>${k}</b>${last ? ` · último: <b>${TIPOS[last.a].nombre}</b> (r = ${fmt(last.rew, 1)})` : ""} · fase <b>${k < 4 ? "explorar" : "explotar"}</b> · regret <b>${fmt(Math.max(0, ts.totalOpt - ts.total), 0)}</b><br>` +
+      TIPOS.map((t, i) => `<span style="color:${t.col}">■</span> ${t.nombre.split(" ")[0]} ${cuenta[i]}`).join(" · ");
+  }
+  $("bTS1").onclick = () => { publicar(); dibujarTS(); };
+  $("bTS12").onclick = () => { while (ts.hist.length < 12) publicar(); dibujarTS(); };
+  $("bTS36").onclick = () => { while (ts.hist.length < 36) publicar(); dibujarTS(); };
+  $("bTS0").onclick = reiniciarTS;
+
+  // =========================================================== 4. métricas reales
+  // tipo planificado de cada post (ver textos.md): 1–4 explorar, uno de cada tipo; 5–12 los cambia Thompson
+  const PLAN = ["intriga", "concepto", "demo", "ensenar", "concepto", "demo", "demo", "concepto", "intriga", "ensenar", "demo", "ensenar"];
+  // ejemplo SUPUESTO (no son datos reales)
+  const EJEMPLO = [[820, 14, 5, 1], [760, 11, 4, 2], [900, 16, 6, 1], [1100, 19, 9, 3], [950, 30, 6, 4], [1300, 34, 17, 11], [1250, 30, 15, 10], [880, 25, 4, 3], [870, 27, 5, 4], [1400, 26, 22, 9], [1500, 39, 19, 13], [1700, 31, 27, 12]];
+  const CLAVE = "rl-a-ciegas:metricas-v1";
+  const tbody = $("tablaM").querySelector("tbody");
+  let datos = PLAN.map(t => ({ tipo: t, m: ["", "", "", ""] }));
+  try { const g = JSON.parse(localStorage.getItem(CLAVE) || "null"); if (Array.isArray(g) && g.length === 12) datos = g; } catch (e) { /* sin almacenamiento */ }
+  const guardar = () => { try { localStorage.setItem(CLAVE, JSON.stringify(datos)); } catch (e) { /* sin almacenamiento */ } };
+  tbody.innerHTML = datos.map((d, i) => `<tr><td>${String(i + 1).padStart(2, "0")}</td>
+    <td><select data-i="${i}" aria-label="Tipo del post ${i + 1}">${TIPOS.map(t => `<option value="${t.id}">${t.nombre.split(" ")[0].replace("Invitación", "Enseñar")}</option>`).join("")}</select></td>
+    ${[0, 1, 2, 3].map(k => `<td><input type="number" min="0" step="1" inputmode="numeric" data-i="${i}" data-k="${k}" aria-label="${["alcance", "guardados", "compartidos", "visitas al repo"][k]} del post ${i + 1}"></td>`).join("")}
+    <td class="num" id="rr${i}">–</td></tr>`).join("");
+  function volcar() {
+    tbody.querySelectorAll("select").forEach(s => s.value = datos[+s.dataset.i].tipo);
+    tbody.querySelectorAll("input").forEach(inp => inp.value = datos[+inp.dataset.i].m[+inp.dataset.k]);
+  }
+  tbody.addEventListener("input", e => { const el = e.target, i = +el.dataset.i; if (el.tagName === "SELECT") datos[i].tipo = el.value; else datos[i].m[+el.dataset.k] = el.value; guardar(); recalcular(); });
+  function recalcular() {
+    const pesos = PESOS(), wmax = Math.max(...pesos, 1e-9), agg = TIPOS.map(() => ({ n: 0, sumR: 0, ex: 0, alc: 0 }));
+    datos.forEach((d, i) => {
+      const [alc, g, c, v] = d.m.map(x => +x || 0), cel = $("rr" + i);
+      if (alc > 0) { const r = 1000 * (pesos[0] * g + pesos[1] * c + pesos[2] * v) / alc; cel.textContent = fmt(r, 1);
+        const A = agg[TIPOS.findIndex(t => t.id === d.tipo)]; A.n++; A.sumR += r; A.ex += (pesos[0] * g + pesos[1] * c + pesos[2] * v) / wmax; A.alc += alc; }
+      else cel.textContent = "–";
+    });
+    // P(mejor) por Monte Carlo sobre las posteriores Beta
+    const r = Cueva.rng(99), N = 4000, gana = TIPOS.map(() => 0);
+    for (let s = 0; s < N; s++) { let b = -1, bi = 0; agg.forEach((A, i) => { const th = beta(1 + A.ex, 1 + Math.max(0, A.alc - A.ex), r); if (th > b) { b = th; bi = i; } }); gana[bi]++; }
+    const pm = gana.map(x => x / N), best = pm.indexOf(Math.max(...pm)), cargados = agg.reduce((t, A) => t + A.n, 0);
+    $("tablaR").querySelector("tbody").innerHTML = TIPOS.map((t, i) => `<tr><td><span style="color:${t.col}">■</span> ${t.nombre}</td><td class="num">${agg[i].n}</td><td class="num">${agg[i].n ? fmt(agg[i].sumR / agg[i].n, 1) : "–"}</td><td class="num">${i === best && cargados ? "<b>" : ""}${Math.round(pm[i] * 100)}%${i === best && cargados ? "</b>" : ""}</td></tr>`).join("");
+    const sinProbar = TIPOS.filter((_, i) => !agg[i].n).map(t => t.nombre);
+    $("veredicto").innerHTML = !cargados ? `<b>Sin datos todavía.</b><span class="small muted">Cargá al menos un post (o el ejemplo supuesto) para ver la recomendación.</span>`
+      : sinProbar.length ? `<b>Seguí explorando.</b><span class="small">Faltan probar: ${sinProbar.join(", ")}. La política publica uno de cada tipo antes de explotar.</span>`
+      : `<span class="small muted">Con ${cargados} posts cargados, conviene repetir:</span><b class="g" style="font-size:20px">${TIPOS[best].nombre}</b><span class="small">Probabilidad de que sea el mejor: ${Math.round(pm[best] * 100)}%. ${pm[best] < .8 ? "Todavía hay duda: Thompson seguirá alternando con el segundo." : "Ya hay bastante certeza."}</span>`;
+  }
+  $("bEj").onclick = () => { datos = PLAN.map((t, i) => ({ tipo: t, m: EJEMPLO[i].map(String) })); guardar(); volcar(); recalcular(); };
+  $("bBorrar").onclick = () => { datos = PLAN.map(t => ({ tipo: t, m: ["", "", "", ""] })); guardar(); volcar(); recalcular(); $("taNb").hidden = true; };
+  $("bCopiar").onclick = () => {
+    const filas = datos.filter(d => +d.m[0] > 0).map(d => `    ("${d.tipo}", ${d.m.map(x => +x || 0).join(", ")}),`);
+    const txt = `# tipo, alcance, guardados, compartidos, visitas_repo\nMIS_METRICAS = [\n${filas.join("\n")}\n]`;
+    const ta = $("taNb"); ta.hidden = false; ta.value = txt; ta.select();
+    try { navigator.clipboard.writeText(txt).catch(() => {}); } catch (e) { /* copiar a mano */ }
+  };
+
+  // ---------- inicio ----------
+  medirOrg(); sembrar(semilla); for (let g = 0; g < 9; g++) generacion(); dibujarOrg(); dibujarRec(); reiniciarTS(); while (ts.hist.length < 12) publicar(); dibujarTS(); volcar(); recalcular();
+  let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { const g = GW; medirOrg(); if (g !== GW) correrOrg(false); else dibujarOrg(); dibujarRec(); dibujarTS(); }, 120); });
+})();
+</script>
+</body>
+</html>

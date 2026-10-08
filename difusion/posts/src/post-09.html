@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>09 · Cuidado con lo que premiás · RL a ciegas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../../../assets/estilo.css">
+<link rel="stylesheet" href="post.css">
+<style></style>
+</head>
+<body class="a3" data-n="9">
+<div class="post">
+  <div class="cab"></div>
+
+  <h1 class="tit m">Cuidado con lo que <span class="a">premiás</span>.</h1>
+  <div class="fig"><canvas id="cv" class="marco"></canvas></div>
+  <div style="display:grid;gap:16px">
+    <p class="txt">Un tutor de IA premiado por aciertos aprende a dar <b>solo sumas fáciles</b>.</p>
+    <p class="voz">Se llama <i>reward hacking</i>. Con personas pasa igual: premiá lo que querés que aprendan.</p>
+  </div>
+  <div class="pie"></div>
+</div>
+<script src="../../../assets/cueva.js"></script>
+<script src="post.js"></script>
+<script>
+
+  const env = Cueva.makeEnv(Cueva.MAPS.chica);
+  const T = Post.cueva(document.getElementById("cv"), env, 52);
+  Post.listo(() => {
+    const ctx = T.ctx, c = T.cell;
+    T.fondo("#000"); T.paredes("#151924");
+    T.salida();
+    // moneda +0.1 que reaparece cerca de la entrada
+    const coin = env.idx["1,3"], [rc, cc] = env.free[coin];
+    ctx.save(); ctx.shadowColor = "#f2b35a"; ctx.shadowBlur = 18; ctx.fillStyle = "#f2b35a"; ctx.beginPath(); ctx.arc(cc * c + c / 2, rc * c + c / 2, c * .26, 0, 7); ctx.fill(); ctx.restore();
+    // el bucle del agente alrededor de la moneda (en el pasillo de arriba)
+    const ex = 3 * c, ey = 1.5 * c, rx = 1.75 * c, ry = .36 * c, a1 = Math.PI * 1.9;
+    ctx.strokeStyle = "#e0645a"; ctx.lineWidth = 5; ctx.setLineDash([12, 9]);
+    ctx.beginPath(); ctx.ellipse(ex, ey, rx, ry, 0, Math.PI * .1, a1); ctx.stroke(); ctx.setLineDash([]);
+    const ax = ex + rx * Math.cos(a1), ay = ey + ry * Math.sin(a1);
+    ctx.fillStyle = "#e0645a"; ctx.beginPath(); ctx.moveTo(ax + 16, ay + 6); ctx.lineTo(ax - 4, ay - 10); ctx.lineTo(ax - 2, ay + 12); ctx.fill();
+    T.sprite(env.idx["1,2"], 1);
+    ctx.font = `600 ${c * .5}px "JetBrains Mono"`; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#f2b35a"; ctx.fillText("+0.1 × 1000", 5.3 * c, 1.5 * c);
+    const [rg, cg] = env.free[env.goal];
+    ctx.fillStyle = "#3ddc84"; ctx.textAlign = "right"; ctx.fillText("+1 · nunca", (cg - .25) * c, (rg + .5) * c);
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>11 · Esta campaña es un bandit · RL a ciegas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../../../assets/estilo.css">
+<link rel="stylesheet" href="post.css">
+<style></style>
+</head>
+<body class="a3" data-n="11">
+<div class="post">
+  <div class="cab"></div>
+
+  <h1 class="tit m">Esta campaña es un <span class="a">bandit</span>.</h1>
+  <div class="fig"><canvas id="cv"></canvas></div>
+  <div style="display:grid;gap:16px">
+    <p class="txt">Cuatro tipos de post. <b>Tus guardados son mi recompensa</b>: el que más te sirva, lo repito.</p>
+    <p class="voz">Thompson sampling: cuanto más dudo de un brazo, más lo pruebo.</p>
+  </div>
+  <div class="pie"></div>
+</div>
+<script src="../../../assets/cueva.js"></script>
+<script src="post.js"></script>
+<script>
+
+  const cv = document.getElementById("cv"), W = 900, H = 560; cv.width = W; cv.height = H; const ctx = cv.getContext("2d");
+  // posteriores Beta con datos SUPUESTOS (ilustración): éxitos/fracasos por tipo de post
+  const brazos = [["Intriga", 9, 300, "#c9ccd3"], ["Concepto", 14, 300, "#f2b35a"], ["Demo", 22, 300, "#3ddc84"], ["Enseñar", 6, 100, "#5ec8d8"]];
+  const lgam = z => { const g = 7, c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7]; if (z < .5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - lgam(1 - z); z -= 1; let x = c[0]; for (let i = 1; i < g + 2; i++) x += c[i] / (z + i); const t = z + g + .5; return .5 * Math.log(2 * Math.PI) + (z + .5) * Math.log(t) - t + Math.log(x); };
+  const beta = (x, a, b) => Math.exp((a - 1) * Math.log(x) + (b - 1) * Math.log(1 - x) + lgam(a + b) - lgam(a) - lgam(b));
+  Post.listo(() => {
+    const L = 30, R = W - 20, T0 = 70, B = H - 70, xmax = .12;
+    ctx.strokeStyle = "#2c3346"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(L, B); ctx.lineTo(R, B); ctx.stroke();
+    ctx.font = '22px "JetBrains Mono"'; ctx.fillStyle = "#8d93a3"; ctx.textAlign = "center";
+    [0, .03, .06, .09, .12].forEach(v => { const x = L + (R - L) * v / xmax; ctx.fillText(Math.round(v * 100) + "%", x, B + 34); });
+    ctx.textAlign = "right"; ctx.fillText("tasa de guardado (supuesta)", R, B + 64);
+    let ymax = 0; const curvas = brazos.map(([n, s, t]) => { const pts = []; for (let i = 1; i < 400; i++) { const x = xmax * i / 400, y = beta(x, 1 + s, 1 + t - s); pts.push([x, y]); ymax = Math.max(ymax, y); } return pts; });
+    curvas.forEach((pts, k) => { const col = brazos[k][3];
+      ctx.beginPath(); pts.forEach(([x, y], i) => { const px = L + (R - L) * x / xmax, py = B - (B - T0) * y / ymax; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); });
+      ctx.strokeStyle = col; ctx.lineWidth = 5; ctx.stroke();
+      ctx.lineTo(L + (R - L) * pts[pts.length - 1][0] / xmax, B); ctx.lineTo(L, B); ctx.fillStyle = col + "22"; ctx.fill();
+      const [mx, my] = pts.reduce((a, b) => b[1] > a[1] ? b : a);
+      ctx.font = '400 26px Silkscreen'; ctx.fillStyle = col; ctx.textAlign = "center";
+      ctx.fillText(brazos[k][0], L + (R - L) * mx / xmax, B - (B - T0) * my / ymax - 18);
+    });
+  });
+</script>
+</body>
+</html>

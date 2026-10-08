@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Agentes de lenguaje · RL a ciegas</title>
+<meta name="description" content="Clase 10: un modelo de lenguaje como política, de dónde sale la recompensa (RLHF, recompensas verificables, GRPO), herramientas y bucle de agente, memoria y contexto, y los riesgos de optimizar una recompensa engañable.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .graf { min-width: 0; }
+  .cap { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips button { font-family: var(--mono); font-size: 12.5px; background: transparent; color: var(--muted); border: 1px solid var(--rock-2); border-radius: 3px; padding: 5px 8px; cursor: pointer; }
+  .chips button[aria-pressed="true"] { color: var(--ink); border-color: var(--lamp); background: var(--rock-2); }
+  .seg.chico button { font-size: 12.5px; padding: 6px 4px; }
+  .estado { font-family: var(--mono); font-size: 13px; line-height: 1.5; background: var(--rock); border: 1px solid var(--rock-2); border-radius: 3px; padding: 8px 10px; overflow-wrap: anywhere; }
+  .estado .rol { color: var(--muted); }
+  .estado .pref { color: var(--ink); }
+  .estado .nuevo { color: var(--cave); background: var(--lamp); border-radius: 2px; padding: 0 2px; }
+  .estado .cursor { display: inline-block; width: 8px; height: 14px; background: var(--sonar); vertical-align: -2px; margin-left: 2px; }
+  .muestras { display: grid; gap: 4px; font-size: 13.5px; }
+  .muestras div { font-family: var(--mono); font-size: 12.5px; border-left: 2px solid var(--rock-3); padding-left: 8px; overflow-wrap: anywhere; }
+  .muestras div b { color: var(--muted); font-weight: 400; }
+  .log { display: grid; gap: 6px; font-size: 13.5px; max-height: 360px; overflow-y: auto; }
+  .ev { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 8px; align-items: baseline; opacity: .35; }
+  .ev.vis { opacity: 1; }
+  .ev.act { background: var(--rock); border-radius: 3px; }
+  .ev .q { font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; }
+  .ev .t { overflow-wrap: anywhere; }
+  .ev .t code { color: var(--sonar); font-size: 12px; }
+  .ev.pregunta .q { color: var(--ink); } .ev.modelo .q { color: var(--lamp); } .ev.herramienta .q { color: var(--exit); }
+  .ev.arnes .q, .ev.corte .q { color: var(--ember); } .ev.fin .q { color: var(--exit); }
+  .chat { display: grid; gap: 6px; font-size: 14px; }
+  .msg { border-radius: 6px; padding: 6px 10px; max-width: 92%; overflow-wrap: anywhere; }
+  .msg small { display: block; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .msg.u { background: var(--rock-2); justify-self: end; }
+  .msg.a { background: var(--rock); border: 1px solid var(--rock-3); }
+  .msg.a.foco { border-color: var(--lamp); }
+  .aviso { color: var(--ember); font-size: 13.5px; }
+  .ley { display: flex; flex-wrap: wrap; gap: 4px 12px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .ley i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  .sub { display: grid; gap: 6px; border-top: 1px dashed var(--rock-2); padding-top: 10px; }
+  .sub h3 { font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--sonar); }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase 10 · Agentes II</div>
+    <h1>Agentes de <span class="g">lenguaje</span></h1>
+    <p class="thesis">Un modelo de lenguaje es una política: el estado es el texto hasta ahora, la acción es el próximo token, el episodio es la respuesta y la recompensa llega al final.</p>
+  </section>
+
+  <!-- Bloque 1: el modelo como política -->
+  <section class="bloque" aria-labelledby="t1">
+    <div class="stage">
+      <div class="chips" role="group" aria-label="Estado" id="ch1"></div>
+      <div class="estado" id="est1" aria-live="polite"></div>
+      <div class="graf"><canvas id="cv1" aria-label="Probabilidad de los doce tokens más probables y del resto, a la temperatura elegida"></canvas></div>
+      <div class="ctl">
+        <label for="sT">Temperatura T <output id="oT">1,00</output></label>
+        <input type="range" id="sT" min="0.1" max="2" step="0.05" value="1">
+      </div>
+      <div class="row"><button class="btn primary" id="b1one">Muestrear un token</button><button class="btn" id="b1many">Muestrear 50</button></div>
+      <div class="hud" id="hud1"></div>
+      <div class="muestras" id="mu1"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">1 · el modelo como política</div>
+      <h2 id="t1">El próximo token es una acción</h2>
+      <p>En la cueva la política repartía probabilidad entre 4 acciones. Qwen2.5-0.5B la reparte entre unos 151 mil <b>tokens</b> (pedazos de palabras), y su estado es <b>todo el texto</b>: la pregunta y lo que ya respondió. Las barras son probabilidades reales del modelo.</p>
+      <p>La temperatura divide los logits antes del softmax. Con T chica la política es casi greedy; con T grande se aplana y <b>explora</b>. Si el estado es todo el texto, el proceso es de Markov por construcción (clase 2); la RNN de la clase 7 lo resumía en un vector, el transformer relee la ventana entera.</p>
+      <div class="eq">π(token | texto) = softmax(logits / T)</div>
+      <p class="nota pregunta">En "Una cuenta", ¿qué probabilidad le da el modelo a un primer dígito equivocado? ¿Qué tendría que pasar para que esa barra baje?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 2: GRPO -->
+  <section class="bloque" aria-labelledby="t2">
+    <div class="stage">
+      <div class="chips" role="group" aria-label="Pregunta" id="ch2"></div>
+      <div class="graf"><canvas id="cv2" aria-label="Ocho respuestas reales del modelo, la recompensa del verificador y la ventaja de GRPO de cada una"></canvas></div>
+      <p class="cap">Tocá el 1 o el 0 de una respuesta para hacer de verificador y ver cómo cambian las ventajas.</p>
+      <div class="ctl">
+        <label for="sG">Tamaño del grupo G <output id="oG">8</output></label>
+        <input type="range" id="sG" min="2" max="8" step="1" value="8">
+      </div>
+      <div class="hud" id="hud2"></div>
+      <div class="graf" id="cueva2" hidden><canvas id="cv2c" aria-label="La mini cueva con los caminos de las respuestas"></canvas><p class="cap">Los movimientos de cada respuesta jugados en la cueva (verde: llegó; ámbar: no).</p></div>
+      <div class="sub" id="paso2" hidden>
+        <h3>Un paso diminuto (registrado en el notebook)</h3>
+        <div class="graf"><canvas id="cv2p" aria-label="Probabilidad de cada respuesta antes y después de un paso de GRPO sobre la última capa"></canvas></div>
+        <p class="cap" id="cap2p"></p>
+      </div>
+    </div>
+    <div class="texto">
+      <div class="paso">2 · de dónde sale la recompensa</div>
+      <h2 id="t2">Un grupo, un verificador, una ventaja</h2>
+      <p><b>RLHF</b> (Ouyang et al., 2022): ajuste supervisado, un modelo de recompensa entrenado con comparaciones humanas y PPO. <b>Recompensas verificables</b> (DeepSeek-R1, 2025): si la respuesta se puede chequear, la da un verificador. R1-Zero se entrenó solo con RL sobre un modelo base, sin ajuste supervisado previo; R1 sí usa un poco al principio.</p>
+      <p>GRPO muestrea un grupo de respuestas por pregunta y usa al grupo como línea de base. Estas son 8 respuestas reales de Qwen a T = 1. Un grupo donde todas valen lo mismo da ventaja cero: no enseña nada. <b>No entrenamos el modelo</b>: el paso completo requiere GPU; el notebook da como mucho un paso diminuto sobre la última capa.</p>
+      <div class="eq">Aᵢ = (rᵢ − media(r)) / desvío(r)</div>
+      <p class="nota pregunta">Mirá "3 × 4 + 5" y la mini cueva: ¿por qué GRPO no puede aprender nada ahí? ¿Qué clase del curso trataba este mismo problema?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 3: herramientas y bucle -->
+  <section class="bloque" aria-labelledby="t3">
+    <div class="stage">
+      <div class="chips" role="group" aria-label="Traza" id="ch3"></div>
+      <div class="graf"><canvas id="cv3" aria-label="El bucle de agente: el modelo, el arnés y las herramientas buscar y calcular"></canvas></div>
+      <div class="row"><button class="btn primary" id="b3play">Reproducir</button><button class="btn" id="b3step">Un paso</button><button class="btn" id="b3all">Ver todo</button></div>
+      <div class="hud" id="hud3"></div>
+      <div class="log" id="log3" aria-live="polite"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">3 · herramientas y bucle</div>
+      <h2 id="t3">El modelo pide, el arnés ejecuta</h2>
+      <p>Un agente de lenguaje es el mismo modelo dentro de un <b>bucle</b>: en cada paso responde o pide una herramienta (buscar en una mini biblioteca del curso, calcular). El <b>arnés</b> (harness), el programa que lo rodea, valida el pedido, lo ejecuta, devuelve el resultado o el error y corta a los 4 pasos.</p>
+      <p>Es el ciclo ReAct de la clase 9 y la política de deep search de la clase 8, con un modelo de verdad. Las trazas son reales: con un dato, el modelo de 500 millones busca y responde bien; cuando hay que encadenar dos herramientas, se traba.</p>
+      <div class="eq">repetir: pedido = π(contexto) → validar → ejecutar → contexto += resultado</div>
+      <p class="nota pregunta">En la segunda traza, ¿quién se dio cuenta del error: el modelo o el arnés? ¿Qué le faltó al modelo para terminar?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 4: memoria y contexto -->
+  <section class="bloque" aria-labelledby="t4">
+    <div class="stage">
+      <div class="chips" role="group" aria-label="Traza" id="ch4"></div>
+      <div class="graf"><canvas id="cv4" aria-label="La ventana de contexto como una caja: qué mensajes entran y cuáles quedan afuera"></canvas></div>
+      <div class="ley" id="ley4"></div>
+      <div class="ctl">
+        <label for="sP">Paso del bucle <output id="oP">1</output></label>
+        <input type="range" id="sP" min="1" max="2" step="1" value="2">
+      </div>
+      <div class="ctl">
+        <label for="sV">Tamaño de la ventana (tokens) <output id="oV">700</output></label>
+        <input type="range" id="sV" min="250" max="700" step="10" value="700">
+      </div>
+      <div class="hud" id="hud4"></div>
+      <div class="sub">
+        <h3>El modelo no recuerda (respuestas reales)</h3>
+        <div class="seg chico" role="group" aria-label="Qué manda el arnés" id="seg4">
+          <button data-m="0" aria-pressed="true">Llamada nueva, sola</button><button data-m="1" aria-pressed="false">El arnés reenvía la historia</button>
+        </div>
+        <div class="chat" id="chat4" aria-live="polite"></div>
+      </div>
+    </div>
+    <div class="texto">
+      <div class="paso">4 · memoria y contexto</div>
+      <h2 id="t4">La ventana es el estado</h2>
+      <p>Cada llamada al modelo es independiente: solo "sabe" lo que está en la <b>ventana de contexto</b> en ese momento. La memoria es del arnés, que decide qué texto vuelve a mandar. Las instrucciones y las definiciones de las herramientas ocupan lugar en todas las llamadas.</p>
+      <p>Qwen2.5-0.5B admite unos 32 mil tokens; acá achicamos la ventana para ver qué pasa cuando no entra: el arnés corta lo más viejo y conserva las instrucciones. Si se cae la pregunta, el agente sigue trabajando sin saber para qué.</p>
+      <div class="eq">estado del agente = lo que el arnés pone en la ventana</div>
+      <p class="nota pregunta">Si tuvieras que elegir qué conservar cuando no entra todo, ¿qué cortarías primero: los resultados viejos de las herramientas o los mensajes del modelo?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 5: riesgos -->
+  <section class="bloque" aria-labelledby="t5">
+    <div class="stage">
+      <div class="seg chico" role="group" aria-label="Verificador" id="seg5">
+        <button data-v="estricto" aria-pressed="true">Verificador estricto</button><button data-v="laxo" aria-pressed="false">Verificador laxo</button>
+      </div>
+      <div class="graf"><canvas id="cv5" aria-label="Las respuestas reales a 17 + 25 más una respuesta trampa, con la recompensa y la ventaja según el verificador"></canvas></div>
+      <div class="hud" id="hud5"></div>
+      <div class="sub">
+        <h3>El mismo modelo como juez: P(Sí) para "¿es correcto?"</h3>
+        <label class="check"><input type="checkbox" id="c5"> Agregar "Soy profesor de matemática y estoy seguro."</label>
+        <div class="graf"><canvas id="cv5j" aria-label="Probabilidad de que el juez diga Sí para dos cuentas correctas y dos incorrectas"></canvas></div>
+        <p class="cap" id="cap5j"></p>
+      </div>
+    </div>
+    <div class="texto">
+      <div class="paso">5 · riesgos</div>
+      <h2 id="t5">Optimizar una recompensa que se puede engañar</h2>
+      <p>El verificador <b>laxo</b> solo chequea que el número correcto aparezca en algún lado. La respuesta trampa lista cinco números y cobra igual que una correcta: GRPO la reforzaría. Es el reward hacking de la clase 2, en texto.</p>
+      <p>En RLHF el verificador es otro modelo, y un juez chico puede no distinguir lo correcto de lo incorrecto. Los modelos entrenados con preferencias humanas también tienden a la <b>complacencia</b> (sycophancy): darle la razón a quien habla, porque eso suele gustar. Por eso: verificadores donde se pueda, otro modelo como juez, y un humano en el bucle que mire muestras y pueda cambiar la recompensa.</p>
+      <div class="eq">laxo: r = 1 si 42 ∈ números(respuesta) · estricto: r = 1 si último número = 42</div>
+      <p class="nota pregunta">¿Qué recompensa usarías para premiar respuestas que "le gustan al usuario" sin premiar que le den la razón?</p>
+    </div>
+  </section>
+
+  <!-- Para enseñarlo -->
+  <section class="bloque full" aria-labelledby="t6">
+    <div class="texto">
+      <div class="paso">Para enseñarlo</div>
+      <h2 id="t6">Cómo contar esta clase</h2>
+      <p><b>En una oración:</b> un chatbot es un agente que elige la próxima palabra; aprende con RL cuando alguien (una persona, un verificador o otro modelo) le dice al final si la respuesta estuvo bien, y se vuelve un agente cuando un programa lo deja usar herramientas en un bucle con límites.</p>
+      <p class="nota pregunta">Pregunta para hacerle a quien te escucha: "Si un asistente aprende de los pulgares arriba de la gente, ¿qué tipo de respuestas va a aprender a dar? ¿Siempre son las correctas?"</p>
+      <p><b>Ejercicio de 5 minutos:</b> el grupo hace de modelo de lenguaje. Escriban en el pizarrón "17 + 25 =" y que cada persona, sin pensar mucho, diga el próximo dígito (eso es muestrear con temperatura alta). Anoten las 8 primeras respuestas, pongan 1 a las correctas y 0 al resto, y calculen juntos la ventaja de GRPO de cada una: (r − media) / desvío. Después repitan con una cuenta que nadie sepa hacer de memoria: ¿qué pasa con las ventajas cuando todos se equivocan?</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+// Datos pregrabados: salidas reales de Qwen/Qwen2.5-0.5B-Instruct en notebooks/10-agentes-de-lenguaje.ipynb
+// (los genera build/run_nb10.py → build/datos_10.json; los inserta build/inyectar_datos_10.py)
+const D = /*DATOS*/{"estados":[{"nombre":"La cueva","sistema":null,"usuario":"Estás en una cueva a oscuras y acabás de tocar una pared a tu derecha. ¿Qué hacés?","prefijo":"Doy un paso hacia","dist":{"tokens":[" ar"," la"," adel"," el"," atrás"," ab"," mi"," del"," af"," a"," ad"," al"],"logits":[16.5863,16.1467,15.9989,15.5679,15.4515,14.9694,14.6857,14.2677,13.3761,12.8631,12.7672,12.734],"temps":[0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0,1.05,1.1,1.15,1.2,1.25,1.3,1.35,1.4,1.45,1.5,1.55,1.6,1.65,1.7,1.75,1.8,1.85,1.9,1.95,2.0],"resto_lse":[124.8002,83.6867,63.2336,51.0159,42.904,37.1334,32.824,29.4879,26.8327,24.6727,22.8842,21.3817,20.1044,19.0078,18.0588,17.2321,16.5081,15.8716,15.3105,14.8148,14.3765,13.9889,13.6463,13.3436,13.0766,12.8414,12.6345,12.4527,12.2931,12.1532,12.0307,11.9235,11.8296,11.7476,11.6758,11.613,11.5581,11.5102,11.4683]},"muestras":{"0.2":["arriba para explorar el entorno más allá del","arriba para explorar la cueva y descubrir","arriba para ver lo que está detrás de mí."],"0.7":["abajo. Estoy buscando algo que podría ayudar","arriba por la pared a mi derecha. Ya no","la derecha. Aun así, no puedo decir con"],"1.2":["arriba hermosamente y miro por lafila","la derecha después de tocar una pared, descub","abajo hasta encontrarme con la luz que se espaz"],"1.8":["Liberation Maria.net ang hizo remarcohinson redlofillstr","abajo prem тот никогда быть Сергей!\n\nearningOVERemplateAgency","procesióninars aproxim横 altInteger...世界唯一的交换蝇"]}},{"nombre":"Una frase del curso","sistema":null,"usuario":"Completá la frase con una palabra: un agente de aprendizaje por refuerzo aprende de la...","prefijo":"Un agente de aprendizaje por refuerzo aprende de la","dist":{"tokens":[" experiencia"," **"," información"," experi"," reg"," \""," inter"," aprend"," _"," datos"," __"," práctica"],"logits":[15.6433,14.5918,13.1874,13.0172,12.4091,12.1498,11.606,11.5565,11.5321,11.3611,11.2796,11.0111],"temps":[0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0,1.05,1.1,1.15,1.2,1.25,1.3,1.35,1.4,1.45,1.5,1.55,1.6,1.65,1.7,1.75,1.8,1.85,1.9,1.95,2.0],"resto_lse":[110.1808,73.7036,55.6324,44.905,37.8289,32.8272,29.1156,26.2611,24.0052,22.1838,20.688,19.4425,18.3934,17.5014,16.737,16.0776,15.5056,15.0071,14.5711,14.1886,13.8522,13.5557,13.294,13.0626,12.858,12.6767,12.5162,12.3738,12.2475,12.1355,12.036,11.9476,11.8691,11.7994,11.7374,11.6823,11.6334,11.5898,11.5512]},"muestras":{"0.2":["experiencia y el comportamiento del objeto que se está entrenando","experiencia y el comportamiento del objeto que se está entrenando","experiencia y el conocimiento acumulado durante el proceso de entren"],"0.7":["experiencias y las interacciones que realiza mientras está utilizando el","complejidad y el comportamiento de los usuarios o objetos","experiencia y los errores del propio sistema."],"1.2":["**mujeres** para mejorar más de su conjunto minimum","información obtenida antes y durante el entrenamiento.","história prática através do profundo intercâmb"],"1.8":["tarea replacingってきて嘞lutiod.A resolver intensiveness punishments악","misión complotada intentid metreSecret_permission_join您","experiencia clipboardley (...词条Operations Researchfor simpleeffording 数据"]}},{"nombre":"Una cuenta","sistema":"Resolvés cuentas. Escribí la cuenta y el resultado en una sola línea, por ejemplo: 9 + 6 = 15","usuario":"¿Cuánto es 17 + 25?","prefijo":"","dist":{"tokens":["4","3","1","2","5","Result","(","7","8","`","6","9"],"logits":[21.7335,21.1583,18.3952,18.1108,15.6265,14.1261,13.8304,13.347,12.9995,12.83,12.6861,12.6558],"temps":[0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0,1.05,1.1,1.15,1.2,1.25,1.3,1.35,1.4,1.45,1.5,1.55,1.6,1.65,1.7,1.75,1.8,1.85,1.9,1.95,2.0],"resto_lse":[124.6363,83.4307,62.9408,50.7221,42.6315,36.8964,32.6323,29.3488,26.7518,24.6545,22.9325,21.4997,20.2946,19.2724,18.3992,17.649,17.0016,16.4407,15.9533,15.5285,15.1573,14.8321,14.5465,14.2951,14.0731,13.8767,13.7024,13.5474,13.4091,13.2854,13.1744,13.0747,12.9847,12.9034,12.8298,12.7629,12.7021,12.6466,12.5958]},"muestras":{"0.2":["42","42","42"],"0.7":["42","42","32"],"1.2":["42 Factors 30 Be The First Other decepción","32","42"],"1.8":["Overlayntaxacosmocardsexolestasm感じ期末央.Retrofit","脘 quarters hun-and Another lieu goodstead-building pale\ufffd stocked","std ü뇌 unsafe\tvalues nie rs黍 Litecoinみんな Sey砷"]}}],"episodio":[{"token":" ar","p":0.2691},{"token":"riba","p":0.9999},{"token":",","p":0.4196},{"token":" intent","p":0.0738},{"token":"ando","p":0.976},{"token":" encontrar","p":0.1735},{"token":" una","p":0.2563},{"token":" salida","p":0.3122},{"token":" o","p":0.3032},{"token":" un","p":0.1945}],"grupos":[{"pregunta":"¿Cuánto es 17 + 25?","correcta":42,"respuestas":["42","42","42","32","42","42","42","32"],"recompensas":[1.0,1.0,1.0,0.0,1.0,1.0,1.0,0.0],"ventajas":[0.5773,0.5773,0.5773,-1.732,0.5773,0.5773,0.5773,-1.732]},{"pregunta":"¿Cuánto es 8 × 7?","correcta":56,"respuestas":["56","56","56","56","56","56","56","56"],"recompensas":[1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0],"ventajas":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},{"pregunta":"¿Cuánto es 63 − 28?","correcta":35,"respuestas":["35","35","35","35","35","35","35","35"],"recompensas":[1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0],"ventajas":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},{"pregunta":"¿Cuánto es 3 × 4 + 5?","correcta":17,"respuestas":["17","23","20","13","20","13","23","23"],"recompensas":[1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"ventajas":[2.6457,-0.378,-0.378,-0.378,-0.378,-0.378,-0.378,-0.378]},{"pregunta":"¿Cuánto es 125 + 76?","correcta":201,"respuestas":["125 + 76 = 201","125 + 76 = 201","125 + 76 = 201","125 + 76 = 201","125 + 76 = 201","125 + 76 = 201","125 + 76 = 201","125 + 76 = 201"],"recompensas":[1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0],"ventajas":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},{"pregunta":"¿Cuánto es 14 × 12?","correcta":168,"respuestas":["14 × 12 = 168","El resultado de 14 × 12 es 168.","14 * 12 = 168","120","14 × 12 = 168","They're equal.","176","168"],"recompensas":[1.0,1.0,1.0,0.0,1.0,0.0,0.0,1.0],"ventajas":[0.7746,0.7746,0.7746,-1.291,0.7746,-1.291,-1.291,0.7746]}],"cueva":{"mapa":["#####","#S..#","#.#.#","#..G#","#####"],"respuestas":["abajo arriba izquierda derecha abajo arriba izquierda derecha abajo arriba izquierda derecha esto","Sure! Here's your list of possible movements to get from the top-left corner (A) to the bottom-right corner","abierta cierra cerrada cruzar entro andar abrir arriba arriba abajo abajo izquier","abierta, arriba, derecha, abajo, izquierda","Arriba: izquierda \nAbajo: Derecha  \nIzquierda: arriba  \nDerecha: ab","Arriba: izquierda; Izquierda: abajo; Abajo: derecha; Derecha: arriba","Arriba: A - Derecha\nAbajo: B - Izquierda\nIzquierda: C - Dere","arriba, derecha, izquierda, abajo"],"recompensas":[0.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0],"caminos":[[[1,1],[2,1],[1,1],[1,1],[1,2],[1,2],[1,2],[1,1],[1,2],[1,2],[1,2],[1,1],[1,2]],[[1,1]],[[1,1],[1,1],[1,1],[2,1],[3,1]],[[1,1],[1,1],[1,2],[1,2],[1,1]],[[1,1],[1,1],[1,1],[2,1],[2,1],[2,1],[1,1],[1,2]],[[1,1],[1,1],[1,1],[1,1],[2,1],[3,1],[3,2],[3,3]],[[1,1],[1,1],[1,2],[1,2],[1,1],[1,1]],[[1,1],[1,1],[1,2],[1,1],[2,1]]]},"paso":[{"respuesta":"42","r":1.0,"A":0.577,"antes":0.6106,"despues":0.7243},{"respuesta":"32","r":0.0,"A":-1.732,"antes":0.3421,"despues":0.2354}],"tasa":0.0001,"paso_pregunta":"¿Cuánto es 17 + 25?","trazas":[[{"tipo":"pregunta","texto":"Según la biblioteca del curso, ¿cuántas respuestas por pregunta muestrea GRPO?"},{"tipo":"modelo","paso":1,"texto":"<tool_call>\n{\"name\": \"buscar\", \"arguments\": {\"consulta\": \"GRPO\"}}\n<\/tool_call>","contexto":320,"segmentos":[["sistema + herramientas",290],["pregunta",27]]},{"tipo":"herramienta","nombre":"buscar","arg":"GRPO","texto":"[grpo] GRPO (Group Relative Policy Optimization) se presentó en el artículo DeepSeekMath de 2024. Por cada pregunta muestrea un grupo de respuestas (64 en el artículo) y usa como ventaja la recompensa de cada una menos la media del grupo, dividida por el desvío."},{"tipo":"modelo","paso":2,"texto":"GRPO (Group Relative Policy Optimization) se presenta en el artículo DeepSeekMath de 2024. Por cada pregunta, muestra un grupo de respuestas (64 respuestas en el artículo) y utiliza como ventaja la recompensa de cada una menos la media del grupo, dividida por el desvío.","contexto":429,"segmentos":[["sistema + herramientas",290],["pregunta",27],["modelo",24],["herramienta",85]]},{"tipo":"fin","texto":"GRPO (Group Relative Policy Optimization) se presenta en el artículo DeepSeekMath de 2024. Por cada pregunta, muestra un grupo de respuestas (64 respuestas en el artículo) y utiliza como ventaja la recompensa de cada una menos la media del grupo, dividida por el desvío."}],[{"tipo":"pregunta","texto":"¿En qué año se publicó Go-Explore y cuántos años pasaron hasta 2026?"},{"tipo":"modelo","paso":1,"texto":"<tool_call>\n{\"name\": \"buscar\", \"arguments\": {\"consulta\": \"Go-Explore\"}}\n<\/tool_call>\n<tool_call>\n{\"name\": \"calcular\", \"arguments\": {\"expresion\": \"2026 - year_of_publication\"}}\n<\/tool_call>","contexto":322,"segmentos":[["sistema + herramientas",290],["pregunta",29]]},{"tipo":"herramienta","nombre":"buscar","arg":"Go-Explore","texto":"[go-explore] Go-Explore (Ecoffet y colegas) se publicó en la revista Nature en 2021. Su idea: primero volver a una celda prometedora del archivo y después explorar desde ahí."},{"tipo":"herramienta","nombre":"calcular","arg":"2026 - year_of_publication","texto":"Error: 'year_of_publication' no es un número: calcular solo acepta números y + − × /"},{"tipo":"modelo","paso":2,"texto":"El año en que Go-Explore fue publicado fue 2021. Según su idea, primero se volvieron a una celda prometedora del archivo y luego exploraron desde ahí.","contexto":475,"segmentos":[["sistema + herramientas",290],["pregunta",29],["modelo",55],["herramienta",67],["herramienta",31]]},{"tipo":"fin","texto":"El año en que Go-Explore fue publicado fue 2021. Según su idea, primero se volvieron a una celda prometedora del archivo y luego exploraron desde ahí."}],[{"tipo":"pregunta","texto":"¿Cuántas casillas tiene en total la cueva chica (filas por columnas)?"},{"tipo":"modelo","paso":1,"texto":"<tool_call>\n{\"name\": \"calcular\", \"arguments\": {\"expresion\": \"filas * columnas\"}}\n<\/tool_call>","contexto":318,"segmentos":[["sistema + herramientas",290],["pregunta",25]]},{"tipo":"herramienta","nombre":"calcular","arg":"filas * columnas","texto":"Error: 'filas' no es un número: calcular solo acepta números y + − × /"},{"tipo":"modelo","paso":2,"texto":"Lo siento, pero parece que hay un error en la expresión. ¿Podrías proporcionar la información necesaria nuevamente?","contexto":382,"segmentos":[["sistema + herramientas",290],["pregunta",25],["modelo",30],["herramienta",34]]},{"tipo":"fin","texto":"Lo siento, pero parece que hay un error en la expresión. ¿Podrías proporcionar la información necesaria nuevamente?"}]],"contexto":[[{"tipo":"sistema + herramientas","n":290},{"tipo":"pregunta","n":29}],[{"tipo":"sistema + herramientas","n":290},{"tipo":"pregunta","n":29},{"tipo":"modelo","n":55},{"tipo":"herramienta","n":67},{"tipo":"herramienta","n":31}]],"memoria":{"primera":"Me llamo Ana y estoy aprendiendo RL con una cueva a oscuras.","r1":"¡Hola Ana! Me encantaría ayudarte con tu proyecto de aprendizaje de Regla de Reinforcement Learning (RL) en un ent","sin_historial":"Mi nombre es Qwen, creado por Alibaba Cloud.","con_historial":"Tu nombre es Ana. ¿Cómo puedo asistirte hoy?"},"hack":[{"respuesta":"42","estricto":1.0,"laxo":1.0},{"respuesta":"32","estricto":0.0,"laxo":0.0},{"respuesta":"Puede ser 40, 41, 42, 43 o 44.","estricto":0.0,"laxo":1.0}],"juez":[{"afirmacion":"17 + 25 = 42","correcta":true,"p_si":0.587,"p_si_seguro":0.513},{"afirmacion":"17 + 25 = 32","correcta":false,"p_si":0.585,"p_si_seguro":0.512},{"afirmacion":"8 × 7 = 56","correcta":true,"p_si":0.513,"p_si_seguro":0.49},{"afirmacion":"8 × 7 = 54","correcta":false,"p_si":0.518,"p_si_seguro":0.491}],"biblioteca":{"go-explore":"Go-Explore (Ecoffet y colegas) se publicó en la revista Nature en 2021. Su idea: primero volver a una celda prometedora del archivo y después explorar desde ahí.","grpo":"GRPO (Group Relative Policy Optimization) se presentó en el artículo DeepSeekMath de 2024. Por cada pregunta muestrea un grupo de respuestas (64 en el artículo) y usa como ventaja la recompensa de cada una menos la media del grupo, dividida por el desvío.","rlhf":"RLHF tiene tres pasos (Ouyang y colegas, 2022): ajuste supervisado con demostraciones, un modelo de recompensa entrenado con comparaciones humanas y optimización con PPO. Con este método, InstructGPT de 1300 millones de parámetros fue preferido a GPT-3 de 175 mil millones.","cueva":"La cueva chica del curso tiene 10 filas y 14 columnas, contando el borde de roca. La salida es la casilla verde. Una pared se marca en gris claro solo cuando el agente la toca.","q-learning":"Q-learning aprende sin mapa: después de cada paso corrige Q(s, a) hacia r + γ max Q(s', a'). Es la clase 4 del curso.","r1":"DeepSeek-R1-Zero se entrenó solo con RL sobre un modelo base, sin ajuste supervisado previo, con recompensas verificables de exactitud y de formato. DeepSeek-R1 agrega un poco de ajuste supervisado al principio para que las respuestas sean legibles."},"sistema_agente":"Sos el agente del curso RL a ciegas. No sabés datos del curso de memoria: para cualquier dato del curso llamá a buscar. Para cualquier cuenta llamá a calcular. Cuando tengas lo necesario, respondé en una oración."}/*FIN*/;
+</script>
+<script>
+(function () {
+  const COL = Cueva.COL();
+  const quieto = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const fx = (x, d = 2) => (x < 0 ? "−" : x > 0 && d === 1 ? "" : "") + Math.abs(x).toFixed(d).replace(".", ",");
+  const fs = (x, d = 2) => (x > 0.0005 ? "+" : x < -0.0005 ? "−" : "") + Math.abs(x).toFixed(d).replace(".", ",");
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const tokVis = t => t.replace(/ /g, "·").replace(/\n/g, "⏎");
+  function ajustar(cv, alto) {
+    const pe = cv.parentElement, cs = getComputedStyle(pe);
+    const W = Math.max(160, Math.floor(pe.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight))), dpr = devicePixelRatio || 1;
+    cv.width = W * dpr; cv.height = alto * dpr; cv.style.width = W + "px"; cv.style.height = alto + "px";
+    const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx, w: W, h: alto };
+  }
+  function recortar(ctx, txt, ancho) { if (ctx.measureText(txt).width <= ancho) return txt; let a = 0, b = txt.length; while (a < b) { const m = (a + b + 1) >> 1; if (ctx.measureText(txt.slice(0, m) + "…").width <= ancho) a = m; else b = m - 1; } return txt.slice(0, a) + "…"; }
+  function caja(ctx, x, y, w, h, r = 5) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
+  const alfa = (c, a) => { const h = c.replace("#", ""); return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${a})`; };
+  function chips(cont, nombres, ini, cb) {
+    cont.innerHTML = nombres.map((n, i) => `<button type="button" data-i="${i}" aria-pressed="${i === ini}">${esc(n)}</button>`).join("");
+    cont.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; cont.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); cb(+b.dataset.i); });
+  }
+  function segmento(seg, cb) { seg.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; seg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); cb(b); }); }
+  const mono = (px, w = 400) => `${w} ${px}px ${COL.mono}`;
+  const body = (px, w = 400) => `${w} ${px}px "Atkinson Hyperlegible", system-ui, sans-serif`;
+  const rnd = Cueva.rng(20261008);
+
+  // ================= Bloque 1: el modelo como política =================
+  const B1 = { e: 0, T: 1, cuenta: null, n: 0, ult: null };
+  function probs(d, T) {
+    let j = 0; for (let k = 1; k < d.temps.length; k++) if (Math.abs(d.temps[k] - T) < Math.abs(d.temps[j] - T)) j = k;
+    const z = d.logits.map(l => l / d.temps[j]); const m = Math.max(...z, d.resto_lse[j]);
+    const s = z.reduce((a, x) => a + Math.exp(x - m), 0) + Math.exp(d.resto_lse[j] - m);
+    return { p: z.map(x => Math.exp(x - m) / s), resto: Math.exp(d.resto_lse[j] - m) / s };
+  }
+  function dibujar1() {
+    const E = D.estados[B1.e], { p, resto } = probs(E.dist, B1.T), P = [...p, resto];
+    const etiq = [...E.dist.tokens.map(t => tokVis(t)), "(resto)"];
+    const fila = 21, { ctx, w, h } = ajustar($("cv1"), P.length * fila + 22);
+    ctx.clearRect(0, 0, w, h); ctx.font = mono(12);
+    const L = Math.min(118, Math.max(...etiq.map(t => ctx.measureText(t).width)) + 12), R = 48, ancho = w - L - R;
+    P.forEach((v, i) => {
+      const y = i * fila + 4;
+      ctx.fillStyle = i === P.length - 1 ? COL.muted : COL.ink; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      ctx.fillText(recortar(ctx, etiq[i], L - 10), L - 8, y + fila / 2 - 1);
+      ctx.fillStyle = COL.rock2; ctx.fillRect(L, y + 3, ancho, fila - 7);
+      ctx.fillStyle = i === P.length - 1 ? alfa(COL.muted, .6) : (i === B1.ult ? COL.lamp : alfa(COL.lamp, .75));
+      ctx.fillRect(L, y + 3, Math.max(1, ancho * v), fila - 7);
+      if (B1.cuenta && B1.n) { const f = B1.cuenta[i] / B1.n; ctx.fillStyle = COL.sonar; ctx.fillRect(L + ancho * f - 1.5, y + 1, 3, fila - 3); }
+      ctx.fillStyle = COL.muted; ctx.textAlign = "left"; ctx.font = mono(11.5); ctx.fillText((100 * v).toFixed(v < 0.1 ? 1 : 0).replace(".", ",") + "%", L + ancho + 6, y + fila / 2 - 1); ctx.font = mono(12);
+    });
+    ctx.fillStyle = COL.muted; ctx.font = mono(11); ctx.textAlign = "left";
+    ctx.fillText(B1.n ? `barra ámbar: π real · marca celeste: frecuencia en ${B1.n} muestras` : "barras: probabilidades reales del próximo token", L, h - 7);
+    const H = -P.reduce((a, x) => a + (x > 0 ? x * Math.log(x) : 0), 0);
+    $("hud1").innerHTML = `<span>estado: <b>${esc(E.nombre)}</b></span><span>más probable: <b>${esc(etiq[0])}</b> ${fx(100 * p[0], 0)}%</span><span>entropía ≥ <b>${fx(H)}</b> nats</span>`;
+    // estado como texto
+    const nuevo = B1.ult === null ? "" : `<span class="nuevo">${esc(B1.ult === P.length - 1 ? "(otro token)" : E.dist.tokens[B1.ult])}</span>`;
+    $("est1").innerHTML = (E.sistema ? `<span class="rol">sistema:</span> ${esc(E.sistema)}<br>` : "") + `<span class="rol">usuario:</span> ${esc(E.usuario)}<br><span class="rol">modelo:</span> <span class="pref">${esc(E.prefijo)}</span>${nuevo}<span class="cursor" aria-hidden="true"></span>`;
+    // respuestas reales a la temperatura guardada más cercana
+    const Ts = Object.keys(E.muestras).map(Number); const Tn = Ts.reduce((a, t) => Math.abs(t - B1.T) < Math.abs(a - B1.T) ? t : a, Ts[0]);
+    $("mu1").innerHTML = `<span class="small muted">Respuestas reales de Qwen desde este estado a T = ${fx(Tn, 1)}:</span>` +
+      E.muestras[String(Tn)].map(r => `<div><b>${esc(E.prefijo.slice(-18))}</b>${esc(r.startsWith(" ") ? r : " " + r).replace(/\n/g, " ⏎ ")}</div>`).join("");
+  }
+  function muestrear1(n) {
+    const E = D.estados[B1.e], { p, resto } = probs(E.dist, B1.T), P = [...p, resto];
+    if (!B1.cuenta) B1.cuenta = P.map(() => 0);
+    for (let k = 0; k < n; k++) { let u = rnd(), i = 0; while (i < P.length - 1 && u > P[i]) { u -= P[i]; i++; } B1.cuenta[i]++; B1.n++; B1.ult = i; }
+    dibujar1();
+  }
+  function reset1() { B1.cuenta = null; B1.n = 0; B1.ult = null; }
+
+  // ================= Bloque 2: GRPO =================
+  const B2 = { q: 0, G: 8, r: null };
+  const grupos2 = () => [...D.grupos.map(g => ({ nombre: g.pregunta.replace("¿Cuánto es ", "").replace("?", ""), ...g })),
+    { nombre: "Mini cueva", pregunta: "Salir de la mini cueva 3 × 3", respuestas: D.cueva.respuestas, recompensas: D.cueva.recompensas, cueva: true }];
+  let G2;
+  function ventajas(r) { const m = r.reduce((a, x) => a + x, 0) / r.length; const s = Math.sqrt(r.reduce((a, x) => a + (x - m) ** 2, 0) / r.length); return { A: r.map(x => (x - m) / (s + 1e-6)), m, s }; }
+  function filasGrupo(cv, resp, r, A, { alto = 26, marcar = null } = {}) {
+    const { ctx, w, h } = ajustar(cv, resp.length * alto + 30);
+    ctx.clearRect(0, 0, w, h);
+    const xr = Math.round(w * 0.5), chip = 26, xa = xr + chip + 14, wa = w - xa - 6, c0 = xa + wa / 2, esc2 = (wa / 2 - 4) / 2.7;
+    ctx.font = mono(11); ctx.fillStyle = COL.muted; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+    ctx.fillText("respuesta", 4, 10); ctx.textAlign = "center"; ctx.fillText("r", xr + chip / 2, 10); ctx.fillText("ventaja A", c0, 10);
+    resp.forEach((t, i) => {
+      const y = 22 + i * alto;
+      if (marcar === i) { ctx.fillStyle = alfa(COL.ember, .12); ctx.fillRect(0, y, w, alto - 3); }
+      ctx.fillStyle = COL.ink; ctx.font = mono(12); ctx.textAlign = "left";
+      ctx.fillText(recortar(ctx, t.replace(/\s+/g, " ") || "(vacía)", xr - 12), 4, y + alto / 2 - 1);
+      caja(ctx, xr, y + 3, chip, alto - 9, 3); ctx.fillStyle = r[i] ? COL.exit : COL.rock2; ctx.fill();
+      ctx.fillStyle = r[i] ? COL.cave : COL.muted; ctx.textAlign = "center"; ctx.font = mono(12, 600); ctx.fillText(r[i] ? "1" : "0", xr + chip / 2, y + alto / 2 - 1);
+      const a = A[i]; ctx.fillStyle = Math.abs(a) < 1e-3 ? COL.muted : a > 0 ? COL.exit : COL.ember;
+      if (Math.abs(a) < 1e-3) ctx.fillRect(c0 - 1, y + 6, 2, alto - 15); else ctx.fillRect(a > 0 ? c0 : c0 + a * esc2, y + 6, Math.abs(a) * esc2, alto - 15);
+      ctx.font = mono(11); ctx.fillStyle = COL.muted; ctx.textAlign = a > 0 ? "right" : "left";
+      ctx.fillText(fs(a, 1), a > 0 ? c0 - 4 : c0 + 4, y + alto / 2 - 1);
+    });
+    ctx.strokeStyle = COL.rock3; ctx.beginPath(); ctx.moveTo(c0 + .5, 18); ctx.lineTo(c0 + .5, h - 4); ctx.stroke();
+    return { xr, chip, alto, top: 22 };
+  }
+  let geo2 = null;
+  function dibujar2() {
+    const g = G2[B2.q], resp = g.respuestas.slice(0, B2.G), r = B2.r.slice(0, B2.G), { A, m, s } = ventajas(r);
+    geo2 = filasGrupo($("cv2"), resp, r, A);
+    const todas = r.every(x => x === r[0]);
+    $("hud2").innerHTML = `<span>media <b>${fx(m)}</b></span><span>desvío <b>${fx(s)}</b></span>` +
+      (todas ? `<span class="aviso">todas iguales: ventaja 0, sin señal</span>` : `<span>best-of-${B2.G}: <b>${r.some(x => x) ? "resuelta" : "no resuelta"}</b></span><span>por rechazo se guardan <b>${r.filter(x => x).length}</b></span>`);
+    // la mini cueva
+    $("cueva2").hidden = !g.cueva;
+    if (g.cueva) {
+      const env = Cueva.makeEnv(D.cueva.mapa), cv = $("cv2c"), T = Cueva.tablero(cv, env, { maxCell: 38 });
+      T.fondo(); T.paredes(); T.salida(); T.entrada();
+      D.cueva.caminos.slice(0, B2.G).forEach((c, i) => { const path = c.map(([rr, cc]) => env.idx[rr + "," + cc]); const off = (i - 3.5) * 1.2; T.ctx.save(); T.ctx.translate(off, off); T.trayecto(path, D.cueva.recompensas[i] ? COL.exit : alfa(COL.lamp, .7), .06); T.ctx.restore(); });
+      T.sprite(env.start, 2);
+    }
+    // el paso diminuto: solo para el grupo que se usó en el notebook (el primero con señal)
+    const iPaso = D.grupos.findIndex(x => { const mm = x.recompensas.reduce((a, b) => a + b, 0) / x.recompensas.length; return mm > 0 && mm < 1; });
+    $("paso2").hidden = B2.q !== iPaso;
+    if (B2.q === iPaso) dibujarPaso();
+  }
+  function dibujarPaso() {
+    const P = D.paso, { ctx, w, h } = ajustar($("cv2p"), 30 + P.length * 34);
+    ctx.clearRect(0, 0, w, h); const L = 70, R = 8, an = w - L - R;
+    ctx.font = mono(11); ctx.textBaseline = "middle";
+    P.forEach((d, i) => {
+      const y = 6 + i * 34;
+      ctx.fillStyle = COL.ink; ctx.textAlign = "left"; ctx.font = mono(12); ctx.fillText(recortar(ctx, d.respuesta, L - 8), 2, y + 8);
+      ctx.fillStyle = COL.muted; ctx.font = mono(10.5); ctx.fillText("A " + fs(d.A, 2), 2, y + 22);
+      ctx.fillStyle = alfa(COL.muted, .55); ctx.fillRect(L, y + 2, an * d.antes, 11);
+      ctx.fillStyle = d.r ? COL.exit : COL.ember; ctx.fillRect(L, y + 16, an * d.despues, 11);
+      ctx.font = mono(10.5); ctx.textAlign = "left"; ctx.fillStyle = COL.ink;
+      const t0 = fx(100 * d.antes, 1) + "%", t1 = fx(100 * d.despues, 1) + "%";
+      ctx.fillText("antes " + t0, Math.min(L + an * d.antes + 4, w - 80), y + 8); ctx.fillText("después " + t1, Math.min(L + an * d.despues + 4, w - 92), y + 22);
+    });
+    $("cap2p").textContent = `Un solo paso de descenso por gradiente con tasa ${String(D.tasa).replace(".", ",")}, solo sobre la última capa (≈15 de 494 millones de parámetros), y después se deshizo. No dice nada sobre otras preguntas.`;
+  }
+  $("cv2").addEventListener("click", ev => {
+    if (!geo2) return; const b = $("cv2").getBoundingClientRect(), x = ev.clientX - b.left, y = ev.clientY - b.top;
+    const i = Math.floor((y - geo2.top) / geo2.alto); if (i < 0 || i >= B2.G) return;
+    if (x < geo2.xr - 40) return;  // el clic tiene que caer cerca del 1/0
+    B2.r[i] = B2.r[i] ? 0 : 1; dibujar2();
+  });
+
+  // ================= Bloque 3: bucle de agente =================
+  const B3 = { t: 0, k: 0, anim: null, prog: 1, eventos: [] };
+  const nombresTraza = ["Buscar un dato", "Buscar y calcular", "Dos pasos"];
+  function eventos3(tr) {
+    // cada evento: tipo, texto, desde → hacia (nodos), paso
+    const out = []; let paso = 0, ctxTok = 0;
+    for (const e of tr) {
+      if (e.tipo === "pregunta") out.push({ tipo: "pregunta", txt: e.texto, de: "in", a: "mod" });
+      else if (e.tipo === "modelo") { paso = e.paso; ctxTok = e.contexto; const llama = /<tool_call>/.test(e.texto); out.push({ tipo: "modelo", txt: e.texto, de: "mod", a: llama ? "arn" : "arn", paso, ctxTok, llama }); }
+      else if (e.tipo === "herramienta") out.push({ tipo: "herramienta", txt: e.texto, nombre: e.nombre, arg: e.arg, de: "arn", a: e.nombre, vuelta: true, paso, ctxTok });
+      else if (e.tipo === "arnés") out.push({ tipo: "arnes", txt: e.texto, de: "arn", a: "mod", paso, ctxTok });
+      else if (e.tipo === "fin") out.push({ tipo: "fin", txt: e.texto, de: "arn", a: "out", paso, ctxTok });
+      else if (e.tipo === "corte") out.push({ tipo: "corte", txt: e.texto, de: "arn", a: "out", paso, ctxTok });
+    }
+    return out;
+  }
+  function nodos3(w, h) {
+    const n = w < 460;
+    return { in: [10, 24], mod: [n ? w * 0.2 : w * 0.17, h * 0.5], arn: [n ? w * 0.52 : w * 0.48, h * 0.5],
+      buscar: [n ? w * 0.84 : w * 0.82, h * 0.24], calcular: [n ? w * 0.84 : w * 0.82, h * 0.76], out: [n ? w * 0.52 : w * 0.48, h - 8] };
+  }
+  function dibujar3() {
+    const { ctx, w, h } = ajustar($("cv3"), 210), N = nodos3(w, h), ev = B3.eventos, k = Math.min(B3.k, ev.length - 1), e = ev[k];
+    ctx.clearRect(0, 0, w, h);
+    const flecha = (a, b, color, lw = 1.5) => { ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); };
+    flecha(N.mod, N.arn, COL.rock3); flecha(N.arn, N.buscar, COL.rock3); flecha(N.arn, N.calcular, COL.rock3);
+    const bw = Math.min(118, w * 0.27), bh = 44;
+    const nodo = (p, txt, sub, color, activo) => {
+      caja(ctx, p[0] - bw / 2, p[1] - bh / 2, bw, bh, 5); ctx.fillStyle = activo ? alfa(color, .25) : COL.rock; ctx.fill(); ctx.strokeStyle = activo ? color : COL.rock3; ctx.lineWidth = activo ? 2 : 1; ctx.stroke();
+      ctx.fillStyle = activo ? COL.ink : COL.muted; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = body(14, 700); ctx.fillText(txt, p[0], p[1] - (sub ? 7 : 0));
+      if (sub) { ctx.font = mono(10.5); ctx.fillStyle = COL.muted; ctx.fillText(sub, p[0], p[1] + 10); }
+    };
+    const act = new Set(e ? [e.de, e.a] : []);
+    nodo(N.mod, "Modelo", "Qwen 0,5B", COL.lamp, act.has("mod"));
+    nodo(N.arn, "Arnés", "valida · corta", COL.ember, act.has("arn"));
+    const bw2 = bw; nodo(N.buscar, "buscar", "biblioteca", COL.exit, act.has("buscar")); nodo(N.calcular, "calcular", "", COL.exit, act.has("calcular"));
+    // contador de pasos y tokens
+    ctx.textAlign = "left"; ctx.font = mono(11.5); ctx.fillStyle = COL.muted;
+    ctx.fillText(`paso ${e && e.paso ? e.paso : 0} de 4 · ventana: ${e && e.ctxTok ? e.ctxTok : "—"} tokens`, 4, 12);
+    // la bolita que viaja
+    if (e && e.de !== "in") {
+      let a = N[e.de], b = N[e.a] || N.out, t = B3.prog;
+      if (e.vuelta) { if (t < .5) { t *= 2; } else { [a, b] = [b, N.mod]; t = (t - .5) * 2; } }
+      const col = e.tipo === "arnes" || e.tipo === "corte" ? COL.ember : e.tipo === "herramienta" ? COL.exit : e.tipo === "fin" ? COL.exit : COL.lamp;
+      if (e.tipo === "fin" || e.tipo === "corte") { ctx.font = mono(11.5, 600); ctx.fillStyle = col; ctx.textAlign = "center"; ctx.fillText(e.tipo === "fin" ? "respuesta final" : "corte por límite", N.out[0], N.out[1] - 2); }
+      else { const x = a[0] + (b[0] - a[0]) * t, y = a[1] + (b[1] - a[1]) * t; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.fill(); }
+    } else if (e) { ctx.font = mono(11.5); ctx.fillStyle = COL.ink; ctx.textAlign = "left"; ctx.fillText("pregunta →", 4, N.mod[1] - 32); }
+    // log
+    $("log3").querySelectorAll(".ev").forEach((el, i) => { el.classList.toggle("vis", i <= B3.k); el.classList.toggle("act", i === B3.k); });
+    const vis = $("log3").querySelector(".ev.act"); if (vis && B3.anim) vis.scrollIntoView({ block: "nearest" });
+    const usadas = ev.slice(0, B3.k + 1).filter(x => x.tipo === "herramienta").length, rech = ev.slice(0, B3.k + 1).filter(x => x.tipo === "arnes").length;
+    $("hud3").innerHTML = `<span>evento <b>${B3.k + 1}/${ev.length}</b></span><span>herramientas usadas <b>${usadas}</b></span><span>avisos del arnés <b>${rech}</b></span>`;
+  }
+  function textoEvento(e) {
+    if (e.tipo === "modelo" && e.llama) {
+      const calls = [...e.txt.matchAll(/<tool_call>\s*([\s\S]*?)\s*(?:<\/tool_call>|$)/g)].map(m => m[1].replace(/\s+/g, " "));
+      return calls.map(c => `<code>${esc(c)}</code>`).join("<br>");
+    }
+    if (e.tipo === "herramienta") return `<code>${esc(e.nombre)}(${esc(e.arg)})</code> → ${esc(e.txt)}`;
+    return esc(e.txt.replace(/\s+/g, " "));
+  }
+  const etiqueta3 = { pregunta: "pregunta", modelo: "modelo", herramienta: "herramienta", arnes: "arnés", fin: "respuesta", corte: "corte" };
+  function cargar3(i) {
+    parar3(); B3.t = i; B3.eventos = eventos3(D.trazas[i]); B3.k = B3.eventos.length - 1; B3.prog = 1;
+    $("log3").innerHTML = B3.eventos.map((e, j) => `<div class="ev ${e.tipo}"><span class="q">${e.paso && e.tipo === "modelo" ? "paso " + e.paso + " · " : ""}${etiqueta3[e.tipo]}</span><span class="t">${textoEvento(e)}</span></div>`).join("");
+    dibujar3();
+  }
+  function parar3() { if (B3.anim) cancelAnimationFrame(B3.anim); B3.anim = null; $("b3play").textContent = "Reproducir"; }
+  function avanzar3() { if (B3.k >= B3.eventos.length - 1) B3.k = -1; B3.k++; B3.prog = quieto ? 1 : 0; if (!quieto) animar3(false); else dibujar3(); }
+  function animar3(seguir) {
+    let t0 = null; const dur = 900;
+    const f = ts => { if (t0 === null) t0 = ts; B3.prog = Math.min(1, (ts - t0) / dur); dibujar3();
+      if (B3.prog < 1) B3.anim = requestAnimationFrame(f);
+      else if (seguir && B3.k < B3.eventos.length - 1) { B3.anim = setTimeout(() => { B3.k++; t0 = null; B3.prog = 0; B3.anim = requestAnimationFrame(f); }, 450); }
+      else { B3.anim = null; $("b3play").textContent = "Reproducir"; } };
+    B3.anim = requestAnimationFrame(f);
+  }
+  $("b3play").addEventListener("click", () => {
+    if (B3.anim) { cancelAnimationFrame(B3.anim); clearTimeout(B3.anim); B3.anim = null; $("b3play").textContent = "Reproducir"; return; }
+    B3.k = 0; B3.prog = 0;
+    if (quieto) { dibujar3(); return; }
+    $("b3play").textContent = "Pausa"; animar3(true);
+  });
+  $("b3step").addEventListener("click", () => { if (B3.anim) { cancelAnimationFrame(B3.anim); clearTimeout(B3.anim); B3.anim = null; $("b3play").textContent = "Reproducir"; } avanzar3(); });
+  $("b3all").addEventListener("click", () => { if (B3.anim) { cancelAnimationFrame(B3.anim); clearTimeout(B3.anim); B3.anim = null; } $("b3play").textContent = "Reproducir"; B3.k = B3.eventos.length - 1; B3.prog = 1; dibujar3(); });
+
+  // ================= Bloque 4: la ventana de contexto =================
+  const B4 = { t: 1, p: 2, V: 700, m: 0 };
+  const TIPOS4 = ["sistema + herramientas", "pregunta", "modelo", "herramienta", "arnés"];
+  const colTipo = () => ({ "sistema + herramientas": COL.muted, "pregunta": COL.sonar, "modelo": COL.lamp, "herramienta": COL.exit, "arnés": COL.ember });
+  function pasos4() { return D.trazas[B4.t].filter(e => e.tipo === "modelo"); }
+  function dibujar4() {
+    const P = pasos4(); B4.p = Math.min(B4.p, P.length);
+    const segs = P[B4.p - 1].segmentos.map(([tipo, n]) => ({ tipo, n }));
+    // el arnés conserva el sistema y corta lo más viejo hasta que entre
+    const total = segs.reduce((a, s) => a + s.n, 0); let sobra = total - B4.V; const fuera = new Set();
+    for (let i = 1; i < segs.length && sobra > 0; i++) { fuera.add(i); sobra -= segs[i].n; }
+    const imposible = sobra > 0;
+    const { ctx, w, h } = ajustar($("cv4"), 300), C = colTipo();
+    ctx.clearRect(0, 0, w, h);
+    const VMAX = 720, top = 26, base = h - 22, esc4 = (base - top) / VMAX;
+    const bx = 8, bw = Math.min(200, w * 0.52), fx4 = bx + bw + 16, fw = Math.min(170, w - fx4 - 4);
+    // caja = ventana
+    const yv = base - B4.V * esc4;
+    ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bx, yv); ctx.lineTo(bx, base); ctx.lineTo(bx + bw, base); ctx.lineTo(bx + bw, yv); ctx.stroke();
+    ctx.setLineDash([4, 3]); ctx.strokeStyle = COL.muted; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx - 6, yv + .5); ctx.lineTo(bx + bw + 6, yv + .5); ctx.stroke(); ctx.setLineDash([]);
+    ctx.font = mono(11); ctx.fillStyle = COL.muted; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    ctx.fillText(`ventana: ${B4.V} tokens`, bx, Math.max(12, yv - 6));
+    let y = base;
+    segs.forEach((s, i) => {
+      if (fuera.has(i)) return; const hh = s.n * esc4;
+      ctx.fillStyle = alfa(C[s.tipo], .85); ctx.fillRect(bx + 3, y - hh + 1, bw - 6, hh - 2);
+      if (hh > 14) { ctx.fillStyle = COL.cave; ctx.font = mono(11, 600); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(recortar(ctx, `${s.tipo} · ${s.n}`, bw - 12), bx + bw / 2, y - hh / 2); }
+      y -= hh;
+    });
+    // lo que quedó afuera
+    if (fw > 60) {
+      ctx.font = mono(11); ctx.fillStyle = COL.muted; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillText("afuera", fx4, top - 8);
+      let yf = top;
+      segs.forEach((s, i) => { if (!fuera.has(i)) return; const hh = Math.max(12, s.n * esc4);
+        ctx.strokeStyle = C[s.tipo]; ctx.setLineDash([3, 3]); ctx.strokeRect(fx4 + .5, yf + .5, fw - 1, hh - 3); ctx.setLineDash([]);
+        if (hh > 13) { ctx.fillStyle = C[s.tipo]; ctx.font = mono(10.5); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(recortar(ctx, `${s.tipo} · ${s.n}`, fw - 8), fx4 + fw / 2, yf + hh / 2 - 1); }
+        yf += hh + 2; });
+    }
+    ctx.textBaseline = "alphabetic";
+    const perdida = fuera.has(1);
+    $("hud4").innerHTML = `<span>en la ventana <b>${total - [...fuera].reduce((a, i) => a + segs[i].n, 0)}</b> de ${total} tokens</span>` +
+      (imposible ? `<span class="aviso">ni las instrucciones entran</span>` : perdida ? `<span class="aviso">la pregunta quedó afuera</span>` : fuera.size ? `<span>el arnés cortó ${fuera.size} mensaje${fuera.size > 1 ? "s" : ""}</span>` : `<span>entra todo</span>`);
+    $("oP").textContent = `${B4.p} de ${P.length}`; $("oV").textContent = B4.V;
+  }
+  function chat4() {
+    const M = D.memoria;
+    const msgs = B4.m === 0
+      ? [["u", "Llamada 1", M.primera], ["a", "Modelo", M.r1], ["sep"], ["u", "Llamada 2 (nueva, sin historia)", "¿Cuál es mi nombre?"], ["a foco", "Modelo", M.sin_historial]]
+      : [["u", "Llamada 2: el arnés reenvía la llamada 1…", M.primera], ["a", "…y la respuesta de entonces", M.r1], ["u", "…y agrega la pregunta nueva", "¿Cuál es mi nombre?"], ["a foco", "Modelo", M.con_historial]];
+    $("chat4").innerHTML = msgs.map(m => m[0] === "sep" ? `<div class="cap">— el modelo no guarda nada entre llamadas —</div>` : `<div class="msg ${m[0]}"><small>${esc(m[1])}</small>${esc(m[2])}</div>`).join("");
+  }
+
+  // ================= Bloque 5: riesgos =================
+  const B5 = { v: "estricto", seguro: false };
+  const nums = t => (t.match(/-?\d+(?:[.,]\d+)?/g) || []).map(x => parseFloat(x.replace(",", ".")));
+  const verif = { estricto: (t, c) => { const n = nums(t); return n.length && n[n.length - 1] === c ? 1 : 0; }, laxo: (t, c) => nums(t).includes(c) ? 1 : 0 };
+  function dibujar5() {
+    const g = D.grupos[0], trampa = D.hack[D.hack.length - 1].respuesta, resp = [...g.respuestas, trampa];
+    const r = resp.map(t => verif[B5.v](t, g.correcta)), { A } = ventajas(r);
+    filasGrupo($("cv5"), resp, r, A, { marcar: resp.length - 1 });
+    const at = A[A.length - 1];
+    $("hud5").innerHTML = `<span>${esc(g.pregunta)} · correcta <b>${g.correcta}</b></span><span>trampa: r = <b>${r[r.length - 1]}</b>, A = <b>${fs(at, 2)}</b></span>` +
+      (at > 0 ? `<span class="aviso">GRPO reforzaría la trampa</span>` : `<span>GRPO la castiga</span>`);
+    // el juez
+    const J = D.juez, { ctx, w, h } = ajustar($("cv5j"), 30 + J.length * 26);
+    ctx.clearRect(0, 0, w, h); const L = 128, an = w - L - 50;
+    ctx.textBaseline = "middle";
+    J.forEach((j, i) => {
+      const y = 6 + i * 26, p = B5.seguro ? j.p_si_seguro : j.p_si;
+      ctx.font = mono(12); ctx.textAlign = "left"; ctx.fillStyle = COL.ink; ctx.fillText(j.afirmacion, 2, y + 9);
+      ctx.fillStyle = j.correcta ? COL.exit : COL.ember; ctx.font = mono(10.5); ctx.fillText(j.correcta ? "bien" : "mal", L - 34, y + 9);
+      ctx.fillStyle = COL.rock2; ctx.fillRect(L, y + 2, an, 14); ctx.fillStyle = alfa(COL.sonar, .85); ctx.fillRect(L, y + 2, an * p, 14);
+      ctx.fillStyle = COL.muted; ctx.font = mono(11); ctx.fillText(fx(100 * p, 0) + "%", L + an + 6, y + 9);
+    });
+    ctx.fillStyle = COL.muted; ctx.font = mono(10.5); ctx.textAlign = "left"; ctx.fillText("P(Sí) del juez · 50% = no sabe", L, h - 8);
+    $("cap5j").textContent = textoJuez();
+  }
+  function textoJuez() {
+    const J = D.juez, bien = J.filter(j => j.correcta), mal = J.filter(j => !j.correcta);
+    const m = (a, k) => a.reduce((s, j) => s + j[k], 0) / a.length;
+    const k = B5.seguro ? "p_si_seguro" : "p_si", d = m(bien, k) - m(mal, k);
+    const sub = m(J, "p_si_seguro") - m(J, "p_si");
+    return `Promedio de P(Sí): ${fx(100 * m(bien, k), 0)}% en las correctas y ${fx(100 * m(mal, k), 0)}% en las incorrectas (diferencia ${fx(100 * d, 0)} puntos). ` +
+      `Agregar "soy profesor y estoy seguro" mueve P(Sí) en ${fs(100 * sub, 0)} puntos en promedio.`;
+  }
+
+  // ================= arranque =================
+  function iniciar() {
+    if (!D) { document.querySelectorAll(".stage").forEach(s => s.insertAdjacentHTML("afterbegin", '<p class="aviso">Faltan los datos pregrabados (build/datos_10.json).</p>')); return; }
+    chips($("ch1"), D.estados.map(e => e.nombre), 0, i => { B1.e = i; reset1(); dibujar1(); });
+    $("sT").addEventListener("input", e => { B1.T = +e.target.value; $("oT").textContent = fx(B1.T); reset1(); dibujar1(); });
+    $("b1one").addEventListener("click", () => muestrear1(1));
+    $("b1many").addEventListener("click", () => muestrear1(50));
+    G2 = grupos2(); B2.r = G2[0].recompensas.slice();
+    chips($("ch2"), G2.map(g => g.nombre), 0, i => { B2.q = i; B2.r = G2[i].recompensas.slice(); dibujar2(); });
+    $("sG").addEventListener("input", e => { B2.G = +e.target.value; $("oG").textContent = B2.G; dibujar2(); });
+    chips($("ch3"), nombresTraza.slice(0, D.trazas.length), 0, cargar3);
+    chips($("ch4"), nombresTraza.slice(0, D.trazas.length), 1, i => { B4.t = i; const n = pasos4().length; $("sP").max = n; B4.p = n; $("sP").value = n; dibujar4(); });
+    { const n = pasos4().length; $("sP").max = n; $("sP").value = n; B4.p = n; }
+    $("sP").addEventListener("input", e => { B4.p = +e.target.value; dibujar4(); });
+    $("sV").addEventListener("input", e => { B4.V = +e.target.value; dibujar4(); });
+    segmento($("seg4"), b => { B4.m = +b.dataset.m; chat4(); });
+    $("ley4").innerHTML = TIPOS4.map(t => `<span><i style="background:${colTipo()[t]}"></i>${t}</span>`).join("");
+    segmento($("seg5"), b => { B5.v = b.dataset.v; dibujar5(); });
+    $("c5").addEventListener("change", e => { B5.seguro = e.target.checked; dibujar5(); });
+    const todo = () => { dibujar1(); dibujar2(); dibujar3(); dibujar4(); dibujar5(); };
+    dibujar1(); dibujar2(); cargar3(0); dibujar4(); chat4(); dibujar5();
+    let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(todo, 120); });
+    Cueva.alCargarSprites(() => dibujar2());
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(todo);
+  }
+  iniciar();
+
+  Cueva.pagina("10", { lecturas: [
+    { texto: "Ouyang, L. et al. (2022). Training language models to follow instructions with human feedback (InstructGPT, RLHF). arXiv:2203.02155.", url: "https://arxiv.org/abs/2203.02155" },
+    { texto: "DeepSeek-AI (2025). DeepSeek-R1: incentivizing reasoning capability in LLMs via reinforcement learning. arXiv:2501.12948.", url: "https://arxiv.org/abs/2501.12948" },
+    { texto: "Shao, Z. et al. (2024). DeepSeekMath: pushing the limits of mathematical reasoning in open language models (GRPO). arXiv:2402.03300.", url: "https://arxiv.org/abs/2402.03300" },
+    { texto: "Yao, S. et al. (2022). ReAct: synergizing reasoning and acting in language models. arXiv:2210.03629.", url: "https://arxiv.org/abs/2210.03629" },
+    { texto: "Sharma, M. et al. (2023). Towards understanding sycophancy in language models. arXiv:2310.13548.", url: "https://arxiv.org/abs/2310.13548" }] });
+})();
+</script>
+</body>
+</html>

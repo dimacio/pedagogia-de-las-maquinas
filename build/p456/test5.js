@@ -1,0 +1,30 @@
+const { chromium } = require('/tmp/claude-0/-home-claude/c0892404-b462-53b0-ae0f-c95d40b227f9/scratchpad/node_modules/playwright');
+(async () => {
+  const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1200, height: 900 } });
+  const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => m.type() === 'error' && errs.push(m.text()));
+  const t0 = Date.now(); await p.goto('http://localhost:8765/clases/06-redes-neuronales.html'); console.log('load ms', Date.now() - t0);
+  const out = '/home/claude/rl-a-ciegas/build/shots/';
+  await p.fill('#b1ep', '20'); await p.dispatchEvent('#b1ep', 'input');
+  const m = await (await p.$('#cv1m')).boundingBox(); await p.mouse.move(m.x + 5, m.y + 30 * 5);
+  await (await p.$('#cv1m')).evaluate(e => e.closest('.stage').scrollIntoView());
+  await (await p.$('#cv1c')).evaluate(e => 0);
+  await (await p.$('section.bloque')).screenshot({ path: out + 'i5-1-tabla.png' });
+  // long task check during training
+  await p.evaluate(() => { window.__lt = 0; new PerformanceObserver(l => l.getEntries().forEach(e => window.__lt = Math.max(window.__lt, e.duration))).observe({ entryTypes: ['longtask'] }); });
+  const t1 = Date.now(); await p.click('#b2ent');
+  await p.waitForFunction(() => document.getElementById('b2ent').textContent === 'Entrenado', null, { timeout: 30000 });
+  console.log('train ms', Date.now() - t1, 'longest task', await p.evaluate(() => window.__lt));
+  console.log('hud2', await p.textContent('#hud2'));
+  await (await p.$('#cv2')).evaluate(e => e.closest('.stage').scrollIntoView());
+  await (await p.$$('section.bloque'))[1].screenshot({ path: out + 'i5-2-vivo.png' });
+  await p.click('#m2dqn'); await p.fill('#b2ep', '40'); await p.dispatchEvent('#b2ep', 'input');
+  console.log('hud2 dqn', await p.textContent('#hud2'));
+  await (await p.$$('section.bloque'))[1].screenshot({ path: out + 'i5-2-dqn.png' });
+  await p.fill('#b3u', '60'); await p.dispatchEvent('#b3u', 'input');
+  const c3 = await (await p.$('#cv3c')).boundingBox(); await p.mouse.move(c3.x + c3.width * 0.8, c3.y + c3.height * 0.3);
+  console.log('hud3', await p.textContent('#hud3'));
+  const c4 = await (await p.$('#cv4c')).boundingBox(); await p.mouse.click(c4.x + c4.width * 0.86, c4.y + c4.height * 0.82);
+  console.log('hud4', await p.textContent('#hud4'));
+  await (await p.$$('section.bloque'))[3].screenshot({ path: out + 'i5-4-red.png' });
+  console.log('errs', errs); await b.close();
+})();

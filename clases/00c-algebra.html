@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Álgebra lineal con Bellman · RL a ciegas</title>
+<meta name="description" content="Nivelación · 0c: la cueva como vector, la matriz de transición, Bellman como producto matriz-vector, resolver el sistema de una vez y el autovalor 1.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .lienzo { min-width: 0; }
+  .ley { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  .ley i { display: inline-block; width: 18px; height: 3px; margin-right: 5px; vertical-align: 3px; }
+  .ensenar { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .ensenar > div { background: var(--rock); border: 1px solid var(--rock-2); border-radius: 4px; padding: 14px; display: grid; gap: 6px; align-content: start; }
+  .ensenar h3 { font-family: var(--display); font-weight: 400; font-size: 14px; color: var(--lamp); letter-spacing: .04em; }
+  .sub { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Nivelación · 0c</div>
+    <h1>Álgebra lineal con <span class="g">Bellman</span></h1>
+    <p class="thesis">Una matriz por clase: si la cueva es un vector y moverse es una matriz, evaluar una política es resolver un sistema lineal, y ya sabemos hacerlo.</p>
+  </section>
+
+  <!-- 1. La cueva como vector -->
+  <section class="bloque">
+    <div class="stage">
+      <div class="lienzo"><canvas id="cv1" aria-label="La grilla de la cueva desenrollada en un vector de 60 casillas; pasá el mouse por una casilla"></canvas></div>
+      <div class="row"><button class="btn primary" id="b1">Enrollar</button></div>
+      <div class="hud" id="hud1"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 1</div>
+      <h2>La cueva es un vector</h2>
+      <p>Las 60 casillas libres se numeran de izquierda a derecha y de arriba abajo, y cualquier cosa que digamos de cada casilla (acá, cuántos pasos faltan hasta la salida) se guarda en un vector de 60 números. Tocá el botón para enrollar y desenrollar, y pasá el mouse para ver qué casilla es cada posición.</p>
+      <div class="eq">s = idx[(r, c)]&emsp;&emsp;V ∈ ℝ⁶⁰</div>
+      <p class="nota pregunta">En el vector, ¿quedan juntas dos casillas que en la cueva son vecinas de arriba y abajo? ¿Eso le importa a la matriz que viene?</p>
+    </div>
+  </section>
+
+  <!-- 2. La matriz P -->
+  <section class="bloque">
+    <div class="stage">
+      <div class="sub">Cueva mini: P de 11×11 (tocá una fila o una casilla)</div>
+      <div class="lienzo"><canvas id="cv2a" aria-label="Matriz P de la política al azar en la cueva mini, con números"></canvas></div>
+      <div class="sub">Cueva chica: P de 60×60 como imagen</div>
+      <div class="lienzo"><canvas id="cv2b" aria-label="Matriz P de 60 por 60 como imagen, junto a la cueva chica"></canvas></div>
+      <div class="hud" id="hud2"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 2</div>
+      <h2>Moverse es una matriz</h2>
+      <p>Con la política al azar (cada flecha con probabilidad ¼), la fila <code>s</code> de la matriz <code>P</code> dice adónde se va desde <code>s</code>: un ¼ por cada vecina libre, y lo que choca se queda en la diagonal. Tocá una fila y mirá en la cueva el origen (borde ámbar) y sus destinos.</p>
+      <div class="eq">P[s, s′] = Σₐ π(a|s) · P(s′ | s, a)</div>
+      <p>Cada fila suma 1. En la cueva chica casi toda la matriz es cero: cada casilla tiene a lo sumo 4 vecinas.</p>
+      <p class="nota pregunta">¿Por qué la imagen de 60×60 tiene casi todo pegado a la diagonal? ¿Qué pasaría si numeráramos las casillas en otro orden?</p>
+    </div>
+  </section>
+
+  <!-- 3. Producto matriz-vector -->
+  <section class="bloque">
+    <div class="stage">
+      <div class="lienzo"><canvas id="cv3" aria-label="Valor de la política al azar extendiéndose por la cueva"></canvas></div>
+      <div class="legend"><span>V≈0</span><div class="bar" id="ley3"></div><span>V(salida vecina)</span></div>
+      <div class="row"><button class="btn primary" id="b3">Multiplicar una vez</button><button class="btn" id="b3x10">× 10</button><button class="btn" id="b3reset">V = 0</button></div>
+      <div class="hud" id="hud3"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 3</div>
+      <h2>Multiplicar es propagar</h2>
+      <p>Arrancamos con <code>V = 0</code>. Cada producto <code>P·V</code> promedia el valor de las vecinas, y <code>R</code> suma lo que se gana al entrar a la salida. Tocá "multiplicar": el valor nace en la salida y avanza una casilla por vez (el color está en escala logarítmica).</p>
+      <div class="eq">V ← R + γ P V&emsp;&emsp;γ = 0.99</div>
+      <p class="nota pregunta">¿Cuántas multiplicaciones hacen falta para que la entrada S tenga un valor distinto de cero? Compará con el largo del camino más corto.</p>
+    </div>
+  </section>
+
+  <!-- 4. Resolver de una vez -->
+  <section class="bloque">
+    <div class="stage">
+      <div class="lienzo"><canvas id="cv4a" aria-label="Error de la iteración contra la solución exacta, en escala logarítmica, para varios gamma"></canvas></div>
+      <div class="ley" id="ley4"></div>
+      <div class="ctl"><label for="g4">γ elegido <output id="og4"></output></label><input type="range" id="g4" min="0.5" max="0.999" step="0.001" value="0.95"></div>
+      <div class="hud" id="hud4"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 4</div>
+      <h2>Resolver de una vez</h2>
+      <p>La ecuación de Bellman de la política es un sistema lineal: se puede despejar <code>V</code> con eliminación gaussiana, como en el secundario pero con 60 incógnitas. El gráfico compara esa solución exacta con la iteración del paso 3: el error cae como una recta en escala logarítmica, nunca más despacio que la línea punteada de pendiente <code>log γ</code>.</p>
+      <div class="eq">V = R + γPV&emsp;&emsp;⇔&emsp;&emsp;(I − γP) V = R</div>
+      <p class="nota pregunta">Con γ = 0.999, ¿conviene iterar o resolver? ¿Y si la cueva tuviera un millón de casillas?</p>
+    </div>
+  </section>
+
+  <!-- 5. Autovalores -->
+  <section class="bloque">
+    <div class="stage">
+      <div class="lienzo"><canvas id="cv5" aria-label="Distribución del caminante al azar sobre la cueva"></canvas></div>
+      <div class="lienzo"><canvas id="cv5b" aria-label="Distancia a la distribución estacionaria en escala logarítmica"></canvas></div>
+      <div class="row"><button class="btn primary" id="b5">Soltar al caminante en S</button></div>
+      <div class="hud" id="hud5"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 5</div>
+      <h2>El autovalor 1</h2>
+      <p>Un caminante al azar que vuelve a S cada vez que sale. Si <code>μ</code> es la probabilidad de estar en cada casilla, un paso es <code>μ ← μP</code>. Multiplicar muchas veces es el método de la potencia (<i>power method</i>): converge a la distribución estacionaria, el autovector de autovalor 1.</p>
+      <div class="eq">πP = 1·π&emsp;&emsp;P·[1, …, 1]ᵀ = [1, …, 1]ᵀ</div>
+      <p>El mapa de calor se parece al de las visitas del agente al azar de la nivelación 0a: es la misma cuenta, hecha con álgebra en vez de con partidas.</p>
+      <p class="nota pregunta">¿Por qué ningún autovalor de P puede ser mayor que 1? (Pista: cada fila suma 1.) ¿Qué controla la velocidad con la que cae el error?</p>
+    </div>
+  </section>
+
+  <section class="bloque full">
+    <div class="texto">
+      <div class="paso">Para enseñarlo</div>
+      <h2>Contalo en una oración</h2>
+    </div>
+    <div class="ensenar">
+      <div><h3>La oración</h3><p>Escribimos lo que vale cada casilla en un vector y cómo nos movemos en una matriz; entonces "lo que vale acá es lo que gano más lo que valen mis vecinas" es una ecuación lineal.</p></div>
+      <div><h3>La pregunta</h3><p>Si cada casilla vale el promedio de sus vecinas y la salida vale 1, ¿cuánto vale una casilla que solo toca la salida y una pared?</p></div>
+      <div><h3>Ejercicio de 5 minutos</h3><p>Con la cueva mini (11 casillas), cada grupo escribe a mano una fila de <code>P</code> y la suma para verificar que da 1. Después, entre todos, arman la matriz completa en el pizarrón y comparan con la figura.</p></div>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(() => {
+  const col = Cueva.COL();
+  const env = Cueva.makeEnv(Cueva.MAPS.chica), mini = Cueva.makeEnv(Cueva.MAPS.mini);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = id => document.getElementById(id);
+  const anchoDe = cv => Math.max(120, cv.parentElement.clientWidth);
+  function ajustar(cv, w, h) {
+    const dpr = window.devicePixelRatio || 1, ctx = cv.getContext("2d");
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.width = w + "px"; cv.style.height = h + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.imageSmoothingEnabled = false; return ctx;
+  }
+  const ink = (ctx, f, px = 10, w = 400) => { ctx.font = `${w} ${px}px ${col.mono}`; ctx.fillStyle = f; };
+
+  // ---------- álgebra ----------
+  // matriz de la política al azar: Pi[s][s'] (la salida es absorbente)
+  function matrizAzar(e) {
+    const P = Cueva.transiciones(e, 0), M = [];
+    for (let s = 0; s < e.nS; s++) { const f = new Float64Array(e.nS); for (let a = 0; a < 4; a++) for (const [s2, p] of P[s][a]) f[s2] += p / 4; M.push(f); }
+    return M;
+  }
+  // R(s) = probabilidad de entrar a la salida en un paso; la salida es terminal (fila de ceros en el sistema)
+  function sistema(e) {
+    const M = matrizAzar(e), PT = M.map((f, s) => { const g = Float64Array.from(f); if (s === e.goal) g.fill(0); g[e.goal] = 0; return g; });
+    const R = M.map((f, s) => s === e.goal ? 0 : f[e.goal]);
+    return { M, PT, R };
+  }
+  // eliminación gaussiana con pivoteo parcial: resuelve A x = b
+  function gauss(A, b) {
+    const n = b.length, M = A.map((f, i) => [...f, b[i]]);
+    for (let k = 0; k < n; k++) {
+      let p = k; for (let i = k + 1; i < n; i++) if (Math.abs(M[i][k]) > Math.abs(M[p][k])) p = i;
+      [M[k], M[p]] = [M[p], M[k]];
+      const piv = M[k][k]; if (Math.abs(piv) < 1e-14) continue;
+      for (let i = k + 1; i < n; i++) { const f = M[i][k] / piv; if (!f) continue; for (let j = k; j <= n; j++) M[i][j] -= f * M[k][j]; }
+    }
+    const x = new Array(n).fill(0);
+    for (let i = n - 1; i >= 0; i--) { let s = M[i][n]; for (let j = i + 1; j < n; j++) s -= M[i][j] * x[j]; x[i] = Math.abs(M[i][i]) < 1e-14 ? 0 : s / M[i][i]; }
+    return x;
+  }
+  const bellman = (PT, R, V, g) => R.map((r, s) => { let acc = 0; const f = PT[s]; for (let j = 0; j < f.length; j++) if (f[j]) acc += f[j] * V[j]; return r + g * acc; });
+  const exacta = (PT, R, g) => gauss(PT.map((f, i) => Array.from(f, (x, j) => (i === j ? 1 : 0) - g * x)), R);
+  const normInf = (a, b) => a.reduce((m, x, i) => Math.max(m, Math.abs(x - b[i])), 0);
+  const SC = sistema(env), SM = sistema(mini);
+
+  // ---------- 1. La cueva como vector ----------
+  const cv1 = $("cv1"), hud1 = $("hud1");
+  let t1 = 1, meta1 = 1, anim1 = 0, sel1 = env.start, geo1 = null;
+  const dmax = Math.max(...env.dist.filter(isFinite));
+  const ease = x => x < .5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+  function pos1(s, t, g) {
+    const [r, c] = env.free[s], k = Math.max(0, Math.min(1, (t * 1.6 - (s / env.nS) * .6))), e = ease(k);
+    const ax = g.gx + c * g.cg, ay = g.gy + r * g.cg, bx = g.vx + s * g.cv, by = g.vy;
+    return [ax + (bx - ax) * e, ay + (by - ay) * e, g.cg + (g.cv - g.cg) * e, g.cg + (g.vh - g.cg) * e];
+  }
+  function dibujar1() {
+    const w = anchoDe(cv1), cg = Math.min(26, Math.floor(w / env.W)), cv = (w - 4) / env.nS;
+    const g = { cg, cv, vh: 22, gx: Math.floor((w - env.W * cg) / 2), gy: 4, vx: 2, vy: env.H * cg + 40 };
+    const h = g.vy + g.vh + 22, ctx = ajustar(cv1, w, h); geo1 = g;
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    // paredes fantasma y casillas vacías de la grilla
+    for (let r = 0; r < env.H; r++) for (let c = 0; c < env.W; c++) { ctx.fillStyle = env.rows[r][c] === "#" ? `rgba(30,35,49,${1 - .6 * t1})` : "#07080c"; ctx.fillRect(g.gx + c * cg, g.gy + r * cg, cg, cg); }
+    ctx.strokeStyle = "rgba(141,147,163,.35)"; ctx.strokeRect(g.vx - .5, g.vy - .5, env.nS * cv + 1, g.vh + 1);
+    for (let s = 0; s < env.nS; s++) {
+      const [x, y, ww, hh] = pos1(s, t1, g);
+      ctx.fillStyle = s === env.goal ? col.exit : Cueva.rampa("valor", 1 - env.dist[s] / dmax);
+      ctx.fillRect(x + .5, y + .5, Math.max(1, ww - 1), Math.max(1, hh - 1));
+      if (s === sel1) { ctx.strokeStyle = col.ink; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, ww - 2, hh - 2); }
+    }
+    // marcas de la casilla elegida en ambos lugares
+    const [r, c] = env.free[sel1];
+    ctx.strokeStyle = col.lamp; ctx.lineWidth = 1.5; ctx.setLineDash([3, 2]);
+    ctx.strokeRect(g.gx + c * cg + 1, g.gy + r * cg + 1, cg - 2, cg - 2); ctx.strokeRect(g.vx + sel1 * cv, g.vy - 3, cv, g.vh + 6); ctx.setLineDash([]);
+    ink(ctx, col.muted); ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (let s = 0; s < env.nS; s += 10) ctx.fillText(s, g.vx + (s + .5) * cv, g.vy + g.vh + 6);
+    ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillText("V[0] … V[59]", g.vx, g.vy - 6);
+    hud1.innerHTML = `<span>s = <b>${sel1}</b></span><span>(r, c) = <b>(${r}, ${c})</b></span><span>V[${sel1}] = <b>${env.dist[sel1]}</b> pasos a la salida</span>`;
+  }
+  function animar1() {
+    cancelAnimationFrame(anim1); meta1 = t1 > .5 ? 0 : 1; $("b1").textContent = meta1 ? "Enrollar" : "Desenrollar";
+    if (reduce) { t1 = meta1; dibujar1(); return; }
+    let prev = performance.now();
+    const tick = now => { const dt = (now - prev) / 1400; prev = now; t1 += meta1 ? dt : -dt; t1 = Math.max(0, Math.min(1, t1)); dibujar1(); if (t1 !== meta1) anim1 = requestAnimationFrame(tick); };
+    anim1 = requestAnimationFrame(tick);
+  }
+  $("b1").onclick = animar1;
+  function elegir1(ev) {
+    const b = cv1.getBoundingClientRect(), x = ev.clientX - b.left, y = ev.clientY - b.top, g = geo1;
+    for (let s = 0; s < env.nS; s++) { const [px, py, ww, hh] = pos1(s, t1, g); if (x >= px && x < px + ww && y >= py && y < py + hh) { if (s !== sel1) { sel1 = s; dibujar1(); } return; } }
+    const c = Math.floor((x - g.gx) / g.cg), r = Math.floor((y - g.gy) / g.cg), s = env.idx[r + "," + c];
+    if (s !== undefined && s !== sel1) { sel1 = s; dibujar1(); }
+  }
+  cv1.addEventListener("pointermove", elegir1); cv1.addEventListener("pointerdown", elegir1);
+
+  // ---------- 2. La matriz P ----------
+  const cv2a = $("cv2a"), cv2b = $("cv2b"), hud2 = $("hud2");
+  let sel2 = { e: mini, s: 2 }, geoA = null, geoB = null;
+  const frac = p => ({ 0.25: "¼", 0.5: "½", 0.75: "¾", 1: "1" })[Math.round(p * 4) / 4] || p.toFixed(2);
+  function caveEn(ctx, e, x0, y0, cell, s0, M, etiquetas) {
+    for (let r = 0; r < e.H; r++) for (let c = 0; c < e.W; c++) { ctx.fillStyle = e.rows[r][c] === "#" ? col.rock2 : "#000"; ctx.fillRect(x0 + c * cell, y0 + r * cell, cell, cell); }
+    const f = s0 !== null ? M[s0] : null;
+    for (let s = 0; s < e.nS; s++) {
+      const [r, c] = e.free[s], x = x0 + c * cell, y = y0 + r * cell;
+      if (s === e.goal) { ctx.fillStyle = col.exit; ctx.fillRect(x + 2, y + 2, cell - 4, cell - 4); }
+      if (f && f[s] > 0) { ctx.fillStyle = `rgba(94,200,216,${.25 + .75 * f[s]})`; ctx.fillRect(x + 2, y + 2, cell - 4, cell - 4); }
+      if (etiquetas) { ink(ctx, s === e.goal || (f && f[s] > .3) ? "#0b0d12" : col.muted, Math.max(8, Math.round(cell * .32)), 600); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(f && f[s] > 0 ? frac(f[s]) : s, x + cell / 2, y + cell / 2 + 1); }
+    }
+    if (s0 !== null) { const [r, c] = e.free[s0]; ctx.strokeStyle = col.lamp; ctx.lineWidth = 2; ctx.strokeRect(x0 + c * cell + 1, y0 + r * cell + 1, cell - 2, cell - 2); }
+  }
+  function dibujar2a() {
+    const w = anchoDe(cv2a), n = mini.nS, lab = 18, M = SM.M, lado = w >= 600;
+    const cm = lado ? Math.min(32, Math.floor((w - lab - 20) * .6 / n)) : Math.min(32, Math.floor((w - lab) / n));
+    const cc = lado ? Math.min(46, Math.floor((w - lab - n * cm - 20) / mini.W)) : Math.min(46, Math.floor(w / mini.W));
+    const g = { mx: lab, my: lab, cm, cx: lado ? lab + n * cm + 20 : Math.floor((w - mini.W * cc) / 2), cy: lado ? lab + 4 : lab + n * cm + 14, cc };
+    const h = lado ? Math.max(lab + n * cm, g.cy + mini.H * cc) + 4 : g.cy + mini.H * cc + 4, ctx = ajustar(cv2a, w, h); geoA = g;
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    const s0 = sel2.e === mini ? sel2.s : null;
+    ink(ctx, col.muted, 9); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (let j = 0; j < n; j++) { ctx.fillStyle = j === s0 ? col.lamp : col.muted; ctx.fillText(j, g.mx + j * cm + cm / 2, lab / 2); ctx.fillText(j, lab / 2, g.my + j * cm + cm / 2); }
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      const p = M[i][j], x = g.mx + j * cm, y = g.my + i * cm;
+      ctx.fillStyle = i === s0 ? "rgba(242,179,90,.12)" : (i + j) % 2 ? "#06070a" : "#0a0c11"; ctx.fillRect(x, y, cm, cm);
+      if (p > 0) { ctx.fillStyle = `rgba(94,200,216,${.15 + .6 * p})`; ctx.fillRect(x + 1, y + 1, cm - 2, cm - 2); }
+      ink(ctx, p > 0 ? col.ink : "#3a4052", Math.max(8, Math.round(cm * .36)), p > 0 ? 600 : 400); ctx.fillText(p > 0 ? frac(p) : "0", x + cm / 2, y + cm / 2 + 1);
+    }
+    if (s0 !== null) { ctx.strokeStyle = col.lamp; ctx.lineWidth = 2; ctx.strokeRect(g.mx + 1, g.my + s0 * cm + 1, n * cm - 2, cm - 2); }
+    caveEn(ctx, mini, g.cx, g.cy, cc, s0, M, true);
+  }
+  function dibujar2b() {
+    const w = anchoDe(cv2b), n = env.nS, M = SC.M, lado = w >= 600;
+    const k = lado ? Math.max(2, Math.min(5, Math.floor((w * .5) / n))) : Math.max(2, Math.min(5, Math.floor(w / n)));
+    const cc = lado ? Math.min(24, Math.floor((w - n * k - 20) / env.W)) : Math.min(24, Math.floor(w / env.W));
+    const g = { mx: 0, my: 0, k, cx: lado ? n * k + 20 : Math.floor((w - env.W * cc) / 2), cy: lado ? 0 : n * k + 12, cc };
+    const h = lado ? Math.max(n * k, env.H * cc) : g.cy + env.H * cc, ctx = ajustar(cv2b, w, h); geoB = g;
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    const s0 = sel2.e === env ? sel2.s : null;
+    ctx.fillStyle = "#0a0c11"; ctx.fillRect(0, 0, n * k, n * k);
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) if (M[i][j] > 0) { ctx.fillStyle = Cueva.rampa("visitas", .35 + .65 * M[i][j]); ctx.fillRect(j * k, i * k, k, k); }
+    if (s0 !== null) { ctx.strokeStyle = col.lamp; ctx.lineWidth = 1.5; ctx.strokeRect(.5, s0 * k - 1, n * k - 1, k + 2); }
+    caveEn(ctx, env, g.cx, g.cy, cc, s0, M, false);
+  }
+  function hud2txt() {
+    const e = sel2.e, s = sel2.s, M = e === mini ? SM.M : SC.M, [r, c] = e.free[s];
+    const nz = [...M[s]].map((p, j) => [j, p]).filter(x => x[1] > 0).map(([j, p]) => `P[${s}, ${j}] = ${frac(p)}`).join(" · ");
+    hud2.innerHTML = `<span>${e === mini ? "mini" : "chica"}: fila <b>${s}</b> = casilla (${r}, ${c})</span><span>${nz}</span><span>suma de la fila <b>${M[s].reduce((a, b) => a + b, 0).toFixed(2)}</b></span>`;
+  }
+  function dibujar2() { dibujar2a(); dibujar2b(); hud2txt(); }
+  function elegirEn(ev, cv, g, e, esMini) {
+    const b = cv.getBoundingClientRect(), x = ev.clientX - b.left, y = ev.clientY - b.top;
+    let s;
+    const cm = esMini ? g.cm : g.k;
+    if (x >= g.mx && y >= g.my && x < g.mx + e.nS * cm && y < g.my + e.nS * cm) s = Math.floor((y - g.my) / cm);
+    else { const c = Math.floor((x - g.cx) / g.cc), r = Math.floor((y - g.cy) / g.cc); s = e.idx[r + "," + c]; }
+    if (s !== undefined && (sel2.e !== e || sel2.s !== s)) { sel2 = { e, s }; dibujar2(); }
+  }
+  cv2a.addEventListener("pointerdown", ev => elegirEn(ev, cv2a, geoA, mini, true));
+  cv2a.addEventListener("pointermove", ev => ev.pointerType === "mouse" && ev.buttons === 0 ? null : elegirEn(ev, cv2a, geoA, mini, true));
+  cv2b.addEventListener("pointerdown", ev => elegirEn(ev, cv2b, geoB, env, false));
+  cv2b.addEventListener("pointermove", ev => elegirEn(ev, cv2b, geoB, env, false));
+
+  // ---------- 3. Producto matriz-vector ----------
+  const cv3 = $("cv3"), hud3 = $("hud3"), T3 = Cueva.tablero(cv3, env, { maxCell: 40 }), G3 = .99;
+  const Vstar3 = exacta(SC.PT, SC.R, G3);
+  let V3 = new Array(env.nS).fill(0), k3 = 0;
+  $("ley3").style.background = Cueva.gradienteCSS("valor");
+  const lmax = Math.log10(Math.max(...Vstar3)), lmin = -6;
+  function dibujar3() {
+    const t = V3.map(v => v > 0 ? (Math.log10(v) - lmin) / (lmax - lmin) : -1);
+    T3.medir().fondo().paredes();
+    for (let s = 0; s < env.nS; s++) if (s !== env.goal) { const [r, c] = env.free[s]; T3.casilla(r, c, t[s] < 0 ? "#07080c" : Cueva.rampa("valor", .08 + .92 * t[s])); }
+    T3.salida().entrada();
+    if (T3.cell >= 26) for (let s = 0; s < env.nS; s++) if (s !== env.goal && V3[s] > 0) T3.texto(s, V3[s] >= .01 ? V3[s].toFixed(2).slice(1) : "·", t[s] > .7 ? "#0b0d12" : "rgba(232,230,223,.75)", .3);
+    const alcanzadas = V3.filter((v, s) => v > 0 && s !== env.goal).length;
+    hud3.innerHTML = `<span>iteración k = <b>${k3}</b></span><span>V(S) = <b>${V3[env.start].toExponential(2)}</b></span><span>casillas con V > 0: <b>${alcanzadas}</b>/${env.nS - 1}</span><span>‖V − V*‖∞ = <b>${normInf(V3, Vstar3).toExponential(2)}</b></span>`;
+  }
+  const mult3 = n => { for (let i = 0; i < n; i++) { V3 = bellman(SC.PT, SC.R, V3, G3); k3++; } dibujar3(); };
+  $("b3").onclick = () => mult3(1); $("b3x10").onclick = () => mult3(10);
+  $("b3reset").onclick = () => { V3 = new Array(env.nS).fill(0); k3 = 0; dibujar3(); };
+  mult3(3);
+
+  // ---------- 4. Resolver de una vez ----------
+  const cv4a = $("cv4a"), hud4 = $("hud4"), K4 = 300;
+  const FIJOS = [.5, .9, .99], COLS = [col.ember, col.sonar, col.exit];
+  function curva(g) {
+    const t0 = performance.now(), Vs = exacta(SC.PT, SC.R, g), ms = performance.now() - t0;
+    let V = new Array(env.nS).fill(0); const err = [normInf(V, Vs)];
+    for (let k = 1; k <= K4; k++) { V = bellman(SC.PT, SC.R, V, g); err.push(normInf(V, Vs)); }
+    return { g, Vs, err, ms };
+  }
+  const cache4 = FIJOS.map(curva);
+  let elegido4 = null;
+  function dibujar4() {
+    const g = +$("g4").value; $("og4").textContent = g.toFixed(3);
+    if (!elegido4 || elegido4.g !== g) elegido4 = curva(g);
+    const series = [...cache4.map((c, i) => ({ ...c, color: COLS[i] })), { ...elegido4, color: col.lamp, ancho: 2.5 }];
+    const w = anchoDe(cv4a), h = 220, ctx = ajustar(cv4a, w, h), ml = 44, mb = 24, mt = 8, pw = w - ml - 8, ph = h - mb - mt;
+    const lo = -12, hi = 0, X = k => ml + k / K4 * pw, Y = e => mt + (hi - Math.max(lo, Math.log10(Math.max(e, 1e-300)))) / (hi - lo) * ph;
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    ink(ctx, col.muted); ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (let p = hi; p >= lo; p -= 3) { ctx.fillText(`1e${p}`, ml - 4, Y(Math.pow(10, p))); ctx.strokeStyle = "rgba(141,147,163,.12)"; ctx.beginPath(); ctx.moveTo(ml, Y(Math.pow(10, p)) + .5); ctx.lineTo(w - 8, Y(Math.pow(10, p)) + .5); ctx.stroke(); }
+    ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; for (const k of [0, 100, 200, 300]) ctx.fillText(k, X(k), h - 6);
+    ctx.fillText("iteración k", ml + pw / 2, h - 6);
+    ctx.save(); ctx.beginPath(); ctx.rect(ml, mt, pw, ph); ctx.clip();
+    for (const s of series) {
+      // referencia: e0 · γ^k (pendiente log γ)
+      ctx.strokeStyle = s.color; ctx.globalAlpha = .5; ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(X(0), Y(s.err[0])); ctx.lineTo(X(K4), Y(s.err[0] * Math.pow(s.g, K4))); ctx.stroke(); ctx.setLineDash([]);
+      ctx.globalAlpha = 1; ctx.lineWidth = s.ancho || 1.6; ctx.beginPath(); s.err.forEach((e, k) => k ? ctx.lineTo(X(k), Y(e)) : ctx.moveTo(X(k), Y(e))); ctx.stroke();
+    }
+    ctx.restore();
+    $("ley4").innerHTML = series.map(s => `<span><i style="background:${s.color}"></i>γ = ${s.g}</span>`).join("") + `<span>punteada: e₀·γᵏ</span>`;
+    const k1 = elegido4.err.findIndex(e => e < 1e-6);
+    hud4.innerHTML = `<span>γ = <b>${g.toFixed(3)}</b></span><span>gauss: <b>${elegido4.ms.toFixed(1)} ms</b></span><span>V*(S) = <b>${elegido4.Vs[env.start].toExponential(3)}</b></span><span>iteraciones hasta error &lt; 1e-6: <b>${k1 < 0 ? "más de " + K4 : k1}</b></span>`;
+  }
+  $("g4").addEventListener("input", dibujar4);
+
+  // ---------- 5. Autovalores: método de la potencia ----------
+  const cv5 = $("cv5"), cv5b = $("cv5b"), hud5 = $("hud5"), T5 = Cueva.tablero(cv5, env, { maxCell: 40 });
+  // caminante con reinicio: al llegar a la salida vuelve a S
+  const PW = SC.M.map((f, s) => { if (s !== env.goal) return f; const g = new Float64Array(env.nS); g[env.start] = 1; return g; });
+  // π exacta: π (I − P) = 0, Σπ = 1  → sistema transpuesto con la última ecuación cambiada por la normalización
+  const piEst = (() => { const n = env.nS, A = [], b = new Array(n).fill(0);
+    for (let i = 0; i < n; i++) A.push(Array.from({ length: n }, (_, j) => (i === j ? 1 : 0) - PW[j][i]));
+    A[n - 1] = new Array(n).fill(1); b[n - 1] = 1; return gauss(A, b); })();
+  const pmax = Math.max(...piEst);
+  let mu = [], k5 = 0, err5 = [], anim5 = 0;
+  const L1 = (a, b) => a.reduce((m, x, i) => m + Math.abs(x - b[i]), 0);
+  function pasoPot() { const nu = new Array(env.nS).fill(0); for (let i = 0; i < env.nS; i++) if (mu[i]) { const f = PW[i]; for (let j = 0; j < env.nS; j++) if (f[j]) nu[j] += mu[i] * f[j]; } mu = nu; k5++; err5.push(L1(mu, piEst)); }
+  function reiniciar5() { mu = new Array(env.nS).fill(0); mu[env.start] = 1; k5 = 0; err5 = [L1(mu, piEst)]; }
+  const K5 = 4000;
+  function dibujar5() {
+    T5.medir().fondo().paredes();
+    T5.valores(mu.map(x => Math.sqrt(x / pmax)), { rampa: "visitas", lo: 0, hi: 1, omitirMeta: false }).entrada();
+    const [gr, gc] = env.free[env.goal], cell = T5.cell; T5.ctx.strokeStyle = col.exit; T5.ctx.lineWidth = 2; T5.ctx.strokeRect(gc * cell + 2, gr * cell + 2, cell - 4, cell - 4);
+    const w = anchoDe(cv5b), h = 120, ctx = ajustar(cv5b, w, h), ml = 40, mt = 6, mb = 20, pw = w - ml - 8, ph = h - mt - mb, lo = -14, hi = .5;
+    const X = k => ml + k / K5 * pw, Y = e => mt + (hi - Math.max(lo, Math.log10(Math.max(e, 1e-12)))) / (hi - lo) * ph;
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    ink(ctx, col.muted); ctx.textAlign = "right"; ctx.textBaseline = "middle"; for (const p of [0, -4, -8, -12]) ctx.fillText(`1e${p}`, ml - 4, Y(Math.pow(10, p)));
+    ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText("iteración k", ml + pw / 2, h - 4); ctx.textAlign = "left"; ctx.fillText("0", ml, h - 4); ctx.textAlign = "right"; ctx.fillText(K5, w - 8, h - 4);
+    ctx.strokeStyle = col.sonar; ctx.lineWidth = 1.6; ctx.beginPath(); err5.forEach((e, k) => k ? ctx.lineTo(X(k), Y(e)) : ctx.moveTo(X(k), Y(e))); ctx.stroke();
+    ctx.fillStyle = col.muted; ctx.textAlign = "right"; ctx.textBaseline = "top"; ctx.fillText("‖μₖ − π‖₁", w - 10, mt);
+    const n = err5.length; let u = n - 1; while (u > 0 && err5[u] < 1e-9) u--; const lam2 = u > 200 ? Math.pow(err5[u] / err5[u - 100], 1 / 100) : NaN;
+    hud5.innerHTML = `<span>k = <b>${k5}</b></span><span>Σμ = <b>${mu.reduce((a, b) => a + b, 0).toFixed(3)}</b></span><span>‖μ − π‖₁ = <b>${err5[n - 1].toExponential(2)}</b></span><span>|λ₂| ≈ <b>${isNaN(lam2) ? "…" : lam2.toFixed(4)}</b></span>`;
+  }
+  function correr5(animar) {
+    cancelAnimationFrame(anim5); reiniciar5();
+    if (!animar || reduce) { while (k5 < K5) pasoPot(); dibujar5(); return; }
+    const tick = () => { const t0 = performance.now(), paso = k5 < 60 ? 1 : k5 < 400 ? 8 : 60; for (let i = 0; i < paso && k5 < K5 && performance.now() - t0 < 25; i++) pasoPot(); dibujar5(); if (k5 < K5) anim5 = requestAnimationFrame(tick); };
+    tick();
+  }
+  $("b5").onclick = () => correr5(true);
+  correr5(false);
+
+  function todo() { dibujar1(); dibujar2(); dibujar3(); dibujar4(); dibujar5(); }
+  todo();
+  let rz = 0; addEventListener("resize", () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(todo); });
+  if (document.fonts) document.fonts.ready.then(todo);
+
+  Cueva.pagina("0c", { lecturas: [
+    { texto: "Sutton y Barto, cap. 4 (evaluación de políticas)", url: "http://incompleteideas.net/book/the-book-2nd.html" },
+    { texto: "Stanford CS234, clase 2 (Brunskill)", url: "https://web.stanford.edu/class/cs234/" },
+    { texto: "3Blue1Brown, Essence of Linear Algebra", url: "https://www.3blue1brown.com/topics/linear-algebra" }
+  ] });
+})();
+</script>
+</body>
+</html>

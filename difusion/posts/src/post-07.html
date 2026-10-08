@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>07 · Explorar o explotar · RL a ciegas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../../../assets/estilo.css">
+<link rel="stylesheet" href="post.css">
+<style>
+  .par { display:grid; grid-template-columns: 1fr 1fr; gap: 40px; width: 900px; }
+  .par > div { display:grid; gap: 14px; justify-items: start; }
+  .par h2 { font-family: var(--display); font-size: 34px; color: var(--ink); }
+  .par .etq { font-size: 24px; }
+</style>
+</head>
+<body class="a2" data-n="7">
+<div class="post">
+  <div class="cab"></div>
+
+  <h1 class="tit">¿Explorar o <span class="a">explotar</span>?</h1>
+  <div class="fig"><div class="par">
+    <div><h2>Explotar</h2><canvas id="cv1" class="marco"></canvas><span class="etq">repito lo que conozco</span></div>
+    <div><h2 style="color:var(--sonar)">Explorar</h2><canvas id="cv2" class="marco"></canvas><span class="etq">voy donde menos fui</span></div>
+  </div></div>
+  <div style="display:grid;gap:16px">
+    <p class="txt">Si solo repetís lo que ya funcionó, nunca encontrás <b>la salida</b>.</p>
+    <p class="voz">Color = cuántas veces pasó el agente por cada casilla.</p>
+  </div>
+  <div class="pie"></div>
+</div>
+<script src="../../../assets/cueva.js"></script>
+<script src="post.js"></script>
+<script>
+
+  const env = Cueva.makeEnv(Cueva.MAPS.chica);
+  const T1 = Post.cueva(document.getElementById("cv1"), env, 30), T2 = Post.cueva(document.getElementById("cv2"), env, 30);
+  // explotar: el mismo recorrido corto, repetido 20 veces
+  const corto = Post.caminata(env, 45, 3); const v1 = corto.visitas.map(v => v * 20);
+  const cur = Post.curiosidad(env, 900, 5);
+  function pintar(T, vis, toc, llego) {
+    T.fondo("#000"); const mx = Math.max(...vis);
+    vis.forEach((v, s) => { if (v > 0 && s !== env.goal) { const [r, c] = env.free[s]; T.casilla(r, c, Cueva.rampa("visitas", .2 + .8 * Math.log(1 + v) / Math.log(1 + mx))); } });
+    T.tocadas(toc);
+    if (llego) T.salida();
+    T.sprite(env.start, 2);
+  }
+  Post.listo(() => { pintar(T1, v1, corto.tocadas, false); pintar(T2, cur.visitas, cur.tocadas, cur.visitas[env.goal] > 0); });
+</script>
+</body>
+</html>

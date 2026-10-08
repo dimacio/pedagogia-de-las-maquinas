@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RL a ciegas</title>
+<meta name="description" content="Curso libre y abierto (MOOC) de aprendizaje por refuerzo, en castellano: doce clases en cuatro trimestres, contadas desde un juego, una cueva a oscuras y una salida verde.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="assets/estilo.css">
+<style>
+  .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 32px; align-items: center; padding-block: 44px 36px; }
+  @media (max-width: 860px) { .hero { grid-template-columns: minmax(0, 1fr); padding-block: 28px; } }
+  .hero h1 { font-size: clamp(40px, 7vw, 76px); }
+  .hero .lead { display: grid; gap: 16px; }
+  .hero .cta { display: flex; flex-wrap: wrap; gap: 10px; }
+  .hero .cta a.btn { text-decoration: none; }
+  .hero .stage { padding: 10px; }
+  .caption { font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+  .seccion { padding-block: 32px; border-top: 1px solid var(--rock-2); display: grid; gap: 18px; }
+  .ruta { display: grid; gap: 22px; }
+  .tramo { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 16px; align-items: start; }
+  @media (max-width: 640px) { .tramo { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
+  .tramo > .nombre { font-family: var(--display); font-size: 14px; color: var(--lamp); letter-spacing: .04em; padding-top: 12px; }
+  .clases { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .clase { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; text-decoration: none; color: var(--ink);
+    background: var(--rock); border: 1px solid var(--rock-2); border-radius: 4px; padding: 12px 14px; }
+  .clase:hover { border-color: var(--lamp); color: var(--ink); }
+  .clase .num { font-family: var(--display); font-size: 20px; color: var(--exit); grid-row: span 2; align-self: start; min-width: 2.2ch; }
+  .clase b { font-size: 15.5px; }
+  .clase span { color: var(--muted); font-size: 13.5px; }
+  .vias { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .via { border: 1px solid var(--rock-2); border-radius: 4px; padding: 16px; display: grid; gap: 8px; align-content: start; }
+  .via h3 { font-family: var(--display); font-weight: 400; font-size: 15px; color: var(--ink); }
+  .manifiesto { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+  @media (max-width: 820px) { .manifiesto { grid-template-columns: minmax(0, 1fr); } }
+  .manifiesto blockquote { margin: 0; font-family: var(--display); font-size: clamp(18px, 2.4vw, 24px); line-height: 1.35; color: var(--ink); }
+  .manifiesto blockquote .g { color: var(--exit); }
+  .ciclo { display: grid; gap: 10px; counter-reset: c; }
+  .ciclo li { list-style: none; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; }
+  .ciclo li::before { counter-increment: c; content: counter(c); font-family: var(--mono); color: var(--cave); background: var(--lamp); border-radius: 2px; text-align: center; height: 22px; line-height: 22px; font-size: 13px; }
+  .ciclo { padding: 0; margin: 0; }
+  a.via.idea { text-decoration: none; color: var(--ink); background: var(--rock); }
+  a.via.idea:hover { border-color: var(--lamp); color: var(--ink); }
+  a.via.idea p { color: var(--muted); font-size: 14.5px; }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="wrap"><a class="brand" href="index.html">RL <span class="g">a ciegas</span></a>
+  <nav aria-label="Secciones"><a href="clases/01-introduccion.html">Por qué</a><a href="#clases">Clases</a><a href="juego/la-cueva-a-ciegas.html">Juego</a><a href="difusion/estrategia.html">Difusión</a><a id="ghLink" href="#">GitHub</a></nav></div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <div class="lead">
+      <div class="eyebrow">Curso libre y abierto de aprendizaje por refuerzo</div>
+      <h1>RL a <span class="g">ciegas</span></h1>
+      <p class="thesis">Estás en una cueva a oscuras. Solo sabés que hay una pared cuando la tocás. En algún lugar hay una salida verde. Este curso enseña cómo aprende una máquina en esa situación, y cómo enseñárselo a otra persona.</p>
+      <div class="cta">
+        <a class="btn primary" href="clases/01-introduccion.html">Empezar por la clase 1</a>
+        <a class="btn go" href="juego/la-cueva-a-ciegas.html">Jugar la cueva</a>
+        <a class="btn" href="clases/00a-python.html">Nivelación (optativa)</a>
+      </div>
+    </div>
+    <div>
+      <div class="stage"><canvas id="hero" aria-label="El valor se propaga por la cueva desde la salida, casilla por casilla"></canvas></div>
+      <p class="caption" id="heroCap">iteración de valor en la cueva grande · el conocimiento se propaga desde la salida</p>
+    </div>
+  </section>
+
+  <section class="seccion" id="por-que">
+    <h2>Por qué este curso</h2>
+    <p class="prose muted">La clase 1 es el marco desde el que se lee todo el resto. Tres ideas de fondo, cada una con una figura para tocar y anclada en la cueva.</p>
+    <div class="vias">
+      <a class="via idea" href="clases/01-introduccion.html#freire"><span class="caption">Freire · Pedagogía del oprimido</span><h3>Aprender actuando</h3><p>No te depositan RL: se lo enseñás a una máquina y entendés en el camino. El feed, que deposita contenido elegido para el próximo clic, es el contraejemplo.</p></a>
+      <a class="via idea" href="clases/01-introduccion.html#foucault"><span class="caption">Foucault · La hermenéutica del sujeto</span><h3>Elegir tu recompensa</h3><p>Toda la pregunta del RL es quién define la recompensa. Cuidarse, en este curso, es poder ver y elegir la propia en lugar de aceptar la que pone una plataforma.</p></a>
+      <a class="via idea" href="clases/01-introduccion.html#dawkins"><span class="caption">Dawkins · El gen egoísta</span><h3>Enseñar a enseñar</h3><p>El curso es un meme: vive solo si cada persona que lo aprende se lo enseña a otra, con fidelidad, fecundidad y longevidad.</p></a>
+    </div>
+  </section>
+
+  <section class="seccion" id="clases">
+    <h2>El recorrido</h2>
+    <p class="prose muted">Doce clases en cuatro trimestres de tres, desde la primera definición hasta Deep RL y los agentes. Antes, una nivelación optativa: Python, probabilidad y álgebra lineal, todo explicado con la misma cueva. Se basa en las primeras clases de Stanford CS234 y en el libro de Sutton y Barto.</p>
+    <div class="ruta" id="ruta"></div>
+  </section>
+
+  <section class="seccion">
+    <h2>Dos vías, la misma cueva</h2>
+    <div class="vias">
+      <div class="via"><h3>Sin código</h3><p>Cada clase tiene una página interactiva y está el juego. Se aprende tocando: cambiás γ, soltás un agente, mirás cómo se llena el mapa de valores.</p></div>
+      <div class="via"><h3>Con código</h3><p>Cada clase tiene un notebook de Python que corre en Colab en menos de un minuto. Los pasos están numerados y cada uno es una llamada a una función con su gráfico: no hace falta saber programar de antes.</p></div>
+      <div class="via"><h3>Para docentes</h3><p>Cada página termina con un bloque «Para enseñarlo»: la clase en una oración, una pregunta para hacer y un ejercicio de cinco minutos. El programa sugiere dinámicas de aula invertida.</p></div>
+    </div>
+  </section>
+
+  <section class="seccion manifiesto">
+    <blockquote>Soy un curso. Para sobrevivir necesito que alguien me aprenda <span class="g">y me enseñe a otro</span>.</blockquote>
+    <div style="display:grid; gap:14px">
+      <p>Un agente de RL aprende propagando el valor de la salida hacia atrás, casilla por casilla. Las ideas se propagan igual, de persona en persona. Este curso funciona como un meme, en el sentido de Dawkins: algo que se copia, a veces con errores, y que dura según cuántas veces se enseña.</p>
+      <ol class="ciclo">
+        <li>Le enseñás a una máquina a salir de la cueva.</li>
+        <li>Entendés cómo aprende algo que no ve.</li>
+        <li>Se lo enseñás a otra persona con el bloque «Para enseñarlo».</li>
+        <li>Esa persona hace lo mismo con otra.</li>
+      </ol>
+      <p>La campaña de difusión del curso es el ejemplo resuelto del proyecto final: <a href="difusion/estrategia.html">cómo se propaga este curso, planteado como un problema de RL</a>.</p>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <h2>Créditos</h2>
+    <p class="prose muted small">Basado en <a href="https://web.stanford.edu/class/cs234/">Stanford CS234</a> (Brunskill, 2026), los repasos de probabilidad y álgebra lineal de CS229 y el tutorial de Python de CS231n, todos adaptados libremente al castellano; en <a href="http://incompleteideas.net/book/the-book-2nd.html">Sutton y Barto (2018)</a> y en Ecoffet et al., <a href="https://doi.org/10.1038/s41586-020-03157-9"><i>First return, then explore</i></a> (Nature, 2021). Personaje: sprites del juego original. Curso de Dimas Torres.</p>
+  </section>
+</main>
+<footer class="site wrap">RL a ciegas · material libre para enseñar a las máquinas y a las personas.</footer>
+
+<script src="assets/cueva.js"></script>
+<script>
+  // recorrido
+  const DESC = {
+    "1": "Por qué este curso: Freire, Foucault y el curso como meme.", "7": "Cuando la casilla no alcanza: memoria y modelos de lenguaje.",
+    "10": "El modelo de lenguaje como política: la acción es texto.", "11": "Difusión y tutor: a favor de quién juega la recompensa.", "12": "Proyecto final, el recorrido entero y cómo se propaga.",
+    "0a": "La cueva es una matriz y una imagen.", "0b": "Variables aleatorias y Bayes con un piso que resbala.", "0c": "Bellman como sistema lineal: una matriz por clase.",
+    "2": "Agente, entorno, historia, estado y el tutor de IA.", "3": "Descuento, Bellman e iteración de valor.", "4": "Monte Carlo, TD y Q-learning.",
+    "5": "Recompensa escasa, curiosidad y Go-Explore.", "6": "De la tabla Q a una red neuronal.", "8": "Marketing, tutores, robots, deep search y RLHF.",
+    "9": "El feed, RL sin simulador (ReAgent) y agentes de LLM."
+  };
+  const grupos = [["Nivelación (optativa)", Cueva.CLASES.filter(c => c.trimestre === "N")], ...[1, 2, 3, 4].map(t => [`Trimestre ${t}`, Cueva.CLASES.filter(c => c.trimestre === t)]),
+    ["Epílogo", [{ id: "∞", archivo: "../difusion/estrategia.html", titulo: "Cómo se propaga este curso" }]]];
+  DESC["∞"] = "La campaña de difusión resuelta como bandit.";
+  document.getElementById("ruta").innerHTML = grupos.map(([n, cs]) => `<div class="tramo"><div class="nombre">${n}</div><div class="clases">${
+    cs.map(c => `<a class="clase" href="clases/${c.archivo}"><span class="num">${c.id}</span><b>${c.titulo}</b><span>${DESC[c.id] || ""}</span></a>`).join("")}</div></div>`).join("");
+  document.getElementById("ghLink").href = "https://github.com/" + Cueva.REPO;
+
+  // héroe: el valor se derrama por la cueva grande y vuelve a empezar
+  const env = Cueva.makeEnv(Cueva.MAPS.grande);
+  const T = Cueva.tablero(document.getElementById("hero"), env, { maxCell: 26 });
+  const reducido = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const finalV = Cueva.iteracionValor(env, { gamma: 0.96, iters: 80 }).V;
+  let V = new Array(env.nS).fill(0), k = 0, pausa = 0;
+  const lo = Math.min(...finalV.filter((_, s) => s !== env.goal)), hi = Math.max(...finalV);
+  function dibujar() {
+    T.fondo().paredes();
+    for (let s = 0; s < env.nS; s++) { if (s === env.goal) continue; const [r, c] = env.free[s]; T.casilla(r, c, V[s] > 0 ? Cueva.rampa("valor", (V[s] - lo) / (hi - lo)) : "#05070a"); }
+    T.salida().entrada();
+    if (k >= 60) T.trayecto(Cueva.camino(env, Cueva.politicaGreedy(env, V, { gamma: 0.96 })), Cueva.COL().exit, .1);
+  }
+  function paso() {
+    if (k < 60) { V = Cueva.iteracionValor(env, { gamma: 0.96, iters: 1, V }).V; k++; }
+    else if (++pausa > 40) { V = new Array(env.nS).fill(0); k = 0; pausa = 0; }
+    dibujar(); setTimeout(() => requestAnimationFrame(paso), 90);
+  }
+  if (reducido) { V = finalV; k = 60; dibujar(); } else { V = Cueva.iteracionValor(env, { gamma: 0.96, iters: 18 }).V; k = 18; dibujar(); paso(); }
+  addEventListener("resize", () => { T.medir(); dibujar(); });
+</script>
+</body>
+</html>

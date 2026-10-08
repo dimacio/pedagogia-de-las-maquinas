@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>05 · Recompensa · RL a ciegas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../../../assets/estilo.css">
+<link rel="stylesheet" href="post.css">
+<style></style>
+</head>
+<body class="a2" data-n="5">
+<div class="post">
+  <div class="cab"></div>
+
+  <h1 class="tit m">Recompensa: decile <span class="a">qué</span>, no cómo.</h1>
+  <div class="fig"><canvas id="cv" class="marco"></canvas></div>
+  <div style="display:grid;gap:16px">
+    <p class="txt">Un poquito de castigo por paso, <b>+1</b> al salir. La máquina encuentra sola el camino corto.</p>
+    <p class="voz">La recompensa es lo único que le das. Elegila bien.</p>
+  </div>
+  <div class="pie"></div>
+</div>
+<script src="../../../assets/cueva.js"></script>
+<script src="post.js"></script>
+<script>
+
+  const env = Cueva.makeEnv(Cueva.MAPS.chica);
+  const T = Post.cueva(document.getElementById("cv"), env, 52);
+  const { V } = Cueva.iteracionValor(env, { gamma: .95, costo: .01, iters: 300 });
+  const pol = Cueva.politicaGreedy(env, V, { gamma: .95, costo: .01 });
+  const path = Cueva.camino(env, pol);
+  Post.listo(() => {
+    T.fondo("#000"); T.paredes("#151924");
+    T.trayecto(path, "rgba(242,179,90,.35)", .5);
+    path.slice(1, -1).forEach(s => T.texto(s, "−.01", "#e0645a", .3));
+    T.salida(); T.texto(env.goal, "+1", "#0b0d12", .42);
+    T.entrada(); T.sprite(env.start, 1);
+  });
+</script>
+</body>
+</html>

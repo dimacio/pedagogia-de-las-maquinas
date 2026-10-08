@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>06 · Cada casilla tiene un valor · RL a ciegas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../../../assets/estilo.css">
+<link rel="stylesheet" href="post.css">
+<style>
+  .eqp { font-family: var(--mono); font-size: 36px; color: var(--lamp); background: var(--rock); border:1px solid var(--rock-2); padding: 14px 20px; justify-self: start; }
+</style>
+</head>
+<body class="a2" data-n="6">
+<div class="post">
+  <div class="cab"></div>
+
+  <h1 class="tit m">Cada casilla tiene un <span class="a">valor</span>.</h1>
+  <div class="fig"><div style="display:grid;gap:14px;justify-items:center"><canvas id="cv" class="marco"></canvas>
+    <div class="legend" style="width:900px;font-size:22px"><span>lejos</span><span class="bar" id="bar" style="height:12px"></span><span>cerca de salir</span></div></div></div>
+  <div style="display:grid;gap:18px">
+    <div class="eqp">V(s) = máx [ r + γ·V(s') ]</div>
+    <p class="txt" style="max-width:26ch">Bellman: estar acá vale lo que vale <b>el mejor paso siguiente</b>.</p>
+  </div>
+  <div class="pie"></div>
+</div>
+<script src="../../../assets/cueva.js"></script>
+<script src="post.js"></script>
+<script>
+
+  const env = Cueva.makeEnv(Cueva.MAPS.grande);
+  const T = Post.cueva(document.getElementById("cv"), env, 36);
+  const { V } = Cueva.iteracionValor(env, { gamma: .95, costo: 0, iters: 400 });
+  const pol = Cueva.politicaGreedy(env, V, { gamma: .95 });
+  document.getElementById("bar").style.background = Cueva.gradienteCSS("valor");
+  Post.listo(() => {
+    T.fondo("#000"); T.paredes("#151924");
+    T.valores(V);
+    T.flechas(pol, "rgba(11,13,18,.55)");
+    T.trayecto(Cueva.camino(env, pol), "rgba(61,220,132,.9)", .1);
+    T.salida(); T.sprite(env.start, 1);
+  });
+</script>
+</body>
+</html>

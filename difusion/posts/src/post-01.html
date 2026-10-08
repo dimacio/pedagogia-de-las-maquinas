@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>01 · Estás a ciegas · RL a ciegas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../../../assets/estilo.css">
+<link rel="stylesheet" href="post.css">
+<style></style>
+</head>
+<body class="a1" data-n="1">
+<div class="post">
+  <div class="cab"></div>
+
+  <h1 class="tit">Estás <span class="a">a ciegas</span> en una cueva.</h1>
+  <div class="fig"><canvas id="cv" class="marco"></canvas></div>
+  <div style="display:grid;gap:16px">
+    <p class="txt">No ves el mapa. No sabés dónde está la salida. Solo podés <b>moverte</b>.</p>
+    <p class="voz">Soy un curso. Empiezo como vos: <b>a oscuras</b>.</p>
+  </div>
+  <div class="pie"></div>
+</div>
+<script src="../../../assets/cueva.js"></script>
+<script src="post.js"></script>
+<script>
+
+  const env = Cueva.makeEnv(Cueva.MAPS.chica);
+  const T = Post.cueva(document.getElementById("cv"), env, 52);
+  Post.listo(() => {
+    const ctx = T.ctx, c = T.cell, [r0, c0] = env.free[env.start];
+    T.fondo("#000");
+    const x = c0 * c + c / 2, y = r0 * c + c / 2, g = ctx.createRadialGradient(x, y, 4, x, y, c * 2.6);
+    g.addColorStop(0, "rgba(242,179,90,.26)"); g.addColorStop(1, "rgba(242,179,90,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, env.W * c, env.H * c);
+    T.entrada(); T.sprite(env.start, 2);
+    ctx.font = `400 ${c * .9}px Silkscreen`; ctx.fillStyle = "rgba(141,147,163,.38)"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    [[3, 9], [6, 4], [7, 11], [2, 12], [5, 7]].forEach(([r, cc]) => ctx.fillText("?", cc * c + c / 2, r * c + c / 2));
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>¿Qué es RL? · RL a ciegas</title>
+<meta name="description" content="Clase 2: el ciclo agente–entorno, historia vs estado, el supuesto de Markov y la trampa de la recompensa, desde la cueva a ciegas.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .lz { min-width: 0; }
+  .seg { flex-wrap: wrap; }
+  .seg button { min-width: 0; }
+  .hist { font-family: var(--mono); font-size: 12.5px; line-height: 1.5; height: 132px; overflow-y: auto; background: var(--rock);
+    border: 1px solid var(--rock-2); border-radius: 3px; padding: 6px 8px; margin: 0; list-style: none; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .hist li { white-space: nowrap; }
+  .hist li b { color: var(--ink); font-weight: 600; }
+  .hist li.bump b.o { color: var(--chalk); }
+  .hist li.meta b.r { color: var(--exit); }
+  .juego { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+  .dpad { display: grid; grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(2, 34px); gap: 4px; }
+  .dpad button { padding: 0; font-family: var(--mono); font-size: 16px; }
+  .dpad .u { grid-column: 2; grid-row: 1; } .dpad .l { grid-column: 1; grid-row: 2; } .dpad .d { grid-column: 2; grid-row: 2; } .dpad .r { grid-column: 3; grid-row: 2; }
+  .cap { font-size: 13px; color: var(--muted); }
+  .cap b { color: var(--ink); }
+  canvas:focus-visible { outline: 2px solid var(--exit); outline-offset: 2px; }
+  .ctlrow { display: grid; gap: 10px; }
+  .ctl.apagado { opacity: .55; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase 2</div>
+    <h1>¿Qué es <span class="g">RL</span>?</h1>
+    <p class="thesis">Un agente que no ve el mapa aprende solo con lo que le devuelve el mundo: qué pasó y cuánto le pagaron.</p>
+  </section>
+
+  <!-- Bloque 1: ciclo agente–entorno -->
+  <section class="bloque" id="b-ciclo">
+    <div class="stage">
+      <div class="lz"><canvas id="cvCiclo" aria-label="Ciclo agente–entorno animado: la acción va del agente al mundo y vuelven la observación y la recompensa"></canvas></div>
+      <div class="hud" id="hudCiclo"></div>
+      <div class="row">
+        <button class="btn primary" id="cicloPlay">Pausa</button>
+        <button class="btn" id="cicloPaso">Un paso</button>
+        <button class="btn" id="cicloReset">Reiniciar</button>
+      </div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 1</div>
+      <h2>Alguien decide, el mundo responde</h2>
+      <p>En cada instante <i>t</i> el <b>agente</b> (<i>agent</i>) elige una acción y el <b>entorno</b> (<i>environment</i>) le devuelve una observación y una recompensa (<i>reward</i>). Los números de la figura son los de una partida real en la cueva: 0 en cada paso, +1 al llegar a la salida.</p>
+      <p>Mirá la cueva de la izquierda: es todo lo que sabe el agente. La de la derecha la conoce solo el mundo.</p>
+      <div class="eq">maximizar  E[ r₁ + r₂ + r₃ + … ]</div>
+      <p class="nota pregunta">El agente recibe 0 durante 21 pasos seguidos. ¿Cómo sabe si iba bien o mal?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 2: historia vs estado -->
+  <section class="bloque" id="b-historia">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Memoria de la pantalla" id="segMem">
+        <button aria-pressed="true" data-m="facil">Fácil</button>
+        <button aria-pressed="false" data-m="medio">Medio</button>
+        <button aria-pressed="false" data-m="dificil">Difícil</button>
+      </div>
+      <div class="lz"><canvas id="cvJuego" tabindex="0" aria-label="Mini juego de la cueva: mover con las flechas del teclado o con los botones"></canvas></div>
+      <div class="juego">
+        <p class="cap" id="capMem"></p>
+        <div class="dpad" aria-label="Mover">
+          <button class="btn u" data-a="0" aria-label="Arriba">↑</button>
+          <button class="btn l" data-a="3" aria-label="Izquierda">←</button>
+          <button class="btn d" data-a="2" aria-label="Abajo">↓</button>
+          <button class="btn r" data-a="1" aria-label="Derecha">→</button>
+        </div>
+      </div>
+      <div class="hud" id="hudJuego"></div>
+      <ol class="hist" id="hist" aria-label="Historia h_t" aria-live="polite"></ol>
+      <div class="row"><button class="btn" id="juegoReset">Empezar de nuevo</button></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 2</div>
+      <h2>Historia contra estado</h2>
+      <p>Jugá con las flechas (tocá la cueva primero) o con los botones. Todo lo que viviste es tu <b>historia</b> (<i>history</i>): la lista de abajo, que crece en cada paso. En el modo fácil la pantalla guarda la historia por vos; en el difícil la pared solo destella al chocar y la tenés que llevar en la cabeza.</p>
+      <p>El <b>estado</b> (<i>state</i>) es un resumen de la historia que alcanza para decidir.</p>
+      <div class="eq">hₜ = (a₁, o₁, r₁, …, aₜ, oₜ, rₜ)    sₜ = f(hₜ)</div>
+      <p class="nota pregunta">En el modo difícil, ¿qué parte de la lista te alcanza recordar para no volver a chocar?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 3: Markov -->
+  <section class="bloque" id="b-markov">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué percibe el agente" id="segMarkov">
+        <button aria-pressed="true" data-m="pos">Sabe su casilla</button>
+        <button aria-pressed="false" data-m="bigotes">Solo siente 4 bigotes</button>
+      </div>
+      <div class="lz"><canvas id="cvMarkov" aria-label="La cueva con dos historias que terminan en la misma casilla, o las casillas que se sienten igual con cuatro bigotes"></canvas></div>
+      <div class="hud" id="hudMarkov"></div>
+      <div class="row" id="rowPos">
+        <button class="btn" id="mkA">Historia A</button>
+        <button class="btn" id="mkB">Historia B</button>
+      </div>
+      <p class="cap" id="capMarkov"></p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 3</div>
+      <h2>El supuesto de Markov</h2>
+      <p>Las historias A y B son distintas pero terminan en la misma casilla, y desde ahí conviene hacer lo mismo: si el agente sabe su casilla, el camino ya no importa. Eso es el <b>supuesto de Markov</b> (<i>Markov assumption</i>).</p>
+      <p>Ahora pasá a "4 bigotes" y tocá casillas: si el agente solo sintiera las paredes vecinas, 60 casillas darían apenas 12 lecturas distintas, y casillas que se sienten igual pueden pedir flechas distintas (un pasillo vertical se siente igual en toda la cueva, pero en unos conviene subir y en otros bajar).</p>
+      <div class="eq">p(sₜ₊₁ | sₜ, aₜ) = p(sₜ₊₁ | hₜ, aₜ)</div>
+      <p class="nota pregunta">Con solo los bigotes, ¿qué tendría que recordar el agente para que su estado vuelva a ser Markov?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 4: el tutor -->
+  <section class="bloque" id="b-tutor">
+    <div class="stage">
+      <div class="ctlrow">
+        <div class="seg" role="group" aria-label="Política del tutor" id="segPol">
+          <button aria-pressed="true" data-p="sumas">Solo sumas</button>
+          <button aria-pressed="false" data-p="alternar">Alternar</button>
+          <button aria-pressed="false" data-p="restas">Mayormente restas</button>
+          <button aria-pressed="false" data-p="tuya">La tuya</button>
+        </div>
+        <div class="ctl apagado" id="ctlTuya">
+          <label for="slTuya">La tuya: % de problemas de resta <output id="outTuya">50 %</output></label>
+          <input type="range" id="slTuya" min="0" max="100" step="5" value="50">
+        </div>
+        <div class="seg" role="group" aria-label="Recompensa del tutor" id="segRec">
+          <button aria-pressed="true" data-r="acierto">Recompensa: +1 / −1 por acierto</button>
+          <button aria-pressed="false" data-r="aprendizaje">Recompensa: lo que aprendió</button>
+        </div>
+      </div>
+      <div class="lz"><canvas id="cvTutor" aria-label="Gráfico: recompensa acumulada del tutor contra aprendizaje final del alumno, para cada política"></canvas></div>
+      <div class="hud" id="hudTutor"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 4 · aula invertida</div>
+      <h2>El tutor de IA y la trampa de la recompensa</h2>
+      <p>Un alumno no sabe sumar (fácil de aprender) ni restar (difícil). Un tutor le da 60 problemas, uno por vez, y cobra +1 si el alumno acierta y −1 si se equivoca. Cada punto del gráfico es una política promediada sobre 300 alumnos simulados.</p>
+      <p>Con +1/−1, la política que más cobra es "solo sumas", que deja al alumno sin restar: el tutor optimiza lo que le pedimos, no lo que queríamos. Eso es la <b>trampa de la recompensa</b> (<i>reward hacking</i>). Cambiá la recompensa y mirá cómo se endereza la curva.</p>
+      <p class="nota pregunta">Antes de tocar nada: ¿cuál es el estado, la acción y la recompensa de este tutor? ¿Un tutor real podría medir "lo que aprendió"?</p>
+    </div>
+  </section>
+
+  <!-- Para enseñarlo -->
+  <section class="bloque full" id="b-ensenar">
+    <div class="texto prose">
+      <div class="paso">Para enseñarlo</div>
+      <h2>Cómo contar esta clase en una oración</h2>
+      <p>"Aprender por refuerzo es aprender a decidir cuando nadie te dice la respuesta correcta: solo te pagan, a veces mucho después, y te pagan por lo que pediste, no por lo que querías."</p>
+      <p class="nota pregunta">Pregunta para hacerle a la otra persona: si te pagaran un punto por cada respuesta correcta de tus alumnos, ¿qué ejercicios les darías?</p>
+      <p><b>Ejercicio de 5 minutos:</b> en parejas, una persona hace de agente con los ojos cerrados y la otra de entorno. El agente dice una dirección; el entorno responde solo "pared" o "nada" y, al llegar a una salida imaginaria, "+1". Después de dos minutos cambian de rol y anotan en el pizarrón qué recordaba cada agente para no chocar dos veces con la misma pared: eso es su estado.</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(async () => {
+  // cada figura se arma en su propia tarea, para no trabar el navegador al cargar
+  const tarea = f => new Promise(r => setTimeout(() => r(f()), 0));
+  Cueva.pagina("2", { lecturas: [
+    { texto: "Sutton y Barto, Reinforcement Learning: An Introduction, cap. 1 y 3", url: "http://incompleteideas.net/book/the-book-2nd.html" },
+    { texto: "Stanford CS234 (Brunskill), clase 1", url: "https://web.stanford.edu/class/cs234/" },
+    { texto: "Amodei et al. (2016), Concrete Problems in AI Safety: la trampa de la recompensa", url: "https://arxiv.org/abs/1606.06565" }
+  ] });
+  const env = Cueva.makeEnv(Cueva.MAPS.chica);
+  const COL = Cueva.COL();
+  const AR = Cueva.ARROW;
+  const reducir = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const MONO = COL.mono || "monospace";
+  const GAMMA = 0.99;
+  const rcTxt = s => `(${env.free[s][0]},${env.free[s][1]})`;
+
+  // política óptima (con mapa) para dar la "partida real" y las flechas de referencia
+  let V = new Array(env.nS).fill(0);
+  for (let k = 0; k < 200; k++) { const r = Cueva.iteracionValor(env, { gamma: GAMMA, V }); V = r.V; if (r.delta < 1e-12) break; }
+  const POL = Cueva.politicaGreedy(env, V, { gamma: GAMMA });
+
+  // ---------- utilidades de dibujo ----------
+  function flechaCurva(ctx, x0, y0, cx, cy, x1, y1, color) {
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(cx, cy, x1, y1); ctx.stroke();
+    const ang = Math.atan2(y1 - cy, x1 - cx), L = 9;
+    ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(x1, y1);
+    ctx.lineTo(x1 - L * Math.cos(ang - .45), y1 - L * Math.sin(ang - .45)); ctx.lineTo(x1 - L * Math.cos(ang + .45), y1 - L * Math.sin(ang + .45)); ctx.closePath(); ctx.fill();
+  }
+  const bez = (t, a, b, c) => (1 - t) * (1 - t) * a + 2 * (1 - t) * t * b + t * t * c;
+  function miniCueva(ctx, x, y, cell, { mapa = false, tocadas = null, rastro = null, s = null, dir = 2 }) {
+    ctx.fillStyle = "#000"; ctx.fillRect(x, y, env.W * cell, env.H * cell);
+    for (let r = 0; r < env.H; r++) for (let c = 0; c < env.W; c++) {
+      if (mapa && env.rows[r][c] === "#") { ctx.fillStyle = "#2c3346"; ctx.fillRect(x + c * cell, y + r * cell, cell, cell); }
+    }
+    if (tocadas) for (const k of tocadas) { const [r, c] = k.split(",").map(Number); ctx.fillStyle = COL.chalk; ctx.fillRect(x + c * cell + .5, y + r * cell + .5, cell - 1, cell - 1); }
+    const [gr, gc] = env.free[env.goal]; ctx.fillStyle = COL.exit; ctx.fillRect(x + gc * cell + 1, y + gr * cell + 1, cell - 2, cell - 2);
+    if (rastro && rastro.length > 1) {
+      ctx.strokeStyle = "rgba(242,179,90,.55)"; ctx.lineWidth = Math.max(1.5, cell * .18); ctx.lineJoin = "round"; ctx.beginPath();
+      rastro.forEach((q, i) => { const [r, c] = env.free[q]; const px = x + c * cell + cell / 2, py = y + r * cell + cell / 2; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }); ctx.stroke();
+    }
+    if (s !== null) { const [r, c] = env.free[s]; ctx.fillStyle = COL.lamp; ctx.beginPath(); ctx.arc(x + c * cell + cell / 2, y + r * cell + cell / 2, Math.max(2.5, cell * .36), 0, 7); ctx.fill(); }
+  }
+  function chip(ctx, x, y, txt, color) {
+    ctx.font = `600 12px ${MONO}`; const w = ctx.measureText(txt).width + 12;
+    ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - w / 2, y - 10, w, 20, 3) : ctx.rect(x - w / 2, y - 10, w, 20); ctx.fill();
+    ctx.fillStyle = "#0b0d12"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(txt, x, y + 1);
+  }
+
+  // =====================================================================
+  // 1. Ciclo agente–entorno
+  // =====================================================================
+  const ciclo = await tarea(() => {
+    // partida real: un choque al principio, uno a mitad de camino, y después el camino óptimo
+    const opt = Cueva.camino(env, POL);
+    const acciones = [];
+    for (let i = 0; i < opt.length - 1; i++) acciones.push(POL[opt[i]]);
+    const pared = s => [0, 1, 2, 3].find(a => env.move(s, a)[1] && a !== POL[s]);
+    acciones.splice(0, 0, 0);                       // ↑ contra la pared de arriba de S
+    const mid = 9; const sm = opt[mid - 1]; const am = pared(sm); if (am !== undefined) acciones.splice(mid, 0, am);
+    const pasos = []; let s = env.start;
+    for (const a of acciones) { const [s2, choque, key] = env.move(s, a); pasos.push({ s, a, s2, choque, key, r: Cueva.recompensa(env, s2, 0) }); s = s2; if (s2 === env.goal) break; }
+
+    const cv = document.getElementById("cvCiclo"), hud = document.getElementById("hudCiclo");
+    const btnPlay = document.getElementById("cicloPlay");
+    const ajustar = Cueva.lienzo(cv, 300);
+    let t = 0, fase = 0, jugando = !reducir, ultimo = 0, espera = 0, raf = 0;
+    const DUR = 1500;
+    function conocido(hasta) {   // lo que sabe el agente después de recibir hasta el paso `hasta` (exclusivo)
+      const toc = new Set(), rastro = [env.start];
+      for (let i = 0; i < hasta; i++) { const p = pasos[i]; if (p.choque) toc.add(p.key); rastro.push(p.s2); }
+      return { toc, rastro };
+    }
+    function dibujar() {
+      const alto = Math.max(260, Math.min(360, Math.round(cv.parentElement.clientWidth * .52)) + 70);
+      const lz = Cueva.lienzo(cv, alto); const { w, h, ctx } = lz();
+      ctx.clearRect(0, 0, w, h); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      const pad = 6, bw = Math.min(Math.floor((w - 2 * pad) * .42), 270);
+      const cell = Math.max(5, Math.floor((bw - 14) / env.W));
+      const bh = 26 + cell * env.H + 10, y0 = Math.round((h - bh) / 2);
+      const xa = pad, xm = w - pad - bw;
+      const p = pasos[Math.min(t, pasos.length - 1)];
+      const enCurso = t < pasos.length;
+      // estado del mundo: si la acción ya llegó (fase >= .5) el mundo está en s2
+      const mundoS = enCurso ? (fase >= .5 ? p.s2 : p.s) : pasos[pasos.length - 1].s2;
+      const k = conocido(enCurso ? (fase >= 1 ? t + 1 : t) : pasos.length);
+      const agS = k.rastro[k.rastro.length - 1];
+      // cajas
+      for (const [x, titulo, sub, col] of [[xa, "Agente", "lo que sabe", COL.lamp], [xm, "Mundo", "el mapa real", COL.exit]]) {
+        ctx.fillStyle = "#151924"; ctx.strokeStyle = col; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.rect(x + .5, y0 + .5, bw - 1, bh - 1); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = COL.ink; ctx.font = `700 14px ${MONO}`; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(titulo, x + 7, y0 + 13);
+        ctx.fillStyle = COL.muted; ctx.font = `11px ${MONO}`; ctx.textAlign = "right"; if (bw > 150) ctx.fillText(sub, x + bw - 7, y0 + 13);
+      }
+      const cx0 = xa + Math.round((bw - cell * env.W) / 2), cx1 = xm + Math.round((bw - cell * env.W) / 2), cy = y0 + 26;
+      miniCueva(ctx, cx0, cy, cell, { tocadas: k.toc, rastro: k.rastro, s: agS });
+      miniCueva(ctx, cx1, cy, cell, { mapa: true, s: mundoS });
+      // flechas
+      const ax0 = xa + bw * .55, ax1 = xm + bw * .45;
+      const topY = y0 - 6, cTop = Math.max(14, y0 - 46), botY = y0 + bh + 6, cBot = Math.min(h - 14, y0 + bh + 46);
+      flechaCurva(ctx, ax0, topY, (ax0 + ax1) / 2, cTop, ax1, topY, "rgba(242,179,90,.7)");
+      flechaCurva(ctx, ax1, botY, (ax0 + ax1) / 2, cBot, ax0, botY, "rgba(94,200,216,.7)");
+      ctx.font = `12px ${MONO}`; ctx.fillStyle = COL.muted; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("acción aₜ", (ax0 + ax1) / 2, Math.max(8, cTop - 4));
+      ctx.fillText("observación oₜ · recompensa rₜ", (ax0 + ax1) / 2, Math.min(h - 7, cBot + 4));
+      // t en el medio
+      ctx.fillStyle = COL.ink; ctx.font = `600 ${w < 420 ? 12 : 15}px ${MONO}`; ctx.fillText(`t=${Math.min(t + 1, pasos.length)}`, w / 2, y0 + bh / 2);
+      // paquetes viajando
+      if (enCurso) {
+        const midX = (ax0 + ax1) / 2;
+        if (fase < .5) {
+          const u = fase / .5; chip(ctx, bez(u, ax0, midX, ax1), bez(u, topY, cTop + 18, topY), AR[p.a], COL.lamp);
+        } else if (fase < 1) {
+          const u = (fase - .5) / .5;
+          const txt = `${rcTxt(p.s2)}${p.choque ? " pared" : ""} · r=${p.r}`;
+          chip(ctx, bez(u, ax1, midX, ax0), bez(u, botY, cBot - 18, botY), txt, p.r > 0 ? COL.exit : COL.sonar);
+        }
+      }
+      // HUD
+      const G = pasos.slice(0, enCurso ? (fase >= 1 ? t + 1 : t) : pasos.length).reduce((a, q) => a + q.r, 0);
+      hud.innerHTML = `<span>t <b>${Math.min(t + 1, pasos.length)}</b></span><span>aₜ <b>${AR[p.a]}</b></span>` +
+        `<span>oₜ <b>${rcTxt(p.s2)}${p.choque ? ", chocó" : ""}</b></span><span>rₜ <b>${p.r}</b></span><span>suma <b>${G}</b></span>` +
+        (!enCurso || (t === pasos.length - 1 && fase >= 1) ? `<span style="color:var(--exit)">salió en ${pasos.length} pasos</span>` : "");
+    }
+    function loop(now) {
+      raf = 0;
+      if (!jugando) return;
+      const dt = Math.min(80, now - (ultimo || now)); ultimo = now;
+      if (espera > 0) { espera -= dt; if (espera <= 0) { t = 0; fase = 0; } }
+      else {
+        fase += dt / DUR;
+        if (fase >= 1.25) { fase = 0; t++; if (t >= pasos.length) { t = pasos.length; espera = 1800; } }
+      }
+      dibujar(); raf = requestAnimationFrame(loop);
+    }
+    function play(on) { jugando = on; btnPlay.textContent = on ? "Pausa" : "Animar"; ultimo = 0; if (on && !raf) raf = requestAnimationFrame(loop); }
+    btnPlay.onclick = () => play(!jugando);
+    document.getElementById("cicloPaso").onclick = () => {
+      play(false); espera = 0;
+      if (t >= pasos.length) { t = 0; fase = 1; } else if (fase < 1) fase = 1; else { t++; if (t < pasos.length) fase = 1; }
+      dibujar();
+    };
+    document.getElementById("cicloReset").onclick = () => { t = 0; fase = 0; espera = 0; dibujar(); };
+    if (reducir) { fase = 1; t = 3; }
+    play(jugando);
+    // pausa la animación fuera de pantalla
+    new IntersectionObserver(es => { for (const e of es) { if (!e.isIntersecting && jugando) { cancelAnimationFrame(raf); raf = 0; } else if (e.isIntersecting && jugando && !raf) { ultimo = 0; raf = requestAnimationFrame(loop); } } }).observe(cv);
+    return { dibujar };
+  });
+
+  // =====================================================================
+  // 2. Historia vs estado: mini juego
+  // =====================================================================
+  const juego = await tarea(() => {
+    const cv = document.getElementById("cvJuego"), hud = document.getElementById("hudJuego"), lista = document.getElementById("hist"), cap = document.getElementById("capMem");
+    const T = Cueva.tablero(cv, env, { maxCell: 40 });
+    let modo = "facil", s, dir, rastro, h, paredes, salio, raf = 0;
+    const FADE = 3000, FLASH = 450;
+    function reset() { s = env.start; dir = 2; rastro = [s]; h = []; paredes = new Map(); salio = false; lista.innerHTML = ""; }
+    function mover(a, silencioso = false) {
+      if (salio) reset();
+      const [s2, choque, key] = env.move(s, a); dir = a;
+      const r = Cueva.recompensa(env, s2, 0);
+      if (choque) paredes.set(key, performance.now()); else rastro.push(s2);
+      s = s2; h.push({ a, s2, choque, r });
+      if (s === env.goal) salio = true;
+      const li = document.createElement("li"); li.className = (choque ? "bump" : "") + (r > 0 ? " meta" : "");
+      li.innerHTML = `t=${String(h.length).padStart(2, " ")}  a=<b>${AR[a]}</b>  o=<b class="o">${rcTxt(s2)}${choque ? " pared " + AR[a] : ""}</b>  r=<b class="r">${r}</b>`;
+      lista.appendChild(li); while (lista.children.length > 300) lista.firstChild.remove();
+      if (!silencioso) lista.scrollTop = lista.scrollHeight;
+      animar();
+    }
+    function animar() { if (!raf) raf = requestAnimationFrame(dibujar); }
+    function dibujar() {
+      raf = 0; const now = performance.now(); let activo = false;
+      T.fondo("#000");
+      if (modo === "facil") { T.trayecto(rastro, "rgba(242,179,90,.45)", .14); T.tocadas(paredes.keys()); }
+      else {
+        for (const [k, t0] of paredes) {
+          const dur = modo === "medio" ? FADE : FLASH, e = now - t0;
+          if (e < dur) { const al = modo === "medio" ? 1 - e / dur : 1 - (e / dur) ** 2; const [r, c] = k.split(",").map(Number); T.casilla(r, c, `rgba(201,204,211,${al.toFixed(3)})`, 1); activo = true; }
+        }
+      }
+      T.salida(); T.sprite(s, dir, h.length % 2);
+      if (salio) {
+        const ctx = T.ctx, cell = T.cell; ctx.fillStyle = "rgba(0,0,0,.6)"; ctx.fillRect(0, env.H * cell / 2 - 22, env.W * cell, 44);
+        ctx.fillStyle = COL.exit; ctx.font = `600 ${Math.max(13, Math.round(cell * .5))}px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(`Saliste en ${h.length} pasos. r = +1`, env.W * cell / 2, env.H * cell / 2);
+      }
+      // cuánto recuerda la pantalla
+      const visibles = modo === "facil" ? paredes.size : [...paredes.values()].filter(t0 => now - t0 < (modo === "medio" ? FADE : FLASH)).length;
+      const choques = h.filter(x => x.choque).length;
+      hud.innerHTML = `<span>pasos <b>${h.length}</b></span><span>choques <b>${choques}</b></span><span>paredes en pantalla <b>${visibles}/${paredes.size}</b></span><span>|hₜ| <b>${h.length * 3}</b> números</span>`;
+      if (activo) raf = requestAnimationFrame(dibujar);
+    }
+    const textos = {
+      facil: "La pantalla guarda la historia por vos: <b>quedan las paredes tocadas y el camino</b>.",
+      medio: "Las paredes se apagan en unos 3 segundos y <b>el camino no queda</b>: la pantalla recuerda poco.",
+      dificil: "La pared <b>solo destella al chocar</b>: la historia la llevás en la cabeza."
+    };
+    function setModo(m) { modo = m; cap.innerHTML = textos[m]; document.querySelectorAll("#segMem button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === m)); animar(); }
+    document.querySelectorAll("#segMem button").forEach(b => b.onclick = () => setModo(b.dataset.m));
+    document.querySelectorAll(".dpad button").forEach(b => b.onclick = () => mover(+b.dataset.a));
+    const TECLAS = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3, w: 0, d: 1, s: 2, a: 3, W: 0, D: 1, S: 2, A: 3 };
+    cv.addEventListener("keydown", e => { if (e.key in TECLAS) { e.preventDefault(); mover(TECLAS[e.key]); } });
+    cv.addEventListener("pointerdown", () => cv.focus());
+    document.getElementById("juegoReset").onclick = () => { reset(); animar(); };
+    reset();
+    for (const a of [1, 1, 1, 0, 1, 2, 2]) mover(a, true);   // historia inicial: dos choques
+    // las marcas de tiempo de la historia inicial se ponen "viejas" para que en medio/difícil no destellen solas
+    for (const k of paredes.keys()) paredes.set(k, -1e9);
+    setModo("facil");
+    Cueva.alCargarSprites(animar);
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // 3. Markov: dos historias, misma casilla / bigotes
+  // =====================================================================
+  const markov = await tarea(() => {
+    const cv = document.getElementById("cvMarkov"), hud = document.getElementById("hudMarkov"), cap = document.getElementById("capMarkov");
+    const T = Cueva.tablero(cv, env, { maxCell: 40 });
+    const recorrer = acc => { let s = env.start; const p = [s]; for (const a of acc) { s = env.move(s, a)[0]; p.push(s); } return p; };
+    const histA = recorrer([1, 1, 1, 2, 2, 3]);
+    const histB = recorrer([2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 0, 0, 3, 3, 3, 0, 0]);
+    const fin = histA[histA.length - 1];
+    const sigue = (() => { const p = [fin]; let s = fin; for (let i = 0; i < 80 && s !== env.goal; i++) { s = env.move(s, POL[s])[0]; p.push(s); } return p; })();
+    const lectura = s => { const [r, c] = env.free[s]; return Cueva.DR.map(([dr, dc]) => env.isWall(r + dr, c + dc) ? 1 : 0); };
+    const firmas = Array.from({ length: env.nS }, (_, s) => lectura(s).join(""));
+    const nFirmas = new Set(firmas).size;
+    let modo = "pos", cual = "B", progreso = 1, raf = 0, sel = env.idx["4,1"];
+
+    function offsetPath(path, off) { const cell = T.cell; return path.map(q => { const [r, c] = env.free[q]; return [c * cell + cell / 2 + off, r * cell + cell / 2 + off]; }); }
+    function linea(pts, color, ancho, frac = 1, dash = null) {
+      const ctx = T.ctx; const n = Math.max(1, Math.floor((pts.length - 1) * frac));
+      ctx.strokeStyle = color; ctx.lineWidth = ancho; ctx.lineJoin = "round"; ctx.lineCap = "round"; if (dash) ctx.setLineDash(dash);
+      ctx.beginPath(); pts.slice(0, n + 1).forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); ctx.setLineDash([]);
+    }
+    function dibujar() {
+      raf = 0; const ctx = T.ctx, cell = T.cell;
+      T.fondo("#000").paredes("#2c3346").salida().entrada();
+      if (modo === "pos") {
+        const off = Math.max(2, cell * .1);
+        const pA = offsetPath(histA, -off), pB = offsetPath(histB, off);
+        if (cual === "A") { linea(pB, "rgba(94,200,216,.25)", Math.max(2, cell * .1)); linea(pA, COL.lamp, Math.max(2.5, cell * .14), progreso); }
+        else { linea(pA, "rgba(242,179,90,.25)", Math.max(2, cell * .1)); linea(pB, COL.sonar, Math.max(2.5, cell * .14), progreso); }
+        if (progreso >= 1) {
+          linea(offsetPath(sigue, 0), "rgba(61,220,132,.8)", Math.max(2, cell * .1), 1, [cell * .25, cell * .2]);
+          T.texto(fin, AR[POL[fin]], COL.exit, .55);
+        }
+        const [r, c] = env.free[fin]; ctx.strokeStyle = COL.ember; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(c * cell + cell / 2, r * cell + cell / 2, cell * .46, 0, 7); ctx.stroke();
+        const h = cual === "A" ? histA : histB;
+        hud.innerHTML = `<span>historia <b style="color:${cual === "A" ? "var(--lamp)" : "var(--sonar)"}">${cual}</b>: <b>${h.length - 1}</b> pasos</span><span>termina en <b>${rcTxt(fin)}</b></span><span>mejor acción ahí <b style="color:var(--exit)">${AR[POL[fin]]}</b></span>`;
+        cap.innerHTML = `A tiene ${histA.length - 1} pasos y B ${histB.length - 1}. Desde el círculo rojo, el camino verde punteado es el mismo para las dos: <b>el pasado no cambia la decisión</b>.`;
+      } else {
+        const f = firmas[sel]; const iguales = [];
+        for (let s = 0; s < env.nS; s++) if (firmas[s] === f) { iguales.push(s); const [r, c] = env.free[s]; T.casilla(r, c, "rgba(94,200,216,.28)", 1); }
+        for (const s of iguales) if (s !== env.goal) T.texto(s, AR[POL[s]], s === sel ? COL.ink : "rgba(232,230,223,.8)", .45);
+        // bigotes en la casilla elegida
+        const [r, c] = env.free[sel], x = c * cell + cell / 2, y = r * cell + cell / 2;
+        lectura(sel).forEach((w, a) => { const [dr, dc] = Cueva.DR[a]; ctx.strokeStyle = w ? COL.chalk : "rgba(141,147,163,.6)"; ctx.lineWidth = w ? 2.5 : 1.5; ctx.setLineDash(w ? [] : [2, 3]);
+          ctx.beginPath(); ctx.moveTo(x + dc * cell * .22, y + dr * cell * .22); ctx.lineTo(x + dc * cell * .62, y + dr * cell * .62); ctx.stroke(); ctx.setLineDash([]); });
+        ctx.strokeStyle = COL.lamp; ctx.lineWidth = 2.5; ctx.strokeRect(c * cell + 1.5, r * cell + 1.5, cell - 3, cell - 3);
+        const flechas = new Set(iguales.filter(s => s !== env.goal).map(s => POL[s]));
+        const txtL = lectura(sel).map((w, a) => `${AR[a]}${w ? "■" : "□"}`).join(" ");
+        hud.innerHTML = `<span>lectura <b>${txtL}</b></span><span>casillas iguales <b>${iguales.length}</b> de ${env.nS}</span><span>lecturas distintas <b>${nFirmas}</b></span><span>flechas óptimas distintas <b>${flechas.size}</b></span>`;
+        cap.innerHTML = `Tocá una casilla. ■ = pared, □ = libre. Las celestes se sienten igual; las flechas muestran qué conviene en cada una${flechas.size > 1 ? ": <b>misma lectura, distinta decisión</b>, así que la lectura sola no es Markov." : "."}`;
+      }
+    }
+    function animarHistoria(h) {
+      cual = h; progreso = reducir ? 1 : 0; const t0 = performance.now();
+      const paso = now => { progreso = Math.min(1, (now - t0) / 1400); dibujar(); if (progreso < 1) raf = requestAnimationFrame(paso); };
+      cancelAnimationFrame(raf); if (reducir) dibujar(); else raf = requestAnimationFrame(paso);
+    }
+    function setModo(m) { modo = m; document.getElementById("rowPos").hidden = m !== "pos"; document.querySelectorAll("#segMarkov button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === m)); progreso = 1; dibujar(); }
+    document.querySelectorAll("#segMarkov button").forEach(b => b.onclick = () => setModo(b.dataset.m));
+    document.getElementById("mkA").onclick = () => animarHistoria("A");
+    document.getElementById("mkB").onclick = () => animarHistoria("B");
+    cv.addEventListener("pointerdown", e => {
+      const [r, c] = T.celdaEn(e); const s = env.idx[r + "," + c];
+      if (s === undefined) return;
+      if (modo !== "bigotes") setModo("bigotes");
+      sel = s; dibujar();
+    });
+    setModo("pos");
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // 4. El tutor de IA: modelo de alumno (mismos números que el notebook)
+  // =====================================================================
+  const tutor = await tarea(() => {
+    const HAB0 = { suma: .10, resta: .05 }, VEL = { suma: .12, resta: .04 }, N_PROB = 60, N_ALUM = 300;
+    const cv = document.getElementById("cvTutor"), hud = document.getElementById("hudTutor");
+    const sl = document.getElementById("slTuya"), out = document.getElementById("outTuya"), ctlT = document.getElementById("ctlTuya");
+    const POLS = {
+      sumas: { nombre: "solo sumas", f: () => "suma" },
+      alternar: { nombre: "alternar", f: t => t % 2 === 0 ? "suma" : "resta" },
+      restas: { nombre: "mayormente restas", f: (t, u) => u() < .8 ? "resta" : "suma" }
+    };
+    const RECS = {
+      acierto: (ok) => ok ? 1 : -1,
+      aprendizaje: (ok, tipo, antes, despues) => 100 * (despues[tipo] - antes[tipo])
+    };
+    function simular(pol, rec, seed = 7) {
+      const u = Cueva.rng(seed); let G = 0, fs = 0, fr = 0;
+      for (let i = 0; i < N_ALUM; i++) {
+        const hab = { ...HAB0 };
+        for (let t = 0; t < N_PROB; t++) {
+          const tipo = pol(t, u), ok = u() < hab[tipo], antes = { ...hab };
+          hab[tipo] += VEL[tipo] * (1 - hab[tipo]);
+          G += rec(ok, tipo, antes, hab);
+        }
+        fs += hab.suma; fr += hab.resta;
+      }
+      fs /= N_ALUM; fr /= N_ALUM;
+      return { G: G / N_ALUM, suma: fs, resta: fr, apr: 50 * (fs + fr) };
+    }
+    let pol = "sumas", rec = "acierto", cache = {};
+    function calcular() {
+      if (cache[rec]) return cache[rec];
+      const R = RECS[rec], fijas = {}, barrido = [];
+      for (const k in POLS) fijas[k] = simular(POLS[k].f, R);
+      for (let p = 0; p <= 100; p += 5) barrido.push({ p, ...simular((t, u) => u() < p / 100 ? "resta" : "suma", R) });
+      return (cache[rec] = { fijas, barrido });
+    }
+    function dibujar() {
+      const alto = cv.parentElement.clientWidth < 480 ? 280 : 320;
+      const { w, h, ctx } = Cueva.lienzo(cv, alto)();
+      const { fijas, barrido } = calcular();
+      const elegido = pol === "tuya" ? barrido.find(b => b.p === +sl.value) : fijas[pol];
+      const pts = [...barrido, ...Object.values(fijas)];
+      const ymin = Math.min(0, ...pts.map(p => p.G)), ymax = Math.max(...pts.map(p => p.G));
+      const yr = [ymin - (ymax - ymin) * .06, ymax + (ymax - ymin) * .12];
+      const xr = [40, 100];
+      const m = { l: 44, r: 12, t: 14, b: 40 };
+      const X = x => m.l + (x - xr[0]) / (xr[1] - xr[0]) * (w - m.l - m.r), Y = y => h - m.b - (y - yr[0]) / (yr[1] - yr[0]) * (h - m.t - m.b);
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      // ejes y grilla
+      ctx.font = `11px ${MONO}`; ctx.fillStyle = COL.muted; ctx.strokeStyle = "rgba(141,147,163,.16)"; ctx.lineWidth = 1;
+      for (let x = 40; x <= 100; x += 10) { ctx.beginPath(); ctx.moveTo(X(x) + .5, m.t); ctx.lineTo(X(x) + .5, h - m.b); ctx.stroke(); ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(x + "%", X(x), h - m.b + 4); }
+      const paso = niceStep((yr[1] - yr[0]) / 5);
+      for (let y = Math.ceil(yr[0] / paso) * paso; y <= yr[1]; y += paso) { ctx.beginPath(); ctx.moveTo(m.l, Y(y) + .5); ctx.lineTo(w - m.r, Y(y) + .5); ctx.stroke(); ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(Math.round(y), m.l - 5, Y(y)); }
+      if (yr[0] < 0) { ctx.strokeStyle = "rgba(141,147,163,.5)"; ctx.beginPath(); ctx.moveTo(m.l, Y(0) + .5); ctx.lineTo(w - m.r, Y(0) + .5); ctx.stroke(); }
+      ctx.fillStyle = COL.muted; ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText("aprendizaje final del alumno (lo que queremos) →", (m.l + w - m.r) / 2, h - 2);
+      ctx.save(); ctx.translate(11, (m.t + h - m.b) / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "middle"; ctx.fillText("recompensa del tutor →", 0, 0); ctx.restore();
+      // barrido de "la tuya"
+      ctx.strokeStyle = "rgba(141,147,163,.55)"; ctx.lineWidth = 1.5; ctx.beginPath(); barrido.forEach((b, i) => i ? ctx.lineTo(X(b.apr), Y(b.G)) : ctx.moveTo(X(b.apr), Y(b.G))); ctx.stroke();
+      for (const b of barrido) { ctx.fillStyle = "rgba(141,147,163,.8)"; ctx.beginPath(); ctx.arc(X(b.apr), Y(b.G), 2.2, 0, 7); ctx.fill(); }
+      ctx.fillStyle = COL.muted; ctx.font = `10.5px ${MONO}`; ctx.textBaseline = "middle";
+      const b1 = barrido[barrido.length - 1];
+      ctx.textAlign = "left"; ctx.fillText("la tuya, 100% restas", X(b1.apr) - 30, Y(b1.G) + 13);
+      // máximo de recompensa y máximo de aprendizaje
+      const maxG = pts.reduce((a, b) => b.G > a.G ? b : a), maxA = pts.reduce((a, b) => b.apr > a.apr ? b : a);
+      ctx.strokeStyle = COL.ember; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(X(maxG.apr), Y(maxG.G), 9, 0, 7); ctx.stroke();
+      ctx.strokeStyle = COL.exit; ctx.beginPath(); ctx.arc(X(maxA.apr), Y(maxA.G), 12, 0, 7); ctx.stroke();
+      // políticas con nombre
+      const colores = { sumas: COL.ember, alternar: COL.sonar, restas: "#c58cf2" }, dy = { sumas: -11, alternar: -11, restas: 13 };
+      for (const k in fijas) {
+        const f = fijas[k]; ctx.fillStyle = colores[k]; ctx.beginPath(); ctx.arc(X(f.apr), Y(f.G), 5, 0, 7); ctx.fill();
+        ctx.font = `600 11px ${MONO}`; ctx.textBaseline = "middle"; const der = X(f.apr) < w * .6;
+        ctx.textAlign = der ? "left" : "right"; ctx.fillText(POLS[k].nombre, X(f.apr) + (der ? 9 : -9), Y(f.G) + dy[k]);
+      }
+      // elegida
+      ctx.strokeStyle = COL.lamp; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(X(elegido.apr), Y(elegido.G), 7.5, 0, 7); ctx.stroke();
+      // leyenda de anillos
+      ctx.font = `10.5px ${MONO}`; ctx.textAlign = "right"; ctx.textBaseline = "middle"; const lx = w - m.r - 6, ly = maxG === maxA ? h - m.b - 34 : m.t;
+      ctx.strokeStyle = COL.ember; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(lx - 4, ly + 8, 5, 0, 7); ctx.stroke(); ctx.fillStyle = COL.ink; ctx.fillText("más recompensa", lx - 14, ly + 8);
+      ctx.strokeStyle = COL.exit; ctx.beginPath(); ctx.arc(lx - 4, ly + 24, 5, 0, 7); ctx.stroke(); ctx.fillText("más aprendizaje", lx - 14, ly + 24);
+      const nombre = pol === "tuya" ? `la tuya (${sl.value}% restas)` : POLS[pol].nombre;
+      hud.innerHTML = `<span><b>${nombre}</b></span><span>recompensa <b>${elegido.G.toFixed(1)}</b></span><span>suma final <b>${Math.round(elegido.suma * 100)}%</b></span><span>resta final <b>${Math.round(elegido.resta * 100)}%</b></span>` +
+        `<span>${maxG === maxA ? '<b style="color:var(--exit)">recompensa y aprendizaje coinciden</b>' : '<b style="color:var(--ember)">la política que más cobra no es la que más enseña</b>'}</span>`;
+    }
+    function niceStep(x) { const p = 10 ** Math.floor(Math.log10(x)), f = x / p; return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p; }
+    function setPol(p) { pol = p; ctlT.classList.toggle("apagado", p !== "tuya"); document.querySelectorAll("#segPol button").forEach(b => b.setAttribute("aria-pressed", b.dataset.p === p)); dibujar(); }
+    document.querySelectorAll("#segPol button").forEach(b => b.onclick = () => setPol(b.dataset.p));
+    document.querySelectorAll("#segRec button").forEach(b => b.onclick = () => { rec = b.dataset.r; document.querySelectorAll("#segRec button").forEach(x => x.setAttribute("aria-pressed", x === b)); dibujar(); });
+    sl.oninput = () => { out.textContent = sl.value + " %"; if (pol !== "tuya") setPol("tuya"); else dibujar(); };
+    dibujar();
+    return { dibujar };
+  });
+
+  let tm = 0;
+  addEventListener("resize", () => { clearTimeout(tm); tm = setTimeout(() => { ciclo.dibujar(); juego.dibujar(); markov.dibujar(); tutor.dibujar(); }, 80); });
+  Cueva.alCargarSprites(() => { juego.dibujar(); });
+
+})();
+</script>
+</body>
+</html>

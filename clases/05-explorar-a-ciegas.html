@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Explorar a ciegas · RL a ciegas</title>
+<meta name="description" content="Clase 5: recompensa escasa, curiosidad por conteo, optimismo inicial y Go-Explore en la cueva grande.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .carrera { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 900px) { .carrera { grid-template-columns: minmax(0, 1fr); } }
+  .corredor { display: grid; gap: 6px; min-width: 0; }
+  .corredor h3 { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--ink); display: flex; justify-content: space-between; gap: 8px; }
+  .corredor .marca { font-family: var(--mono); font-size: 12.5px; color: var(--muted); min-height: 2.6em; font-variant-numeric: tabular-nums; }
+  .corredor .marca b { color: var(--exit); font-weight: 600; }
+  .corredor .marca .no { color: var(--ember); }
+  .dos-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+  @media (max-width: 820px) { .dos-col { grid-template-columns: minmax(0, 1fr); } }
+  .pantallas { display: grid; gap: 10px; }
+  .pantallas .cap { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 4px; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase 5 · Explorar a ciegas</div>
+    <h1>Explorar <span class="g">a ciegas</span></h1>
+    <p class="thesis">Cuando la única recompensa está en la salida, aprender no es el problema: el problema es llegar una vez, y para eso hay que saber qué no se conoce y tener cómo volver ahí.</p>
+  </section>
+
+  <!-- Bloque 1: la carrera -->
+  <section class="bloque full" aria-labelledby="t1">
+    <div class="stage">
+      <div class="carrera" id="carrera"></div>
+      <div class="row">
+        <button class="btn primary" id="b1correr">Correr la carrera</button>
+        <button class="btn" id="b1semilla">Otra semilla</button>
+        <div class="ctl" style="min-width:200px;flex:1">
+          <label for="b1vel">Pasos por cuadro <output id="o1vel">200</output></label>
+          <input type="range" id="b1vel" min="20" max="2000" step="20" value="200">
+        </div>
+      </div>
+      <div class="legend"><span>nunca</span><span class="bar" id="leg1"></span><span>muchas visitas (log)</span></div>
+      <div class="hud" id="hud1"></div>
+    </div>
+    <div class="dos-col">
+      <div class="texto" style="display:grid;gap:12px">
+        <div class="paso">Paso 1 · la carrera</div>
+        <h2 id="t1">Tres exploradores, el mismo presupuesto</h2>
+        <p>La cueva grande tiene 155 casillas y la salida está a 44 pasos. La recompensa es 0 en todos lados salvo en la salida. Los tres agentes usan el mismo Q-learning de la clase 4 (α = 0,5, γ = 0,9, ε = 0,1, episodios de 300 pasos, 60.000 pasos en total). Lo único que cambia es <em>cómo</em> exploran. Las paredes se pintan de gris claro solo cuando el agente las toca.</p>
+        <p>Sin recompensa, la tabla Q queda en ceros y la elección <em>greedy</em> (codiciosa) es un empate: <b>ε-greedy es una caminata al azar</b> y se queda pegado a la entrada. La curiosidad por conteo (<em>count-based exploration</em>) suma un premio por pisar lo poco visitado. El optimismo inicial arranca con Q = 1 en todo: lo no probado "promete" y el agente lo va probando todo.</p>
+      </div>
+      <div class="texto" style="display:grid;gap:12px">
+        <div class="eq">r_total = r_entorno + β / √N(s')</div>
+        <p class="small muted">En el notebook (8 semillas): ε-greedy no encuentra la salida en ninguna; conteo, mediana ≈ 30.000 pasos; optimismo, ≈ 5.000.</p>
+        <p class="nota pregunta">El optimismo gana por lejos en la tabla. ¿Por qué no se puede "poner un 1" en cada pantalla de Atari que el agente todavía no vio?</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bloque 2: Go-Explore -->
+  <section class="bloque" aria-labelledby="t2">
+    <div class="stage">
+      <canvas id="cv2" aria-label="Go-Explore sobre la cueva grande: el archivo de celdas crece; se resalta el trayecto de vuelta y la exploración"></canvas>
+      <div class="hud" id="hud2"></div>
+      <div class="row">
+        <button class="btn primary" id="b2correr">Correr</button>
+        <button class="btn" id="b2paso">Una iteración</button>
+        <button class="btn" id="b2salto">Saltar hasta la salida</button>
+        <button class="btn" id="b2reset">Reiniciar</button>
+      </div>
+      <div class="ctl">
+        <label for="b2vel">Velocidad <output id="o2vel">3</output></label>
+        <input type="range" id="b2vel" min="1" max="10" step="1" value="3">
+      </div>
+      <div class="legend"><span><span class="sw" style="background:var(--lamp)"></span>volver</span><span><span class="sw" style="background:var(--sonar)"></span>explorar</span><span>archivo:</span><span class="bar" id="leg2"></span><span>reciente</span></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 2 · Go-Explore</div>
+      <h2 id="t2">Primero volver, después explorar</h2>
+      <p><b>Go-Explore</b> (Ecoffet y otros, <em>Nature</em> 2021) guarda un <b>archivo</b> (<em>archive</em>) de celdas visitadas con el camino para llegar a cada una. En cada iteración elige una celda, más probable cuanto menos visitada; <b>vuelve</b> a ella sin explorar (en amarillo) y recién ahí <b>explora</b> 30 pasos al azar (en celeste). Las celdas nuevas se suman al archivo, y el color dice cuándo entraron.</p>
+      <div class="eq">P(elegir celda) ∝ 1 / √(visitas + 1)</div>
+      <p>El archivo nunca retrocede: cada iteración arranca desde el borde de lo conocido. Sin tabla Q ni premio intrínseco, encuentra la salida con unos pocos miles de pasos (en el notebook, mediana ≈ 3.600).</p>
+      <p class="nota pregunta">"Volver" acá es restaurar el estado del simulador. ¿En qué problemas reales eso no se puede hacer?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 3: desapego y descarrilamiento -->
+  <section class="bloque" aria-labelledby="t3">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué falla">
+        <button id="m3des" aria-pressed="true">Desapego</button>
+        <button id="m3desc" aria-pressed="false">Descarrilamiento</button>
+      </div>
+      <canvas id="cv3" aria-label="Las dos fallas que corrige Go-Explore, sobre la cueva grande"></canvas>
+      <div class="hud" id="hud3"></div>
+      <div class="row" id="ctl3a">
+        <button class="btn primary" id="b3sig">Siguiente</button>
+        <button class="btn" id="b3re">Desde el principio</button>
+      </div>
+      <div id="ctl3b" hidden style="display:grid;gap:10px">
+        <div class="ctl">
+          <label for="b3eps">ε del agente que intenta volver <output id="o3eps">0,05</output></label>
+          <input type="range" id="b3eps" min="0" max="0.3" step="0.01" value="0.05">
+        </div>
+        <div class="row">
+          <button class="btn primary" id="b3otro">8 intentos nuevos</button>
+          <label class="check"><input type="checkbox" id="b3rest"> Restaurar el estado (Go-Explore)</label>
+        </div>
+      </div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 3 · por qué fallaban los demás</div>
+      <h2 id="t3">Desapego y descarrilamiento</h2>
+      <p><b>Desapego</b> (<em>detachment</em>): la curiosidad se gasta. El agente explora una zona A, se va a una zona B y el pasillo hacia A ya no tiene premio: la frontera de A queda olvidada aunque era prometedora (el brillo indica cuánta novedad le queda a cada casilla).</p>
+      <p><b>Descarrilamiento</b> (<em>derailment</em>): aun queriendo volver a un lugar, el agente repite el camino con su política ruidosa y se desvía; termina explorando desde el lugar equivocado. Go-Explore corrige lo primero con el archivo y lo segundo restaurando el estado.</p>
+      <div class="eq">P(volver sin desviarse) ≈ (1 − ¾ε)^L</div>
+      <p class="nota pregunta">Con ε = 0,1 y un camino de 40 pasos, ¿qué fracción de los intentos llega? Probalo con el control y compará con la fórmula.</p>
+    </div>
+  </section>
+
+  <!-- Bloque 4: de la cueva a Atari -->
+  <section class="bloque" aria-labelledby="t4">
+    <div class="stage">
+      <div class="pantallas">
+        <div class="cap">Pantalla (lo que ve un agente de Atari). Tocá para mover al jugador.</div>
+        <canvas id="cv4a" aria-label="La cueva dibujada en pixeles, como una pantalla"></canvas>
+        <div class="cap" id="cap4b">Celda: pantalla reducida</div>
+        <canvas id="cv4b" aria-label="La misma pantalla reducida a pocas celdas y pocos tonos de gris"></canvas>
+      </div>
+      <div class="ctl">
+        <label for="b4w">Ancho de la imagen reducida <output id="o4w">11</output></label>
+        <input type="range" id="b4w" min="2" max="50" step="1" value="11">
+      </div>
+      <div class="ctl">
+        <label for="b4n">Tonos de gris <output id="o4n">8</output></label>
+        <input type="range" id="b4n" min="2" max="32" step="1" value="8">
+      </div>
+      <div class="row"><button class="btn" id="b4mont">Como en Montezuma (11 de ancho, 8 tonos)</button></div>
+      <div class="hud" id="hud4"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 4 · de la cueva a Atari</div>
+      <h2 id="t4">Una celda es una pantalla borrosa</h2>
+      <p>En la cueva cada casilla es una celda del archivo. En <em>Montezuma's Revenge</em> el estado es la pantalla, y nunca se repite exacta. Go-Explore la achica (<em>downsampling</em>) a 11 × 8 pixeles con 8 tonos de gris: pantallas parecidas caen en la misma celda.</p>
+      <p>El contador muestra en cuántas celdas distintas caen las 155 posiciones posibles del jugador. Muy grueso: todo se mezcla y el archivo no distingue lugares. Muy fino: cada pantalla es una celda y el archivo explota.</p>
+      <p class="nota pregunta">¿Qué resolución elegirías si además hubiera un enemigo que se mueve solo? ¿Querés que dos pantallas que difieren solo en el enemigo sean la misma celda?</p>
+    </div>
+  </section>
+
+  <!-- Para enseñarlo -->
+  <section class="bloque full" aria-labelledby="t5">
+    <div class="texto">
+      <div class="paso">Para enseñarlo</div>
+      <h2 id="t5">Cómo contar esta clase</h2>
+      <p><b>En una oración:</b> si el premio está lejos, el azar no llega; hay que recordar dónde ya estuviste, volver al borde de lo conocido y explorar desde ahí.</p>
+      <p class="nota pregunta">Pregunta para hacerle a quien te escucha: "Perdiste las llaves en una casa que no conocés. ¿Buscás al azar, buscás donde todavía no miraste, o anotás cada habitación revisada y volvés a la última puerta sin abrir?"</p>
+      <p><b>Ejercicio de 5 minutos:</b> en parejas, una persona dibuja en papel una grilla de 6 × 6 con paredes y una salida escondida, sin mostrarla. La otra explora diciendo una dirección por vez (la primera responde "pared" o "nada") con dos reglas por turnos: (1) tirar un dado para elegir la dirección; (2) llevar una lista de casillas visitadas y volver siempre a la menos visitada antes de seguir. Comparen cuántas jugadas tardó cada regla y relaciónenlo con ε-greedy y Go-Explore.</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(function () {
+  const env = Cueva.makeEnv(Cueva.MAPS.grande);
+  const COL = Cueva.COL();
+  const quieto = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const fmt = n => Math.round(n).toLocaleString("es-AR");
+  const PRESUPUESTO = 60000;
+  document.getElementById("leg1").style.background = Cueva.gradienteCSS("visitas");
+  document.getElementById("leg2").style.background = Cueva.gradienteCSS("valor");
+
+  // ================= Bloque 1: carrera de exploradores =================
+  const TIPOS = [
+    { id: "eps", nombre: "ε-greedy" },
+    { id: "conteo", nombre: "Curiosidad por conteo" },
+    { id: "opt", nombre: "Optimismo inicial" }];
+
+  function explorador(tipo, seed) {
+    const R = Cueva.rng(seed * 7919 + 13), nS = env.nS, beta = tipo === "conteo" ? 0.1 : 0, q0 = tipo === "opt" ? 1 : 0;
+    const Q = new Float64Array(nS * 4).fill(q0); for (let a = 0; a < 4; a++) Q[env.goal * 4 + a] = 0;
+    const N = new Float64Array(nS);
+    const X = { Q, N, s: env.start, t: 0, pasos: 0, hallado: null, exitos: 0, ep: 0, tocadas: new Set() };
+    N[env.start]++;
+    X.paso = () => {
+      const s = X.s; let a;
+      if (R() < 0.1) a = Math.floor(R() * 4);
+      else { let m = -Infinity, b = []; for (let k = 0; k < 4; k++) { const q = Q[s * 4 + k]; if (q > m + 1e-12) { m = q; b = [k]; } else if (Math.abs(q - m) <= 1e-12) b.push(k); } a = b[Math.floor(R() * b.length)]; }
+      const [s2, choque, clave] = env.move(s, a); if (choque) X.tocadas.add(clave);
+      N[s2]++; X.pasos++; X.t++;
+      const fin = s2 === env.goal; const r = (fin ? 1 : 0) + (beta ? beta / Math.sqrt(N[s2]) : 0);
+      let mx = -Infinity; for (let k = 0; k < 4; k++) mx = Math.max(mx, Q[s2 * 4 + k]);
+      Q[s * 4 + a] += 0.5 * (r + (fin ? 0 : 0.9 * mx) - Q[s * 4 + a]); X.s = s2;
+      if (fin) { X.exitos++; if (X.hallado === null) X.hallado = X.pasos; }
+      if (fin || X.t >= 300) { X.s = env.start; X.t = 0; N[env.start]++; X.ep++; }
+    };
+    return X;
+  }
+
+  const carrera = document.getElementById("carrera");
+  const corredores = TIPOS.map(tp => {
+    const div = document.createElement("div"); div.className = "corredor";
+    div.innerHTML = `<h3><span>${tp.nombre}</span></h3><canvas aria-label="Mapa de visitas de ${tp.nombre}"></canvas><div class="marca"></div>`;
+    carrera.appendChild(div);
+    const T = Cueva.tablero(div.querySelector("canvas"), env, { maxCell: 22, minCell: 8 });
+    return { tp, T, marca: div.querySelector(".marca"), X: null };
+  });
+  let semilla1 = 1, anim1 = null;
+  function dibujarCorredor(c) {
+    const { T, X } = c; T.fondo("#000");
+    const ctx = T.ctx; let mx = 0; for (let s = 0; s < env.nS; s++) mx = Math.max(mx, X.N[s]);
+    const lm = Math.log10(1 + mx) || 1;
+    for (let s = 0; s < env.nS; s++) if (X.N[s] > 0) { const [r, cc] = env.free[s]; T.casilla(r, cc, Cueva.rampa("visitas", 0.15 + 0.85 * Math.log10(1 + X.N[s]) / lm)); }
+    T.paredes("#11141c"); T.tocadas(X.tocadas, COL.chalk); T.salida();
+    if (X.pasos < PRESUPUESTO) T.sprite(X.s, 2);
+    const visitadas = Array.from(X.N).filter(v => v > 0).length;
+    c.marca.innerHTML = `pasos ${fmt(X.pasos)} / ${fmt(PRESUPUESTO)} · casillas pisadas ${visitadas}/${env.nS}<br>` +
+      (X.hallado !== null ? `<b>encontró la salida en el paso ${fmt(X.hallado)}</b> · ${X.exitos} episodios exitosos` : `<span class="no">todavía no encontró la salida</span>`);
+  }
+  function nuevaCarrera() { corredores.forEach(c => c.X = explorador(c.tp.id, semilla1)); }
+  function dibujarCarrera() { corredores.forEach(dibujarCorredor); document.getElementById("hud1").innerHTML = `semilla <b>${semilla1}</b>`; }
+  function correrHastaElFinal() { corredores.forEach(c => { while (c.X.pasos < PRESUPUESTO) c.X.paso(); }); }
+  function animar1() {
+    const v = +document.getElementById("b1vel").value;
+    let falta = false;
+    corredores.forEach(c => { for (let i = 0; i < v && c.X.pasos < PRESUPUESTO; i++) c.X.paso(); if (c.X.pasos < PRESUPUESTO) falta = true; });
+    dibujarCarrera();
+    anim1 = falta ? requestAnimationFrame(animar1) : null;
+    document.getElementById("b1correr").textContent = anim1 ? "Pausa" : "Correr la carrera";
+  }
+  document.getElementById("b1correr").onclick = () => {
+    if (anim1) { cancelAnimationFrame(anim1); anim1 = null; document.getElementById("b1correr").textContent = "Seguir"; return; }
+    if (corredores[0].X.pasos >= PRESUPUESTO) nuevaCarrera();
+    if (quieto) { correrHastaElFinal(); dibujarCarrera(); return; }
+    anim1 = requestAnimationFrame(animar1);
+  };
+  document.getElementById("b1semilla").onclick = () => {
+    semilla1++; if (anim1) { cancelAnimationFrame(anim1); anim1 = null; }
+    nuevaCarrera(); if (quieto) correrHastaElFinal(); else anim1 = requestAnimationFrame(animar1);
+    dibujarCarrera();
+  };
+  document.getElementById("b1vel").oninput = e => document.getElementById("o1vel").textContent = e.target.value;
+  // estado inicial: la carrera ya corrida (60.000 pasos)
+  nuevaCarrera(); correrHastaElFinal();
+
+  // ================= Bloque 2: Go-Explore =================
+  const T2 = Cueva.tablero(document.getElementById("cv2"), env, { maxCell: 30 });
+  const K = 30;
+  let GE, anim2 = null, corriendo2 = false;
+  function nuevoGE(seed) {
+    GE = { R: Cueva.rng(seed * 104729 + 7), arch: new Map([[env.start, { tray: [env.start], vistas: 1, nacio: 0 }]]), it: 0, pasos: 0, hall: null, ultima: null, prog: 1e9 };
+  }
+  function iterGE() {
+    const { R, arch } = GE; GE.it++;
+    const cs = [...arch.keys()], w = cs.map(c => 1 / Math.sqrt(arch.get(c).vistas + 1));
+    let u = R() * w.reduce((a, b) => a + b), i = 0; while (i < cs.length - 1 && u > w[i]) { u -= w[i]; i++; }
+    const c = cs[i], volver = arch.get(c).tray.slice(), tray = volver.slice(), explorar = [c], nuevas = new Map();
+    let s = c;
+    for (let j = 0; j < K; j++) {
+      const [s2] = env.move(s, Math.floor(R() * 4)); GE.pasos++; tray.push(s2); explorar.push(s2); s = s2;
+      const e = arch.get(s2);
+      if (e) { e.vistas++; if (tray.length < e.tray.length) e.tray = tray.slice(); }
+      else { arch.set(s2, { tray: tray.slice(), vistas: 1, nacio: GE.it }); nuevas.set(s2, explorar.length - 1); }
+      if (s2 === env.goal) { if (!GE.hall) GE.hall = { it: GE.it, pasos: GE.pasos }; break; }
+    }
+    GE.ultima = { c, volver, explorar, nuevas };
+  }
+  // progreso de la animación de la última iteración, en "unidades": [0,10) elegir, volver, explorar, [.., +10) sumar
+  function largoAnim() { const u = GE.ultima; return u ? 10 + u.volver.length + u.explorar.length + 10 : 0; }
+  function dibujarGE() {
+    const T = T2, ctx = T.ctx, u = GE.ultima, p = GE.prog;
+    T.fondo("#000");
+    const itMax = Math.max(1, GE.it);
+    const enVolver = u ? Math.max(0, Math.min(u.volver.length, p - 10)) : 0;
+    const enExpl = u ? Math.max(0, Math.min(u.explorar.length, p - 10 - u.volver.length)) : 0;
+    for (const [s, d] of GE.arch) {
+      if (u && d.nacio === GE.it && u.nuevas.get(s) >= enExpl) continue;   // todavía no descubierta en la animación
+      const [r, c] = env.free[s]; T.casilla(r, c, Cueva.rampa("valor", 0.08 + 0.92 * d.nacio / itMax));
+    }
+    T.paredes(COL.rock2); T.salida();
+    if (u) {
+      if (enVolver > 1) T.trayecto(u.volver.slice(0, Math.ceil(enVolver)), COL.lamp, .16);
+      if (enExpl > 1) T.trayecto(u.explorar.slice(0, Math.ceil(enExpl)), COL.sonar, .12);
+      // celda elegida
+      const [r, c] = env.free[u.c], cell = T.cell;
+      ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.strokeRect(c * cell + 1, r * cell + 1, cell - 2, cell - 2);
+      T.texto(u.c, "★", COL.lamp, .7);
+      const pos = enExpl > 0 ? u.explorar[Math.max(0, Math.ceil(enExpl) - 1)] : (enVolver > 0 ? u.volver[Math.max(0, Math.ceil(enVolver) - 1)] : env.start);
+      T.sprite(pos, 2);
+    } else T.sprite(env.start, 2);
+    const fase = !u ? "—" : p < 10 ? "elegir celda" : p < 10 + u.volver.length ? "volver" : p < 10 + u.volver.length + u.explorar.length ? "explorar" : "sumar al archivo";
+    document.getElementById("hud2").innerHTML = `iteración <b>${GE.it}</b> <span>fase <b>${fase}</b></span> <span>archivo <b>${GE.arch.size}</b>/${env.nS}</span> <span>pasos de exploración <b>${fmt(GE.pasos)}</b></span>` +
+      (GE.hall ? `<span style="color:var(--exit)">salida en la iteración <b style="color:var(--exit)">${GE.hall.it}</b> (${fmt(GE.hall.pasos)} pasos)</span>` : "");
+  }
+  function tick2() {
+    const v = +document.getElementById("b2vel").value;
+    if (v >= 9) {   // rápido: varias iteraciones por cuadro, sin animar cada una
+      for (let i = 0; i < (v === 10 ? 6 : 2); i++) iterGE(); GE.prog = 1e9;
+    } else {
+      GE.prog += [0, 0.5, 1, 2, 3, 5, 8, 12, 20][v];
+      if (GE.prog >= largoAnim()) { if (!corriendo2 && GE.ultima) { GE.prog = 1e9; dibujarGE(); anim2 = null; return; } iterGE(); GE.prog = 0; }
+    }
+    dibujarGE();
+    anim2 = requestAnimationFrame(tick2);
+  }
+  function parar2() { if (anim2) cancelAnimationFrame(anim2); anim2 = null; corriendo2 = false; document.getElementById("b2correr").textContent = "Correr"; }
+  document.getElementById("b2correr").onclick = () => {
+    if (corriendo2) { parar2(); return; }
+    if (quieto) { for (let i = 0; i < 10; i++) iterGE(); GE.prog = 1e9; dibujarGE(); return; }
+    corriendo2 = true; document.getElementById("b2correr").textContent = "Pausa";
+    if (GE.prog >= largoAnim()) { iterGE(); GE.prog = 0; }
+    if (!anim2) anim2 = requestAnimationFrame(tick2);
+  };
+  document.getElementById("b2paso").onclick = () => {
+    parar2(); iterGE();
+    if (quieto) { GE.prog = 1e9; dibujarGE(); return; }
+    GE.prog = 0; anim2 = requestAnimationFrame(tick2);
+  };
+  document.getElementById("b2salto").onclick = () => { parar2(); let n = 0; while (!GE.hall && n++ < 2000) iterGE(); GE.prog = 1e9; dibujarGE(); };
+  document.getElementById("b2reset").onclick = () => { parar2(); semilla2++; nuevoGE(semilla2); GE.prog = 1e9; dibujarGE(); };
+  document.getElementById("b2vel").oninput = e => document.getElementById("o2vel").textContent = e.target.value;
+  let semilla2 = 1;
+  // estado inicial: 40 iteraciones hechas, se ve la última (volver + explorar)
+  nuevoGE(semilla2); for (let i = 0; i < 40; i++) iterGE(); GE.prog = 1e9;
+
+  // ================= Bloque 3: desapego y descarrilamiento =================
+  const T3 = Cueva.tablero(document.getElementById("cv3"), env, { maxCell: 30 });
+  function bfsCamino(a, b) {   // camino más corto entre dos casillas (índices)
+    const prev = new Map([[a, -1]]), q = [a];
+    while (q.length) { const s = q.shift(); if (s === b) break; for (let k = 0; k < 4; k++) { const [s2, ch] = env.move(s, k); if (!ch && !prev.has(s2)) { prev.set(s2, s); q.push(s2); } } }
+    const p = []; for (let s = b; s !== -1; s = prev.get(s)) p.unshift(s); return p;
+  }
+  const I = (r, c) => env.idx[r + "," + c];
+  // guion del desapego: explora la zona A (hacia la salida real), salta a la zona B (arriba a la derecha) y la agota
+  const tramoA = bfsCamino(env.start, I(7, 8));
+  const tramoB = bfsCamino(I(7, 8), I(3, 23)).slice(1);
+  const tramoB2 = [I(3, 23), I(3, 22), I(3, 21)].concat(bfsCamino(I(3, 21), I(1, 15)).slice(1)).concat(bfsCamino(I(1, 15), I(3, 23)).slice(1));
+  const GUION = [
+    { hasta: tramoA.length, txt: "1/3 · Explora la zona A: cada casilla nueva da premio; la frontera de A (recuadros) brilla." },
+    { hasta: tramoA.length + tramoB.length, txt: "2/3 · Algo lo atrae a la zona B. Al volver por el pasillo, esas casillas ya son aburridas." },
+    { hasta: tramoA.length + tramoB.length + tramoB2.length, txt: "3/3 · Agota B. La frontera de A sigue sin explorar, pero el camino hasta ella no da premio: quedó olvidada." }];
+  const recorrido = tramoA.concat(tramoB, tramoB2);
+  const fronteraA = [I(8, 7), I(7, 9)].filter(s => s !== undefined);
+  let modo3 = "des", etapa3 = 0, prog3 = 0, anim3 = null, intentos = [], restaurar = false;
+  function dibujarDesapego() {
+    const T = T3, ctx = T.ctx, cell = T.cell; const n = Math.min(recorrido.length, Math.floor(prog3));
+    const N = new Float64Array(env.nS); for (let i = 0; i < n; i++) N[recorrido[i]]++;
+    T.fondo("#000");
+    for (let s = 0; s < env.nS; s++) if (N[s] > 0) { const [r, c] = env.free[s]; T.casilla(r, c, Cueva.rampa("valor", 0.1 + 0.9 * (1 / Math.sqrt(N[s]) - 0.35) / 0.65)); }
+    T.paredes(COL.rock2);
+    // frontera: casillas sin pisar vecinas de lo pisado
+    const fr = new Set(); for (let s = 0; s < env.nS; s++) if (N[s] > 0) for (let k = 0; k < 4; k++) { const [s2, ch] = env.move(s, k); if (!ch && N[s2] === 0) fr.add(s2); }
+    const final = n >= recorrido.length;
+    for (const s of fr) {
+      const [r, c] = env.free[s]; const esA = fronteraA.includes(s);
+      ctx.strokeStyle = esA && n > tramoA.length ? (final ? COL.ember : "rgba(242,179,90,.45)") : COL.lamp; ctx.lineWidth = 2;
+      ctx.strokeRect(c * cell + 3, r * cell + 3, cell - 6, cell - 6);
+      if (esA && final) T.texto(s, "?", COL.ember, .6);
+    }
+    T.salida();
+    if (n > 0) T.sprite(recorrido[n - 1], 2);
+    const g = GUION.find(g => n <= g.hasta) || GUION[2];
+    document.getElementById("hud3").innerHTML = `<span>${g.txt}</span>`;
+  }
+  // descarrilamiento: repetir la secuencia de acciones de un camino guardado con ruido ε
+  const destino = I(9, 9);
+  const caminoGuardado = bfsCamino(env.start, destino);
+  const accionesGuardadas = caminoGuardado.slice(1).map((s, i) => { for (let k = 0; k < 4; k++) if (env.move(caminoGuardado[i], k)[0] === s) return k; });
+  let semilla3 = 1;
+  function nuevosIntentos() {
+    const eps = +document.getElementById("b3eps").value, R = Cueva.rng(semilla3++ * 31 + 5);
+    intentos = [];
+    for (let j = 0; j < 8; j++) {
+      let s = env.start; const p = [s];
+      for (const a0 of accionesGuardadas) { const a = R() < eps ? Math.floor(R() * 4) : a0; s = env.move(s, a)[0]; p.push(s); }
+      intentos.push(p);
+    }
+    prog3 = 0;
+  }
+  function dibujarDescarrilamiento() {
+    const T = T3, ctx = T.ctx, cell = T.cell; const L = accionesGuardadas.length, n = Math.min(L + 1, Math.floor(prog3));
+    T.fondo("#000"); T.paredes(COL.rock2); T.salida();
+    T.trayecto(caminoGuardado, "rgba(242,179,90,.35)", .3);
+    const [rd, cd] = env.free[destino];
+    let llegaron = 0;
+    if (restaurar) {
+      ctx.setLineDash([5, 5]); ctx.strokeStyle = COL.lamp; ctx.lineWidth = 2;
+      const [r0, c0] = env.free[env.start]; ctx.beginPath(); ctx.moveTo(c0 * cell + cell / 2, r0 * cell + cell / 2); ctx.lineTo(cd * cell + cell / 2, rd * cell + cell / 2); ctx.stroke(); ctx.setLineDash([]);
+      T.sprite(destino, 2); llegaron = 8;
+    } else {
+      intentos.forEach((p, j) => {
+        const q = p.slice(0, Math.max(1, n));
+        T.trayecto(q, `hsla(${(j * 47) % 360},70%,65%,.75)`, .07);
+        const fin = q[q.length - 1]; const [r, c] = env.free[fin];
+        if (n > L) { if (fin === destino) llegaron++; else { ctx.strokeStyle = COL.ember; ctx.lineWidth = 2; const x = c * cell, y = r * cell; ctx.beginPath(); ctx.moveTo(x + 5, y + 5); ctx.lineTo(x + cell - 5, y + cell - 5); ctx.moveTo(x + cell - 5, y + 5); ctx.lineTo(x + 5, y + cell - 5); ctx.stroke(); } }
+      });
+    }
+    T.texto(destino, "★", COL.lamp, .75);
+    const eps = +document.getElementById("b3eps").value, teo = Math.pow(1 - 0.75 * eps, L);
+    document.getElementById("hud3").innerHTML = restaurar
+      ? `<span>Go-Explore no repite el camino: <b>restaura</b> el simulador en ★ y explora desde ahí. Llegan <b>8 de 8</b>.</span>`
+      : `<span>camino guardado <b>${L}</b> pasos</span><span>ε <b>${eps.toFixed(2).replace(".", ",")}</b></span>` +
+        (n > L ? `<span>llegaron a ★ <b>${llegaron} de 8</b></span>` : `<span>repitiendo el camino…</span>`) + `<span>fórmula ≈ <b>${Math.round(teo * 100)}%</b></span>`;
+  }
+  function dibujar3() { modo3 === "des" ? dibujarDesapego() : dibujarDescarrilamiento(); }
+  function animar3(objetivo, vel) {
+    if (anim3) cancelAnimationFrame(anim3);
+    if (quieto) { prog3 = objetivo; dibujar3(); return; }
+    const f = () => { prog3 = Math.min(objetivo, prog3 + vel); dibujar3(); anim3 = prog3 < objetivo ? requestAnimationFrame(f) : null; };
+    anim3 = requestAnimationFrame(f);
+  }
+  function modo(m) {
+    modo3 = m; if (anim3) cancelAnimationFrame(anim3); anim3 = null;
+    document.getElementById("m3des").setAttribute("aria-pressed", m === "des");
+    document.getElementById("m3desc").setAttribute("aria-pressed", m === "desc");
+    document.getElementById("ctl3a").hidden = m !== "des"; document.getElementById("ctl3b").hidden = m !== "desc";
+    if (m === "des") { etapa3 = 2; prog3 = recorrido.length; dibujar3(); }
+    else { nuevosIntentos(); animar3(accionesGuardadas.length + 1, 0.6); }
+  }
+  document.getElementById("m3des").onclick = () => modo("des");
+  document.getElementById("m3desc").onclick = () => modo("desc");
+  document.getElementById("b3sig").onclick = () => {
+    if (prog3 >= recorrido.length) { prog3 = 0; etapa3 = -1; }
+    etapa3 = Math.min(2, etapa3 + 1); animar3(GUION[etapa3].hasta, 0.5);
+  };
+  document.getElementById("b3re").onclick = () => { etapa3 = 0; prog3 = 0; animar3(GUION[0].hasta, 0.5); };
+  document.getElementById("b3eps").oninput = e => { document.getElementById("o3eps").textContent = (+e.target.value).toFixed(2).replace(".", ","); nuevosIntentos(); prog3 = accionesGuardadas.length + 1; dibujar3(); };
+  document.getElementById("b3otro").onclick = () => { nuevosIntentos(); animar3(accionesGuardadas.length + 1, 0.6); };
+  document.getElementById("b3rest").onchange = e => { restaurar = e.target.checked; dibujar3(); };
+  // estado inicial: el desapego en su estado final
+  etapa3 = 2; prog3 = recorrido.length;
+
+  // ================= Bloque 4: de la cueva a Atari =================
+  const PX = 8, IW = env.W * PX, IH = env.H * PX;
+  const off = document.createElement("canvas"); off.width = IW; off.height = IH; const octx = off.getContext("2d");
+  let jugador = env.start, lumBase = null, lumJug = null;
+  function pintarPantalla(ctx, conJugador) {
+    const R = Cueva.rng(99);
+    ctx.fillStyle = "#06070a"; ctx.fillRect(0, 0, IW, IH);
+    for (let r = 0; r < env.H; r++) for (let c = 0; c < env.W; c++) {
+      const x = c * PX, y = r * PX;
+      if (env.rows[r][c] === "#") {
+        ctx.fillStyle = "#5a4a3c"; ctx.fillRect(x, y, PX, PX);
+        ctx.fillStyle = "#3b2f26"; for (let i = 0; i < 5; i++) ctx.fillRect(x + Math.floor(R() * PX), y + Math.floor(R() * PX), 2, 1);
+        ctx.fillStyle = "#7a6552"; ctx.fillRect(x, y, PX, 1);
+      } else if (R() < 0.15) { ctx.fillStyle = "#1a1d26"; ctx.fillRect(x + Math.floor(R() * 7), y + Math.floor(R() * 7), 1, 1); }
+    }
+    const [gr, gc] = env.free[env.goal]; ctx.fillStyle = "#3ddc84"; ctx.fillRect(gc * PX + 1, gr * PX + 1, PX - 2, PX - 2);
+    ctx.fillStyle = "#f2b35a"; ctx.fillRect(1 * PX + 2, 9 * PX + 3, 4, 2); ctx.fillRect(1 * PX + 5, 9 * PX + 2, 2, 4);   // una "llave"
+    if (conJugador) {
+      const [r, c] = env.free[jugador];
+      ctx.fillStyle = "#e8e6df"; ctx.fillRect(c * PX + 2, r * PX + 1, 4, 3);
+      ctx.fillStyle = "#e0645a"; ctx.fillRect(c * PX + 2, r * PX + 4, 4, 3);
+      ctx.fillStyle = "#5ec8d8"; ctx.fillRect(c * PX + 2, r * PX + 7, 1, 1); ctx.fillRect(c * PX + 5, r * PX + 7, 1, 1);
+    }
+  }
+  function luminancia(ctx) { const d = ctx.getImageData(0, 0, IW, IH).data, L = new Float32Array(IW * IH); for (let i = 0; i < IW * IH; i++) L[i] = 0.299 * d[4 * i] + 0.587 * d[4 * i + 1] + 0.114 * d[4 * i + 2]; return L; }
+  function prepararLum() {
+    pintarPantalla(octx, false); lumBase = luminancia(octx);
+    // el jugador en (0,0) de una casilla, como parche de 8x8 sobre fondo
+    const g = jugador; jugador = env.start; pintarPantalla(octx, true); const conJ = luminancia(octx); jugador = g;
+    const [r0, c0] = env.free[env.start]; lumJug = new Float32Array(PX * PX);
+    for (let y = 0; y < PX; y++) for (let x = 0; x < PX; x++) { const i = (r0 * PX + y) * IW + c0 * PX + x; lumJug[y * PX + x] = conJ[i] - lumBase[i]; }
+  }
+  function reducir(pos, w, h, niveles) {   // devuelve niveles cuantizados w*h para el jugador en pos
+    const sum = new Float32Array(w * h), cnt = new Float32Array(w * h);
+    const [r, c] = env.free[pos];
+    for (let y = 0; y < IH; y++) { const by = Math.floor(y * h / IH); for (let x = 0; x < IW; x++) { const bx = Math.floor(x * w / IW); let v = lumBase[y * IW + x];
+      const dy = y - r * PX, dx = x - c * PX; if (dy >= 0 && dy < PX && dx >= 0 && dx < PX) v += lumJug[dy * PX + dx];
+      sum[by * w + bx] += v; cnt[by * w + bx]++; } }
+    const q = new Uint8Array(w * h); for (let i = 0; i < w * h; i++) q[i] = Math.min(niveles - 1, Math.floor(sum[i] / cnt[i] / 256 * niveles)); return q;
+  }
+  const cv4a = document.getElementById("cv4a"), cv4b = document.getElementById("cv4b");
+  function tamCanvas(cv, w, h) { const W = cv.parentElement.clientWidth, esc = W / w, dpr = devicePixelRatio || 1; cv.width = Math.round(W * dpr); cv.height = Math.round(h * esc * dpr); cv.style.width = W + "px"; cv.style.height = Math.round(h * esc) + "px"; const ctx = cv.getContext("2d"); ctx.setTransform(dpr * esc, 0, 0, dpr * esc, 0, 0); ctx.imageSmoothingEnabled = false; return ctx; }
+  let distintasCache = {};
+  function dibujar4() {
+    const w = +document.getElementById("b4w").value, niveles = +document.getElementById("b4n").value;
+    const h = Math.max(1, Math.round(w * IH / IW));
+    pintarPantalla(octx, true);
+    const a = tamCanvas(cv4a, IW, IH); a.drawImage(off, 0, 0);
+    const q = reducir(jugador, w, h, niveles);
+    const b = tamCanvas(cv4b, w, h);
+    for (let i = 0; i < w * h; i++) { const g = niveles > 1 ? Math.round(q[i] * 255 / (niveles - 1)) : 0; b.fillStyle = `rgb(${g},${g},${g})`; b.fillRect(i % w, Math.floor(i / w), 1.02, 1.02); }
+    const clave = w + "x" + niveles;
+    if (!(clave in distintasCache)) { const S = new Set(); for (let s = 0; s < env.nS; s++) S.add(reducir(s, w, h, niveles).join(",")); distintasCache[clave] = S.size; }
+    const d = distintasCache[clave];
+    document.getElementById("cap4b").textContent = `Celda: la pantalla reducida a ${w} × ${h} pixeles con ${niveles} tonos de gris`;
+    document.getElementById("hud4").innerHTML = `<span>las ${env.nS} posiciones caen en <b>${d}</b> celdas distintas</span><span>${d < 40 ? "muy grueso: se mezclan lugares distintos" : d >= env.nS ? "fino: una celda por posición" : "intermedio"}</span>`;
+  }
+  ["b4w", "b4n"].forEach(id => document.getElementById(id).oninput = e => { document.getElementById(id.replace("b", "o")).textContent = e.target.value; dibujar4(); });
+  document.getElementById("b4mont").onclick = () => { document.getElementById("b4w").value = 11; document.getElementById("b4n").value = 8; document.getElementById("o4w").textContent = 11; document.getElementById("o4n").textContent = 8; dibujar4(); };
+  function moverJugador(ev) {
+    const b = cv4a.getBoundingClientRect(); const c = Math.floor((ev.clientX - b.left) / b.width * env.W), r = Math.floor((ev.clientY - b.top) / b.height * env.H);
+    const s = env.idx[r + "," + c]; if (s !== undefined && s !== jugador) { jugador = s; dibujar4(); }
+  }
+  let arrastrando = false;
+  cv4a.addEventListener("pointerdown", e => { arrastrando = true; moverJugador(e); });
+  cv4a.addEventListener("pointermove", e => { if (arrastrando) moverJugador(e); });
+  addEventListener("pointerup", () => arrastrando = false);
+  jugador = I(5, 9) ?? env.start;
+  prepararLum();
+
+  // ================= dibujo general =================
+  function todo() {
+    corredores.forEach(c => c.T.medir()); dibujarCarrera();
+    T2.medir(); dibujarGE();
+    T3.medir(); dibujar3();
+    dibujar4();
+  }
+  Cueva.alCargarSprites(todo); todo();
+  let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(todo, 80); });
+  window.P4 = { explorador, env, GE: () => GE, iterGE, reducir };
+
+  Cueva.pagina("5", { lecturas: [
+    { texto: "Ecoffet, Huizinga, Lehman, Stanley y Clune (2021). First return, then explore. Nature 590.", url: "https://www.nature.com/articles/s41586-020-03157-9" },
+    { texto: "Bellemare y otros (2016). Unifying count-based exploration and intrinsic motivation.", url: "https://arxiv.org/abs/1606.01868" },
+    { texto: "Sutton y Barto, cap. 2.6–2.7: valores iniciales optimistas y UCB.", url: "http://incompleteideas.net/book/the-book-2nd.html" }] });
+})();
+</script>
+</body>
+</html>

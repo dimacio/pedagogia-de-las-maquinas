@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Agentes I: RL en el mundo real · RL a ciegas</title>
+<meta name="description" content="Clase 9: el bucle ReAct (pensamiento, acción, observación) en la cueva, el agente de la cueva y el agente de LLM, el feed como MDP miope, evaluación contrafactual y RL offline (Horizon/ReAgent), de ReAgent a Pearl y a los modelos de lenguaje.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .graf { min-width: 0; }
+  .cap { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .leyenda { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .leyenda i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 5px; }
+  .leyenda i.sq { width: 10px; height: 10px; border-radius: 2px; }
+  /* bloque 1: dos ciclos */
+  .ciclos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+  @media (max-width: 560px) { .ciclos { grid-template-columns: minmax(0, 1fr); } }
+  .ciclo { display: grid; gap: 8px; min-width: 0; align-content: start; }
+  .ciclo h3 { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+  .casilleros { display: grid; gap: 4px; }
+  .cas { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px; align-items: baseline; border: 1px solid var(--rock-2); border-radius: 3px; padding: 5px 8px; min-height: 2.4em; }
+  .cas span { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .cas b { font-family: var(--mono); font-size: 12.5px; font-weight: 400; color: var(--ink); overflow-wrap: anywhere; }
+  .cas.nuevo { border-color: var(--lamp); }
+  .cas.pen span { color: var(--ink); } .cas.obs span { color: var(--sonar); } .cas.acc span { color: var(--lamp); } .cas.rec span { color: var(--exit); }
+  /* bloque 3b: dos mapas */
+  .par { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  @media (max-width: 480px) { .par { grid-template-columns: minmax(0, 1fr); } }
+  .par > div { display: grid; gap: 6px; min-width: 0; align-content: start; }
+  /* bloque 4: hitos */
+  .hitos { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .hitos li { border-left: 3px solid var(--rock-2); padding: 4px 0 4px 10px; display: grid; gap: 2px; cursor: pointer; }
+  .hitos li[aria-current="true"] { border-color: var(--exit); background: rgba(61,220,132,.06); }
+  .hitos li b { font-size: 14.5px; }
+  .hitos li .cap { margin-left: 6px; }
+  .hitos li p { font-size: 13.5px; color: var(--muted); }
+  .hitos li[aria-current="true"] p { color: var(--ink); }
+  .hitos li a { font-size: 13px; margin-right: 12px; }
+  /* bloque 0: ReAct en la cueva */
+  .react { display: grid; gap: 4px; }
+  .fase { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 8px; align-items: baseline; border: 1px solid var(--rock-2); border-left-width: 3px; border-radius: 3px; padding: 6px 8px; min-height: 2.6em; opacity: .55; transition: opacity .2s; }
+  .fase span { font-family: var(--mono); font-size: 11.5px; }
+  .fase b { font-family: var(--mono); font-size: 12.5px; font-weight: 400; color: var(--ink); overflow-wrap: anywhere; }
+  .fase.pen span { color: var(--ink); } .fase.acc span { color: var(--lamp); } .fase.obs span { color: var(--sonar); }
+  .fase.on { opacity: 1; }
+  .fase.pen.on { border-color: var(--ink); } .fase.acc.on { border-color: var(--lamp); } .fase.obs.on { border-color: var(--sonar); }
+  .fase.hecha { opacity: .9; }
+  .log { font-family: var(--mono); font-size: 11.5px; color: var(--muted); display: grid; gap: 2px; max-height: 7.6em; overflow: hidden; }
+  .log div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .log .ch { color: var(--ember); }
+  @media (max-width: 480px) { .fase { grid-template-columns: minmax(0, 1fr); gap: 2px; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase 9 · Agentes I: RL en el mundo real</div>
+    <h1>Agentes sin <span class="g">simulador</span></h1>
+    <p class="thesis">Un agente es cualquier cosa que observa, actúa y recibe una recompensa. La diferencia entre la cueva y el mundo real es que en el mundo real no hay simulador: hay que aprender y evaluar con lo que ya pasó.</p>
+  </section>
+
+  <!-- Bloque 0: el bucle ReAct en la cueva -->
+  <section class="bloque" aria-labelledby="t0">
+    <div class="stage">
+      <canvas id="cv0" aria-label="La cueva con la trayectoria del agente ReAct hasta el paso actual; las paredes aparecen solo cuando las toca o las siente"></canvas>
+      <div class="react" aria-live="polite">
+        <div class="fase pen" id="f0p"><span>Pensamiento</span><b></b></div>
+        <div class="fase acc" id="f0a"><span>Acción</span><b></b></div>
+        <div class="fase obs" id="f0o"><span>Observación</span><b></b></div>
+      </div>
+      <div class="row">
+        <button class="btn" id="b0atr" aria-label="Fase anterior">← Atrás</button>
+        <button class="btn primary" id="b0sig" aria-label="Fase siguiente">Siguiente →</button>
+        <button class="btn" id="b0rep">Reproducir</button>
+      </div>
+      <div class="ctl">
+        <label for="b0k">Paso de la traza <output id="o0k"></output></label>
+        <input type="range" id="b0k" min="1" max="40" step="1" value="4">
+      </div>
+      <div class="log" id="log0" aria-label="Pasos anteriores"></div>
+      <div class="hud" id="hud0"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">1 · el bucle ReAct</div>
+      <h2 id="t0">Pensar, actuar, observar</h2>
+      <p><b>ReAct</b> (Yao y otros, 2022) es la forma en que hoy funcionan casi todos los agentes de lenguaje: el modelo escribe un <b>pensamiento</b>, elige una <b>acción</b> (una llamada a una herramienta) y el resultado vuelve como <b>observación</b>, que se suma al texto para el próximo paso. Es el ciclo agente-entorno del curso con un paso más: pensar en voz alta.</p>
+      <p>Esta traza es real: Qwen2.5-0.5B jugando la cueva con dos herramientas, <code>mover(dirección)</code> y <code>sentir()</code>. Su única memoria es el texto de la traza y nunca recibe recompensa para aprender: no mejora entre pasos ni entre partidas. (Muestreada con temperatura 0,7: con decodificación codiciosa se queda en un bucle desde el principio.)</p>
+      <div class="eq">pensamiento → acción → observación → …</div>
+      <p class="nota pregunta">Recorré la traza: ¿cuántas veces repite un choque que ya conocía? ¿Qué le falta que sí tiene Q-learning?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 1: dos ciclos -->
+  <section class="bloque" aria-labelledby="t1">
+    <div class="stage">
+      <div class="ciclos">
+        <div class="ciclo">
+          <h3>La cueva</h3>
+          <div class="graf"><canvas id="cv1a" aria-label="Ciclo agente-entorno en la cueva: el explorador elige una dirección y la cueva le devuelve si chocó y la recompensa"></canvas></div>
+          <div class="casilleros">
+            <div class="cas pen" id="c1ap"><span>pensamiento</span><b>no hay: mira su tabla Q</b></div>
+            <div class="cas acc" id="c1aa"><span>acción</span><b></b></div>
+            <div class="cas obs" id="c1ao"><span>observación</span><b></b></div>
+            <div class="cas rec" id="c1ar"><span>recompensa</span><b></b></div>
+          </div>
+        </div>
+        <div class="ciclo">
+          <h3>Un agente ReAct que investiga</h3>
+          <div class="graf"><canvas id="cv1b" aria-label="Ciclo agente-entorno de un modelo de lenguaje que busca, lee y responde"></canvas></div>
+          <div class="casilleros">
+            <div class="cas pen" id="c1bp"><span>pensamiento</span><b></b></div>
+            <div class="cas acc" id="c1ba"><span>acción</span><b></b></div>
+            <div class="cas obs" id="c1bo"><span>observación</span><b></b></div>
+            <div class="cas rec" id="c1br"><span>recompensa</span><b></b></div>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn primary" id="b1anim">Pausa</button>
+        <button class="btn" id="b1paso">Un paso</button>
+      </div>
+      <div class="hud" id="hud1"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">2 · el mismo bucle, otro entorno</div>
+      <h2 id="t1">ReAct fuera de la cueva</h2>
+      <p>A la izquierda, el explorador de Q-learning: no piensa en voz alta, elige con su tabla, observa si chocó y cobra −0,01 por paso y +1 en la salida. A la derecha, el deep search de la clase 8 como agente ReAct: piensa, usa una herramienta (<b>buscar</b> o <b>leer</b>), observa lo que devuelve y al final <b>responde</b>; la recompensa llega cuando alguien juzga la respuesta.</p>
+      <p>El resto de la clase recorre este bucle cuando no hay simulador: en el feed, la acción es qué mostrar y la observación es si el usuario vuelve; en ReAgent, las observaciones ya pasaron y quedaron en registros, y la evaluación contrafactual pregunta qué habría observado otra política.</p>
+      <div class="eq">pensamiento (opcional) → aₜ → oₜ₊₁, rₜ₊₁ → …</div>
+      <p class="nota pregunta">En la tercera pregunta el modelo responde sin buscar y se equivoca. ¿Qué tendría que valer cada búsqueda para que eso deje de convenir?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 2: el feed -->
+  <section class="bloque" aria-labelledby="t2">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Política del feed">
+        <button id="m2mio" aria-pressed="true">Miope (γ = 0)</button>
+        <button id="m2lar" aria-pressed="false">Largo plazo</button>
+      </div>
+      <div class="ctl">
+        <label for="b2g">γ de la política a largo plazo <output id="o2g">0,90</output></label>
+        <input type="range" id="b2g" min="0" max="0.99" step="0.01" value="0.9">
+      </div>
+      <div class="graf"><canvas id="cv2" aria-label="El feed del día: seis tarjetas (gancho, útil o del interés del usuario), la barra de satisfacción y la composición del feed según la satisfacción"></canvas></div>
+      <div class="row">
+        <button class="btn primary" id="b2sim">Simular un usuario</button>
+        <button class="btn" id="b2fin">Hasta el final</button>
+      </div>
+      <div class="hud" id="hud2"></div>
+      <div class="graf"><canvas id="cv2b" aria-label="Clics acumulados según los días que el usuario sigue volviendo, para la política miope y la de largo plazo"></canvas></div>
+      <div class="leyenda" id="ley2"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">3 · el feed como MDP</div>
+      <h2 id="t2">Clics de hoy o usuarios mañana</h2>
+      <p>Lo que Meta publicó sobre su ranking: juntar candidatos, pasarlos por redes multitarea que predicen P(ver), P(like), P(compartir), P(guardar) y P(ocultar), sumar esas probabilidades con pesos y ordenar. Es aprendizaje supervisado y <b>miope</b>: un MDP con γ = 0, que maximiza lo que pasa hoy.</p>
+      <p>En el juguete, el usuario tiene una satisfacción (0 a 10) que el contenido gancho (<em>clickbait</em>) baja y lo útil o de su interés sube; la probabilidad de volver mañana va de 30% a 97%. La política a largo plazo sale de iteración de valor sobre la satisfacción redondeada. Qué usa hoy cada plataforma no es público, y lo publicado puede estar desactualizado.</p>
+      <div class="eq">puntaje = Σₖ wₖ · P(eventoₖ)   ·   γ = 0: max E[r hoy]</div>
+      <p class="nota pregunta">El tutor de la clase 2 daba sumas fáciles porque cobraba por acierto. ¿Qué cobra el feed miope, y qué "suma fácil" encontró?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 3a: evaluación contrafactual -->
+  <section class="bloque" aria-labelledby="t3">
+    <div class="stage">
+      <canvas id="cv3" aria-label="La cueva con las partidas registradas de la política vieja dibujadas en tenue"></canvas>
+      <div class="ctl">
+        <label for="b3d">Qué tan distinta es la política nueva <output id="o3d"></output></label>
+        <input type="range" id="b3d" min="-1" max="1" step="0.05" value="0.6">
+      </div>
+      <div class="ctl">
+        <label for="b3n">Partidas registradas <output id="o3n">100</output></label>
+        <input type="range" id="b3n" min="0" max="6" step="1" value="3">
+      </div>
+      <div class="row"><button class="btn primary" id="b3reg">Registrar partidas de la política vieja</button></div>
+      <div class="graf"><canvas id="cv3b" aria-label="Estimación de cada estimador, media más o menos desvío en 30 repeticiones, contra el valor verdadero"></canvas></div>
+      <div class="leyenda"><span><i class="sq" style="background:rgba(242,179,90,.5)"></i>media de 30 repeticiones ± desvío</span><span><i class="sq" style="background:var(--sonar);border-radius:50%"></i>tus registros</span><span><i style="background:var(--exit)"></i>valor verdadero</span></div>
+      <div class="hud" id="hud3"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">4 · RL sin simulador: ReAgent</div>
+      <h2 id="t3">Evaluar una política sin jugarla</h2>
+      <p><b>Horizon</b> (Gauci y otros, 2018), después <b>ReAgent</b>, fue la plataforma de RL aplicado de Facebook para problemas con muchos datos, respuesta lenta y sin simulador; en 2018 decidía cuándo mandar notificaciones, las sugerencias de M en Messenger y el bitrate de los videos 360. Su pieza clave: la <b>evaluación contrafactual</b> (<em>off-policy evaluation</em>): estimar cuánto rendiría una política nueva solo con registros de la vieja.</p>
+      <p>Política vieja: 60% la acción óptima, 40% al azar, partidas de hasta 60 pasos (−0,02 por paso, +1 en la salida). El <b>método directo</b> arma un modelo con los registros y lo resuelve; <b>IS</b> repesa cada partida por cuánto más (o menos) probable la habría hecho la nueva; <b>WIS</b> normaliza por la suma de pesos; <b>PDIS</b> (IS por decisión, <em>per-decision</em>) repesa cada recompensa solo hasta su paso.</p>
+      <div class="eq">IS: V̂ = (1/N) Σᵢ ( Πₜ π_nueva(aₜ|sₜ) / π_vieja(aₜ|sₜ) ) · Gᵢ</div>
+      <p class="nota pregunta">Llevá la política nueva a "siempre la óptima". ¿Cuántas de tus partidas cuentan de verdad (ESS)? ¿Por qué empeora con partidas más largas?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 3b: RL offline -->
+  <section class="bloque" aria-labelledby="t3b">
+    <div class="stage">
+      <div class="par">
+        <div><span class="cap">Visitas en los registros</span><canvas id="cv3c" aria-label="Mapa de visitas de las partidas registradas"></canvas></div>
+        <div><span class="cap">Política aprendida solo con ellos</span><canvas id="cv3d" aria-label="Política aprendida con Q-learning sobre los registros; en rojo las casillas nunca visitadas donde se equivoca"></canvas></div>
+      </div>
+      <div class="leyenda"><span>nunca</span><span class="bar" id="leg3" style="flex:0 1 90px"></span><span>muchas visitas</span><span><i class="sq" style="background:rgba(224,100,90,.6)"></i>nunca visitada y equivocada</span><span><i class="sq" style="border:2px solid var(--lamp)"></i>visitada y equivocada</span><span><i style="background:var(--exit)"></i>camino desde la entrada</span></div>
+      <div class="ctl">
+        <label for="b3e">Cuánto explora la política vieja (parte al azar) <output id="o3e">0,40</output></label>
+        <input type="range" id="b3e" min="0" max="1" step="0.05" value="0.4">
+      </div>
+      <div class="ctl">
+        <label for="b3m">Partidas registradas <output id="o3m">30</output></label>
+        <input type="range" id="b3m" min="0" max="7" step="1" value="3">
+      </div>
+      <div class="row"><button class="btn" id="b3otra">Otros registros</button></div>
+      <div class="hud" id="hud3b"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">4 · RL offline</div>
+      <h2 id="t3b">Aprender solo con lo que ya pasó</h2>
+      <p>Si no se puede evaluar jugando, tampoco se puede aprender jugando. El <b>RL offline</b> (<em>batch RL</em>) corre Q-learning una y otra vez sobre los mismos registros (<em>fitted Q iteration</em>), sin pedir partidas nuevas.</p>
+      <p>Donde la política vieja pasó, la nueva aprende bien. Donde nunca pasó, Q queda en su valor inicial y la flecha es un empate o un invento: es el <b>cambio de distribución</b> (<em>distribution shift</em>). Bajá la exploración de la vieja y mirá crecer el rojo.</p>
+      <div class="eq">Q(s,a) ← r + γ maxₐ' Q(s',a')   solo para (s,a,r,s') en los registros</div>
+      <p class="nota pregunta">Una casilla visitada también puede salir mal si una acción nunca probada "parece" mejor que las probadas. ¿Por qué el RL offline suele ser pesimista con lo que no vio?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 4: línea de tiempo -->
+  <section class="bloque" aria-labelledby="t4">
+    <div class="stage">
+      <div class="graf"><canvas id="cv4" aria-label="Línea de tiempo: Horizon, ReAgent, archivado, Pearl; en paralelo RLHF y DeepSeek-R1. Tocá un hito."></canvas></div>
+      <div class="cap">Tocá un hito.</div>
+      <ol class="hitos" id="hitos"></ol>
+    </div>
+    <div class="texto">
+      <div class="paso">5 · de ReAgent a Pearl y a los LLM</div>
+      <h2 id="t4">Los mismos problemas, en forma de agente</h2>
+      <p>El repositorio de ReAgent está archivado y su README recomienda <b>Pearl</b> (Zhu y otros, 2023), el agente de RL "listo para producción" de Meta. Los problemas son los de esta clase: explorar con cuidado, evaluar offline antes de desplegar y no romper nada en el camino.</p>
+      <p>En paralelo, los modelos de lenguaje se volvieron agentes cuya acción es el próximo texto: <b>RLHF</b> (2022) los ajusta con una recompensa aprendida de preferencias humanas y <b>DeepSeek-R1</b> (2025) usa RL a gran escala para que aprendan a razonar.</p>
+      <div class="eq">acción = el próximo texto   ·   recompensa = un juicio sobre la respuesta</div>
+      <p class="nota pregunta">Este curso también es un agente: observa a quien lo usa, actúa (una clase, un juego) y su recompensa es que alguien más lo enseñe. ¿Qué es "explorar" para un curso? <a href="../difusion/estrategia.html">Epílogo: cómo se propaga</a>.</p>
+    </div>
+  </section>
+
+  <!-- Para enseñarlo -->
+  <section class="bloque full" aria-labelledby="t5">
+    <div class="texto">
+      <div class="paso">Para enseñarlo</div>
+      <h2 id="t5">Cómo contar esta clase</h2>
+      <p><b>En una oración:</b> un agente piensa (o no), actúa, observa y cobra, como en ReAct; cuando no hay simulador, lo que ya pasó es todo lo que tenés, y cada registro vale según cuán probable era que la política vieja hiciera lo que haría la nueva.</p>
+      <p class="nota pregunta">Pregunta para hacerle a quien te escucha: "Con los registros de cómo se atendió la farmacia el año pasado, ¿podés saber qué habría pasado atendiendo de otra forma? ¿Para qué formas sí y para cuáles no?"</p>
+      <p><b>Ejercicio de 5 minutos:</b> cada persona arma una tabla de 12 días. Para elegir cómo ir al trabajo tira un dado (1–4 colectivo, 5–6 subte) y para el tiempo tira otro (colectivo: 30 + 5 × dado minutos; subte: 20 + 2 × dado). Con esos registros estimen cuánto tardaría alguien que va siempre en subte: con IS (sumar tiempo × 3 en los días de subte y dividir por 12) y con WIS (promedio de los días de subte). El valor verdadero es 27 minutos. Comparen entre personas: ¿cuál de los dos varía más, y qué pasa si alguien no sacó ningún 5 ni 6?</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(function () {
+  const COL = Cueva.COL();
+  const quieto = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const fx = (x, d = 2) => (x < 0 ? "−" : "") + Math.abs(x).toFixed(d).replace(".", ",");
+  const sg = (x, d = 2) => (x > 0 ? "+" : "") + fx(x, d);
+  const $ = id => document.getElementById(id);
+  function ajustar(cv, alto) { const W = cv.parentElement.clientWidth - (cv.parentElement.classList.contains("stage") ? 22 : 0), dpr = devicePixelRatio || 1; cv.width = W * dpr; cv.height = alto * dpr; cv.style.width = W + "px"; cv.style.height = alto + "px"; const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx, w: W, h: alto }; }
+  function partir(ctx, txt, ancho) { const pal = txt.split(" "), out = []; let l = ""; for (const p of pal) { const t = l ? l + " " + p : p; if (ctx.measureText(t).width > ancho && l) { out.push(l); l = p; } else l = t; } if (l) out.push(l); return out; }
+  function caja(ctx, x, y, w, h, r = 5) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
+  const env = Cueva.makeEnv(Cueva.MAPS.chica);
+  // acciones óptimas de cada casilla (las que acercan a la salida)
+  const OPT = Array.from({ length: env.nS }, (_, s) => { const o = []; for (let a = 0; a < 4; a++) { const [s2, b] = env.move(s, a); if (!b && env.dist[s2] === env.dist[s] - 1) o.push(a); } return o; });
+  const SPR = {}; for (const d of Cueva.DIRN) { const im = new Image(); im.src = "../assets/sprites/boy_" + d + "_1.png"; SPR[d] = im; }
+
+  // ================= Bloque 0: traza ReAct real (pregrabada del notebook 09) =================
+  // cada paso: [pensamiento, acción tal como la escribió el modelo, tipo ("mover" | "sentir" | null), a, observación, s, s2]
+  const TRAZA0 = /*TRAZA*/[
+    ["Me encuentro en la cueva, pero no tengo un sentido visual.", "no pido ayuda", null, null, "no entendí la acción: usá mover(dirección) o sentir().", 0, 0],
+    ["Tengo que buscar el nombre de la entrada para poder avanzar.", "sentir()", "sentir", null, "pared arriba y a la izquierda; libre a la derecha y abajo.", 0, 0],
+    ["A la derecha está libre.", "mover(derecha)", "mover", 1, "avancé.", 0, 1],
+    ["Sigo hacia la derecha.", "mover(derecha)", "mover", 1, "avancé.", 1, 2],
+    ["Todavía no sé nada; toco las paredes.", "sentir()", "sentir", null, "pared arriba y abajo; libre a la derecha y a la izquierda.", 2, 2],
+    ["A la izquierda está libre.", "mover(izquierda)", "mover", 3, "avancé.", 2, 1],
+    ["Sigue hacia arriba.", "mover(arriba)", "mover", 0, "choqué con una pared.", 1, 1],
+    ["Choqué; pruebo hacia abajo.", "mover(abajo)", "mover", 2, "choqué con una pared.", 1, 1],
+    ["Choqué; pruebo hacia la derecha.", "mover(derecha)", "mover", 1, "avancé.", 1, 2],
+    ["Todavía no sé nada; toco las paredes.", "sentir()", "sentir", null, "pared arriba y abajo; libre a la derecha y a la izquierda.", 2, 2],
+    ["A la derecha está libre.", "mover(derecha)", "mover", 1, "avancé.", 2, 3],
+    ["Sigue hacia la derecha.", "mover(derecha)", "mover", 1, "choqué con una pared.", 3, 3],
+    ["Choqué; pruebo hacia abajo.", "mover(abajo)", "mover", 2, "avancé.", 3, 12],
+    ["Todavía no sé nada; toco las paredes.", "sentir()", "sentir", null, "pared a la derecha y a la izquierda; libre arriba y abajo.", 12, 12],
+    ["A la derecha está libre.", "mover(derecha)", "mover", 1, "choqué con una pared.", 12, 12],
+    ["Choqué; pruebo hacia a la izquierda.", "mover(izquierda)", "mover", 3, "choqué con una pared.", 12, 12],
+    ["Choqué; pruebo hacia arriba.", "mover(arriba)", "mover", 0, "avancé.", 12, 3],
+    ["Todavía no sé nada; toco las paredes.", "sentir()", "sentir", null, "pared arriba y a la derecha; libre abajo y a la izquierda.", 3, 3],
+    ["A la derecha está libre.", "mover(derecha)", "mover", 1, "choqué con una pared.", 3, 3],
+    ["Choqué; pruebo hacia abajo.", "mover(abajo)", "mover", 2, "avancé.", 3, 12],
+    ["Todavía no sé nada; toco las paredes.", "sentir()", "sentir", null, "pared a la derecha y a la izquierda; libre arriba y abajo.", 12, 12],
+    ["A la derecha está libre.", "mover(derecha)", "mover", 1, "choqué con una pared.", 12, 12],
+    ["Choqué; pruebo hacia a la izquierda.", "mover(izquierda)", "mover", 3, "choqué con una pared.", 12, 12],
+    ["Choqué; pruebo hacia arriba.", "mover(arriba)", "mover", 0, "avancé.", 12, 3],
+    ["Todavía no sé nada; toco las paredes.", "sentir()", "sentir", null, "pared arriba y a la derecha; libre abajo y a la izquierda.", 3, 3],
+    ["A la derecha está libre.", "mover(derecha)", "mover", 1, "choqué con una pared.", 3, 3],
+    ["Choqué; pruebo hacia abajo.", "mover(abajo)", "mover", 2, "avancé.", 3, 12],
+    ["Todavía no sé nada; toco las paredes.", "sentir()", "sentir", null, "pared a la derecha y a la izquierda; libre arriba y abajo.", 12, 12],
+    ["A la derecha está libre.", "mover(derecha)", "mover", 1, "choqué con una pared.", 12, 12],
+    ["Choqué; pruebo hacia a la izquierda.", "mover(izquierda)", "mover", 3, "choqué con una pared.", 12, 12]]/*FIN*/;
+  const REF0 = /*REF*/{ q: 20, azar: 0 }/*FIN*/;
+  const T0 = Cueva.tablero($("cv0"), env, { maxCell: 34 });
+  const N0 = TRAZA0.length;
+  let k0 = Math.min(N0 - 1, 3) * 3 + 2, anim0 = null;   // índice = paso·3 + fase (0 pensamiento, 1 acción, 2 observación)
+  $("b0k").max = N0;
+  function estado0(idx) {   // paredes descubiertas, camino y choques hasta el índice
+    const toc = new Set(), sent = new Set(), path = [env.start], choques = [];
+    const paso = Math.floor(idx / 3), fase = idx % 3;
+    for (let i = 0; i <= paso; i++) {
+      const p = TRAZA0[i], hecho = i < paso || fase === 2;
+      if (!hecho) break;
+      if (p[2] === "mover") { const [s2, b, clave] = env.move(p[5], p[3]); if (b) { toc.add(clave); choques.push(p[5]); } else path.push(s2); }
+      else if (p[2] === "sentir") { const [r, c] = env.free[p[5]]; for (const [dr, dc] of Cueva.DR) if (env.isWall(r + dr, c + dc)) sent.add((r + dr) + "," + (c + dc)); }
+    }
+    return { toc, sent, path, choques };
+  }
+  function dibujar0() {
+    if (!N0) return;
+    const paso = Math.floor(k0 / 3), fase = k0 % 3, p = TRAZA0[paso], st = estado0(k0), T = T0, ctx = T.ctx, cell = T.cell;
+    T.fondo("#000");
+    for (let r = 0; r < env.H; r++) for (let c = 0; c < env.W; c++) if (env.rows[r][c] === "#") T.casilla(r, c, "#0d1017");
+    for (const k of st.sent) { if (st.toc.has(k)) continue; const [r, c] = k.split(",").map(Number); ctx.strokeStyle = COL.sonar; ctx.lineWidth = 1.5; ctx.strokeRect(c * cell + 2.5, r * cell + 2.5, cell - 5, cell - 5); }
+    T.tocadas(st.toc);
+    T.salida(); T.entrada();
+    T.trayecto(st.path, "rgba(94,200,216,.55)", .12);
+    const visit = new Map(); st.path.forEach(s => visit.set(s, (visit.get(s) || 0) + 1));
+    for (const [s, n] of visit) if (n > 1 && s !== env.goal) T.texto(s, "×" + n, "rgba(232,230,223,.6)", .3);
+    const pos = fase === 2 ? p[6] : p[5], dir = p[2] === "mover" ? p[3] : 2;
+    if (fase >= 1 && p[2] === "mover") {   // flecha de la acción elegida
+      const [r, c] = env.free[p[5]], [dr, dc] = Cueva.DR[p[3]];
+      ctx.strokeStyle = COL.lamp; ctx.fillStyle = COL.lamp; ctx.lineWidth = 2.5; const x = c * cell + cell / 2, y = r * cell + cell / 2, x2 = x + dc * cell * .9, y2 = y + dr * cell * .9;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke(); const an = Math.atan2(y2 - y, x2 - x);
+      ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(x2 - 8 * Math.cos(an - .5), y2 - 8 * Math.sin(an - .5)); ctx.lineTo(x2 - 8 * Math.cos(an + .5), y2 - 8 * Math.sin(an + .5)); ctx.fill();
+    }
+    if (fase === 2 && p[2] === "mover" && p[5] === p[6]) { const [r, c] = env.free[p[5]], [dr, dc] = Cueva.DR[p[3]]; T.casilla(r + dr, c + dc, COL.ember, 2); }
+    T.sprite(pos, dir);
+    // casilleros
+    const set = (id, txt, f) => { const el = $(id); el.querySelector("b").textContent = f <= fase ? txt : "…"; el.classList.toggle("on", f === fase); el.classList.toggle("hecha", f < fase); };
+    set("f0p", p[0] || "(no escribió pensamiento)", 0); set("f0a", p[1], 1); set("f0o", p[4], 2);
+    $("o0k").textContent = `${paso + 1} de ${N0}`; $("b0k").value = paso + 1;
+    $("log0").innerHTML = TRAZA0.slice(Math.max(0, paso - 4), paso).map((q, i) => `<div class="${q[2] === "mover" && q[5] === q[6] ? "ch" : ""}">${Math.max(0, paso - 4) + i + 1}. ${esc0(q[1])} → ${esc0(q[4])}</div>`).join("") || `<div>Acá van quedando los pasos anteriores: son toda la memoria del agente.</div>`;
+    const hechos = TRAZA0.slice(0, paso + (fase === 2 ? 1 : 0)), nCh = hechos.filter(q => q[2] === "mover" && q[5] === q[6]).length;
+    const distintas = new Set(st.path).size, repetidos = hechos.filter((q, i) => q[2] === "mover" && q[5] === q[6] && hechos.slice(0, i).some(o => o[2] === "mover" && o[5] === q[5] && o[3] === q[3] && o[5] === o[6])).length;
+    $("hud0").innerHTML = `<span>choques <b>${nCh}</b> (repetidos <b style="color:var(--ember)">${repetidos}</b>)</span><span>casillas distintas <b>${distintas}</b></span><span>distancia a la salida <b>${env.dist[pos]}</b></span>` +
+      (REF0.q ? `<span>referencia: Q-learning sale en <b style="color:var(--exit)">${REF0.q}</b> pasos; al azar, ${REF0.azar} de cada 100 partidas de ${N0} pasos</span>` : "");
+  }
+  const esc0 = t => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  function ir0(k) { k0 = Math.max(0, Math.min(3 * N0 - 1, k)); dibujar0(); }
+  function parar0() { if (anim0) clearTimeout(anim0); anim0 = null; $("b0rep").textContent = "Reproducir"; }
+  $("b0sig").onclick = () => { parar0(); ir0(k0 + 1); };
+  $("b0atr").onclick = () => { parar0(); ir0(k0 - 1); };
+  $("b0k").oninput = e => { parar0(); ir0((+e.target.value - 1) * 3 + 2); };
+  $("b0rep").onclick = () => {
+    if (anim0) { parar0(); return; }
+    if (k0 >= 3 * N0 - 1) k0 = -1;
+    $("b0rep").textContent = "Pausa";
+    const f = () => { ir0(k0 + 1); anim0 = k0 < 3 * N0 - 1 ? setTimeout(() => requestAnimationFrame(f), quieto ? 900 : 520) : null; if (!anim0) $("b0rep").textContent = "Reproducir"; };
+    f();
+  };
+
+  // ================= Bloque 1: dos ciclos =================
+  const R1 = Cueva.rng(11), EPS1 = 0.25;
+  let cueva = { s: env.start, prev: env.start, tocadas: new Set(), ret: 0, ep: 1, t: 0, dir: 2 };
+  const GUIONES = [
+    { q: "¿En qué año publicó Facebook Horizon, su plataforma de RL?", pasos: [
+      { pensar: "No lo sé de memoria: busco.", acc: 'buscar("Horizon Facebook RL")', obs: "3 resultados: arXiv, VentureBeat, GitHub", r: -0.01 },
+      { pensar: "El paper trae la fecha: lo leo.", acc: "leer(arXiv 1811.00260)", obs: "«Horizon: Facebook's Open Source Applied RL Platform», 2018", r: -0.01 },
+      { pensar: "Ya tengo la respuesta.", acc: 'responder("2018")', obs: "el usuario la marca correcta", r: 1 }] },
+    { q: "¿Qué recomienda hoy el repositorio de ReAgent?", pasos: [
+      { pensar: "Busco el repositorio.", acc: 'buscar("ReAgent GitHub")', obs: "facebookresearch/ReAgent (archivado)", r: -0.01 },
+      { pensar: "Leo el README.", acc: "leer(README de ReAgent)", obs: "«…please refer to Pearl»", r: -0.01 },
+      { pensar: "Respondo.", acc: 'responder("usar Pearl")', obs: "el usuario la marca correcta", r: 1 }] },
+    { q: "¿Quién es el primer autor del paper de Pearl?", pasos: [
+      { pensar: "Creo que lo sé: respondo ya.", acc: 'responder("Sutton")', obs: "el usuario la marca incorrecta", r: 0 }] }];
+  const LLM = []; GUIONES.forEach((g, i) => { LLM.push({ pensar: "Llega una pregunta.", acc: "—", obs: "pregunta: " + g.q, r: null, nueva: i }); g.pasos.forEach(p => LLM.push({ ...p, q: i })); });
+  let llmI = -1, llmRet = 0, llmLog = [], llmPensar = "Esperando una pregunta.";
+  let pendC = null, pendL = null, fase1 = 2, anim1 = null, corriendo1 = !quieto, visible1 = true, tAnt = 0;
+
+  function pasoCueva() {
+    if (cueva.s === env.goal) { cueva = { s: env.start, prev: env.start, tocadas: new Set(), ret: 0, ep: cueva.ep + 1, t: 0, dir: 2 }; return { acc: "—", obs: "vuelve a la entrada: episodio " + cueva.ep, r: null }; }
+    const s = cueva.s, a = R1() < EPS1 ? Math.floor(R1() * 4) : OPT[s][Math.floor(R1() * OPT[s].length)];
+    const [s2, choque, clave] = env.move(s, a); if (choque) cueva.tocadas.add(clave);
+    const r = s2 === env.goal ? 1 : -0.01; cueva.prev = s; cueva.s = s2; cueva.dir = a; cueva.ret += r; cueva.t++;
+    const [rr, cc] = env.free[s2];
+    return { acc: "mover " + Cueva.ARROW[a], obs: choque ? `pared ${Cueva.ARROW[a]} · sigo en (${rr}, ${cc})` : s2 === env.goal ? "¡la salida!" : `libre · ahora en (${rr}, ${cc})`, r };
+  }
+  function pasoLLM() {
+    llmI = (llmI + 1) % LLM.length; const p = LLM[llmI];
+    if (p.nueva !== undefined) { llmRet = 0; llmLog = []; }
+    llmPensar = p.pensar; if (p.r !== null) llmRet += p.r;
+    return p;
+  }
+  function casillero(id, txt, nuevo) { const el = $(id); el.querySelector("b").textContent = txt; el.classList.toggle("nuevo", !!nuevo); }
+  const fr = r => r === null ? "—" : r === 0 ? "0" : sg(r, r === 1 ? 0 : 2).replace("+1,00", "+1");
+  function empezarPaso() {
+    pendC = pasoCueva(); pendL = pasoLLM(); fase1 = 0;
+    casillero("c1aa", pendC.acc, true); casillero("c1ba", pendL.acc, true); casillero("c1bp", pendL.pensar, true);
+    $("c1ao").classList.remove("nuevo"); $("c1bo").classList.remove("nuevo"); $("c1ar").classList.remove("nuevo"); $("c1br").classList.remove("nuevo");
+  }
+  function cerrarPaso() {
+    if (!pendC) return;
+    casillero("c1ao", pendC.obs, true); casillero("c1ar", fr(pendC.r), true); casillero("c1aa", pendC.acc, false);
+    casillero("c1bo", pendL.obs, true); casillero("c1br", fr(pendL.r), true); casillero("c1ba", pendL.acc, false);
+    casillero("c1bp", pendL.pensar, false);
+    llmLog.push(pendL.obs); if (llmLog.length > 6) llmLog.shift();
+    fase1 = 2;
+    $("hud1").innerHTML = `<span>cueva: episodio <b>${cueva.ep}</b>, paso <b>${cueva.t}</b>, retorno <b>${fx(cueva.ret)}</b></span><span>LLM: pregunta <b>${(LLM[llmI].q ?? LLM[llmI].nueva) + 1}</b> de 3, retorno <b>${fx(llmRet)}</b></span>`;
+  }
+  function geomCiclo(w) {
+    const cell = Math.max(8, Math.min(20, Math.floor((w - 64) / env.W))), envH = env.H * cell, top = 54, gap = 30;
+    return { cell, envH, top, gap, h: top + gap + envH + 6, ax: 30, aw: w - 60, ey: top + gap };
+  }
+  function flechasCiclo(ctx, w, g, fase) {
+    const yA = 4 + (g.top - 8) / 2, yE = g.ey + g.envH / 2;
+    const der = [[w - 30, yA], [w - 12, yA], [w - 12, yE], [w - 30, yE]], izq = [[30, yE], [12, yE], [12, yA], [30, yA]];
+    const linea = (pts, col, activo) => { ctx.strokeStyle = col; ctx.globalAlpha = activo ? 1 : .45; ctx.lineWidth = activo ? 2 : 1.5; ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
+      const [x2, y2] = pts[pts.length - 1]; const d = Math.sign(x2 - pts[pts.length - 2][0]); ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x2 + 2 * d, y2); ctx.lineTo(x2 - 6 * d, y2 - 5); ctx.lineTo(x2 - 6 * d, y2 + 5); ctx.fill(); ctx.globalAlpha = 1; };
+    linea(der, COL.lamp, fase < 1); linea(izq, COL.sonar, fase >= 1 && fase < 2);
+    const rot = (txt, x, y, col) => { ctx.save(); ctx.translate(x, y); ctx.rotate(-Math.PI / 2); ctx.font = `11px ${COL.mono}`; const tw = ctx.measureText(txt).width + 8; ctx.fillStyle = "#000"; ctx.fillRect(-tw / 2, -7, tw, 14); ctx.fillStyle = col; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(txt, 0, 0); ctx.restore(); };
+    rot("acción", w - 12, (yA + yE) / 2, COL.lamp); rot("observación, recompensa", 12, (yA + yE) / 2, COL.sonar);
+    if (fase < 2) {   // ficha que viaja
+      const pts = fase < 1 ? der : izq, f = fase % 1; const L = []; let tot = 0; for (let i = 1; i < pts.length; i++) { const l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); L.push(l); tot += l; }
+      let d = f * tot, i = 0; while (i < L.length - 1 && d > L[i]) { d -= L[i]; i++; } const u = d / L[i];
+      const x = pts[i][0] + (pts[i + 1][0] - pts[i][0]) * u, y = pts[i][1] + (pts[i + 1][1] - pts[i][1]) * u;
+      ctx.fillStyle = fase < 1 ? COL.lamp : COL.sonar; ctx.beginPath(); ctx.arc(x, y, 5, 0, 7); ctx.fill();
+    }
+  }
+  function cajaAgente(ctx, g, titulo, linea2) {
+    ctx.fillStyle = COL.rock; ctx.strokeStyle = COL.rock3; ctx.lineWidth = 1; caja(ctx, g.ax + .5, 4.5, g.aw - 1, g.top - 8); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = COL.ink; ctx.font = `600 12px ${COL.mono}`; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(titulo, g.ax + 10, 17);
+    ctx.fillStyle = COL.muted; ctx.font = `12px ${COL.mono}`; const l = partir(ctx, linea2, g.aw - 20); ctx.fillText(l[0] + (l.length > 1 ? "…" : ""), g.ax + 10, 35);
+  }
+  function dibujar1() {
+    // cueva
+    let cv = $("cv1a"), W = cv.parentElement.clientWidth, g = geomCiclo(W), { ctx, w } = ajustar(cv, g.h);
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, g.h);
+    cajaAgente(ctx, g, "agente: el explorador", `ε = 0,25 · elige ${pendC && fase1 < 2 ? pendC.acc.replace("mover ", "") : "…"}`);
+    const ox = Math.round((w - env.W * g.cell) / 2), oy = g.ey, c = g.cell;
+    for (let r = 0; r < env.H; r++) for (let cc = 0; cc < env.W; cc++) { ctx.fillStyle = env.rows[r][cc] === "#" ? (cueva.tocadas.has(r + "," + cc) ? COL.chalk : "#11141c") : "#05060a"; ctx.fillRect(ox + cc * c, oy + r * c, c - (env.rows[r][cc] === "#" ? 1 : 0), c - (env.rows[r][cc] === "#" ? 1 : 0)); }
+    const [gr, gc] = env.free[env.goal]; ctx.fillStyle = COL.exit; ctx.fillRect(ox + gc * c + 2, oy + gr * c + 2, c - 4, c - 4);
+    const pos = fase1 < 1 ? cueva.prev : cueva.s, [pr, pc] = env.free[pos], im = SPR[Cueva.DIRN[cueva.dir]];
+    if (im.complete && im.naturalWidth) { ctx.imageSmoothingEnabled = false; ctx.drawImage(im, ox + pc * c + c * .05, oy + pr * c + c * .05, c * .9, c * .9); } else { ctx.fillStyle = COL.lamp; ctx.beginPath(); ctx.arc(ox + pc * c + c / 2, oy + pr * c + c / 2, c * .3, 0, 7); ctx.fill(); }
+    flechasCiclo(ctx, w, g, fase1);
+    // LLM
+    cv = $("cv1b"); W = cv.parentElement.clientWidth; g = geomCiclo(W); ({ ctx, w } = ajustar(cv, g.h));
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, g.h);
+    cajaAgente(ctx, g, "agente: el modelo de lenguaje", "piensa: " + llmPensar);
+    ctx.strokeStyle = COL.rock3; caja(ctx, g.ax + .5, g.ey + .5, g.aw - 1, g.envH - 1); ctx.stroke();
+    ctx.fillStyle = COL.muted; ctx.font = `11px ${COL.mono}`; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(g.aw > 250 ? "entorno: buscador, páginas, usuario" : "entorno: buscador, páginas", g.ax + 8, g.ey + 6);
+    ctx.font = `12px ${COL.mono}`; let y = g.ey + 24; const lineas = [];
+    const log = fase1 >= 1 && fase1 < 2 && pendL ? llmLog.concat(["▸ " + pendL.acc]) : llmLog;
+    log.forEach(t => partir(ctx, t, g.aw - 18).forEach((l, k) => lineas.push([l, t.startsWith("▸") ? COL.lamp : t.startsWith("pregunta") ? COL.ink : COL.sonar, k === 0])));
+    const maxL = Math.floor((g.envH - 30) / 16), vis = lineas.slice(-maxL);
+    vis.forEach(([l, col]) => { ctx.fillStyle = col; ctx.fillText(l, g.ax + 9, y); y += 16; });
+    flechasCiclo(ctx, w, g, fase1);
+  }
+  function tick1(t) {
+    const dt = Math.min(100, t - (tAnt || t)); tAnt = t;
+    if (fase1 >= 2) empezarPaso(); else { fase1 += dt / 650; if (fase1 >= 2) cerrarPaso(); }
+    dibujar1();
+    anim1 = corriendo1 && visible1 ? requestAnimationFrame(tick1) : null;
+  }
+  function arrancar1() { if (!anim1 && corriendo1 && visible1) { tAnt = 0; anim1 = requestAnimationFrame(tick1); } }
+  $("b1anim").onclick = () => { corriendo1 = !corriendo1; $("b1anim").textContent = corriendo1 ? "Pausa" : "Animar"; if (corriendo1) arrancar1(); else if (anim1) { cancelAnimationFrame(anim1); anim1 = null; } };
+  $("b1paso").onclick = () => { corriendo1 = false; $("b1anim").textContent = "Animar"; if (anim1) { cancelAnimationFrame(anim1); anim1 = null; } if (fase1 < 2) cerrarPaso(); empezarPaso(); cerrarPaso(); dibujar1(); };
+  if (quieto) $("b1anim").textContent = "Animar";
+  new IntersectionObserver(es => es.forEach(en => { visible1 = en.isIntersecting; if (visible1) arrancar1(); })).observe($("cv1a"));
+  // estado inicial: algunos pasos ya dados
+  for (let i = 0; i < 5; i++) { empezarPaso(); cerrarPaso(); }
+
+  // ================= Bloque 2: el feed =================
+  const NC = 6, CLIC = [0.5, 0.3, 0.1], DSAT = [-0.6, 0.25, 0.4], DERIVA = -0.6, S0 = 6, MAXD = 60;
+  const TIP = [{ n: "gancho", col: COL.ember }, { n: "tu interés", col: COL.exit }, { n: "útil", col: COL.sonar }];
+  const TITULOS = [
+    ["No vas a creer lo que pasó después", "El truco que nadie te cuenta", "Esta foto rompió internet", "10 cosas que te van a sorprender", "Lo que dijo te va a indignar", "Nadie lo esperaba"],
+    ["Nuevo paper sobre tu tema", "Tutorial del tema que seguís", "Charla de alguien que admirás", "Datos abiertos de tu área", "Hilo de una colega sobre RL", "Reseña del libro que buscabas"],
+    ["Cómo ordenar tus gastos", "Guía para dormir mejor", "Resumen de noticias del día", "Cómo leer un prospecto", "Atajos de teclado útiles", "Receta rápida y barata"]];
+  const pVolver = s => 0.3 + 0.067 * s;
+  const ACC2 = []; for (let g = 0; g <= NC; g++) for (let i = 0; g + i <= NC; i++) ACC2.push([g, i, NC - g - i]);
+  const clics = a => a[0] * CLIC[0] + a[1] * CLIC[1] + a[2] * CLIC[2];
+  const sig2 = (s, a) => Math.max(0, Math.min(10, s + a[0] * DSAT[0] + a[1] * DSAT[1] + a[2] * DSAT[2] + DERIVA));
+  const interp = (V, x) => { const i = Math.min(9, Math.floor(x)), f = x - i; return V[i] * (1 - f) + V[i + 1] * f; };
+  function resolverFeed(g) {
+    let V = new Array(11).fill(0), P = new Array(11).fill(0);
+    for (let it = 0; it < 1500; it++) { const NV = []; let dl = 0; for (let s = 0; s <= 10; s++) { let b = -1, ba = 0; ACC2.forEach((a, k) => { const s2 = sig2(s, a), q = clics(a) + g * pVolver(s2) * interp(V, s2); if (q > b + 1e-12) { b = q; ba = k; } }); NV[s] = b; P[s] = ba; dl = Math.max(dl, Math.abs(b - V[s])); } V = NV; if (dl < 1e-9) break; }
+    return P;
+  }
+  function esperado(P) {   // clics acumulados esperados por día y días activos esperados
+    let d = new Array(11).fill(0); d[S0] = 1; let tot = 0, dias = 0; const curva = [0];
+    for (let t = 0; t < MAXD; t++) { const nd = new Array(11).fill(0); for (let s = 0; s <= 10; s++) { if (!d[s]) continue; const a = ACC2[P[s]]; tot += d[s] * clics(a); dias += d[s]; const s2 = sig2(s, a), p = d[s] * pVolver(s2), i = Math.min(9, Math.floor(s2)), f = s2 - i; nd[i] += p * (1 - f); nd[i + 1] += p * f; } curva.push(tot); d = nd; }
+    return { curva, tot, dias };
+  }
+  let modo2 = "mio", gam2 = 0.9, POLmio = resolverFeed(0), POLlar = resolverFeed(gam2), ESPmio = esperado(POLmio), ESPlar = esperado(POLlar);
+  let usr = null, trazas = { mio: null, lar: null }, anim2 = null, semilla2 = 3, ultimoDia = 0;
+  const pol2 = () => modo2 === "mio" ? POLmio : POLlar;
+  function nuevoUsuario() { usr = { R: Cueva.rng(semilla2++ * 977 + 5), s: S0, dia: 0, cum: 0, activo: true, hoy: [], clicsHoy: 0, traza: [[0, 0]], modo: modo2 }; trazas[modo2] = usr.traza; }
+  function diaFeed() {
+    if (!usr.activo) return;
+    const a = ACC2[pol2()[Math.round(usr.s)]], R = usr.R; usr.hoy = []; usr.clicsHoy = 0;
+    [0, 1, 2].forEach(k => { for (let j = 0; j < a[k]; j++) { const c = R() < CLIC[k]; usr.hoy.push({ k, t: TITULOS[k][Math.floor(R() * 6)], c }); usr.clicsHoy += c; } });
+    usr.antes = usr.s; usr.s = sig2(usr.s, a); usr.cum += usr.clicsHoy; usr.dia++; usr.traza.push([usr.dia, usr.cum]);
+    usr.pv = pVolver(usr.s);
+    if (R() >= usr.pv || usr.dia >= MAXD) usr.activo = false;
+  }
+  function dibujar2() {
+    const cv = $("cv2"), W = cv.parentElement.clientWidth, porFila = W < 520 ? 3 : 6, gap = 6, cw = (W - (porFila - 1) * gap) / porFila, ch = 74;
+    const filas = Math.ceil(NC / porFila), yS = filas * (ch + gap) + 8, yP = yS + 44, hP = 52, alto = yP + hP + 34;
+    const { ctx, w } = ajustar(cv, alto); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, alto);
+    ctx.textAlign = "left"; ctx.textBaseline = "top";
+    (usr.hoy.length ? usr.hoy : []).forEach((c, j) => {
+      const x = (j % porFila) * (cw + gap), y = Math.floor(j / porFila) * (ch + gap), col = TIP[c.k].col;
+      ctx.fillStyle = COL.rock; ctx.strokeStyle = col; ctx.lineWidth = c.c ? 2 : 1; ctx.globalAlpha = c.c ? 1 : .8; caja(ctx, x + .5, y + .5, cw - 1, ch - 1, 4); ctx.fill(); ctx.stroke(); ctx.globalAlpha = 1;
+      ctx.fillStyle = col; ctx.font = `600 10.5px ${COL.mono}`; ctx.fillText(TIP[c.k].n.toUpperCase(), x + 7, y + 6);
+      ctx.fillStyle = COL.ink; ctx.font = `12px ${"Atkinson Hyperlegible, sans-serif"}`; partir(ctx, c.t, cw - 14).slice(0, 3).forEach((l, i) => ctx.fillText(l, x + 7, y + 21 + i * 14));
+      if (c.c) { ctx.fillStyle = COL.lamp; ctx.font = `600 10.5px ${COL.mono}`; ctx.textAlign = "right"; ctx.fillText("clic", x + cw - 6, y + 6); ctx.textAlign = "left"; }
+    });
+    if (!usr.hoy.length) { ctx.fillStyle = COL.muted; ctx.font = `13px ${COL.mono}`; ctx.fillText("Tocá «Simular un usuario».", 4, 30); }
+    if (!usr.activo && usr.dia) { ctx.fillStyle = "rgba(0,0,0,.6)"; ctx.fillRect(0, 0, w, yS - 8); ctx.fillStyle = usr.dia >= MAXD ? COL.exit : COL.ember; ctx.font = `600 14px ${COL.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(usr.dia >= MAXD ? `sigue volviendo después de ${MAXD} días` : `el día ${usr.dia + 1} no volvió`, w / 2, (yS - 8) / 2); ctx.textAlign = "left"; ctx.textBaseline = "top"; }
+    // satisfacción
+    const bx = 96, bw = w - bx - 74;
+    ctx.fillStyle = COL.muted; ctx.font = `11px ${COL.mono}`; ctx.textBaseline = "middle"; ctx.fillText("satisfacción", 0, yS + 10);
+    ctx.fillStyle = COL.rock2; ctx.fillRect(bx, yS + 3, bw, 14); const sc = Cueva.rampa("signo", usr.s / 10); ctx.fillStyle = sc; ctx.fillRect(bx, yS + 3, bw * usr.s / 10, 14);
+    if (usr.antes !== undefined) { ctx.strokeStyle = COL.ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx + bw * usr.antes / 10 + .5, yS); ctx.lineTo(bx + bw * usr.antes / 10 + .5, yS + 20); ctx.stroke(); }
+    ctx.fillStyle = COL.ink; ctx.fillText(fx(usr.s, 1) + " / 10", bx + bw + 8, yS + 10);
+    ctx.fillStyle = COL.muted; ctx.fillText(`P(volver mañana) = ${Math.round(100 * pVolver(usr.s))}%`, bx, yS + 28);
+    // composición del feed según la satisfacción
+    ctx.fillStyle = COL.muted; ctx.textBaseline = "top"; ctx.fillText(w < 520 ? `qué muestra según la satisfacción (${modo2 === "mio" ? "miope" : "γ = " + fx(gam2)})` : `qué muestra la política ${modo2 === "mio" ? "miope" : "a largo plazo (γ = " + fx(gam2) + ")"} según la satisfacción`, 0, yP - 4);
+    const P = pol2(), sw = (w - bx) / 11;
+    for (let s = 0; s <= 10; s++) { const a = ACC2[P[s]]; let y = yP + 12; [0, 1, 2].forEach(k => { const hh = (hP - 12) * a[k] / NC; ctx.fillStyle = TIP[k].col; ctx.globalAlpha = .75; ctx.fillRect(bx + s * sw + 2, y, sw - 4, hh); ctx.globalAlpha = 1; y += hh; });
+      ctx.fillStyle = Math.round(usr.s) === s ? COL.ink : COL.muted; ctx.textAlign = "center"; ctx.fillText(s, bx + s * sw + sw / 2, yP + hP + 3); }
+    const xs = bx + Math.round(usr.s) * sw; ctx.strokeStyle = COL.ink; ctx.lineWidth = 1.5; ctx.strokeRect(xs + 1, yP + 11, sw - 2, hP - 10);
+    ctx.textAlign = "left"; ctx.fillStyle = COL.muted; ctx.textBaseline = "middle";
+    [0, 1, 2].forEach(k => { ctx.fillStyle = TIP[k].col; ctx.fillRect(0, yP + 16 + k * 13, 8, 8); ctx.fillStyle = COL.muted; ctx.fillText(TIP[k].n, 12, yP + 20 + k * 13); });
+    // HUD
+    $("hud2").innerHTML = `<span>día <b>${usr.dia}</b></span><span>clics hoy <b>${usr.clicsHoy}</b></span><span>clics acumulados <b>${usr.cum}</b></span>` +
+      (usr.activo ? `<span>sigue volviendo</span>` : `<span style="color:${usr.dia >= MAXD ? "var(--exit)" : "var(--ember)"}">días activos <b>${usr.dia}</b></span>`) +
+      `<span>esperado: miope <b>${fx(ESPmio.tot, 1)}</b> clics en <b>${fx(ESPmio.dias, 1)}</b> días · largo plazo <b>${fx(ESPlar.tot, 1)}</b> en <b>${fx(ESPlar.dias, 1)}</b></span>`;
+    // gráfico de clics acumulados vs días
+    const G = ajustar($("cv2b"), 190), c2 = G.ctx, m = { l: 34, r: 12, t: 16, b: 24 }, PW = G.w - m.l - m.r, PH = 190 - m.t - m.b;
+    c2.fillStyle = "#000"; c2.fillRect(0, 0, G.w, 190);
+    const tr = [trazas.mio, trazas.lar].filter(Boolean), ymax = Math.max(50, ...tr.map(t => t[t.length - 1][1]), ESPlar.tot) * 1.05;
+    const X = d => m.l + PW * d / MAXD, Y = v => m.t + PH * (1 - v / ymax);
+    c2.strokeStyle = "rgba(141,147,163,.22)"; c2.lineWidth = 1; c2.font = `11px ${COL.mono}`; c2.fillStyle = COL.muted; c2.textAlign = "right"; c2.textBaseline = "middle";
+    for (let v = 0; v <= ymax; v += 20) { c2.beginPath(); c2.moveTo(m.l, Y(v)); c2.lineTo(m.l + PW, Y(v)); c2.stroke(); c2.fillText(v, m.l - 4, Y(v)); }
+    c2.textAlign = "center"; c2.textBaseline = "top"; for (let d = 0; d <= MAXD; d += 10) c2.fillText(d, X(d), m.t + PH + 5);
+    c2.textAlign = "left"; c2.fillText("clics acumulados según los días", m.l + 4, 0);
+    const curva = (cv, col, dash) => { c2.strokeStyle = col; c2.lineWidth = 2; c2.setLineDash(dash); c2.beginPath(); cv.forEach((v, d) => d ? c2.lineTo(X(d), Y(v)) : c2.moveTo(X(0), Y(v))); c2.stroke(); c2.setLineDash([]); };
+    curva(ESPmio.curva, COL.ember, [5, 4]); curva(ESPlar.curva, COL.exit, [5, 4]);
+    for (const [k, col] of [["mio", COL.ember], ["lar", COL.exit]]) { const t = trazas[k]; if (!t) continue; c2.strokeStyle = col; c2.lineWidth = 2.5; c2.beginPath(); t.forEach(([d, v], i) => i ? c2.lineTo(X(d), Y(v)) : c2.moveTo(X(d), Y(v))); c2.stroke();
+      const [d, v] = t[t.length - 1]; const fin = !(usr.traza === t && usr.activo); c2.fillStyle = col; if (fin && d < MAXD) { c2.font = `600 13px ${COL.mono}`; c2.textAlign = "center"; c2.textBaseline = "middle"; c2.fillText("×", X(d), Y(v)); } else { c2.beginPath(); c2.arc(X(d), Y(v), 3.5, 0, 7); c2.fill(); } }
+  }
+  $("ley2").innerHTML = `<span><i style="background:${COL.ember}"></i>miope</span><span><i style="background:${COL.exit}"></i>largo plazo</span><span>línea gruesa = usuario simulado (× = dejó de volver) · punteada = esperado</span>`;
+  function tick2() { diaFeed(); dibujar2(); anim2 = usr.activo ? setTimeout(() => requestAnimationFrame(tick2), 420) : null; }
+  function parar2() { if (anim2) clearTimeout(anim2); anim2 = null; }
+  $("b2sim").onclick = () => { parar2(); nuevoUsuario(); if (quieto) { while (usr.activo) diaFeed(); dibujar2(); return; } tick2(); };
+  $("b2fin").onclick = () => { parar2(); if (!usr.activo) nuevoUsuario(); while (usr.activo) diaFeed(); dibujar2(); };
+  function modoFeed(m) { modo2 = m; $("m2mio").setAttribute("aria-pressed", m === "mio"); $("m2lar").setAttribute("aria-pressed", m === "lar"); parar2(); nuevoUsuario(); diaFeed(); dibujar2(); }
+  $("m2mio").onclick = () => modoFeed("mio"); $("m2lar").onclick = () => modoFeed("lar");
+  $("b2g").oninput = e => { gam2 = +e.target.value; $("o2g").textContent = fx(gam2); POLlar = resolverFeed(gam2); ESPlar = esperado(POLlar); if (modo2 !== "lar") { modoFeed("lar"); } else { parar2(); nuevoUsuario(); diaFeed(); dibujar2(); } };
+  // estado inicial: un usuario con la política a largo plazo ya simulado, y uno con la miope
+  modo2 = "lar"; nuevoUsuario(); while (usr.activo) diaFeed(); modo2 = "mio"; nuevoUsuario(); while (usr.activo) diaFeed();
+
+  // ================= Bloque 3a: evaluación contrafactual =================
+  const H3 = 60, COSTO3 = 0.02, PB = 0.6, NS = [10, 20, 50, 100, 200, 500, 1000], REP = 30;
+  const rec3 = s2 => s2 === env.goal ? 1 : -COSTO3;
+  const polOpt = p => OPT.map(o => { const q = [0, 0, 0, 0]; for (let a = 0; a < 4; a++) q[a] = (1 - p) / 4 + (o.includes(a) ? p / o.length : 0); return q; });
+  const PIB = polOpt(PB), GREEDY = polOpt(1), UNIF = polOpt(0);
+  let d3 = 0.6, n3 = 100, PIE = null, verdadero = 0, datos = [], reps = null, calc3 = null, prog3 = 1, anim3 = null, semilla3 = 1;
+  const mezcla = d => PIB.map((p, s) => p.map((x, a) => (1 - Math.abs(d)) * x + Math.abs(d) * (d >= 0 ? GREEDY : UNIF)[s][a]));
+  function valorExacto(pi, modelo) {   // valor de pi en H3 pasos; modelo(s,a) -> s'
+    let dist = new Float64Array(env.nS); dist[env.start] = 1; let V = 0;
+    for (let t = 0; t < H3; t++) { const nd = new Float64Array(env.nS); for (let s = 0; s < env.nS; s++) { if (!dist[s] || s === env.goal) continue; for (let a = 0; a < 4; a++) { const p = dist[s] * pi[s][a]; if (!p) continue; const s2 = modelo(s, a); V += p * rec3(s2); nd[s2] += p; } } nd[env.goal] = 0; dist = nd; }
+    return V;
+  }
+  function partida(pi, R) { let s = env.start; const ep = []; for (let t = 0; t < H3; t++) { let u = R(), a = 0; while (a < 3 && u > pi[s][a]) { u -= pi[s][a]; a++; } const [s2] = env.move(s, a); ep.push([s, a, rec3(s2), s2]); s = s2; if (s === env.goal) break; } return ep; }
+  function estimar(eps, pe) {
+    const n = eps.length; let is = 0, sw = 0, sw2 = 0, swg = 0, pd = 0; const vistos = new Map();
+    for (const ep of eps) { let w = 1, G = 0; for (const [s, a, r, s2] of ep) { w *= pe[s][a] / PIB[s][a]; G += r; pd += w * r; vistos.set(s * 4 + a, s2); } is += w * G; sw += w; sw2 += w * w; swg += w * G; }
+    const dm = valorExacto(pe, (s, a) => vistos.has(s * 4 + a) ? vistos.get(s * 4 + a) : s);   // lo no visto: "se queda"
+    return { dm, is: is / n, wis: sw > 0 ? swg / sw : NaN, pdis: pd / n, ess: sw2 ? sw * sw / sw2 : 0 };
+  }
+  const EST = [["dm", "directo"], ["is", "IS"], ["wis", "WIS"], ["pdis", "PDIS"]];
+  function recalcular3() {
+    PIE = mezcla(d3); verdadero = valorExacto(PIE, (s, a) => env.move(s, a)[0]);
+    if (datos.length) datos.est = estimar(datos, PIE);
+    if (calc3) cancelAnimationFrame(calc3);
+    reps = { k: 0, vals: Object.fromEntries(EST.map(([k]) => [k, []])), ess: [] };
+    const paso = () => { const t0 = performance.now(); while (reps.k < REP && performance.now() - t0 < 25) { const R = Cueva.rng(reps.k * 7919 + n3 * 13 + 1); const eps = []; for (let i = 0; i < n3; i++) eps.push(partida(PIB, R)); const e = estimar(eps, PIE); EST.forEach(([k]) => reps.vals[k].push(e[k])); reps.ess.push(e.ess); reps.k++; }
+      dibujarBarras(); calc3 = reps.k < REP ? requestAnimationFrame(paso) : null; };
+    paso();
+  }
+  function registrar(animar) {
+    const R = Cueva.rng(semilla3++ * 104729 + 3); datos = []; for (let i = 0; i < n3; i++) datos.push(partida(PIB, R)); datos.est = estimar(datos, PIE);
+    if (anim3) cancelAnimationFrame(anim3);
+    if (!animar || quieto) { prog3 = 1; dibujarCueva3(); dibujarBarras(); return; }
+    prog3 = 0; const f = () => { prog3 = Math.min(1, prog3 + 1 / 70); dibujarCueva3(); if (prog3 >= 1) dibujarBarras(); anim3 = prog3 < 1 ? requestAnimationFrame(f) : null; }; anim3 = requestAnimationFrame(f);
+  }
+  const T3 = Cueva.tablero($("cv3"), env, { maxCell: 34 });
+  function dibujarCueva3() {
+    const T = T3, ctx = T.ctx, cell = T.cell; T.fondo("#000"); T.paredes(COL.rock2);
+    const k = Math.round(prog3 * datos.length), al = Math.max(0.035, Math.min(0.4, 5 / datos.length));
+    ctx.lineJoin = "round"; ctx.lineCap = "round"; ctx.lineWidth = Math.max(1.5, cell * 0.08);
+    for (let j = 0; j < k; j++) { const ep = datos[j], jx = (((j * 37) % 9) - 4) * cell * 0.035, jy = (((j * 53) % 9) - 4) * cell * 0.035;
+      ctx.strokeStyle = `rgba(94,200,216,${al})`; ctx.beginPath(); const [r0, c0] = env.free[env.start]; ctx.moveTo(c0 * cell + cell / 2 + jx, r0 * cell + cell / 2 + jy);
+      for (const st of ep) { const [r, c] = env.free[st[3]]; ctx.lineTo(c * cell + cell / 2 + jx, r * cell + cell / 2 + jy); } ctx.stroke(); }
+    // flechas de la política nueva (acción más probable) donde difiere poco o mucho
+    for (let s = 0; s < env.nS; s++) { if (s === env.goal) continue; const p = PIE[s], a = p.indexOf(Math.max(...p)); if (Math.max(...p) > 0.3) T.texto(s, Cueva.ARROW[a], `rgba(242,179,90,${0.25 + 0.6 * (Math.max(...p) - 0.25) / 0.75})`, .42); }
+    T.salida(); T.entrada();
+    if (k < datos.length) { const ep = datos[k]; if (ep) T.sprite(ep[ep.length - 1][3], 2); }
+  }
+  const media = a => a.reduce((x, y) => x + y, 0) / (a.length || 1), desvio = a => { const m = media(a); return Math.sqrt(a.reduce((x, y) => x + (y - m) ** 2, 0) / (a.length || 1)); };
+  function dibujarBarras() {
+    const G = ajustar($("cv3b"), 176), ctx = G.ctx, m = { l: 64, r: 98, t: 20, b: 22 }, PW = G.w - m.l - m.r, fila = (176 - m.t - m.b) / 4, lo = -1.5, hi = 1.5;
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, G.w, 176);
+    const X = v => m.l + PW * (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo);
+    ctx.font = `11px ${COL.mono}`; ctx.fillStyle = COL.muted; ctx.strokeStyle = "rgba(141,147,163,.22)"; ctx.lineWidth = 1; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (let v = -1.5; v <= 1.51; v += 0.5) { ctx.beginPath(); ctx.moveTo(X(v) + .5, m.t); ctx.lineTo(X(v) + .5, m.t + 4 * fila); ctx.stroke(); ctx.fillText(fx(v, 1).replace(",0", ""), X(v), m.t + 4 * fila + 5); }
+    ctx.strokeStyle = COL.muted; ctx.beginPath(); ctx.moveTo(X(0) + .5, m.t); ctx.lineTo(X(0) + .5, m.t + 4 * fila); ctx.stroke();
+    ctx.textAlign = "left"; ctx.fillText(reps && reps.k < REP ? `calculando… ${reps.k}/${REP}` : (G.w < 520 ? `valor estimado (${REP} × ${n3} partidas)` : `estimación del valor de la política nueva (${REP} repeticiones de ${n3} partidas)`), 0, 2);
+    EST.forEach(([k, nom], i) => {
+      const y = m.t + i * fila + fila / 2, v = reps ? reps.vals[k].filter(isFinite) : [];
+      ctx.fillStyle = COL.ink; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(nom, m.l - 8, y);
+      if (v.length) { const mu = media(v), sd = desvio(v);
+        ctx.fillStyle = "rgba(242,179,90,.35)"; ctx.strokeStyle = COL.lamp; ctx.lineWidth = 1; const x0 = X(0), x1 = X(mu); ctx.fillRect(Math.min(x0, x1), y - fila * .28, Math.abs(x1 - x0), fila * .56); ctx.strokeRect(Math.min(x0, x1) + .5, y - fila * .28 + .5, Math.abs(x1 - x0), fila * .56);
+        const a = mu - sd, b = mu + sd; ctx.strokeStyle = COL.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(a), y); ctx.lineTo(X(b), y); ctx.stroke();
+        [[a, -1], [b, 1]].forEach(([u, d]) => { ctx.beginPath(); if (u < lo || u > hi) { const xx = X(u); ctx.moveTo(xx, y); ctx.lineTo(xx - 6 * d, y - 4); ctx.moveTo(xx, y); ctx.lineTo(xx - 6 * d, y + 4); } else { ctx.moveTo(X(u), y - 5); ctx.lineTo(X(u), y + 5); } ctx.stroke(); });
+        ctx.fillStyle = Math.abs(mu - verdadero) > 0.1 || sd > 0.3 ? COL.ember : COL.ink; ctx.textAlign = "left"; ctx.fillText(`${fx(mu)} ± ${fx(sd)}`, m.l + PW + 8, y);
+      } else if (reps && reps.k) { ctx.fillStyle = COL.ember; ctx.textAlign = "left"; ctx.fillText("sin partidas útiles", m.l + 6, y); }
+      if (datos.est && prog3 >= 1 && isFinite(datos.est[k])) { const e = datos.est[k]; ctx.fillStyle = COL.sonar; ctx.beginPath(); ctx.arc(X(e), y - fila * .28 - 1, 3.5, 0, 7); ctx.fill(); }
+    });
+    ctx.strokeStyle = COL.exit; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(verdadero), m.t - 4); ctx.lineTo(X(verdadero), m.t + 4 * fila); ctx.stroke();
+        const pOptB = media(PIB.map((p, s) => OPT[s].reduce((x, a) => x + p[a], 0))), pOptE = media(PIE.map((p, s) => OPT[s].reduce((x, a) => x + p[a], 0)));
+    $("hud3").innerHTML = `<span>valor verdadero <b style="color:var(--exit)">${fx(verdadero)}</b></span><span>acción óptima: vieja <b>${Math.round(100 * pOptB)}%</b>, nueva <b>${Math.round(100 * pOptE)}%</b></span>` +
+      (datos.est ? `<span>tus ${datos.length} partidas valen como <b>${fx(datos.est.ess, 1)}</b> (ESS)</span>` : "") + (reps && reps.ess.length ? `<span>ESS medio <b>${fx(media(reps.ess), 1)}</b></span>` : "");
+  }
+  const etiquetaD = d => d === 0 ? "igual a la vieja" : d > 0 ? `${Math.round(100 * d)}% hacia "siempre la óptima"` : `${Math.round(-100 * d)}% hacia "al azar"`;
+  $("o3d").textContent = etiquetaD(d3);
+  let rz3; const cambiar3 = () => { clearTimeout(rz3); rz3 = setTimeout(() => { recalcular3(); dibujarCueva3(); }, 60); };
+  $("b3d").oninput = e => { d3 = +e.target.value; $("o3d").textContent = etiquetaD(d3); PIE = mezcla(d3); if (datos.length) datos.est = estimar(datos, PIE); dibujarCueva3(); cambiar3(); };
+  $("b3n").oninput = e => { n3 = NS[+e.target.value]; $("o3n").textContent = n3; cambiar3(); };
+  $("b3reg").onclick = () => registrar(true);
+
+  // ================= Bloque 3b: RL offline =================
+  const MS = [5, 10, 20, 30, 50, 100, 200, 500], G3B = 0.95;
+  let eps3b = 0.4, m3b = 30, semilla3b = 1, off = null;
+  const T3c = Cueva.tablero($("cv3c"), env, { maxCell: 26, minCell: 8 }), T3d = Cueva.tablero($("cv3d"), env, { maxCell: 26, minCell: 8 });
+  $("leg3").style.background = Cueva.gradienteCSS("visitas");
+  function offline() {
+    const pi = polOpt(1 - eps3b), R = Cueva.rng(semilla3b * 4099 + 17), N = new Float64Array(env.nS), visto = new Map();
+    for (let i = 0; i < m3b; i++) { const ep = partida(pi, R); N[env.start]++; for (const [s, a, r, s2] of ep) { N[s2]++; visto.set(s * 4 + a, [r, s2]); } }
+    const Q = new Float64Array(env.nS * 4);   // Q inicial = 0 en todo
+    for (let it = 0; it < 300; it++) for (const [k, [r, s2]] of visto) { let mx = 0; if (s2 !== env.goal) { mx = -Infinity; for (let b = 0; b < 4; b++) mx = Math.max(mx, Q[s2 * 4 + b]); } Q[k] = r + G3B * mx; }
+    const pol = []; for (let s = 0; s < env.nS; s++) { let b = 0; for (let a = 1; a < 4; a++) if (Q[s * 4 + a] > Q[s * 4 + b] + 1e-12) b = a; pol.push(b); }
+    let nunca = 0, nuncaMal = 0, vistaMal = 0;
+    const mal = pol.map((a, s) => s !== env.goal && !OPT[s].includes(a));
+    for (let s = 0; s < env.nS; s++) { if (s === env.goal) continue; if (!N[s]) { nunca++; if (mal[s]) nuncaMal++; } else if (mal[s]) vistaMal++; }
+    const cam = Cueva.camino(env, pol, 200), llega = cam[cam.length - 1] === env.goal;
+    off = { N, pol, mal, nunca, nuncaMal, vistaMal, cam, llega };
+  }
+  function dibujar3b() {
+    const { N, pol, mal, cam } = off;
+    let mx = 0; for (let s = 0; s < env.nS; s++) mx = Math.max(mx, N[s]); const lm = Math.log10(1 + mx) || 1;
+    T3c.fondo("#000"); for (let s = 0; s < env.nS; s++) if (N[s] > 0) { const [r, c] = env.free[s]; T3c.casilla(r, c, Cueva.rampa("visitas", 0.15 + 0.85 * Math.log10(1 + N[s]) / lm)); }
+    T3c.paredes(COL.rock2); T3c.salida(); T3c.entrada();
+    const T = T3d, ctx = T.ctx, cell = T.cell; T.fondo("#000");
+    for (let s = 0; s < env.nS; s++) { if (s === env.goal) continue; const [r, c] = env.free[s];
+      if (!N[s]) { if (mal[s]) T.casilla(r, c, "rgba(224,100,90,.6)", 1); }
+      else { T.casilla(r, c, "#10141c", 1); if (mal[s]) { ctx.strokeStyle = COL.lamp; ctx.lineWidth = 2; ctx.strokeRect(c * cell + 2, r * cell + 2, cell - 4, cell - 4); } } }
+    T.paredes(COL.rock2);
+    T.trayecto(cam, "rgba(61,220,132,.55)", .14);
+    for (let s = 0; s < env.nS; s++) if (s !== env.goal) T.texto(s, Cueva.ARROW[pol[s]], N[s] ? "rgba(232,230,223,.85)" : "rgba(232,230,223,.5)", .5);
+    T.salida(); T.entrada();
+    $("hud3b").innerHTML = `<span>casillas visitadas <b>${env.nS - 1 - off.nunca}</b>/${env.nS - 1}</span><span>nunca visitadas y equivocadas <b style="color:var(--ember)">${off.nuncaMal}</b> de ${off.nunca}</span><span>visitadas y equivocadas <b style="color:var(--lamp)">${off.vistaMal}</b></span><span>desde la entrada <b style="color:${off.llega ? "var(--exit)" : "var(--ember)"}">${off.llega ? "llega a la salida" : "no llega"}</b></span>`;
+  }
+  $("b3e").oninput = e => { eps3b = +e.target.value; $("o3e").textContent = fx(eps3b); offline(); dibujar3b(); };
+  $("b3m").oninput = e => { m3b = MS[+e.target.value]; $("o3m").textContent = m3b; offline(); dibujar3b(); };
+  $("b3otra").onclick = () => { semilla3b++; offline(); dibujar3b(); };
+
+  // ================= Bloque 4: línea de tiempo =================
+  const HITOS = [
+    { id: "hor", carril: 0, anio: 2018, nom: "Horizon", fecha: "2018", txt: "Facebook publica su plataforma de RL aplicado: muchos datos, respuesta lenta y sin simulador. Decide cuándo mandar notificaciones, las sugerencias de M en Messenger y el bitrate del video 360.", links: [["Gauci y otros, arXiv 1811.00260", "https://arxiv.org/abs/1811.00260"], ["VentureBeat, 2018", "https://venturebeat.com/ai/facebook-open-sources-reinforcement-learning-platform-horizon"]] },
+    { id: "rea", carril: 0, anio: 2019, nom: "ReAgent", fecha: "2019", txt: "Horizon cambia de nombre para abarcar decisión y razonamiento en general. La evaluación contrafactual sigue en el centro: nada se despliega sin estimar antes cuánto rinde.", links: [["Repositorio ReAgent", "https://github.com/facebookresearch/ReAgent"]] },
+    { id: "arc", carril: 0, anio: null, nom: "Archivado", fecha: "sin mantenimiento", txt: "El repositorio queda archivado y su README manda a Pearl para RL listo para producción.", links: [["README de ReAgent", "https://github.com/facebookresearch/ReAgent#readme"]] },
+    { id: "pea", carril: 0, anio: 2023, nom: "Pearl", fecha: "2023", txt: "Agente de RL de Meta con piezas intercambiables: exploración, evaluación offline, seguridad, memoria e historia. Los problemas de ReAgent, ahora en forma de agente.", links: [["Zhu y otros, arXiv 2312.03814", "https://arxiv.org/abs/2312.03814"], ["Repositorio Pearl", "https://github.com/facebookresearch/Pearl"]] },
+    { id: "rlhf", carril: 1, anio: 2022, nom: "RLHF", fecha: "2022", txt: "Ouyang y otros ajustan un modelo de lenguaje con un modelo de recompensa aprendido de preferencias humanas y PPO (InstructGPT): el modelo es un agente cuya acción es el texto.", links: [["arXiv 2203.02155", "https://arxiv.org/abs/2203.02155"]] },
+    { id: "r1", carril: 1, anio: 2025, nom: "DeepSeek-R1", fecha: "2025", txt: "RL a gran escala con recompensas verificables; la variante R1-Zero aprende a razonar sin ajuste supervisado previo. La cita la clase 1 de CS234.", links: [["arXiv 2501.12948", "https://arxiv.org/abs/2501.12948"]] },
+    { id: "cur", carril: 2, anio: 2026, nom: "Este curso", fecha: "2026", txt: "Un agente más: observa a quien lo usa, actúa con clases y juegos, y su recompensa es que lo enseñes a alguien.", links: [["Epílogo: cómo se propaga", "../difusion/estrategia.html"]] }];
+  let sel4 = "hor"; const lista4 = $("hitos");
+  lista4.innerHTML = HITOS.map(h => `<li data-id="${h.id}"><div><b>${h.nom}</b><span class="cap">${h.fecha}</span></div><p>${h.txt}</p><div>${h.links.map(([t, u]) => `<a href="${u}">${t}</a>`).join("")}</div></li>`).join("");
+  lista4.querySelectorAll("li").forEach(li => li.addEventListener("click", e => { if (e.target.tagName !== "A") { sel4 = li.dataset.id; dibujar4(); } }));
+  function dibujar4() {
+    const cv = $("cv4"), W = cv.parentElement.clientWidth, vertical = W < 520, alto = vertical ? 470 : 250;
+    const { ctx, w } = ajustar(cv, alto); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, alto);
+    const A0 = 2017.6, A1 = 2026.5;
+    const pos = {};   // posición de cada hito
+    const carrilXY = (c, a) => vertical ? [[w * 0.3, w * 0.66, w * 0.48][c], 34 + (alto - 64) * (a - A0) / (A1 - A0)] : [56 + (w - 90) * (a - A0) / (A1 - A0), [64, 168, 116][c]];
+    HITOS.forEach(h => { if (h.anio !== null) pos[h.id] = carrilXY(h.carril, h.anio); });
+    pos.arc = [(pos.rea[0] + pos.pea[0]) / 2, (pos.rea[1] + pos.pea[1]) / 2];
+    // eje de años
+    ctx.font = `11px ${COL.mono}`; ctx.fillStyle = COL.muted; ctx.strokeStyle = "rgba(141,147,163,.18)"; ctx.lineWidth = 1;
+    for (let a = 2018; a <= 2026; a++) { if (vertical) { const y = carrilXY(0, a)[1]; ctx.beginPath(); ctx.moveTo(36, y + .5); ctx.lineTo(w, y + .5); ctx.stroke(); ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(a, 0, y); }
+      else { const x = carrilXY(0, a)[0]; ctx.beginPath(); ctx.moveTo(x + .5, 22); ctx.lineTo(x + .5, alto - 22); ctx.stroke(); ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(a, x, alto - 4); } }
+    ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillStyle = COL.lamp;
+    if (vertical) { ctx.textAlign = "center"; ctx.fillText("RL en Meta", w * 0.3, 2); ctx.fillStyle = COL.sonar; ctx.fillText("modelos de lenguaje", w * 0.7, 2); }
+    else { ctx.fillText("RL en producción (Meta)", 8, 22); ctx.fillStyle = COL.sonar; ctx.fillText("modelos de lenguaje", 8, 196); }
+    const flecha = (a, b, col, dash) => { const [x1, y1] = pos[a], [x2, y2] = pos[b], an = Math.atan2(y2 - y1, x2 - x1), r = 12; const sx = x1 + r * Math.cos(an), sy = y1 + r * Math.sin(an), ex = x2 - r * Math.cos(an), ey = y2 - r * Math.sin(an);
+      ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 2; ctx.setLineDash(dash || []); ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex - 8 * Math.cos(an - .45), ey - 8 * Math.sin(an - .45)); ctx.lineTo(ex - 8 * Math.cos(an + .45), ey - 8 * Math.sin(an + .45)); ctx.fill(); };
+    flecha("hor", "rea", COL.lamp); flecha("rea", "arc", COL.lamp, [4, 4]); flecha("arc", "pea", COL.lamp, [4, 4]); flecha("rlhf", "r1", COL.sonar); flecha("pea", "cur", "rgba(141,147,163,.5)", [3, 4]); flecha("r1", "cur", "rgba(141,147,163,.5)", [3, 4]);
+    HITOS.forEach(h => {
+      const [x, y] = pos[h.id], on = h.id === sel4, col = h.carril === 0 ? COL.lamp : h.carril === 1 ? COL.sonar : COL.exit;
+      ctx.fillStyle = on ? col : "#000"; ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath();
+      if (h.id === "arc") { ctx.moveTo(x, y - 9); ctx.lineTo(x + 9, y); ctx.lineTo(x, y + 9); ctx.lineTo(x - 9, y); ctx.closePath(); } else ctx.arc(x, y, 9, 0, 7);
+      ctx.fill(); ctx.stroke(); if (on) { ctx.strokeStyle = COL.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, 14, 0, 7); ctx.stroke(); }
+      ctx.fillStyle = on ? COL.ink : COL.muted; ctx.font = `${on ? "600 " : ""}12px ${COL.mono}`;
+      if (vertical) { ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(h.nom, x + 17, y - (h.id === "arc" ? 0 : 6)); if (h.anio) { ctx.font = `11px ${COL.mono}`; ctx.fillStyle = COL.muted; ctx.fillText(h.fecha, x + 17, y + 8); } }
+      else { const abajo = h.id === "rea"; ctx.textAlign = "center"; ctx.textBaseline = abajo ? "top" : "bottom"; ctx.fillText(h.nom, x, abajo ? y + 15 : y - 15); if (h.anio) { ctx.textBaseline = "top"; ctx.font = `11px ${COL.mono}`; ctx.fillStyle = COL.muted; ctx.fillText(h.fecha, x, abajo ? y + 29 : y + 15); } }
+    });
+    cv._pos = pos;
+    lista4.querySelectorAll("li").forEach(li => li.setAttribute("aria-current", li.dataset.id === sel4));
+  }
+  $("cv4").addEventListener("pointerdown", e => { const cv = $("cv4"), b = cv.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top; let best = null, bd = 26; for (const [id, [px, py]] of Object.entries(cv._pos || {})) { const d = Math.hypot(px - x, py - y); if (d < bd) { bd = d; best = id; } } if (best) { sel4 = best; dibujar4(); } });
+
+  // ================= dibujo general =================
+  function todo() { T0.medir(); dibujar0(); dibujar1(); dibujar2(); T3.medir(); dibujarCueva3(); dibujarBarras(); T3c.medir(); T3d.medir(); dibujar3b(); dibujar4(); }
+  PIE = mezcla(d3); registrar(false); recalcular3(); offline();
+  todo(); Cueva.alCargarSprites(todo);
+  Promise.all(Object.values(SPR).map(im => im.complete ? 0 : new Promise(r => { im.onload = im.onerror = r; }))).then(dibujar1);
+  arrancar1();
+  let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(todo, 80); });
+  window.P7 = { resolverFeed, esperado, estimar, valorExacto, mezcla, partida, PIB, OPT, env, off: () => off, reps: () => reps, datos: () => datos };
+
+  Cueva.pagina("9", { lecturas: [
+    { texto: "Yao y otros (2022). ReAct: synergizing reasoning and acting in language models.", url: "https://arxiv.org/abs/2210.03629" },
+    { texto: "Gauci y otros (2018). Horizon: Facebook's open source applied reinforcement learning platform.", url: "https://arxiv.org/abs/1811.00260" },
+    { texto: "Zhu y otros (2023). Pearl: a production-ready reinforcement learning agent.", url: "https://arxiv.org/abs/2312.03814" },
+    { texto: "Sutton y Barto, cap. 5.5: predicción off-policy con importance sampling.", url: "http://incompleteideas.net/book/the-book-2nd.html" },
+    { texto: "VentureBeat (2018). Facebook open-sources reinforcement learning platform Horizon.", url: "https://venturebeat.com/ai/facebook-open-sources-reinforcement-learning-platform-horizon" }] });
+})();
+</script>
+</body>
+</html>

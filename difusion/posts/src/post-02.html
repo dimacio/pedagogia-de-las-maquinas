@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>02 · La pared que tocás · RL a ciegas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../../../assets/estilo.css">
+<link rel="stylesheet" href="post.css">
+<style></style>
+</head>
+<body class="a1" data-n="2">
+<div class="post">
+  <div class="cab"></div>
+
+  <h1 class="tit">La pared que <span class="a">tocás</span>, queda.</h1>
+  <div class="fig"><canvas id="cv" class="marco"></canvas></div>
+  <div style="display:grid;gap:16px">
+    <p class="txt">Cada choque pinta una pared de gris. Chocar es tu <b>única forma de ver</b>.</p>
+    <p class="voz">Así aprende una máquina: con lo poco que el mundo le devuelve.</p>
+  </div>
+  <div class="pie"></div>
+</div>
+<script src="../../../assets/cueva.js"></script>
+<script src="post.js"></script>
+<script>
+
+  const env = Cueva.makeEnv(Cueva.MAPS.chica);
+  const T = Post.cueva(document.getElementById("cv"), env, 52);
+  const w = Post.caminata(env, 170, 7);
+  Post.listo(() => {
+    T.fondo("#000");
+    T.trayecto(w.path, "rgba(94,200,216,.35)", .08);
+    T.tocadas(w.tocadas);
+    T.entrada();
+    const fin = w.path[w.path.length - 1];
+    T.sprite(fin, 1);
+    document.title += " (" + w.tocadas.size + " paredes)";
+  });
+</script>
+</body>
+</html>

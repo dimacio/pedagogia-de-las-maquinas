@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>12 · Enseñale esto a alguien · RL a ciegas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../../../assets/estilo.css">
+<link rel="stylesheet" href="post.css">
+<style>
+  .link { display:grid; gap: 8px; border: 2px solid var(--exit); padding: 20px 24px; box-shadow: 0 0 30px rgba(61,220,132,.18); }
+  .link .u { font-family: var(--mono); font-size: 34px; color: var(--exit); word-break: break-all; }
+  .link .etq { font-size: 25px; }
+</style>
+</head>
+<body class="a3" data-n="12">
+<div class="post">
+  <div class="cab"></div>
+
+  <h1 class="tit">Enseñale esto <span class="a">a alguien</span>.</h1>
+  <div class="fig"><canvas id="cv" class="marco"></canvas></div>
+  <p class="txt" style="max-width:27ch">Curso libre: juego, 12 clases y notebooks. Para enseñarle a máquinas <b>y a personas</b>.</p>
+  <div class="link"><span class="etq">link en la bio · repositorio</span><span class="u" id="url"></span></div>
+  <div class="pie"></div>
+</div>
+<script src="../../../assets/cueva.js"></script>
+<script src="post.js"></script>
+<script>
+
+  document.getElementById("url").textContent = "github.com/" + Cueva.REPO;
+  const env = Cueva.makeEnv(Cueva.MAPS.chica);
+  const T = Post.cueva(document.getElementById("cv"), env, 46);
+  const { V } = Cueva.iteracionValor(env, { gamma: .95, costo: .01, iters: 300 });
+  const path = Cueva.camino(env, Cueva.politicaGreedy(env, V, { gamma: .95, costo: .01 }));
+  Post.listo(() => {
+    T.fondo("#000");
+    const todas = new Set(); for (let r = 0; r < env.H; r++) for (let c = 0; c < env.W; c++) if (env.rows[r][c] === "#") todas.add(r + "," + c);
+    T.tocadas(todas);
+    T.trayecto(path, "#3ddc84", .14);
+    T.salida();
+    T.sprite(path[path.length - 2], 1);
+    T.sprite(env.start, 2);
+  });
+</script>
+</body>
+</html>

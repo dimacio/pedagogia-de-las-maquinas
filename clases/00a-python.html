@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Python desde la cueva · RL a ciegas</title>
+<meta name="description" content="Nivelación · 0a: la cueva es texto, matriz e imagen; moverse es sumar vectores y una partida es un bucle.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .editor { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; }
+  .editor textarea { width: auto; min-width: 0; resize: vertical; line-height: 1.25; letter-spacing: .08em; }
+  .editor .lienzo { min-width: 0; }
+  @media (max-width: 520px) { .editor { grid-template-columns: minmax(0, 1fr); } .editor textarea { width: 100%; } }
+  .lienzo { min-width: 0; }
+  .estado { font-family: var(--mono); font-size: 13px; }
+  .estado.ok { color: var(--exit); } .estado.mal { color: var(--ember); }
+  pre.code .on { background: rgba(242,179,90,.14); outline: 1px solid rgba(242,179,90,.35); }
+  pre.code .off { opacity: .45; }
+  #code3 { font-size: 12px; }
+  .flechas { display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(2, 40px); gap: 6px; }
+  .flechas .btn { padding: 0; font-size: 18px; }
+  .flechas .up { grid-column: 2; } .flechas .left { grid-column: 1; grid-row: 2; } .flechas .down { grid-column: 2; grid-row: 2; } .flechas .right { grid-column: 3; grid-row: 2; }
+  .ctls { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+  .ensenar { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .ensenar > div { background: var(--rock); border: 1px solid var(--rock-2); border-radius: 4px; padding: 14px; display: grid; gap: 6px; align-content: start; }
+  .ensenar h3 { font-family: var(--display); font-weight: 400; font-size: 14px; color: var(--lamp); letter-spacing: .04em; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Nivelación · 0a</div>
+    <h1>Python desde la <span class="g">cueva</span></h1>
+    <p class="thesis">Para una computadora la cueva no es un dibujo: es una lista de textos, una matriz de números y una imagen de pixeles, y jugar es un bucle que suma vectores.</p>
+  </section>
+
+  <!-- 1. La cueva es texto -->
+  <section class="bloque">
+    <div class="stage">
+      <div class="editor">
+        <textarea id="ta" rows="10" cols="16" spellcheck="false" autocomplete="off" aria-label="Mapa de la cueva como texto"></textarea>
+        <div class="lienzo"><canvas id="cv1" aria-label="La cueva dibujada a partir del texto"></canvas></div>
+      </div>
+      <div class="hud" id="hud1"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 1</div>
+      <h2>La cueva es texto</h2>
+      <p>El mapa es una lista de cadenas (<i>strings</i>): <code>#</code> es pared, <code>.</code> es piso, <code>S</code> la entrada y <code>G</code> la salida. Editá el texto del mapa: la cueva se redibuja con cada tecla. Si el mapa no es válido, el dibujo queda en el último estado correcto.</p>
+      <pre class="code"><code>mapa = [<span class="s">"##############"</span>,
+        <span class="s">"#S...#.......#"</span>,
+        ...]
+H, W = <span class="k">len</span>(mapa), <span class="k">len</span>(mapa[<span class="n">0</span>])</code></pre>
+      <div class="row"><button class="btn" id="b1reset">Volver al mapa original</button><button class="btn" id="b1abrir">Abrir un atajo</button></div>
+      <p class="nota pregunta">Borrá una pared del borde. ¿Por qué el programa exige que el borde sea todo <code>#</code>? ¿Qué pasaría con <code>mapa[r][c+1]</code> en la última columna?</p>
+    </div>
+  </section>
+
+  <!-- 2. La cueva es una matriz -->
+  <section class="bloque">
+    <div class="stage">
+      <div class="lienzo"><canvas id="cv2" aria-label="La cueva como matriz de ceros y unos y como dibujo; tocá una casilla"></canvas></div>
+      <div class="hud" id="hud2"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 2</div>
+      <h2>La cueva es una matriz</h2>
+      <p>Si cambiamos cada <code>#</code> por 1 y todo lo demás por 0, el mapa se vuelve una matriz <code>M</code> de NumPy de 10 filas por 14 columnas. Pasá el mouse o tocá una casilla: el mismo elemento se marca en los números y en el dibujo.</p>
+      <div class="eq">M = (grilla == "#").astype(int)</div>
+      <p class="small muted">con <code>grilla = np.array([list(f) for f in mapa])</code>, una matriz de caracteres.</p>
+      <p>Las filas (<code>r</code>) crecen hacia abajo y las columnas (<code>c</code>) hacia la derecha, y las dos empiezan en 0. Por eso la entrada es <code>M[1, 1]</code> y no <code>M[0, 0]</code>.</p>
+      <p class="nota pregunta">¿Qué devuelve <code>M[3]</code>? ¿Y <code>M[:, 3]</code>? Buscalas en la figura: una es una fila y la otra una columna.</p>
+    </div>
+  </section>
+
+  <!-- 3. Moverse es sumar -->
+  <section class="bloque">
+    <div class="stage">
+      <div class="lienzo"><canvas id="cv3" tabindex="0" aria-label="El personaje en la cueva; usá las flechas para moverlo"></canvas></div>
+      <div class="row" style="justify-content:space-between;align-items:end">
+        <div class="flechas" role="group" aria-label="Acciones">
+          <button class="btn up" data-a="0" aria-label="Arriba">↑</button>
+          <button class="btn left" data-a="3" aria-label="Izquierda">←</button>
+          <button class="btn down" data-a="2" aria-label="Abajo">↓</button>
+          <button class="btn right" data-a="1" aria-label="Derecha">→</button>
+        </div>
+        <button class="btn" id="b3reset">Volver a la entrada</button>
+      </div>
+      <pre class="code" id="code3" aria-live="polite"></pre>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 3</div>
+      <h2>Moverse es sumar</h2>
+      <p>La posición es un vector <code>[r, c]</code> y cada acción es un desplazamiento <code>(dr, dc)</code>. Moverse es sumar los dos vectores y preguntarle a la matriz si en la casilla nueva hay pared. Usá las flechas (o el teclado) y mirá qué línea se ejecuta con los valores reales.</p>
+      <div class="eq">DESPLAZ = [[-1, 0], [0, 1], [1, 0], [0, -1]]&emsp;&emsp;# ↑ → ↓ ←</div>
+      <p>Cuando choca, la posición no cambia y la pared se pinta de gris claro: así se entera el agente ciego.</p>
+      <p class="nota pregunta">¿Por qué ir hacia arriba es <code>-1</code> en la fila? ¿Qué desplazamiento tendría una acción diagonal?</p>
+    </div>
+  </section>
+
+  <!-- 4. La cueva es una imagen -->
+  <section class="bloque">
+    <div class="stage">
+      <div class="lienzo"><canvas id="cv4" aria-label="La cueva como imagen de pixeles, ampliada, y sus tres canales"></canvas></div>
+      <div class="seg" role="group" aria-label="Qué pintar">
+        <button data-q="pared" aria-pressed="true">Paredes</button><button data-q="salida" aria-pressed="false">Salida</button><button data-q="piso" aria-pressed="false">Piso</button>
+      </div>
+      <div class="ctls">
+        <div class="ctl"><label for="sR">R <output id="oR"></output></label><input type="range" id="sR" min="0" max="255"></div>
+        <div class="ctl"><label for="sG">G <output id="oG"></output></label><input type="range" id="sG" min="0" max="255"></div>
+        <div class="ctl"><label for="sB">B <output id="oB"></output></label><input type="range" id="sB" min="0" max="255"></div>
+        <div class="ctl"><label for="sK">zoom k <output id="oK"></output></label><input type="range" id="sK" min="1" max="8" value="4"></div>
+      </div>
+      <div class="hud" id="hud4"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 4</div>
+      <h2>La cueva es una imagen</h2>
+      <p>Una imagen a color es un arreglo de forma <code>H×W×3</code>: para cada pixel, tres números entre 0 y 255 (rojo, verde, azul). Nuestra cueva entera es una imagen de 10×14 pixeles; para verla la ampliamos repitiendo cada pixel <code>k</code> veces. Mové los sliders y tocá un pixel para leer sus números.</p>
+      <div class="eq">grande = img.repeat(k, 0).repeat(k, 1)</div>
+      <p>Este es el puente con la visión por computadora (<i>computer vision</i>): el agente que aprendió a jugar Atari no recibía un mapa sino pixeles, y tuvo que descubrir solo qué era pared y qué era salida.</p>
+      <p class="nota pregunta">Si pintás las paredes de verde puro, ¿qué canal deja de distinguir pared de salida? ¿Le alcanzaría al agente con un solo canal?</p>
+    </div>
+  </section>
+
+  <!-- 5. Un bucle es una partida -->
+  <section class="bloque">
+    <div class="stage">
+      <div class="lienzo"><canvas id="cv5a" aria-label="Pasos por partida de un agente al azar"></canvas></div>
+      <div class="lienzo"><canvas id="cv5b" aria-label="Mapa de calor de las casillas visitadas"></canvas></div>
+      <div class="row">
+        <label class="small muted" for="selN">Partidas</label>
+        <select id="selN"><option>20</option><option selected>100</option><option>500</option></select>
+        <button class="btn primary" id="b5">Correr al azar</button>
+      </div>
+      <div class="hud" id="hud5"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 5</div>
+      <h2>Un bucle es una partida</h2>
+      <p>Un agente al azar elige una de las 4 flechas en cada paso hasta encontrar la salida. Cada partida es un <code>while</code> y repetir partidas es un <code>for</code>. El gráfico muestra cuántos pasos tardó en cada una; abajo, por dónde anduvo.</p>
+      <pre class="code"><code><span class="k">for</span> ep <span class="k">in</span> <span class="k">range</span>(N):
+    s, pasos = env.reset(), <span class="n">0</span>
+    <span class="k">while</span> s != meta <span class="k">and</span> pasos &lt; <span class="n">5000</span>:
+        s, r, fin, info = env.step(rng.integers(<span class="n">4</span>))
+        pasos += <span class="n">1</span>
+    largos.append(pasos)</code></pre>
+      <p class="nota pregunta">El camino más corto tiene 20 pasos y el azar tarda cientos o miles. ¿Qué tendría que recordar el agente entre partidas para mejorar?</p>
+    </div>
+  </section>
+
+  <section class="bloque full">
+    <div class="texto">
+      <div class="paso">Para enseñarlo</div>
+      <h2>Contalo en una oración</h2>
+    </div>
+    <div class="ensenar">
+      <div><h3>La oración</h3><p>Para la computadora, la cueva es una tabla de números; moverse es sumar dos números a la posición y fijarse en la tabla si hay pared.</p></div>
+      <div><h3>La pregunta</h3><p>Si te doy solo la matriz <code>M</code> y la posición <code>[r, c]</code>, ¿cómo sabés si podés ir a la derecha sin mirar el dibujo?</p></div>
+      <div><h3>Ejercicio de 5 minutos</h3><p>En papel cuadriculado, cada persona dibuja una cueva de 6×6 y la escribe como lista de strings. Se intercambian el texto (no el dibujo) y la otra persona tiene que reconstruir el dibujo y decir el índice <code>[r, c]</code> de la salida.</p></div>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(() => {
+  const col = Cueva.COL();
+  const MAPA0 = Cueva.MAPS.chica.slice();
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = id => document.getElementById(id);
+
+  // ---------- utilidades locales ----------
+  // ancho útil del contenedor del canvas (el padre es un div sin padding)
+  const anchoDe = cv => Math.max(120, cv.parentElement.clientWidth);
+  function ajustar(cv, w, h) {
+    const dpr = window.devicePixelRatio || 1, ctx = cv.getContext("2d");
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    cv.style.width = w + "px"; cv.style.height = h + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.imageSmoothingEnabled = false; return ctx;
+  }
+  // dibuja una cueva (lista de strings) en (x0, y0) con casillas de tamaño cell
+  function cueva(ctx, rows, x0, y0, cell, { paredes = col.rock2, piso = "#000" } = {}) {
+    for (let r = 0; r < rows.length; r++) for (let c = 0; c < rows[r].length; c++) {
+      const ch = rows[r][c];
+      ctx.fillStyle = ch === "#" ? paredes : piso; ctx.fillRect(x0 + c * cell, y0 + r * cell, cell, cell);
+      if (ch === "G") { ctx.save(); ctx.shadowColor = col.exit; ctx.shadowBlur = cell * .6; ctx.fillStyle = col.exit; const i = Math.max(2, cell * .08); ctx.fillRect(x0 + c * cell + i, y0 + r * cell + i, cell - 2 * i, cell - 2 * i); ctx.restore(); }
+      if (ch === "S") { ctx.strokeStyle = col.muted; ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.strokeRect(x0 + c * cell + 2.5, y0 + r * cell + 2.5, cell - 5, cell - 5); ctx.setLineDash([]); }
+    }
+  }
+
+  // ---------- 1. La cueva es texto ----------
+  const ta = $("ta"), cv1 = $("cv1"), hud1 = $("hud1");
+  let valido1 = MAPA0, env1 = Cueva.makeEnv(MAPA0), T1 = null, error1 = "";
+  ta.value = MAPA0.join("\n");
+  function validar(txt) {
+    const rows = txt.replace(/\r/g, "").split("\n").map(f => f.replace(/\s+$/, "")).filter((f, i, a) => f.length || i < a.length - 1);
+    while (rows.length && !rows[rows.length - 1]) rows.pop();
+    if (rows.length < 3) return [null, "hacen falta al menos 3 filas"];
+    const W = rows[0].length;
+    if (W < 3) return [null, "las filas son muy cortas"];
+    if (rows.length > 20 || W > 30) return [null, "máximo 20 filas por 30 columnas"];
+    for (let r = 0; r < rows.length; r++) {
+      if (rows[r].length !== W) return [null, `la fila ${r} tiene ${rows[r].length} caracteres y la 0 tiene ${W}`];
+      const m = rows[r].match(/[^#.SG]/); if (m) return [null, `carácter no válido "${m[0]}" en la fila ${r}`];
+    }
+    const todo = rows.join(""), nS = (todo.match(/S/g) || []).length, nG = (todo.match(/G/g) || []).length;
+    if (nS !== 1) return [null, `tiene que haber una S (hay ${nS})`];
+    if (nG !== 1) return [null, `tiene que haber una G (hay ${nG})`];
+    for (let c = 0; c < W; c++) if (rows[0][c] !== "#" || rows[rows.length - 1][c] !== "#") return [null, `falta pared en el borde, columna ${c}`];
+    for (let r = 0; r < rows.length; r++) if (rows[r][0] !== "#" || rows[r][W - 1] !== "#") return [null, `falta pared en el borde, fila ${r}`];
+    return [rows, ""];
+  }
+  function dibujar1() {
+    const H = env1.H, W = env1.W;
+    const cell = Math.max(8, Math.min(30, Math.floor(anchoDe(cv1) / W)));
+    const ctx = ajustar(cv1, W * cell, H * cell);
+    cueva(ctx, valido1, 0, 0, cell);
+    if (error1) { ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(0, 0, W * cell, H * cell); }
+    const alc = isFinite(env1.dist[env1.start]);
+    hud1.innerHTML = error1
+      ? `<span class="estado mal">mapa no válido: ${error1}</span>`
+      : `<span class="estado ok">mapa válido</span><span>H = <b>${H}</b></span><span>W = <b>${W}</b></span><span>casillas libres <b>${env1.nS}</b></span>` +
+        (alc ? `<span>camino más corto <b>${env1.dist[env1.start]}</b> pasos</span>` : `<span class="estado mal">la salida no se puede alcanzar</span>`);
+  }
+  ta.addEventListener("input", () => {
+    const [rows, err] = validar(ta.value); error1 = err;
+    if (rows) { valido1 = rows; env1 = Cueva.makeEnv(rows); }
+    dibujar1();
+  });
+  $("b1reset").onclick = () => { ta.value = MAPA0.join("\n"); ta.dispatchEvent(new Event("input")); };
+  $("b1abrir").onclick = () => {   // abre la pared interior que más acorta el camino
+    const rows = valido1.slice(); let mejor = null, dmin = env1.dist[env1.start];
+    for (let r = 1; r < rows.length - 1; r++) for (let c = 1; c < rows[0].length - 1; c++) if (rows[r][c] === "#") {
+      const prueba = rows.slice(); prueba[r] = prueba[r].slice(0, c) + "." + prueba[r].slice(c + 1);
+      const e2 = Cueva.makeEnv(prueba); if (e2.dist[e2.start] < dmin) { dmin = e2.dist[e2.start]; mejor = prueba; }
+    }
+    if (mejor) { ta.value = mejor.join("\n"); ta.dispatchEvent(new Event("input")); }
+  };
+
+  // ---------- 2. La cueva es una matriz ----------
+  const cv2 = $("cv2"), hud2 = $("hud2");
+  const M = MAPA0.map(f => [...f].map(ch => ch === "#" ? 1 : 0));
+  const H = M.length, W = M[0].length;
+  let sel2 = [3, 5], geo2 = null;
+  function dibujar2() {
+    const ancho = anchoDe(cv2), lado = ancho >= 560;     // lado a lado o apilado
+    const lab = 16, gap = 18;
+    const cell = lado ? Math.min(22, Math.floor((ancho - lab - gap) / (2 * W))) : Math.min(24, Math.floor((ancho - lab) / W));
+    const wPanel = W * cell;
+    const g = lado ? { ax: lab, ay: lab, bx: lab + wPanel + gap, by: lab } : { ax: lab, ay: lab, bx: lab, by: lab + H * cell + gap };
+    const w = lado ? g.bx + wPanel : lab + wPanel, h = lado ? lab + H * cell : g.by + H * cell;
+    const ctx = ajustar(cv2, w, h); geo2 = { ...g, cell };
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    const [sr, sc] = sel2;
+    // índices de fila/columna
+    ctx.font = `10px ${col.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (let c = 0; c < W; c++) { ctx.fillStyle = c === sc ? col.lamp : col.muted; ctx.fillText(c, g.ax + c * cell + cell / 2, lab / 2); }
+    for (let r = 0; r < H; r++) { ctx.fillStyle = r === sr ? col.lamp : col.muted; ctx.fillText(r, lab / 2, g.ay + r * cell + cell / 2); }
+    // panel de números
+    ctx.font = `600 ${Math.max(8, Math.round(cell * .5))}px ${col.mono}`;
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+      const enFila = r === sr || c === sc;
+      ctx.fillStyle = enFila ? "rgba(242,179,90,.10)" : (M[r][c] ? "#11141d" : "#000");
+      ctx.fillRect(g.ax + c * cell, g.ay + r * cell, cell, cell);
+      ctx.fillStyle = M[r][c] ? col.chalk : "#4a5064";
+      ctx.fillText(M[r][c], g.ax + c * cell + cell / 2, g.ay + r * cell + cell / 2 + 1);
+    }
+    // panel dibujo
+    cueva(ctx, MAPA0, g.bx, g.by, cell);
+    // resaltado
+    ctx.strokeStyle = col.lamp; ctx.lineWidth = 2;
+    ctx.strokeRect(g.ax + sc * cell + 1, g.ay + sr * cell + 1, cell - 2, cell - 2);
+    ctx.strokeRect(g.bx + sc * cell + 1, g.by + sr * cell + 1, cell - 2, cell - 2);
+    const ch = MAPA0[sr][sc];
+    const que = ch === "#" ? "pared" : ch === "S" ? "entrada" : ch === "G" ? "salida" : "piso";
+    hud2.innerHTML = `<span>r = <b>${sr}</b></span><span>c = <b>${sc}</b></span><span><code>M[${sr}, ${sc}]</code> = <b>${M[sr][sc]}</b></span><span><code>mapa[${sr}][${sc}]</code> = <b>"${ch}"</b> (${que})</span>`;
+  }
+  function elegir2(ev) {
+    const b = cv2.getBoundingClientRect(), x = ev.clientX - b.left, y = ev.clientY - b.top, { cell } = geo2;
+    for (const [x0, y0] of [[geo2.ax, geo2.ay], [geo2.bx, geo2.by]]) {
+      const c = Math.floor((x - x0) / cell), r = Math.floor((y - y0) / cell);
+      if (r >= 0 && r < H && c >= 0 && c < W && (r !== sel2[0] || c !== sel2[1])) { sel2 = [r, c]; dibujar2(); return; }
+    }
+  }
+  cv2.addEventListener("pointermove", elegir2); cv2.addEventListener("pointerdown", elegir2);
+
+  // ---------- 3. Moverse es sumar ----------
+  const env3 = Cueva.makeEnv(MAPA0), cv3 = $("cv3"), code3 = $("code3");
+  const T3 = Cueva.tablero(cv3, env3, { maxCell: 36 });
+  const NOM = ["↑", "→", "↓", "←"];
+  let s3 = env3.start, dir3 = 2, frame3 = 0, ult3 = null; const tocadas3 = new Set();
+  const v = a => `[${a[0]}, ${a[1]}]`;
+  function codigo3() {
+    if (!ult3) {
+      const [r, c] = env3.free[s3];
+      code3.innerHTML = `<code>pos = np.array(${v([r, c])})  <span class="c"># la entrada S</span>\n<span class="c"># elegí una acción con las flechas</span></code>`; return;
+    }
+    const { pos, a, nueva, choque } = ult3, d = Cueva.DR[a];
+    code3.innerHTML = `<code>a = <span class="n">${a}</span>  <span class="c"># ${NOM[a]}</span>
+nueva = pos + DESPLAZ[a]  <span class="c"># ${v(pos)} + ${v(d)} = ${v(nueva)}</span>
+<span class="k">if</span> M[nueva[0], nueva[1]] == <span class="n">1</span>:  <span class="c"># M[${nueva[0]}, ${nueva[1]}] = ${choque ? 1 : 0}</span>
+<span class="${choque ? "on" : "off"}">    choque = True  <span class="c"># pos sigue en ${v(pos)}</span></span>
+<span class="k">else</span>:
+<span class="${choque ? "off" : "on"}">    pos = nueva  <span class="c"># pos = ${v(nueva)}</span></span></code>`;
+  }
+  function dibujar3() {
+    T3.medir().fondo().paredes(col.rock).tocadas(tocadas3).salida().entrada().grilla();
+    if (ult3) {   // el vector de desplazamiento
+      const ctx = T3.ctx, cell = T3.cell, [r, c] = ult3.pos, [nr, nc] = ult3.nueva;
+      const x0 = c * cell + cell / 2, y0 = r * cell + cell / 2, x1 = nc * cell + cell / 2, y1 = nr * cell + cell / 2;
+      ctx.strokeStyle = ult3.choque ? col.ember : col.lamp; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      const ang = Math.atan2(y1 - y0, x1 - x0), k = cell * .22; ctx.fillStyle = ctx.strokeStyle;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - k * Math.cos(ang - .5), y1 - k * Math.sin(ang - .5)); ctx.lineTo(x1 - k * Math.cos(ang + .5), y1 - k * Math.sin(ang + .5)); ctx.fill();
+    }
+    T3.sprite(s3, dir3, frame3);
+    codigo3();
+  }
+  function paso3(a) {
+    const pos = env3.free[s3], d = Cueva.DR[a], nueva = [pos[0] + d[0], pos[1] + d[1]];
+    const [s2, choque, k] = env3.move(s3, a);
+    if (choque) tocadas3.add(k);
+    ult3 = { pos, a, nueva, choque }; s3 = s2; dir3 = a; frame3 ^= 1;
+    if (s3 === env3.goal) { s3 = env3.goal; }
+    dibujar3();
+  }
+  document.querySelectorAll(".flechas .btn").forEach(b => b.addEventListener("click", () => paso3(+b.dataset.a)));
+  cv3.addEventListener("keydown", e => { const a = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3 }[e.key]; if (a !== undefined) { e.preventDefault(); paso3(a); } });
+  $("b3reset").onclick = () => { s3 = env3.start; ult3 = null; tocadas3.clear(); dir3 = 2; dibujar3(); };
+  // estado inicial con sentido: un paso a la derecha ya dado y un choque arriba
+  paso3(0); paso3(1);
+
+  // ---------- 4. La cueva es una imagen ----------
+  const cv4 = $("cv4"), hud4 = $("hud4");
+  const colores = { pared: [201, 204, 211], salida: [61, 220, 132], piso: [0, 0, 0] };
+  let quien = "pared", sel4 = [8, 12], geo4 = null;
+  const sl = { R: $("sR"), G: $("sG"), B: $("sB") }, sK = $("sK");
+  function imagen() {   // img[r][c] = [R,G,B]
+    return MAPA0.map(f => [...f].map(ch => (ch === "#" ? colores.pared : ch === "G" ? colores.salida : colores.piso).slice()));
+  }
+  function pintarImg(ctx, img, x0, y0, k, canal = -1) {
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+      const p = img[r][c];
+      ctx.fillStyle = canal < 0 ? `rgb(${p})` : `rgb(${p[canal]},${p[canal]},${p[canal]})`;
+      ctx.fillRect(x0 + c * k, y0 + r * k, k, k);
+    }
+  }
+  function dibujar4() {
+    const ancho = anchoDe(cv4), img = imagen();
+    const kMax = Math.max(1, Math.min(30, Math.floor((ancho - 2) / W))); sK.max = kMax;
+    if (!dibujar4.listo) { sK.value = kMax; $("oK").textContent = kMax; dibujar4.listo = true; }
+    const k = Math.min(+sK.value, kMax);
+    const kc = Math.max(2, Math.floor((ancho - 2 * 10) / (3 * W)));   // canales
+    const top = 18, yZ = top + H + 22, yC = yZ + H * k + 26;
+    const h = yC + H * kc + 4, ctx = ajustar(cv4, ancho, h);
+    geo4 = { k, x: 0, y: yZ };
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, ancho, h);
+    ctx.font = `11px ${col.mono}`; ctx.textBaseline = "alphabetic"; ctx.textAlign = "left"; ctx.fillStyle = col.muted;
+    ctx.fillText(`img: ${H}×${W}×3 (tamaño real, 1 px por casilla)`, 0, 12);
+    pintarImg(ctx, img, 0, top, 1);
+    ctx.strokeStyle = col.rock3 || "#2c3346"; ctx.strokeRect(-.5 + 0, top - .5, W + 1, H + 1);
+    ctx.fillStyle = col.muted; ctx.fillText(`grande = repetir ${k} veces: ${H * k}×${W * k}×3`, 0, yZ - 6);
+    pintarImg(ctx, img, 0, yZ, k);
+    // pixel elegido
+    const [sr, sc] = sel4; ctx.strokeStyle = col.lamp; ctx.lineWidth = 2; ctx.strokeRect(sc * k + 1, yZ + sr * k + 1, Math.max(2, k - 2), Math.max(2, k - 2));
+    ["R", "G", "B"].forEach((n, i) => {
+      const x = i * (W * kc + 10);
+      ctx.fillStyle = col.muted; ctx.fillText(`[:, :, ${i}] ${n}`, x, yC - 6);
+      pintarImg(ctx, img, x, yC, kc, i);
+    });
+    const p = img[sr][sc];
+    hud4.innerHTML = `<span><code>img[${sr}, ${sc}]</code> = <b>[${p.join(", ")}]</b></span><span>${MAPA0[sr][sc] === "#" ? "pared" : MAPA0[sr][sc] === "G" ? "salida" : "piso"}</span><span>valores en total <b>${H * W * 3}</b></span>`;
+  }
+  function syncSliders() { const c = colores[quien]; ["R", "G", "B"].forEach((n, i) => { sl[n].value = c[i]; $("o" + n).textContent = c[i]; }); $("oK").textContent = sK.value; }
+  ["R", "G", "B"].forEach((n, i) => sl[n].addEventListener("input", () => { colores[quien][i] = +sl[n].value; $("o" + n).textContent = sl[n].value; dibujar4(); }));
+  sK.addEventListener("input", () => { $("oK").textContent = sK.value; dibujar4(); });
+  document.querySelectorAll(".seg [data-q]").forEach(b => b.addEventListener("click", () => {
+    quien = b.dataset.q; document.querySelectorAll(".seg [data-q]").forEach(x => x.setAttribute("aria-pressed", x === b));
+    const ej = { pared: [0, 0], salida: [8, 12], piso: [1, 2] }[quien]; sel4 = ej; syncSliders(); dibujar4();
+  }));
+  function elegir4(ev) {
+    const b = cv4.getBoundingClientRect(), { k, y } = geo4;
+    const c = Math.floor((ev.clientX - b.left) / k), r = Math.floor((ev.clientY - b.top - y) / k);
+    if (r >= 0 && r < H && c >= 0 && c < W && (r !== sel4[0] || c !== sel4[1])) { sel4 = [r, c]; dibujar4(); }
+  }
+  cv4.addEventListener("pointermove", elegir4); cv4.addEventListener("pointerdown", elegir4);
+  sel4 = [0, 0]; syncSliders();
+
+  // ---------- 5. Un bucle es una partida ----------
+  const env5 = Cueva.makeEnv(MAPA0), cv5a = $("cv5a"), cv5b = $("cv5b"), hud5 = $("hud5");
+  const T5 = Cueva.tablero(cv5b, env5, { maxCell: 26 });
+  const LIM = 5000; let largos = [], visitas = new Array(env5.nS).fill(0), semilla = 7, anim = 0;
+  function partida(rnd) {
+    let s = env5.start, n = 0; visitas[s]++;
+    while (s !== env5.goal && n < LIM) { s = env5.move(s, Math.floor(rnd() * 4))[0]; n++; visitas[s]++; }
+    return n;
+  }
+  function dibujar5() {
+    const w = anchoDe(cv5a), h = 170, ctx = ajustar(cv5a, w, h);
+    const ml = 40, mb = 22, mt = 10, pw = w - ml - 8, ph = h - mb - mt;
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    const N = +$("selN").value, ymax = LIM, X = i => ml + (i + .5) * pw / Math.max(N, 1), Y = v => mt + ph - (v / ymax) * ph;
+    ctx.font = `10px ${col.mono}`; ctx.fillStyle = col.muted; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (const t of [0, 1000, 2000, 3000, 4000, 5000]) { ctx.fillText(t, ml - 6, Y(t)); ctx.strokeStyle = "rgba(141,147,163,.12)"; ctx.beginPath(); ctx.moveTo(ml, Y(t) + .5); ctx.lineTo(w - 8, Y(t) + .5); ctx.stroke(); }
+    ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText("partida", ml + pw / 2, h - 4);
+    const bw = Math.max(1, pw / N - (N > 120 ? 0 : 2));
+    largos.forEach((L, i) => { ctx.fillStyle = L >= LIM ? col.ember : col.sonar; ctx.fillRect(X(i) - bw / 2, Y(L), bw, Y(0) - Y(L)); });
+    // camino más corto
+    ctx.strokeStyle = col.exit; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(ml, Y(20)); ctx.lineTo(w - 8, Y(20)); ctx.stroke(); ctx.setLineDash([]);
+    if (largos.length) { const m = largos.reduce((a, b) => a + b, 0) / largos.length; ctx.strokeStyle = col.lamp; ctx.beginPath(); ctx.moveTo(ml, Y(m)); ctx.lineTo(w - 8, Y(m)); ctx.stroke();
+      ctx.fillStyle = col.lamp; ctx.textAlign = "left"; ctx.fillText("media", ml + 4, Y(m) - 4); }
+    ctx.fillStyle = col.exit; ctx.textAlign = "right"; ctx.fillText("camino más corto: 20", w - 10, Y(20) - 4);
+    // mapa de calor de visitas (escala log)
+    T5.medir().fondo().paredes();
+    const mx = Math.max(1, ...visitas);
+    T5.valores(visitas.map(x => Math.log1p(x) / Math.log1p(mx)), { rampa: "visitas", lo: 0, hi: 1, omitirMeta: true });
+    T5.salida().entrada();
+    const n = largos.length, m = n ? Math.round(largos.reduce((a, b) => a + b, 0) / n) : 0;
+    hud5.innerHTML = `<span>partidas <b>${n}</b>/${N}</span><span>media <b>${m}</b> pasos</span><span>mín <b>${n ? Math.min(...largos) : "–"}</b></span><span>máx <b>${n ? Math.max(...largos) : "–"}</b></span><span>color: visitas (escala log)</span>`;
+  }
+  function correr(animar) {
+    cancelAnimationFrame(anim); largos = []; visitas.fill(0);
+    const N = +$("selN").value, rnd = Cueva.rng(semilla++);
+    if (!animar || reduce) { for (let i = 0; i < N; i++) largos.push(partida(rnd)); dibujar5(); return; }
+    const porCuadro = Math.max(1, Math.ceil(N / 60));
+    const tick = () => { const t0 = performance.now(); for (let i = 0; i < porCuadro && largos.length < N && performance.now() - t0 < 30; i++) largos.push(partida(rnd)); dibujar5(); if (largos.length < N) anim = requestAnimationFrame(tick); };
+    tick();
+  }
+  $("b5").onclick = () => correr(true);
+  $("selN").onchange = () => correr(true);
+  correr(false);
+
+  // ---------- dibujo general ----------
+  function todo() { dibujar1(); dibujar2(); dibujar3(); dibujar4(); dibujar5(); }
+  todo();
+  Cueva.alCargarSprites(dibujar3);
+  let rz = 0; addEventListener("resize", () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(todo); });
+  if (document.fonts) document.fonts.ready.then(todo);
+
+  Cueva.pagina("0a", { lecturas: [
+    { texto: "CS231n: Python y NumPy (tutorial de Stanford)", url: "https://cs231n.github.io/python-numpy-tutorial/" },
+    { texto: "NumPy para principiantes absolutos", url: "https://numpy.org/doc/stable/user/absolute_beginners.html" },
+    { texto: "Mnih et al. (2015), aprender Atari desde pixeles, Nature", url: "https://www.nature.com/articles/nature14236" }
+  ] });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+const { chromium } = require('/tmp/claude-0/-home-claude/c0892404-b462-53b0-ae0f-c95d40b227f9/scratchpad/node_modules/playwright');
+(async () => {
+  const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1200, height: 900 } });
+  const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => m.type() === 'error' && errs.push(m.text()));
+  await p.goto('http://localhost:8765/clases/05-explorar-a-ciegas.html'); await p.waitForTimeout(500);
+  const out = '/home/claude/rl-a-ciegas/build/shots/';
+  await p.click('#b1semilla'); await p.waitForTimeout(1200);
+  await (await p.$('#carrera')).screenshot({ path: out + 'i4-1-carrera.png' });
+  await p.click('#b2paso'); await p.waitForTimeout(700);
+  await (await p.$('#cv2')).screenshot({ path: out + 'i4-2-ge-paso.png' });
+  await p.click('#b2salto'); await p.waitForTimeout(200);
+  console.log('GE', await p.textContent('#hud2'));
+  await (await p.$('#cv2')).screenshot({ path: out + 'i4-2-ge-salto.png' });
+  await p.click('#m3desc'); await p.waitForTimeout(2500);
+  console.log('desc', await p.textContent('#hud3'));
+  await (await p.$('#cv3')).screenshot({ path: out + 'i4-3-desc.png' });
+  await p.click('#m3des'); await p.click('#b3sig'); await p.waitForTimeout(1500);
+  await (await p.$('#cv3')).screenshot({ path: out + 'i4-3-des.png' });
+  const c = await (await p.$('#cv4a')).boundingBox(); await p.mouse.click(c.x + c.width * 0.9, c.y + c.height * 0.2);
+  await p.fill('#b4w', '25'); await p.dispatchEvent('#b4w', 'input'); await p.waitForTimeout(200);
+  console.log('atari', await p.textContent('#hud4'));
+  await (await p.$('#cv4b')).screenshot({ path: out + 'i4-4-atari.png' });
+  console.log('errs', errs); await b.close();
+})();

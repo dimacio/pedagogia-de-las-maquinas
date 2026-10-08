@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Por qué este curso · RL a ciegas</title>
+<meta name="description" content="Clase 1: el marco del curso. Educación problematizadora (Freire), cuidado de sí (Foucault) y el curso como meme (Dawkins), contados desde la cueva a ciegas.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .lz { min-width: 0; }
+  .seg { flex-wrap: wrap; }
+  canvas:focus-visible { outline: 2px solid var(--exit); outline-offset: 2px; }
+  .cap { font-size: 13px; color: var(--muted); }
+  .cap b { color: var(--ink); }
+  /* marco: tres ideas */
+  .marco { display: grid; gap: 16px; padding-block: 8px 30px; }
+  .marco .prose { color: var(--ink); }
+  .ideas { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+  .idea { display: grid; gap: 6px; text-decoration: none; color: var(--ink); background: var(--rock); border: 1px solid var(--rock-2); border-radius: 4px; padding: 14px; align-content: start; }
+  .idea:hover { border-color: var(--lamp); color: var(--ink); }
+  .idea .n { font-family: var(--mono); font-size: 12px; color: var(--lamp); letter-spacing: .05em; text-transform: uppercase; }
+  .idea b { font-family: var(--display); font-weight: 400; font-size: 16px; }
+  .idea span:last-child { color: var(--muted); font-size: 14px; }
+  .cita { font-family: var(--display); font-size: clamp(16px, 2vw, 19px); line-height: 1.4; border-left: 3px solid var(--exit); padding: 4px 0 4px 14px; margin: 0; }
+  .cita small { display: block; font-family: var(--body); font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+  /* juego */
+  .juego { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+  .dpad { display: grid; grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(2, 34px); gap: 4px; }
+  .dpad button { padding: 0; font-family: var(--mono); font-size: 16px; }
+  .dpad .u { grid-column: 2; grid-row: 1; } .dpad .l { grid-column: 1; grid-row: 2; } .dpad .d { grid-column: 2; grid-row: 2; } .dpad .r { grid-column: 3; grid-row: 2; }
+  /* sliders del día */
+  .ctls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 16px; }
+  @media (max-width: 480px) { .ctls { grid-template-columns: minmax(0, 1fr); } }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px 12px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .chips span { display: inline-flex; align-items: center; gap: 5px; }
+  .chips i { width: 11px; height: 11px; display: inline-block; border-radius: 2px; }
+  /* advertencia */
+  .aviso { background: var(--rock); border: 1px solid var(--rock-2); border-left: 3px solid var(--ember); border-radius: 3px; padding: 12px 14px; display: grid; gap: 8px; }
+  .aviso h3 { font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--ember); letter-spacing: .05em; text-transform: uppercase; }
+  /* llamado a jugar */
+  .llamado { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; align-items: center; padding: 22px; margin-block: 28px;
+    background: var(--rock); border: 1px solid var(--rock-2); border-left: 3px solid var(--exit); border-radius: 4px; }
+  @media (max-width: 820px) { .llamado { grid-template-columns: minmax(0, 1fr); } }
+  .llamado ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+  .checks { display: grid; gap: 8px; }
+  /* cómo se cursa */
+  .anio { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+  @media (max-width: 900px) { .anio { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 480px) { .anio { grid-template-columns: minmax(0, 1fr); } }
+  .trim { background: var(--rock); border: 1px solid var(--rock-2); border-radius: 4px; padding: 10px 12px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+  .trim.opt { border-style: dashed; }
+  .trim h3 { font-family: var(--display); font-weight: 400; font-size: 14px; color: var(--lamp); }
+  .trim a { display: grid; grid-template-columns: 2.4ch minmax(0, 1fr); gap: 6px; text-decoration: none; color: var(--ink); font-size: 14px; line-height: 1.35; }
+  .trim a:hover { color: var(--lamp); }
+  .trim a .id { font-family: var(--mono); color: var(--exit); font-size: 13px; }
+  .trim a.aqui { color: var(--lamp); }
+  .trim .tot { font-family: var(--mono); font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--rock-2); padding-top: 6px; font-variant-numeric: tabular-nums; }
+  .trim .tot b { color: var(--ink); font-weight: 600; }
+  .partes { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14.5px; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase 1 · Introducción</div>
+    <h1>Por qué este <span class="g">curso</span></h1>
+    <p class="thesis">Este curso enseña a enseñarle a una máquina. Lo que se aprende en el camino es a quién le enseñamos, con qué recompensa y quién la elige.</p>
+  </section>
+
+  <section class="marco" aria-label="El marco del curso">
+    <p class="prose">Esta clase no es una clase más: es el marco desde el que se lee todo lo que sigue. El aprendizaje por refuerzo (<i>reinforcement learning</i>, RL) estudia cómo aprende un agente que actúa, recibe una recompensa y no ve el mapa. Las mismas tres preguntas sirven para pensar cómo aprendemos nosotros. Antes de cualquier fórmula, tres ideas de fondo.</p>
+    <div class="ideas">
+      <a class="idea" href="#freire"><span class="n">Idea 1 · Freire</span><b>Aprender actuando</b><span>No te depositan RL: se lo enseñás a una máquina y entendés en el camino.</span></a>
+      <a class="idea" href="#foucault"><span class="n">Idea 2 · Foucault</span><b>Elegir tu recompensa</b><span>Toda la pregunta del RL es quién define la recompensa. Cuidarse es poder verla.</span></a>
+      <a class="idea" href="#dawkins"><span class="n">Idea 3 · Dawkins</span><b>Enseñar a enseñar</b><span>El curso vive solo si cada persona que lo aprende se lo enseña a otra.</span></a>
+    </div>
+  </section>
+
+  <!-- Bloque 1: Freire -->
+  <section class="bloque" id="freire">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Dos formas de aprender" id="segFreire">
+        <button aria-pressed="true" data-m="feed">El feed: te depositan</button>
+        <button aria-pressed="false" data-m="cueva">La cueva: actuás</button>
+      </div>
+      <div class="lz" id="lzFeed"><canvas id="cvFeed" aria-label="Un feed que avanza solo y deposita tarjetas sobre una persona quieta"></canvas></div>
+      <div class="lz" id="lzCueva" hidden><canvas id="cvCueva" tabindex="0" aria-label="La cueva a oscuras: mover con las flechas del teclado o con los botones; las paredes se marcan al tocarlas"></canvas></div>
+      <div class="juego" id="ctlFeed">
+        <div class="row"><button class="btn" id="bFeedPausa">Pausa</button><button class="btn" id="bFeedMas">Seguir scrolleando</button></div>
+      </div>
+      <div class="juego" id="ctlCueva" hidden>
+        <p class="cap" id="capCueva">Tocá la cueva y usá las flechas, o los botones.</p>
+        <div class="dpad" aria-label="Mover">
+          <button class="btn u" data-a="0" aria-label="Arriba">↑</button>
+          <button class="btn l" data-a="3" aria-label="Izquierda">←</button>
+          <button class="btn d" data-a="2" aria-label="Abajo">↓</button>
+          <button class="btn r" data-a="1" aria-label="Derecha">→</button>
+        </div>
+      </div>
+      <div class="hud" id="hudFreire"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Idea 1 · Educación problematizadora</div>
+      <h2>No te depositan RL: lo construís</h2>
+      <p>Paulo Freire, en <i>Pedagogía del oprimido</i> (escrita en 1968, publicada en 1970), llama <b>educación bancaria</b> a la que deposita contenidos en un alumno pasivo, como quien llena una cuenta. Le opone la <b>educación problematizadora</b>: se parte de un problema real, se aprende actuando y reflexionando sobre él (praxis) y en diálogo con otros.</p>
+      <p>Pasá de una pestaña a la otra. En el feed todo llega solo y elegido para el próximo clic: es un agente con γ ≈ 0, que no mira más allá del instante. En la cueva nadie te da el mapa: lo que sabés de las paredes lo sabés porque las tocaste.</p>
+      <blockquote class="cita">Nadie educa a nadie, nadie se educa solo: nos educamos entre nosotros, mediatizados por el mundo.<small>Freire, <i>Pedagogía del oprimido</i>, cap. 2 (paráfrasis).</small></blockquote>
+      <p>En este curso no vas a recibir RL. Le vas a enseñar a una máquina a salir de la cueva, y en ese camino vas a entender cómo aprende.</p>
+      <p class="nota pregunta">Después de dos minutos en cada pestaña: ¿de cuál te acordás más, y por qué?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 2: Foucault -->
+  <section class="bloque" id="foucault">
+    <div class="stage">
+      <div class="lz"><canvas id="cvDia" aria-label="Dos días simulados hora por hora: el que sale de tu función de recompensa y el que sale de la recompensa de una plataforma, con lo que cada uno junta"></canvas></div>
+      <div class="chips" id="chipsDia"></div>
+      <div class="ctls">
+        <div class="ctl"><label for="wE">Estímulo inmediato <output id="oE"></output></label><input type="range" id="wE" min="0" max="1" step="0.1" value="0.3"></div>
+        <div class="ctl"><label for="wA">Aprender algo <output id="oA"></output></label><input type="range" id="wA" min="0" max="1" step="0.1" value="0.8"></div>
+        <div class="ctl"><label for="wV">Ver a otras personas <output id="oV"></output></label><input type="range" id="wV" min="0" max="1" step="0.1" value="1"></div>
+        <div class="ctl"><label for="wC">Cuerpo y descanso <output id="oC"></output></label><input type="range" id="wC" min="0" max="1" step="0.1" value="0.6"></div>
+      </div>
+      <div class="row"><button class="btn" id="bPlat">Usar la de la plataforma</button><button class="btn" id="bMia">Volver a una propia</button></div>
+      <div class="hud" id="hudDia"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Idea 2 · Cuidado de sí</div>
+      <h2>¿Qué te premia?</h2>
+      <p>En su curso <i>La hermenéutica del sujeto</i> (Collège de France, 1981–1982), Michel Foucault recupera la <i>epimeleia heautou</i>, el <b>cuidado de sí</b>. Sostiene que en la Antigüedad el «conócete a ti mismo» (<i>gnothi seauton</i>) era una parte de ese cuidado, y que la modernidad invirtió la relación: dejó el conocimiento de sí como acceso a la verdad, separado del trabajo sobre uno mismo.</p>
+      <p>En RL, el agente hace lo que su recompensa le pide. Los sliders son tu función de recompensa para un día; la página calcula la mejor política hora por hora. La segunda franja es el día de alguien que solo cobra estímulo inmediato, que es lo que mide una plataforma.</p>
+      <div class="eq">r = w₁·estímulo + w₂·aprender + w₃·otros + w₄·cuerpo</div>
+      <p>En esta lectura, cuidarse no es conocerse más: es poder ver y elegir los pesos, en lugar de aceptar los que pone otro.</p>
+      <p class="small muted">Es un modelo de juguete: dieciséis horas, energía de 0 a 4, repetir una actividad rinde la mitad salvo el scroll, que no satura porque siempre trae algo nuevo.</p>
+      <p class="nota pregunta">¿Con qué pesos tu día se parece al de la plataforma? ¿Quién eligió esos pesos?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 3: Dawkins -->
+  <section class="bloque" id="dawkins">
+    <div class="stage">
+      <div class="lz"><canvas id="cvMeme" aria-label="La cueva grande como una comunidad: cada casilla es una persona y el curso se propaga de una a otra; tocá una casilla para sembrarlo ahí"></canvas></div>
+      <div class="hud" id="hudMeme"></div>
+      <div class="ctl"><label for="sFec">Fecundidad: a cuántas personas enseña cada una <output id="oFec"></output></label><input type="range" id="sFec" min="0.4" max="3" step="0.1" value="1.6"></div>
+      <div class="ctl"><label for="sFid">Fidelidad: probabilidad de copiarlo bien <output id="oFid"></output></label><input type="range" id="sFid" min="0.3" max="1" step="0.05" value="0.75"></div>
+      <div class="ctl"><label for="sLon">Longevidad: rondas que sigue enseñando <output id="oLon"></output></label><input type="range" id="sLon" min="1" max="3" step="1" value="1"></div>
+      <div class="row"><button class="btn primary" id="bMeme">Sembrar de nuevo</button><button class="btn" id="bMemePaso">Una ronda</button></div>
+      <div class="chips"><span><i style="background:var(--exit)"></i>enseña ahora</span><span><i style="background:var(--chalk)"></i>aprendió</span><span><i style="background:var(--ember)"></i>copia infiel</span></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Idea 3 · El curso como meme</div>
+      <h2>Enseñar a enseñar</h2>
+      <p>En el capítulo 11 de <i>El gen egoísta</i> (1976), Richard Dawkins propone que las ideas también son replicadores: se copian de una mente a otra. Las que duran tienen <b>fidelidad</b> (se copian bien), <b>fecundidad</b> (se copian mucho) y <b>longevidad</b> (cada copia dura).</p>
+      <p>Cada casilla es una persona. Tocá una para que aprenda el curso y mirá si la luz cruza la cueva o se apaga en un pasillo. Por eso cada clase cierra con un bloque «Para enseñarlo» y una actividad entre pares: son la fecundidad y la fidelidad del curso.</p>
+      <div class="eq">R ≈ fecundidad × fidelidad × longevidad</div>
+      <p>La campaña de difusión del curso es, además, el ejemplo resuelto del proyecto final: <a href="../difusion/estrategia.html">cómo se propaga este curso</a>.</p>
+      <p class="nota pregunta">Con R menor que 1 la luz se apaga. ¿Cuál de las tres perillas depende de cómo está escrito el material y cuál de vos?</p>
+    </div>
+  </section>
+
+  <!-- Jugar la cueva -->
+  <section class="llamado" id="jugar" aria-labelledby="tJugar">
+    <div class="texto" style="display:grid; gap:12px">
+      <div class="paso">Antes de la clase 2</div>
+      <h2 id="tJugar">Jugá la cueva dos veces</h2>
+      <ol>
+        <li>En modo <b>fácil</b>: las paredes que tocás quedan marcadas en gris.</li>
+        <li>En modo <b>difícil</b>: la pared solo destella al chocarla y todo lo tenés que recordar vos.</li>
+        <li>Anotá qué tuviste que recordar para salir. La clase 2 empieza por ahí: esa memoria es tu historia, y lo que te alcanza de ella es tu estado.</li>
+      </ol>
+      <p class="row"><a class="btn go" href="../juego/la-cueva-a-ciegas.html">Abrir el juego</a></p>
+    </div>
+    <div class="checks">
+      <label class="check"><input type="checkbox" id="chkFacil"> Jugué en fácil</label>
+      <label class="check"><input type="checkbox" id="chkDificil"> Jugué en difícil</label>
+      <label class="check"><input type="checkbox" id="chkNota"> Anoté qué tuve que recordar</label>
+      <p class="small muted">Las marcas quedan solo en este navegador.</p>
+    </div>
+  </section>
+
+  <!-- Cómo se cursa -->
+  <section class="bloque full" id="cursada">
+    <div class="texto" style="display:grid; gap:14px">
+      <div class="paso">Cómo se cursa</div>
+      <h2>Doce clases, cuatro trimestres, dos vías</h2>
+      <div class="seg" role="group" aria-label="Vía" id="segVia" style="max-width:420px">
+        <button aria-pressed="true" data-v="visual">Vía visual (sin código)</button>
+        <button aria-pressed="false" data-v="codigo">Vía con código</button>
+      </div>
+      <div class="anio" id="anio"></div>
+      <p class="cap" id="capVia"></p>
+    </div>
+    <div class="ctls" style="gap:24px">
+      <div style="display:grid; gap:10px">
+        <h3>Cada clase tiene</h3>
+        <ol class="partes" id="partes"></ol>
+        <p class="small muted">La nivelación (0a Python, 0b Probabilidad, 0c Álgebra lineal) es optativa y no cuenta entre las doce: sirve a quien quiera hacer la vía con código o repasar las herramientas, todo con la misma cueva. Las clases 1 y 12 no tienen notebook.</p>
+      </div>
+      <div class="aviso">
+        <h3>Lo que este curso no promete</h3>
+        <p>En la clase 4 vas a ver que la dopamina se comporta como un <b>error de predicción de recompensa</b> (Schultz, Dayan y Montague, 1997), el mismo error que usa el aprendizaje por diferencias temporales. Es uno de los puentes más lindos entre RL y neurociencia.</p>
+        <p>Pero el «loop de dopamina» de las redes es una metáfora, no un diagnóstico, y si existe una adicción a las redes sociales es un tema que todavía se discute. El curso no promete curarte del scroll: propone que puedas ver el mecanismo.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Para enseñarlo -->
+  <section class="bloque full" id="ensenar">
+    <div class="texto prose">
+      <div class="paso">Para enseñarlo</div>
+      <h2>Cómo contar esta clase</h2>
+      <p><b>En una oración:</b> "Vamos a enseñarle a una máquina a salir de una cueva a oscuras, y en el camino vamos a ver quién elige lo que premia, a ella y a nosotros."</p>
+      <p class="nota pregunta">Pregunta para hacerle a quien te escucha: "Si alguien pudiera ver la función de recompensa que gobierna tu día, ¿qué pesos encontraría? ¿Los pusiste vos?"</p>
+      <p><b>Ejercicio de 5 minutos:</b> cada persona escribe en un papel tres cosas que hizo ayer y, al lado de cada una, qué la premió (un número de 0 a 1 y quién lo puso: yo, otra persona, una app). En parejas comparan los papeles y responden una sola pregunta: ¿cuál de esos premios eligió alguien que no estaba en la habitación?</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(() => {
+  Cueva.pagina("1", { lecturas: [
+    { texto: "Freire, P. (1970). Pedagogía del oprimido, cap. 2 (la educación bancaria y la problematizadora).", url: "" },
+    { texto: "Foucault, M. (2001). La hermenéutica del sujeto. Curso en el Collège de France, 1981–1982. Clase del 6 de enero de 1982.", url: "" },
+    { texto: "Dawkins, R. (1976). El gen egoísta, cap. 11: «Memes: los nuevos replicadores».", url: "" },
+    { texto: "Schultz, W., Dayan, P. y Montague, P. R. (1997). A neural substrate of prediction and reward. Science 275, 1593–1599.", url: "https://doi.org/10.1126/science.275.5306.1593" },
+    { texto: "Sutton y Barto (2018), Reinforcement Learning: An Introduction, cap. 1.", url: "http://incompleteideas.net/book/the-book-2nd.html" }
+  ] });
+
+  const COL = Cueva.COL();
+  const MONO = COL.mono || "monospace";
+  const reducir = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = id => document.getElementById(id);
+  const fmt = (x, d = 1) => x.toFixed(d).replace(".", ",");
+  const guardar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } };
+  const leer = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch (e) { return d; } };
+  function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+  // ================= Bloque 1: Freire — feed contra cueva =================
+  const freire = (() => {
+    const cvF = $("cvFeed"), ajF = Cueva.lienzo(cvF, 300), hud = $("hudFreire");
+    const TIPOS = [["Clip de 15 s", COL.ember], ["¡No vas a creer…!", COL.lamp], ["Top 5", COL.sonar], ["Meme", "#b48ad8"], ["Noticia", COL.chalk], ["Oferta", COL.exit]];
+    const rnd = Cueva.rng(7);
+    let modo = "feed", off = 0, depositadas = 0, pausa = reducir, cola = [];
+    for (let i = 0; i < 12; i++) cola.push(Math.floor(rnd() * TIPOS.length));
+    const ALTO = 62;
+    function dibujarFeed() {
+      const { w, h, ctx } = ajF();
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      const pw = Math.min(200, w * .5), px = w - pw - Math.max(8, w * .06), py = 10, ph = h - 20;
+      // teléfono
+      ctx.save(); rrect(ctx, px, py, pw, ph, 14); ctx.fillStyle = COL.rock; ctx.fill(); ctx.strokeStyle = COL.rock3; ctx.lineWidth = 2; ctx.stroke(); ctx.clip();
+      for (let i = -1; i < 7; i++) {
+        const k = Math.floor(off / ALTO) + i, y = py + 10 + i * ALTO - (off % ALTO);
+        const t = TIPOS[cola[((k % cola.length) + cola.length) % cola.length]];
+        rrect(ctx, px + 10, y, pw - 20, ALTO - 10, 5); ctx.fillStyle = COL.rock2; ctx.fill();
+        ctx.fillStyle = t[1]; ctx.fillRect(px + 10, y, 5, ALTO - 10);
+        ctx.fillStyle = COL.ink; ctx.font = `600 12px ${MONO}`; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(t[0], px + 22, y + 9);
+        ctx.fillStyle = COL.rock3; ctx.fillRect(px + 22, y + 30, (pw - 50) * (.5 + .4 * ((k * 37) % 7) / 7), 6);
+      }
+      ctx.restore();
+      // la persona, quieta, recibiendo
+      const sx = Math.max(10, (px - 60) / 2), sy = h / 2 - 22;
+      const sz = 44;
+      const spr = SPRITE();
+      if (spr) { ctx.imageSmoothingEnabled = false; ctx.drawImage(spr, sx, sy, sz, sz); } else { ctx.fillStyle = COL.lamp; ctx.beginPath(); ctx.arc(sx + sz / 2, sy + sz / 2, 14, 0, 7); ctx.fill(); }
+      // flechas de depósito: del teléfono a la persona
+      ctx.strokeStyle = "rgba(242,179,90,.55)"; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); ctx.lineDashOffset = -off * .6;
+      for (const dy of [-18, 0, 18]) { ctx.beginPath(); ctx.moveTo(px - 6, h / 2 + dy); ctx.lineTo(sx + sz + 8, h / 2 + dy * .4); ctx.stroke(); }
+      ctx.setLineDash([]);
+      ctx.fillStyle = COL.muted; ctx.font = `12px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "top";
+      ctx.fillText("vos", sx + sz / 2, sy + sz + 6);
+      ctx.fillText("γ ≈ 0", (sx + sz + px) / 2, h / 2 + 34);
+      hud.innerHTML = `<span>tarjetas depositadas <b>${depositadas}</b></span><span>decisiones tuyas <b>0</b></span><span>elegidas para <b>el próximo clic</b></span>`;
+    }
+    let sprImg = null;
+    function SPRITE() {
+      if (sprImg) return sprImg.complete && sprImg.naturalWidth ? sprImg : null;
+      sprImg = new Image(); sprImg.src = "../assets/sprites/boy_down_1.png"; sprImg.onload = () => modo === "feed" && dibujarFeed(); return null;
+    }
+    let ult = 0;
+    function animar(t) {
+      if (modo !== "feed") { ult = 0; return; }
+      if (!pausa) {
+        const dt = ult ? Math.min(60, t - ult) : 16; ult = t;
+        const antes = Math.floor(off / ALTO); off += dt * .045; if (Math.floor(off / ALTO) > antes) depositadas++;
+      } else ult = 0;
+      dibujarFeed(); if (!pausa) requestAnimationFrame(animar);
+    }
+    $("bFeedPausa").textContent = pausa ? "Reanudar" : "Pausa";
+    $("bFeedPausa").addEventListener("click", () => { pausa = !pausa; $("bFeedPausa").textContent = pausa ? "Reanudar" : "Pausa"; if (!pausa) requestAnimationFrame(animar); });
+    $("bFeedMas").addEventListener("click", () => {
+      const meta = (Math.floor(off / ALTO) + 1) * ALTO;
+      if (reducir || pausa) { off = meta; depositadas++; dibujarFeed(); return; }
+      off = meta; depositadas++;
+    });
+
+    // la cueva jugable
+    const env = Cueva.makeEnv(Cueva.MAPS.chica), cv = $("cvCueva"), T = Cueva.tablero(cv, env, { maxCell: 34 });
+    const st = { s: env.start, dir: 2, frame: 0, acciones: 0, paredes: new Set(), rastro: [env.start], salio: false };
+    function dibujarCueva() {
+      T.medir().fondo();
+      T.trayecto(st.rastro, "rgba(242,179,90,.35)", .14);
+      T.tocadas(st.paredes).salida().entrada().sprite(st.s, st.dir, st.frame);
+      hud.innerHTML = `<span>decisiones tuyas <b>${st.acciones}</b></span><span>paredes descubiertas <b>${st.paredes.size}</b></span><span>${st.salio ? '<b style="color:var(--exit)">saliste</b>' : "todavía adentro"}</span>`;
+      $("capCueva").innerHTML = st.salio ? "<b>Saliste.</b> Todo lo gris lo descubriste vos. Probá de nuevo con otra pestaña abierta en la cabeza." : "Tocá la cueva y usá las flechas, o los botones.";
+    }
+    function mover(a) {
+      if (st.salio) { Object.assign(st, { s: env.start, acciones: 0, paredes: new Set(), rastro: [env.start], salio: false }); }
+      st.dir = a; st.frame ^= 1; st.acciones++;
+      const [s2, choque, k] = env.move(st.s, a);
+      if (choque) st.paredes.add(k); else { st.s = s2; st.rastro.push(s2); }
+      if (st.s === env.goal) st.salio = true;
+      dibujarCueva();
+    }
+    const TECLAS = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3 };
+    cv.addEventListener("keydown", e => { if (e.key in TECLAS) { e.preventDefault(); mover(TECLAS[e.key]); } });
+    cv.addEventListener("pointerdown", () => cv.focus());
+    document.querySelectorAll("#ctlCueva .dpad button").forEach(b => b.addEventListener("click", () => mover(+b.dataset.a)));
+
+    function setModo(m) {
+      modo = m;
+      document.querySelectorAll("#segFreire button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === m ? "true" : "false"));
+      $("lzFeed").hidden = $("ctlFeed").hidden = m !== "feed";
+      $("lzCueva").hidden = $("ctlCueva").hidden = m !== "cueva";
+      if (m === "feed") { dibujarFeed(); if (!pausa) requestAnimationFrame(animar); } else dibujarCueva();
+    }
+    document.querySelectorAll("#segFreire button").forEach(b => b.addEventListener("click", () => setModo(b.dataset.m)));
+    Cueva.alCargarSprites(() => { if (modo === "cueva") dibujarCueva(); });
+    setModo("feed");
+    return { dibujar: () => modo === "feed" ? dibujarFeed() : dibujarCueva() };
+  })();
+
+  // ================= Bloque 2: Foucault — ¿qué te premia? =================
+  const dia = (() => {
+    const cv = $("cvDia"), aj = Cueva.lienzo(cv, 230), hud = $("hudDia");
+    // actividades: [nombre, color, vector (estímulo, aprender, otros, cuerpo), Δenergía, satura]
+    const ACT = [
+      ["scroll", COL.ember, [1, 0, 0, 0], 0, false],
+      ["aprender", COL.lamp, [.2, 1, 0, 0], -1, true],
+      ["ver gente", COL.sonar, [.5, 0, 1, 0], -1, true],
+      ["moverse", COL.exit, [.2, 0, 0, 1], -1, true],
+      ["descansar", COL.chalk, [0, 0, 0, .5], +2, true]
+    ];
+    const DIM = ["estímulo", "aprender", "otros", "cuerpo"], H = 16, EMAX = 4, E0 = 3;
+    $("chipsDia").innerHTML = ACT.map(a => `<span><i style="background:${a[1]}"></i>${a[0]}</span>`).join("");
+    const PLAT = [1, 0, 0, 0];
+    // programación dinámica de horizonte finito: estado (hora, energía, actividad anterior)
+    function resolver(w) {
+      const r = (a, last) => { const v = ACT[a][2].reduce((s, x, i) => s + x * w[i], 0); return (ACT[a][4] && a === last) ? v * .5 : v; };
+      const V = Array.from({ length: H + 1 }, () => Array.from({ length: EMAX + 1 }, () => new Array(6).fill(0)));
+      const PI = Array.from({ length: H }, () => Array.from({ length: EMAX + 1 }, () => new Array(6).fill(0)));
+      for (let h = H - 1; h >= 0; h--) for (let e = 0; e <= EMAX; e++) for (let l = 0; l < 6; l++) {
+        let best = -Infinity, ba = 0;
+        for (let a = 0; a < ACT.length; a++) {
+          const e2 = e + ACT[a][3]; if (e2 < 0) continue;
+          const q = r(a, l) + V[h + 1][Math.min(EMAX, e2)][a];
+          if (q > best + 1e-9) { best = q; ba = a; }
+        }
+        V[h][e][l] = best; PI[h][e][l] = ba;
+      }
+      const plan = [], tot = [0, 0, 0, 0]; let e = E0, l = 5;
+      for (let h = 0; h < H; h++) {
+        const a = PI[h][e][l]; plan.push(a);
+        const f = (ACT[a][4] && a === l) ? .5 : 1; ACT[a][2].forEach((x, i) => tot[i] += x * f);
+        e = Math.min(EMAX, e + ACT[a][3]); l = a;
+      }
+      return { plan, tot };
+    }
+    const plat = resolver(PLAT);
+    const S = ["wE", "wA", "wV", "wC"], O = ["oE", "oA", "oV", "oC"];
+    const pesos = () => S.map(id => +$(id).value);
+    function dibujar() {
+      const w = pesos(); S.forEach((id, i) => $(O[i]).textContent = fmt(w[i]));
+      const tuyo = resolver(w);
+      const { w: W, h: Hh, ctx } = aj();
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, Hh);
+      const x0 = 8, lab = 0, cw = (W - x0 * 2) / H, sh = 30;
+      const franja = (plan, y, titulo) => {
+        ctx.fillStyle = COL.muted; ctx.font = `12px ${MONO}`; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillText(titulo, x0, y - 4);
+        plan.forEach((a, i) => { ctx.fillStyle = ACT[a][1]; ctx.globalAlpha = .9; ctx.fillRect(x0 + i * cw + 1, y, cw - 2, sh); });
+        ctx.globalAlpha = 1;
+      };
+      franja(tuyo.plan, 22, "tu día (tu recompensa)");
+      franja(plat.plan, 22 + sh + 26, "el día que maximiza estímulo");
+      // horas
+      ctx.fillStyle = COL.muted; ctx.font = `11px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "top";
+      for (let i = 0; i <= H; i += 4) ctx.fillText((7 + i) + " h", Math.min(W - 16, Math.max(14, x0 + i * cw)), 22 + 2 * sh + 30);
+      // lo que junta cada día, por dimensión
+      const yb = 22 + 2 * sh + 52, bh = Hh - yb - 6, gw = (W - x0 * 2) / 4;
+      DIM.forEach((d, i) => {
+        const gx = x0 + i * gw, bw = Math.min(26, gw * .28), base = yb + bh - 16;
+        [[tuyo.tot[i], COL.lamp], [plat.tot[i], COL.ember]].forEach(([v, c], j) => {
+          const hh = (bh - 22) * v / H; ctx.fillStyle = c; ctx.fillRect(gx + gw / 2 - bw - 2 + j * (bw + 4), base - hh, bw, hh);
+        });
+        ctx.fillStyle = COL.muted; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(d, gx + gw / 2, base + 3);
+      });
+      ctx.strokeStyle = COL.rock2; ctx.beginPath(); ctx.moveTo(x0, yb + bh - 16 + .5); ctx.lineTo(W - x0, yb + bh - 16 + .5); ctx.stroke();
+      const iguales = tuyo.plan.filter((a, i) => a === plat.plan[i]).length;
+      const scroll = tuyo.plan.filter(a => a === 0).length;
+      hud.innerHTML = `<span>horas de scroll <b>${scroll}</b> de ${H}</span><span>horas iguales a la plataforma <b>${iguales}</b></span><span>barras: <b style="color:var(--lamp)">tu día</b> · <b style="color:var(--ember)">plataforma</b></span>`;
+      guardar("rlac-c1-pesos", w);
+    }
+    const g = leer("rlac-c1-pesos", null);
+    if (Array.isArray(g) && g.length === 4) S.forEach((id, i) => $(id).value = g[i]);
+    S.forEach(id => $(id).addEventListener("input", dibujar));
+    $("bPlat").addEventListener("click", () => { S.forEach((id, i) => $(id).value = PLAT[i]); dibujar(); });
+    $("bMia").addEventListener("click", () => { [0.3, 0.8, 1, 0.6].forEach((v, i) => $(S[i]).value = v); dibujar(); });
+    dibujar();
+    return { dibujar };
+  })();
+
+  // ================= Bloque 3: Dawkins — el curso se propaga por la cueva =================
+  const meme = (() => {
+    const env = Cueva.makeEnv(Cueva.MAPS.grande), cv = $("cvMeme"), T = Cueva.tablero(cv, env, { maxCell: 26 }), hud = $("hudMeme");
+    // vecinos a distancia ≤ 2 por los pasillos (a quién le puede enseñar cada persona)
+    const VEC = [];
+    for (let s = 0; s < env.nS; s++) {
+      const d = new Map([[s, 0]]), q = [s];
+      while (q.length) { const u = q.shift(); if (d.get(u) >= 2) continue; for (let a = 0; a < 4; a++) { const [v, b] = env.move(u, a); if (!b && !d.has(v)) { d.set(v, d.get(u) + 1); q.push(v); } } }
+      VEC.push([...d.keys()].filter(v => v !== s));
+    }
+    let est, ronda, semilla = env.start, rnd = Cueva.rng(3), timer = null;
+    const P = () => ({ fec: +$("sFec").value, fid: +$("sFid").value, lon: +$("sLon").value });
+    function poisson(l) { const L = Math.exp(-l); let k = 0, p = 1; do { k++; p *= rnd(); } while (p > L); return k - 1; }
+    function sembrar(s = semilla) {
+      semilla = s; rnd = Cueva.rng(3 + s); ronda = 0;
+      est = new Array(env.nS).fill(0); // 0 nadie, -1 copia infiel, >0 rondas que le quedan enseñando, -2 ya enseñó
+      est[s] = P().lon; paso(); paso(); dibujar(); arrancar();
+    }
+    function paso() {
+      const { fec, fid, lon } = P(), nuevos = [];
+      for (let s = 0; s < env.nS; s++) if (est[s] > 0) {
+        const libres = VEC[s].filter(v => est[v] === 0 && !nuevos.some(n => n[0] === v));
+        let n = Math.min(libres.length, poisson(fec));
+        while (n-- > 0) { const i = Math.floor(rnd() * libres.length); const v = libres.splice(i, 1)[0]; nuevos.push([v, rnd() < fid ? lon : -1]); }
+        est[s] = est[s] - 1 > 0 ? est[s] - 1 : -2;
+      }
+      for (const [v, x] of nuevos) est[v] = x;
+      ronda++; dibujar();
+      return est.some(x => x > 0);
+    }
+    function arrancar() {
+      clearTimeout(timer);
+      if (reducir) { while (paso() && ronda < 60); return; }
+      const tic = () => { if (paso() && ronda < 80) timer = setTimeout(() => requestAnimationFrame(tic), 260); };
+      timer = setTimeout(() => requestAnimationFrame(tic), 400);
+    }
+    function dibujar() {
+      T.medir().fondo().paredes(COL.rock2);
+      for (let s = 0; s < env.nS; s++) {
+        const [r, c] = env.free[s], x = est[s];
+        T.casilla(r, c, x > 0 ? COL.exit : x === -1 ? COL.ember : x === -2 ? COL.chalk : "#05070a", x ? 2 : 0);
+      }
+      T.sprite(semilla, 2);
+      const { fec, fid, lon } = P(), R = fec * fid * lon;
+      const aprendieron = est.filter(x => x > 0 || x === -2).length, ensenan = est.filter(x => x > 0).length;
+      hud.innerHTML = `<span>ronda <b>${ronda}</b></span><span>aprendieron bien <b>${aprendieron}</b> de ${env.nS}</span><span>enseñan ahora <b>${ensenan}</b></span><span>R ≈ <b style="color:${R >= 1 ? "var(--exit)" : "var(--ember)"}">${fmt(R, 2)}</b></span>`;
+    }
+    [["sFec", "oFec", v => fmt(+v)], ["sFid", "oFid", v => Math.round(v * 100) + " %"], ["sLon", "oLon", v => v]].forEach(([s, o, f]) => {
+      const up = () => { $(o).textContent = f($(s).value); }; up(); $(s).addEventListener("input", () => { up(); dibujar(); }); $(s).addEventListener("change", () => sembrar());
+    });
+    $("bMeme").addEventListener("click", () => sembrar());
+    $("bMemePaso").addEventListener("click", () => { clearTimeout(timer); paso(); });
+    cv.addEventListener("click", ev => { const [r, c] = T.celdaEn(ev); const s = env.idx[r + "," + c]; if (s !== undefined) sembrar(s); });
+    Cueva.alCargarSprites(dibujar);
+    sembrar(env.start);
+    return { dibujar };
+  })();
+
+  // ================= Jugar: marcas personales =================
+  for (const id of ["chkFacil", "chkDificil", "chkNota"]) {
+    const el = $(id); el.checked = !!leer("rlac-c1-" + id, false);
+    el.addEventListener("change", () => guardar("rlac-c1-" + id, el.checked));
+  }
+
+  // ================= Cómo se cursa =================
+  (() => {
+    const M = window.MODULOS || {};
+    const DEF = { pagina: 30, notebook: 75 };
+    const PARTES = {
+      visual: ["Antes de empezar: objetivos, tiempo y requisitos.", "Tres a cinco figuras que se tocan: ver primero, leer después.", "«Para enseñarlo»: la clase en una oración, una pregunta y un ejercicio de 5 minutos.", "Cuestionario de 5 preguntas, con 4 se aprueba.", "Actividad entre pares en GitHub Discussions, devuelta con una rúbrica."],
+      codigo: ["Todo lo de la vía visual.", "Un notebook por clase que corre en Colab, en CPU, sin instalar nada.", "Pasos numerados: cada uno llama a una función y muestra su gráfico.", "Al final, un ejercicio abierto para cambiar algo y mirar qué pasa."]
+    };
+    let via = "visual";
+    function pintar() {
+      const grupos = [["Nivelación (optativa)", "N"], ["Trimestre 1", 1], ["Trimestre 2", 2], ["Trimestre 3", 3], ["Trimestre 4", 4]];
+      let total = 0;
+      $("anio").innerHTML = grupos.map(([n, t]) => {
+        const cs = Cueva.CLASES.filter(c => c.trimestre === t); let min = 0;
+        const items = cs.map(c => {
+          const tm = (M[c.id] && M[c.id].tiempo) || {}, p = tm.pagina || DEF.pagina, nb = c.nb ? (tm.notebook || DEF.notebook) : 0;
+          min += p + (via === "codigo" ? nb : 0);
+          return `<a href="${c.archivo}"${c.id === "1" ? ' class="aqui" aria-current="page"' : ""}><span class="id">${c.id}</span><span>${c.titulo}</span></a>`;
+        }).join("");
+        if (t !== "N") total += min;
+        return `<div class="trim${t === "N" ? " opt" : ""}"><h3>${n}</h3>${items}<div class="tot">~<b>${Math.round(min / 60 * 2) / 2}</b> h de material</div></div>`;
+      }).join("");
+      $("partes").innerHTML = PARTES[via].map(p => `<li>${p}</li>`).join("");
+      $("capVia").innerHTML = via === "visual"
+        ? `Vía visual: unas <b>${Math.round(total / 60)} h</b> de páginas en el año, más el juego, los cuestionarios y el foro. No hace falta programar.`
+        : `Vía con código: unas <b>${Math.round(total / 60)} h</b> de páginas y notebooks en el año, a razón de una clase por semana o una cada tres semanas si se cursa por trimestres.`;
+      document.querySelectorAll("#segVia button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === via ? "true" : "false"));
+    }
+    document.querySelectorAll("#segVia button").forEach(b => b.addEventListener("click", () => { via = b.dataset.v; pintar(); }));
+    pintar();
+  })();
+
+  let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { freire.dibujar(); dia.dibujar(); meme.dibujar(); }, 80); });
+})();
+</script>
+</body>
+</html>

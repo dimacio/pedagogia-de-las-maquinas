@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>La cueva a ciegas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: una sola pantalla de juego — escenario (canvas) a la izquierda, tablero de control a la derecha; se apila en el teléfono.
+   Look deliberadamente único y oscuro: es una cueva. */
+:root {
+  --cave: #0b0d12;        /* fondo de roca */
+  --rock: #151924;        /* paneles */
+  --rock-2: #1e2331;      /* bordes, casillas pisadas */
+  --chalk: #c9ccd3;       /* pared tocada: gris claro */
+  --ink: #e8e6df;         /* texto */
+  --muted: #8d93a3;       /* texto secundario */
+  --exit: #3ddc84;        /* salida verde */
+  --lamp: #f2b35a;        /* acento: la lámpara del docente / valores */
+  --sonar: #5ec8d8;       /* visitas */
+  --display: "Silkscreen", "Courier New", monospace;
+  --body: "Atkinson Hyperlegible", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { background: var(--cave); color: var(--ink); }
+body { margin: 0; font-family: var(--body); font-size: 15px; line-height: 1.5; padding-inline: 16px; padding-block: 18px 32px; }
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 18px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+h1 { font-family: var(--display); font-weight: 400; font-size: clamp(26px, 4vw, 40px); letter-spacing: .02em; margin: 0; line-height: 1.1; text-wrap: balance; }
+h1 .g { color: var(--exit); }
+.sub { color: var(--muted); margin: 0; font-size: 14px; }
+nav.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+nav.tabs button { font-family: var(--display); font-size: 13px; letter-spacing: .04em; background: transparent; color: var(--muted);
+  border: 1px solid var(--rock-2); padding: 9px 14px; border-radius: 3px; cursor: pointer; }
+nav.tabs button small { font-family: var(--mono); font-size: 11px; opacity: .8; margin-left: 6px; letter-spacing: 0; }
+nav.tabs button[aria-selected="true"] { color: var(--cave); background: var(--lamp); border-color: var(--lamp); }
+nav.tabs button:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--exit); outline-offset: 2px; }
+.stage-row { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
+@media (max-width: 860px) { .stage-row { grid-template-columns: minmax(0, 1fr); } }
+.stage { position: relative; background: #000; border: 1px solid var(--rock-2); border-radius: 4px; padding: 10px; min-width: 0; }
+canvas#cv { display: block; width: 100%; height: auto; image-rendering: pixelated; touch-action: none; }
+.overlay { position: absolute; inset: 10px; display: grid; place-items: center; pointer-events: none; }
+.overlay .card { pointer-events: auto; background: rgba(11,13,18,.92); border: 1px solid var(--exit); padding: 18px 22px; border-radius: 4px; text-align: center; max-width: 340px; }
+.overlay .card h2 { font-family: var(--display); font-weight: 400; color: var(--exit); margin: 0 0 6px; font-size: 22px; }
+.overlay .card p { margin: 0 0 12px; color: var(--ink); }
+.hud { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-family: var(--mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hud b { color: var(--ink); font-weight: 600; }
+.panel { background: var(--rock); border: 1px solid var(--rock-2); border-radius: 4px; padding: 16px; display: grid; gap: 14px; min-width: 0; }
+.panel h3 { font-family: var(--display); font-weight: 400; font-size: 15px; letter-spacing: .05em; margin: 0; color: var(--lamp); }
+.panel p { margin: 0; color: var(--ink); }
+.panel .note { color: var(--muted); font-size: 13.5px; }
+.eq { font-family: var(--mono); font-size: 13px; background: var(--cave); border: 1px solid var(--rock-2); padding: 8px 10px; border-radius: 3px; overflow-x: auto; white-space: nowrap; }
+.ctl { display: grid; gap: 4px; }
+.ctl label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+.ctl label output { font-family: var(--mono); color: var(--ink); font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--lamp); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { font-family: var(--body); font-weight: 700; font-size: 14px; background: var(--rock-2); color: var(--ink); border: 1px solid #2c3346; padding: 8px 12px; border-radius: 3px; cursor: pointer; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--lamp); color: var(--cave); border-color: var(--lamp); }
+.btn.go { background: var(--exit); color: var(--cave); border-color: var(--exit); }
+.check { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+.check input { accent-color: var(--lamp); width: 16px; height: 16px; }
+.seg { display: flex; border: 1px solid var(--rock-2); border-radius: 3px; overflow: hidden; }
+.seg button { flex: 1; background: transparent; color: var(--muted); border: 0; padding: 7px 6px; font-size: 13px; cursor: pointer; font-family: var(--body); }
+.seg button[aria-pressed="true"] { background: var(--rock-2); color: var(--ink); }
+select { background: var(--cave); color: var(--ink); border: 1px solid var(--rock-2); padding: 6px 8px; border-radius: 3px; font-family: var(--body); font-size: 14px; }
+.legend { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); font-family: var(--mono); }
+.legend .bar { flex: 1; height: 8px; border-radius: 2px; }
+.dpad { display: none; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(2, 46px); gap: 6px; justify-content: center; margin-top: 12px; }
+.dpad button { background: var(--rock-2); color: var(--ink); border: 1px solid #2c3346; border-radius: 4px; font-size: 20px; cursor: pointer; }
+.dpad .up { grid-column: 2; } .dpad .left { grid-column: 1; grid-row: 2; } .dpad .down { grid-column: 2; grid-row: 2; } .dpad .right { grid-column: 3; grid-row: 2; }
+@media (hover: none), (max-width: 860px) { .dpad.on { display: grid; } }
+#spark { width: 100%; height: 64px; display: block; background: var(--cave); border: 1px solid var(--rock-2); border-radius: 3px; }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+.stats span { color: var(--muted); } .stats b { color: var(--ink); font-weight: 600; text-align: right; }
+.keys { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+kbd { font-family: var(--mono); border: 1px solid var(--rock-2); border-bottom-width: 2px; padding: 0 5px; border-radius: 3px; color: var(--ink); }
+footer { color: var(--muted); font-size: 12.5px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>La cueva <span class="g">a ciegas</span></h1>
+      <p class="sub">Mini curso de aprendizaje por refuerzo · <a href="../index.html" style="color:var(--lamp)">volver al curso</a></p>
+    </div>
+    <div class="row" style="align-items:center">
+      <label for="mapSel" class="sub">Cueva</label>
+      <select id="mapSel">
+        <option value="chica">Chica · 60 casillas</option>
+        <option value="grande">Grande · 155 casillas</option>
+      </select>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Modo">
+    <button role="tab" id="tab-jugar" aria-selected="true" data-mode="jugar">Jugar<small>clase 2</small></button>
+    <button role="tab" id="tab-planificar" aria-selected="false" data-mode="planificar">Planificar<small>clase 3</small></button>
+    <button role="tab" id="tab-aprender" aria-selected="false" data-mode="aprender">Aprender<small>clases 4–5</small></button>
+  </nav>
+
+  <div class="stage-row">
+    <div class="stage">
+      <canvas id="cv" width="700" height="500" aria-label="La cueva"></canvas>
+      <div class="overlay" id="overlay" hidden>
+        <div class="card"><h2>¡Saliste!</h2><p id="ovText"></p><button class="btn go" id="ovAgain">Otra vez</button></div>
+      </div>
+      <div class="hud" id="hud"></div>
+      <div class="dpad" id="dpad">
+        <button class="up" data-a="0" aria-label="Arriba">↑</button>
+        <button class="left" data-a="3" aria-label="Izquierda">←</button>
+        <button class="down" data-a="2" aria-label="Abajo">↓</button>
+        <button class="right" data-a="1" aria-label="Derecha">→</button>
+      </div>
+    </div>
+
+    <!-- Panel: JUGAR -->
+    <aside class="panel" id="p-jugar">
+      <h3>Sos el agente</h3>
+      <p>No ves la cueva. Cada vez que chocás, la pared queda marcada en gris claro. Tenés que llegar al cuadrado verde.</p>
+      <p class="keys">Moverse: <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> o <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · Reiniciar: <kbd>R</kbd></p>
+      <div class="eq">recompensa: −0.01 por paso · +1 al salir</div>
+      <div class="ctl"><label for="memSel">Memoria (dificultad)</label>
+        <div class="seg" role="group" aria-label="Memoria" id="memSeg">
+          <button aria-pressed="true" data-mem="facil">Fácil</button>
+          <button aria-pressed="false" data-mem="media">Media</button>
+          <button aria-pressed="false" data-mem="dificil">Difícil</button>
+        </div>
+        <p class="note" id="memNote" style="margin-top:6px"></p>
+      </div>
+      <label class="check"><input type="checkbox" id="showMap"> Mostrar el mapa real</label>
+      <div class="row"><button class="btn primary" id="resetPlay">Reiniciar</button></div>
+      <p class="note">Para discutir: jugá en fácil y después en difícil. ¿Qué tuviste que recordar para salir? Esa memoria es tu <em>historia</em> h<sub>t</sub>. ¿Alcanza con saber dónde estás para decidir bien (supuesto de Markov)?</p>
+    </aside>
+
+    <!-- Panel: PLANIFICAR -->
+    <aside class="panel" id="p-planificar" hidden>
+      <h3>Con el mapa en la mano</h3>
+      <p>Si conocemos el modelo del mundo (paredes, recompensas), podemos calcular cuánto vale cada casilla sin dar un solo paso.</p>
+      <div class="eq">V(s) ← max<sub>a</sub> [ R(s,a) + γ · V(s′) ]</div>
+      <div class="ctl"><label for="gamma">Descuento γ <output id="gammaOut">0.95</output></label><input type="range" id="gamma" min="0.5" max="0.99" step="0.01" value="0.95"></div>
+      <div class="ctl"><label for="cost">Costo por paso <output id="costOut">0.00</output></label><input type="range" id="cost" min="0" max="0.1" step="0.01" value="0"></div>
+      <div class="row">
+        <button class="btn" id="viStep">1 iteración</button>
+        <button class="btn primary" id="viRun">Iterar hasta converger</button>
+        <button class="btn" id="viReset">Borrar V</button>
+      </div>
+      <label class="check"><input type="checkbox" id="viArrows" checked> Mostrar la política (flechas)</label>
+      <label class="check"><input type="checkbox" id="viPath" checked> Mostrar el camino desde la entrada</label>
+      <div class="legend"><span>V bajo</span><span class="bar" id="legV"></span><span>V alto</span></div>
+      <p class="note">Mirá cómo el valor se derrama desde la salida, una casilla por iteración. Con γ chico, las casillas lejanas casi no se enteran de que existe una salida.</p>
+    </aside>
+
+    <!-- Panel: APRENDER -->
+    <aside class="panel" id="p-aprender" hidden>
+      <h3>Un agente que aprende solo</h3>
+      <p>Q-learning: el agente no tiene el mapa. Prueba, choca, y actualiza una tabla Q(s,a) con lo que le pasó.</p>
+      <div class="eq">Q(s,a) ← Q(s,a) + α [ r + γ·max<sub>a′</sub> Q(s′,a′) − Q(s,a) ]</div>
+      <div class="seg" role="group" aria-label="Vista">
+        <button aria-pressed="true" data-view="ciego">Lo que ve</button>
+        <button aria-pressed="false" data-view="valor">Valor aprendido</button>
+        <button aria-pressed="false" data-view="visitas">Visitas</button>
+      </div>
+      <div class="ctl"><label for="eps">Exploración ε <output id="epsOut">0.10</output></label><input type="range" id="eps" min="0" max="0.5" step="0.01" value="0.1"></div>
+      <div class="ctl"><label for="alpha">Tasa de aprendizaje α <output id="alphaOut">0.50</output></label><input type="range" id="alpha" min="0.05" max="1" step="0.05" value="0.5"></div>
+      <div class="ctl"><label for="speed">Velocidad <output id="speedOut">10 pasos/cuadro</output></label><input type="range" id="speed" min="0" max="4" step="1" value="1"></div>
+      <label class="check"><input type="checkbox" id="stepCost" checked> Costo por paso (−0.01)</label>
+      <label class="check"><input type="checkbox" id="curio"> Curiosidad: bonus 0.1/√N(s) por visitar lo nuevo</label>
+      <div class="row">
+        <button class="btn primary" id="trainBtn">Entrenar</button>
+        <button class="btn go" id="greedyBtn">Probar lo aprendido</button>
+        <button class="btn" id="qReset">Olvidar todo</button>
+      </div>
+      <div class="stats" id="stats"></div>
+      <canvas id="spark" width="600" height="128" aria-label="Pasos por episodio"></canvas>
+      <p class="note">Pasos por episodio (línea) y salidas (verde). Probá la cueva grande sin costo por paso y sin curiosidad: es el problema de exploración difícil (recompensa escasa). Después activá la curiosidad.</p>
+    </aside>
+  </div>
+  <footer>Basado en Stanford CS234 (Brunskill, 2026), Sutton &amp; Barto (2018) y Ecoffet et al., <i>First return, then explore</i> (Nature, 2021). Sprites del juego original.</footer>
+</div>
+
+<script>
+const SPR = {"down1": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABhGlDQ1BJQ0MgUHJvZmlsZQAAeJx9kT1Iw1AUhU9TpSoVBzuIOmSonSyIijhKFYtgobQVWnUweekfNGlIUlwcBdeCgz+LVQcXZ10dXAVB8AfEzc1J0UVKvC8ptIjxweV9nPfO4b77AKFRYarZNQGommWk4jExm1sVA6/ohZ9qBBGJmXoivZiB5/q6h4/vd1Ge5X3vz9Wv5E0G+ETiOaYbFvEG8cympXPeJw6xkqQQnxOPG9Qg8SPXZZffOBcdFnhmyMik5olDxGKxg+UOZiVDJZ4mDiuqRvlC1mWF8xZntVJjrT75C4N5bSXNdapRxLGEBJIQIaOGMiqwEKVdI8VEis5jHv5hx58kl0yuMhg5FlCFCsnxg//B79mahalJNykYA7pfbPtjDAjsAs26bX8f23bzBPA/A1da219tALOfpNfbWvgIGNgGLq7bmrwHXO4AQ0+6ZEiO5KcSCgXg/Yy+KQcM3gJ9a+7cWuc4fQAyNKvlG+DgEIgUKXvd4909nXP7905rfj9jaXKhPjT7VwAAAQJJREFUeNqNkyFuw0AQRd9aTnnlExgFGZYERAqp4gvYwCSsuKTXyCkC0gu0MmlVYBIYZOQTROUN2IB2trvrsZJPvPqe/3c8823QYSd4c5UA7PzxVVX3bTXSGE18d//AFI77PNAlcYGIPzed+oyRaOStYtVAirOycZycNaNkyvn0tlPPUwYWsEU9jG5WOhltwa1NBnjc56Nbs7KhqAfZgjNK4+kD/HaSBwZFPQSfk5WNBUwK0D2fgY7FduaMRODj5/sAwPvHl+NSIdarJX1b4adQzETYtxVZG4bQxNnfvTyxXi0BWGxn/HeoDzHx3IyW/b/8B237SDUyLvZWedvfeOV9gAtDOV2D0/ORvgAAAABJRU5ErkJggg==", "down2": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABhGlDQ1BJQ0MgUHJvZmlsZQAAeJx9kT1Iw1AUhU9TpSoVBzuIOmSonSyIijhKFYtgobQVWnUweekfNGlIUlwcBdeCgz+LVQcXZ10dXAVB8AfEzc1J0UVKvC8ptIjxweV9nPfO4b77AKFRYarZNQGommWk4jExm1sVA6/ohZ9qBBGJmXoivZiB5/q6h4/vd1Ge5X3vz9Wv5E0G+ETiOaYbFvEG8cympXPeJw6xkqQQnxOPG9Qg8SPXZZffOBcdFnhmyMik5olDxGKxg+UOZiVDJZ4mDiuqRvlC1mWF8xZntVJjrT75C4N5bSXNdapRxLGEBJIQIaOGMiqwEKVdI8VEis5jHv5hx58kl0yuMhg5FlCFCsnxg//B79mahalJNykYA7pfbPtjDAjsAs26bX8f23bzBPA/A1da219tALOfpNfbWvgIGNgGLq7bmrwHXO4AQ0+6ZEiO5KcSCgXg/Yy+KQcM3gJ9a+7cWuc4fQAyNKvlG+DgEIgUKXvd4909nXP7905rfj9jaXKhPjT7VwAAAQFJREFUeNqFU6ESgkAQfcconeELSCYjxeBocfQHJFBsZosfYTHbLAT9ARgLDoFCNJn4AoaOAYPsDXB7coVlZ997e/d2BfhTa/JiMAGgnqzuLPr92CqYPkE99XLoTlVmConBFT53Kfs1LVepNXRqOpJBAiq0N77MUcyRaDsowoCNhwhEX7n/3zxyTVaLvvdTL8fr5iiqLTCqMpO2jghMgMX1R2JvnA5B217TciUJESCKE6yXc1RlBtNyoZuHqsyQHj6/rh7MFQCAJpF8JzVquwgDRHEC/3ThR5muMzuPAUAqEqj96KyNUZxItWZ0uR0SumVStjE47mXcdCD+beMQYQfzBRfBbmOLgltEAAAAAElFTkSuQmCC", "up1": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABhGlDQ1BJQ0MgUHJvZmlsZQAAeJx9kT1Iw1AUhU9TpSoVBzuIOmSonSyIijhKFYtgobQVWnUweekfNGlIUlwcBdeCgz+LVQcXZ10dXAVB8AfEzc1J0UVKvC8ptIjxweV9nPfO4b77AKFRYarZNQGommWk4jExm1sVA6/ohZ9qBBGJmXoivZiB5/q6h4/vd1Ge5X3vz9Wv5E0G+ETiOaYbFvEG8cympXPeJw6xkqQQnxOPG9Qg8SPXZZffOBcdFnhmyMik5olDxGKxg+UOZiVDJZ4mDiuqRvlC1mWF8xZntVJjrT75C4N5bSXNdapRxLGEBJIQIaOGMiqwEKVdI8VEis5jHv5hx58kl0yuMhg5FlCFCsnxg//B79mahalJNykYA7pfbPtjDAjsAs26bX8f23bzBPA/A1da219tALOfpNfbWvgIGNgGLq7bmrwHXO4AQ0+6ZEiO5KcSCgXg/Yy+KQcM3gJ9a+7cWuc4fQAyNKvlG+DgEIgUKXvd4909nXP7905rfj9jaXKhPjT7VwAAAM5JREFUeNpjZMAO/uMQZyQowMDA8F/dbRVW3Td3hWHoYcSlmU3QFMOAX+9PYxjChM0mbJpxiTMxUAgwDDhW+Bun4gMJx6jvAhbkaNMNv88g7KnI8Hb7UgYGBgYGhwVWKDYLe0ZjjYX/uuH3UUy9vBJhCAwIe0Yz6IbfZ7i8UhElBhlhUYcewkgKGWCuwyLPyIIcx8iGoGvAGwawkBf2VMSrESkhoXgBJe1j886v96dxJmUWtCT9H4sGeIAK7yKcu/4jhz5StP0nKTcSkEcBAGrPTXdX3MXDAAAAAElFTkSuQmCC", "up2": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABhGlDQ1BJQ0MgUHJvZmlsZQAAeJx9kT1Iw1AUhU9TpSoVBzuIOmSonSyIijhKFYtgobQVWnUweekfNGlIUlwcBdeCgz+LVQcXZ10dXAVB8AfEzc1J0UVKvC8ptIjxweV9nPfO4b77AKFRYarZNQGommWk4jExm1sVA6/ohZ9qBBGJmXoivZiB5/q6h4/vd1Ge5X3vz9Wv5E0G+ETiOaYbFvEG8cympXPeJw6xkqQQnxOPG9Qg8SPXZZffOBcdFnhmyMik5olDxGKxg+UOZiVDJZ4mDiuqRvlC1mWF8xZntVJjrT75C4N5bSXNdapRxLGEBJIQIaOGMiqwEKVdI8VEis5jHv5hx58kl0yuMhg5FlCFCsnxg//B79mahalJNykYA7pfbPtjDAjsAs26bX8f23bzBPA/A1da219tALOfpNfbWvgIGNgGLq7bmrwHXO4AQ0+6ZEiO5KcSCgXg/Yy+KQcM3gJ9a+7cWuc4fQAyNKvlG+DgEIgUKXvd4909nXP7905rfj9jaXKhPjT7VwAAANVJREFUeNpjZMAO/uMQZyQowMDA8F/dbRVW3Td3hWHoYcSmmU3QFEPzr/ensRrChK4Qm2Z84kwMFAIMAw4kHMOp+Fjhb+q7AGssvN2+lIGBgYHBYYEViquEPaMZdMPvM1xeqQjXz4ge9zAFMENgAKYZGVxeqcjAAtOMLKkbfp9B2FMRRTG6Zli0suDyG7oGbJrRw+A/AwMDA66EhOxsmPeEPaPxJ2V0g369Pw1LiXAHYPVCncFeBgYGBoboLohiLHmDEV80IudGRuRohTmbGAPwZW8UPQCD5Uj6SFRo7AAAAABJRU5ErkJggg==", "left1": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABhGlDQ1BJQ0MgUHJvZmlsZQAAeJx9kT1Iw1AUhU9TpSoVBzuIOmSonSyIijhKFYtgobQVWnUweekfNGlIUlwcBdeCgz+LVQcXZ10dXAVB8AfEzc1J0UVKvC8ptIjxweV9nPfO4b77AKFRYarZNQGommWk4jExm1sVA6/ohZ9qBBGJmXoivZiB5/q6h4/vd1Ge5X3vz9Wv5E0G+ETiOaYbFvEG8cympXPeJw6xkqQQnxOPG9Qg8SPXZZffOBcdFnhmyMik5olDxGKxg+UOZiVDJZ4mDiuqRvlC1mWF8xZntVJjrT75C4N5bSXNdapRxLGEBJIQIaOGMiqwEKVdI8VEis5jHv5hx58kl0yuMhg5FlCFCsnxg//B79mahalJNykYA7pfbPtjDAjsAs26bX8f23bzBPA/A1da219tALOfpNfbWvgIGNgGLq7bmrwHXO4AQ0+6ZEiO5KcSCgXg/Yy+KQcM3gJ9a+7cWuc4fQAyNKvlG+DgEIgUKXvd4909nXP7905rfj9jaXKhPjT7VwAAAQVJREFUeNqNk6EOwjAQhv92YWAQwBOgUEjcNAkvMAQGh8bwELwBDzABDsWCYVmWmckp1J5gmYSMkEMAo+vajUuatJe7r9fefwxVI+iNNTloND3A7E0KR55Fxf56tis54oHG80R79RckQ7gc6C1DJUCsSjSuSvaWoRZUCwCAwWzRWE0tID052mDVMypd0AHci4/FdlfJ4RKIiU9QJlvEYBFXaUIWU2mN58l7/wOoldWkh3g/BCziCFgHwI3/06p4PywpEgEjMNyVXZDlm2cR0pODcP0o/KaBFug9MzKgS8HRuJ5t5FlUArkXv5Bx/sRDV20bBvrgMD8tJWezEj+zeTxrxloZ+wK/BWxyx0zK4wAAAABJRU5ErkJggg==", "left2": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABhGlDQ1BJQ0MgUHJvZmlsZQAAeJx9kT1Iw1AUhU9TpSoVBzuIOmSonSyIijhKFYtgobQVWnUweekfNGlIUlwcBdeCgz+LVQcXZ10dXAVB8AfEzc1J0UVKvC8ptIjxweV9nPfO4b77AKFRYarZNQGommWk4jExm1sVA6/ohZ9qBBGJmXoivZiB5/q6h4/vd1Ge5X3vz9Wv5E0G+ETiOaYbFvEG8cympXPeJw6xkqQQnxOPG9Qg8SPXZZffOBcdFnhmyMik5olDxGKxg+UOZiVDJZ4mDiuqRvlC1mWF8xZntVJjrT75C4N5bSXNdapRxLGEBJIQIaOGMiqwEKVdI8VEis5jHv5hx58kl0yuMhg5FlCFCsnxg//B79mahalJNykYA7pfbPtjDAjsAs26bX8f23bzBPA/A1da219tALOfpNfbWvgIGNgGLq7bmrwHXO4AQ0+6ZEiO5KcSCgXg/Yy+KQcM3gJ9a+7cWuc4fQAyNKvlG+DgEIgUKXvd4909nXP7905rfj9jaXKhPjT7VwAAARlJREFUeNqVkj1Ow0AQhb8xP0U6xAFQKleUdBYSjQUXCEWadNRpEEdA3IADuIiLtEZuiCLkxmUqV5zAconkSAwF8cretUN40kq7MztPM/Oe4EIZhvwV0Mv7T/Ooq7yTLNKJUyNDxTYaMpvEsz+uZlkvwenZVW/c6ytezTKeLp45BE4H53dTAG5vrg8icQjKJOI/cFQYInh7XzN9eR1UQYDvfV3sRhMCFUD4EG17Rssk0jKJmqBz/DD+vQcqBGpGP7bbBPDDuCNb4wE/jClSaTodAV9iW3ifmfoM5dn7sO3bxmYxBiCbb5s9qWcrkM231FVOXeWmYLMYm3uRTsyobRU0enwwwZ1cjj9aUjo2sLcOypGulyc9+Q5+AI7fgULzlG/KAAAAAElFTkSuQmCC", "right1": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABhGlDQ1BJQ0MgUHJvZmlsZQAAeJx9kT1Iw1AUhU9TpSoVBzuIOmSonSyIijhKFYtgobQVWnUweekfNGlIUlwcBdeCgz+LVQcXZ10dXAVB8AfEzc1J0UVKvC8ptIjxweV9nPfO4b77AKFRYarZNQGommWk4jExm1sVA6/ohZ9qBBGJmXoivZiB5/q6h4/vd1Ge5X3vz9Wv5E0G+ETiOaYbFvEG8cympXPeJw6xkqQQnxOPG9Qg8SPXZZffOBcdFnhmyMik5olDxGKxg+UOZiVDJZ4mDiuqRvlC1mWF8xZntVJjrT75C4N5bSXNdapRxLGEBJIQIaOGMiqwEKVdI8VEis5jHv5hx58kl0yuMhg5FlCFCsnxg//B79mahalJNykYA7pfbPtjDAjsAs26bX8f23bzBPA/A1da219tALOfpNfbWvgIGNgGLq7bmrwHXO4AQ0+6ZEiO5KcSCgXg/Yy+KQcM3gJ9a+7cWuc4fQAyNKvlG+DgEIgUKXvd4909nXP7905rfj9jaXKhPjT7VwAAARFJREFUeNqVk7FOg1AUhr9zURoHB+0TODl1dCMmLkZfoB26dHN28SF8Ax+AoW5OmC42hrAwOnXqExDWhkaPg0CBcoX+CQmXe77Duef8V2iXYpdYFwV8eftaLtyzq/I9S2NWi3GNExtcBZv6ml+UrGkLsMHLWbT37YgeqoLLWcRwvtszh8DD++nevulbPkAS+P+PpGik//TA3c11a5K8CmlWIHhq8FQAmT6/8P7x2QU3fr5LoKPJWnMzNR/rEU7wdEMoP6PJutf860cQNoSiVcflwZ0yufPVdTgu4OhxSxL4ZGlcs7E9AZB9swVktRjXGpilcXkHNHxzgNM+lWk+Tk0C/6+BBheHc2DQ5QPblW6N/QUtZ2VKvHsP3wAAAABJRU5ErkJggg==", "right2": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABhGlDQ1BJQ0MgUHJvZmlsZQAAeJx9kT1Iw1AUhU9TpSoVBzuIOmSonSyIijhKFYtgobQVWnUweekfNGlIUlwcBdeCgz+LVQcXZ10dXAVB8AfEzc1J0UVKvC8ptIjxweV9nPfO4b77AKFRYarZNQGommWk4jExm1sVA6/ohZ9qBBGJmXoivZiB5/q6h4/vd1Ge5X3vz9Wv5E0G+ETiOaYbFvEG8cympXPeJw6xkqQQnxOPG9Qg8SPXZZffOBcdFnhmyMik5olDxGKxg+UOZiVDJZ4mDiuqRvlC1mWF8xZntVJjrT75C4N5bSXNdapRxLGEBJIQIaOGMiqwEKVdI8VEis5jHv5hx58kl0yuMhg5FlCFCsnxg//B79mahalJNykYA7pfbPtjDAjsAs26bX8f23bzBPA/A1da219tALOfpNfbWvgIGNgGLq7bmrwHXO4AQ0+6ZEiO5KcSCgXg/Yy+KQcM3gJ9a+7cWuc4fQAyNKvlG+DgEIgUKXvd4909nXP7905rfj9jaXKhPjT7VwAAARZJREFUeNqdUjuOwjAQffYC0pYrDrCiygno0ErbRHABGprtqGnQHgFxAw7gghTbBtGAIpQmJRWHiNJRhGK2yVjxDwFPsuQZ+409856AH4QwRDBgchQnRqL3MdT783Zg8ESI3CbZaBeRvgsh8vEnd3ISD+D3c6XJdhH5CHn8/QUA6E9mr/2AUabqviQ8SLWc61dtNL9wVBAYkQBAOAkCQL7XrBak6ZcRSS4SxQk1h84qU0VlqjhGp6G/4ySuAMA+iOLEkLOuClz2U+wOmdGeeMZALRMZRqIyVcgXN/uCg7oqnOFrGXeHDJf9VBfhQuftAHVVoK4K5IsbS0lOC5xgCX2mUcu53s/Wm5ANjKmDsr8uCG+eMwKAf4xBdCPxQ68pAAAAAElFTkSuQmCC"};
+const MAPS = {
+  chica: [
+    "##############",
+    "#S...#.......#",
+    "#.##.#.####..#",
+    "#.#..#....#..#",
+    "#.#.####..#.##",
+    "#.#......##..#",
+    "#.####.#..#..#",
+    "#......#.##..#",
+    "###.####....G#",
+    "##############"],
+  grande: [
+    "#########################",
+    "#S..#.........#.........#",
+    "#.#.#####.###.###.#####.#",
+    "#...#.....#.........#...#",
+    "#.###.#####.###.#.#.#.###",
+    "#.#...#.........#...#...#",
+    "#.#.#.#.#.###.#.#.#.#.#.#",
+    "#.....#...#...#.#...#.#.#",
+    "#######.###.###.###.#.#.#",
+    "#...#.........#.....#.#.#",
+    "#.###.#####.#.#####.#.#.#",
+    "#...........#..........G#",
+    "#########################"]
+};
+const DR = [[-1,0],[0,1],[1,0],[0,-1]];
+const DIRN = ["up","right","down","left"];
+const ARROW = ["↑","→","↓","←"];
+
+// ---------- colores (leídos de los tokens) ----------
+const css = getComputedStyle(document.documentElement);
+const C = k => css.getPropertyValue(k).trim();
+const COL = { cave: C("--cave"), rock: C("--rock"), rock2: C("--rock-2"), chalk: C("--chalk"), ink: C("--ink"),
+  muted: C("--muted"), exit: C("--exit"), lamp: C("--lamp"), sonar: C("--sonar") };
+
+// ---------- sprites ----------
+const IMG = {};
+for (const k in SPR) { const im = new Image(); im.src = SPR[k]; im.onload = () => draw(); IMG[k] = im; }
+
+// ---------- entorno ----------
+let env;
+function makeEnv(rows) {
+  const H = rows.length, W = rows[0].length, free = [], idx = {};
+  let start, goal;
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+    const ch = rows[r][c];
+    if (ch !== "#") { idx[r+","+c] = free.length; if (ch === "S") start = free.length; if (ch === "G") goal = free.length; free.push([r,c]); }
+  }
+  const move = (s, a) => {
+    const [r,c] = free[s], nr = r + DR[a][0], nc = c + DR[a][1];
+    if (rows[nr][nc] === "#") return [s, true, nr+","+nc];
+    return [idx[nr+","+nc], false, null];
+  };
+  // distancia BFS a la salida (para comparar)
+  const dist = new Array(free.length).fill(Infinity); dist[goal] = 0; const q = [goal];
+  while (q.length) { const s = q.shift(); for (let a = 0; a < 4; a++) { const [s2,b] = move(s,a); if (!b && dist[s2] === Infinity) { dist[s2] = dist[s]+1; q.push(s2); } } }
+  return { rows, H, W, free, idx, start, goal, nS: free.length, move, dist };
+}
+
+// ---------- canvas ----------
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+let cell = 40;
+function sizeCanvas() {
+  const box = cv.parentElement.clientWidth - 20;
+  cell = Math.max(10, Math.floor(Math.min(box / env.W, 52)));
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = env.W * cell * dpr; cv.height = env.H * cell * dpr;
+  cv.style.width = (env.W * cell) + "px"; cv.style.height = (env.H * cell) + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+}
+function rect(r, c, color, inset = 0) { ctx.fillStyle = color; ctx.fillRect(c*cell+inset, r*cell+inset, cell-2*inset, cell-2*inset); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function hex(h) { h = h.replace("#",""); return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]; }
+const RAMP_V = [hex("#14182a"), hex("#6b3a5c"), hex("#d9773a"), hex("#f2b35a"), hex("#fff1c9")];
+const RAMP_N = [hex("#0f1a22"), hex("#1c4b5a"), hex("#5ec8d8"), hex("#dff7fb")];
+function ramp(stops, t) {
+  t = Math.max(0, Math.min(1, t)); const n = stops.length - 1, i = Math.min(n - 1, Math.floor(t * n)), f = t * n - i;
+  const a = stops[i], b = stops[i+1];
+  return `rgb(${Math.round(lerp(a[0],b[0],f))},${Math.round(lerp(a[1],b[1],f))},${Math.round(lerp(a[2],b[2],f))})`;
+}
+document.getElementById("legV").style.background = `linear-gradient(90deg, ${[0,.25,.5,.75,1].map(t=>ramp(RAMP_V,t)).join(",")})`;
+
+function drawExit() {
+  const [r,c] = env.free[env.goal];
+  ctx.save(); ctx.shadowColor = COL.exit; ctx.shadowBlur = cell * .6;
+  rect(r, c, COL.exit, Math.max(2, cell*.08)); ctx.restore();
+}
+function drawSprite(s, dir, frame) {
+  const [r,c] = env.free[s]; const im = IMG[DIRN[dir] + (frame ? 2 : 1)];
+  if (im && im.complete && im.naturalWidth) ctx.drawImage(im, c*cell + cell*.1, r*cell + cell*.1, cell*.8, cell*.8);
+  else { ctx.fillStyle = COL.lamp; ctx.beginPath(); ctx.arc(c*cell+cell/2, r*cell+cell/2, cell*.3, 0, 7); ctx.fill(); }
+}
+function drawWallsReal(color) { for (let r = 0; r < env.H; r++) for (let c = 0; c < env.W; c++) if (env.rows[r][c] === "#") rect(r, c, color); }
+function drawTouched(set, color = COL.chalk) { for (const k of set) { const [r,c] = k.split(",").map(Number); rect(r, c, color, 1); } }
+function drawArrows(pol, color) {
+  ctx.fillStyle = color; ctx.font = `600 ${Math.round(cell*.5)}px ${C("--mono")}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for (let s = 0; s < env.nS; s++) { if (s === env.goal) continue; const [r,c] = env.free[s]; ctx.fillText(ARROW[pol[s]], c*cell+cell/2, r*cell+cell/2+1); }
+}
+function drawPath(path, color) {
+  if (path.length < 2) return; ctx.strokeStyle = color; ctx.lineWidth = Math.max(2, cell*.12); ctx.lineJoin = "round"; ctx.globalAlpha = .9;
+  ctx.beginPath(); path.forEach((s,i) => { const [r,c] = env.free[s]; const x = c*cell+cell/2, y = r*cell+cell/2; i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); }); ctx.stroke(); ctx.globalAlpha = 1;
+}
+function drawStartMark() {
+  const [r,c] = env.free[env.start]; ctx.strokeStyle = COL.muted; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+  ctx.strokeRect(c*cell+2.5, r*cell+2.5, cell-5, cell-5); ctx.setLineDash([]);
+}
+
+// ---------- estado global ----------
+let mode = "jugar";
+const hud = document.getElementById("hud");
+
+// ======== JUGAR ========
+const play = { s: 0, dir: 2, frame: 0, steps: 0, bumps: 0, ret: 0, touched: new Map(), seen: new Set(), done: false, flash: null, mem: "facil" };
+const MEM_NOTE = {
+  facil: "Las paredes tocadas y tu camino quedan en pantalla: la pantalla guarda tu historia por vos.",
+  media: "Las paredes se apagan en 3 segundos y el camino no queda. Tenés que recordar una parte.",
+  dificil: "La pared solo destella al chocarla. Toda la historia la llevás en la cabeza."
+};
+const FADE_MS = 3000;
+let fadeRaf = null;
+function fadeLoop() { fadeRaf = null; if (mode !== "jugar" || play.mem !== "media") return; draw();
+  const now = performance.now(); for (const t of play.touched.values()) if (now - t < FADE_MS) { fadeRaf = requestAnimationFrame(fadeLoop); return; } }
+function resetPlay() {
+  Object.assign(play, { s: env.start, dir: 2, frame: 0, steps: 0, bumps: 0, ret: 0, touched: new Map(), seen: new Set([env.start]), done: false, flash: null });
+  document.getElementById("overlay").hidden = true; draw();
+}
+function playStep(a) {
+  if (mode !== "jugar" || play.done) return;
+  const [s2, bump, wk] = env.move(play.s, a);
+  play.dir = a; play.frame ^= 1; play.steps++;
+  if (bump) { play.bumps++; play.touched.set(wk, performance.now()); play.flash = { k: wk, t: performance.now() }; }
+  play.s = s2; play.seen.add(s2);
+  play.ret += (s2 === env.goal) ? 1 : -0.01;
+  if (s2 === env.goal) {
+    play.done = true;
+    document.getElementById("ovText").textContent = `Llegaste en ${play.steps} pasos y chocaste ${play.bumps} veces. El camino más corto tiene ${env.dist[env.start]} pasos. Recompensa total: ${play.ret.toFixed(2)}.`;
+    document.getElementById("overlay").hidden = false;
+  }
+  draw(); if (play.flash) requestAnimationFrame(flashLoop);
+  if (play.mem === "media" && !fadeRaf) fadeRaf = requestAnimationFrame(fadeLoop);
+}
+function flashLoop() { if (!play.flash) return; draw(); if (performance.now() - play.flash.t < 400) requestAnimationFrame(flashLoop); else { play.flash = null; draw(); } }
+function drawPlay() {
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, env.W*cell, env.H*cell);
+  if (document.getElementById("showMap").checked) drawWallsReal(COL.rock2);
+  if (play.mem === "facil") {
+    for (const s of play.seen) { const [r,c] = env.free[s]; rect(r, c, "#10131b", 0); }
+    drawTouched(play.touched.keys());
+  } else if (play.mem === "media") {
+    const now = performance.now();
+    for (const [k, t] of play.touched) { const a = 1 - (now - t) / FADE_MS; if (a <= 0) continue;
+      const [r,c] = k.split(",").map(Number); ctx.globalAlpha = a; rect(r, c, COL.chalk, 1); ctx.globalAlpha = 1; }
+  }
+  if (play.flash) { const t = (performance.now() - play.flash.t) / 400; const [r,c] = play.flash.k.split(",").map(Number);
+    ctx.globalAlpha = Math.max(0, 1 - t); rect(r, c, "#ffffff", 1); ctx.globalAlpha = 1; }
+  drawStartMark(); drawExit(); drawSprite(play.s, play.dir, play.frame);
+  hud.innerHTML = `<span>pasos <b>${play.steps}</b></span><span>choques <b>${play.bumps}</b></span><span>recompensa <b>${play.ret.toFixed(2)}</b></span><span>paredes descubiertas <b>${play.touched.size}</b></span><span>memoria <b>${{facil:"fácil",media:"media",dificil:"difícil"}[play.mem]}</b></span>`;
+}
+
+// ======== PLANIFICAR (iteración de valor) ========
+const vi = { V: [], it: 0, delta: NaN, timer: null };
+function viReset() { vi.V = new Array(env.nS).fill(0); vi.it = 0; vi.delta = NaN; stopVI(); draw(); }
+function viParams() { return { g: +document.getElementById("gamma").value, k: +document.getElementById("cost").value }; }
+function qOf(V, s, a, g, k) { const [s2] = env.move(s, a); const r = s2 === env.goal ? 1 : -k; return r + g * (s2 === env.goal ? 0 : V[s2]); }
+function viOnce() {
+  const { g, k } = viParams(), V = vi.V, NV = V.slice(); let d = 0;
+  for (let s = 0; s < env.nS; s++) { if (s === env.goal) { NV[s] = 0; continue; }
+    let best = -Infinity; for (let a = 0; a < 4; a++) best = Math.max(best, qOf(V, s, a, g, k)); NV[s] = best; d = Math.max(d, Math.abs(best - V[s])); }
+  vi.V = NV; vi.it++; vi.delta = d; draw(); return d;
+}
+function viPolicy() { const { g, k } = viParams(); return vi.V.map((_, s) => { let ba = 0, bq = -Infinity; for (let a = 0; a < 4; a++) { const q = qOf(vi.V, s, a, g, k); if (q > bq + 1e-12) { bq = q; ba = a; } } return ba; }); }
+function greedyPath(pol, limit) { const p = [env.start]; let s = env.start; const seen = new Set([s]);
+  for (let i = 0; i < limit && s !== env.goal; i++) { const [s2] = env.move(s, pol[s]); if (seen.has(s2) && s2 !== env.goal) { p.push(s2); break; } s = s2; p.push(s); seen.add(s); } return p; }
+function stopVI() { if (vi.timer) { clearInterval(vi.timer); vi.timer = null; } document.getElementById("viRun").textContent = "Iterar hasta converger"; }
+function drawPlan() {
+  ctx.fillStyle = COL.cave; ctx.fillRect(0, 0, env.W*cell, env.H*cell);
+  drawWallsReal(COL.rock2);
+  const vals = vi.V.filter((_, s) => s !== env.goal); const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
+  for (let s = 0; s < env.nS; s++) { if (s === env.goal) continue; const [r,c] = env.free[s]; rect(r, c, vi.it ? ramp(RAMP_V, (vi.V[s]-lo)/span) : "#14182a"); }
+  drawExit(); drawStartMark();
+  const pol = viPolicy();
+  if (document.getElementById("viArrows").checked && vi.it) drawArrows(pol, "rgba(232,230,223,.75)");
+  if (document.getElementById("viPath").checked && vi.it) drawPath(greedyPath(pol, env.nS + 5), COL.exit);
+  const p = greedyPath(pol, env.nS + 5), ok = p[p.length-1] === env.goal;
+  hud.innerHTML = `<span>iteración <b>${vi.it}</b></span><span>cambio máx. <b>${isNaN(vi.delta) ? "—" : vi.delta.toExponential(1)}</b></span><span>V(entrada) <b>${(vi.V[env.start]||0).toFixed(3)}</b></span><span>camino <b>${vi.it && ok ? (p.length-1)+" pasos" : "todavía no llega"}</b></span>`;
+}
+
+// ======== APRENDER (Q-learning) ========
+const ql = { Q: [], N: [], s: 0, dir: 2, frame: 0, t: 0, ep: 0, totalSteps: 0, hist: [], wins: [], touched: new Set(), trail: [], running: false, greedy: null, view: "ciego" };
+const SPEEDS = [1, 10, 100, 1000, 5000];
+function maxSteps() { return env.nS > 100 ? 300 : 200; }
+function qReset() {
+  ql.Q = Array.from({ length: env.nS }, () => [0,0,0,0]); ql.N = new Array(env.nS).fill(0);
+  Object.assign(ql, { s: env.start, t: 0, ep: 0, totalSteps: 0, hist: [], wins: [], touched: new Set(), trail: [env.start], greedy: null });
+  ql.N[env.start] = 1; setRunning(false); draw();
+}
+let rngState = 12345; function rnd() { rngState = (rngState * 1664525 + 1013904223) >>> 0; return rngState / 4294967296; }
+function argmaxRand(q) { let m = Math.max(...q); const ids = [0,1,2,3].filter(a => q[a] >= m - 1e-12); return ids[Math.floor(rnd() * ids.length)]; }
+function qlStep() {
+  const eps = +document.getElementById("eps").value, alpha = +document.getElementById("alpha").value, g = 0.99;
+  const cost = document.getElementById("stepCost").checked ? 0.01 : 0, curio = document.getElementById("curio").checked;
+  const s = ql.s, a = rnd() < eps ? Math.floor(rnd() * 4) : argmaxRand(ql.Q[s]);
+  const [s2, bump, wk] = env.move(s, a);
+  if (bump) ql.touched.add(wk);
+  ql.N[s2]++;
+  let r = s2 === env.goal ? 1 : -cost;
+  if (curio) r += 0.1 / Math.sqrt(ql.N[s2]);
+  const target = s2 === env.goal ? r : r + g * Math.max(...ql.Q[s2]);
+  ql.Q[s][a] += alpha * (target - ql.Q[s][a]);
+  ql.s = s2; ql.dir = a; ql.frame ^= 1; ql.t++; ql.totalSteps++; ql.trail.push(s2);
+  if (s2 === env.goal || ql.t >= maxSteps()) {
+    ql.hist.push(ql.t); ql.wins.push(s2 === env.goal ? 1 : 0); ql.ep++;
+    ql.s = env.start; ql.t = 0; ql.trail = [env.start];
+  }
+}
+function setRunning(on) { ql.running = on; document.getElementById("trainBtn").textContent = on ? "Pausar" : "Entrenar"; if (on) { ql.greedy = null; requestAnimationFrame(loop); } }
+let lastSlow = 0;
+function loop(ts) {
+  if (!ql.running || mode !== "aprender") return;
+  const sp = SPEEDS[+document.getElementById("speed").value];
+  if (sp === 1) { if (ts - lastSlow > 90) { qlStep(); lastSlow = ts; } } else for (let i = 0; i < sp; i++) qlStep();
+  draw(); requestAnimationFrame(loop);
+}
+function qlPolicy() { return ql.Q.map(q => { let m = Math.max(...q); return q.indexOf(m); }); }
+function runGreedy() {
+  setRunning(false);
+  const pol = qlPolicy(); const p = [env.start]; let s = env.start;
+  for (let i = 0; i < maxSteps() && s !== env.goal; i++) { const [s2] = env.move(s, pol[s]); s = s2; p.push(s); }
+  ql.greedy = { path: p, i: 0 }; animGreedy();
+}
+function animGreedy() { if (!ql.greedy || mode !== "aprender") return; draw(); if (ql.greedy.i < ql.greedy.path.length - 1) { ql.greedy.i++; setTimeout(animGreedy, 70); } }
+function drawLearn() {
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, env.W*cell, env.H*cell);
+  const v = ql.view;
+  if (v === "ciego") {
+    const seen = new Set(); for (let s = 0; s < env.nS; s++) if (ql.N[s] > 0) seen.add(s);
+    for (const s of seen) { const [r,c] = env.free[s]; rect(r, c, "#10131b"); }
+    drawTouched(ql.touched);
+    if (!ql.greedy) drawPath(ql.trail.slice(-40), "rgba(242,179,90,.55)");
+  } else if (v === "valor") {
+    drawWallsReal(COL.rock2);
+    const V = ql.Q.map(q => Math.max(...q)), vals = V.filter((_, s) => s !== env.goal); const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
+    for (let s = 0; s < env.nS; s++) { if (s === env.goal) continue; const [r,c] = env.free[s]; rect(r, c, ql.N[s] ? ramp(RAMP_V, (V[s]-lo)/span) : "#0b0d12"); }
+    drawArrows(qlPolicy().map((a, s) => a), "rgba(232,230,223,.55)");
+  } else {
+    drawWallsReal(COL.rock2);
+    const L = ql.N.map(n => Math.log10(1 + n)), hi = Math.max(...L) || 1;
+    for (let s = 0; s < env.nS; s++) { const [r,c] = env.free[s]; rect(r, c, ql.N[s] ? ramp(RAMP_N, L[s]/hi) : "#05070a"); }
+  }
+  drawStartMark(); drawExit();
+  if (ql.greedy) { const p = ql.greedy.path.slice(0, ql.greedy.i + 1); drawPath(p, COL.exit); drawSprite(p[p.length-1], 2, 0); }
+  else drawSprite(ql.s, ql.dir, ql.frame);
+  const last20 = ql.wins.slice(-20), rate = last20.length ? last20.reduce((a,b)=>a+b,0) / last20.length : 0;
+  const explored = ql.N.filter(n => n > 0).length;
+  document.getElementById("stats").innerHTML =
+    `<span>episodios</span><b>${ql.ep}</b><span>pasos totales</span><b>${ql.totalSteps.toLocaleString("es-AR")}</b>` +
+    `<span>salidas (últ. 20)</span><b>${Math.round(rate*100)}%</b><span>último episodio</span><b>${ql.hist.length ? ql.hist[ql.hist.length-1] + " pasos" : "—"}</b>` +
+    `<span>casillas exploradas</span><b>${explored}/${env.nS}</b><span>camino más corto</span><b>${env.dist[env.start]} pasos</b>`;
+  if (ql.greedy) { const p = ql.greedy.path, ok = p[p.length-1] === env.goal;
+    hud.innerHTML = `<span>política aprendida (sin explorar): <b>${ok ? "sale en " + (p.length-1) + " pasos" : "no encuentra la salida"}</b></span>`; }
+  else hud.innerHTML = `<span>episodio <b>${ql.ep + 1}</b></span><span>paso <b>${ql.t}</b> / ${maxSteps()}</span><span>ε <b>${(+document.getElementById("eps").value).toFixed(2)}</b></span>`;
+  drawSpark();
+}
+const sp = document.getElementById("spark"), sctx = sp.getContext("2d");
+function drawSpark() {
+  const W = sp.width, H = sp.height; sctx.fillStyle = COL.cave; sctx.fillRect(0, 0, W, H);
+  const h = ql.hist.slice(-300), w = ql.wins.slice(-300); if (!h.length) { sctx.fillStyle = COL.muted; sctx.font = "22px " + C("--mono"); sctx.fillText("todavía no hay episodios", 16, H/2 + 8); return; }
+  const max = maxSteps(); sctx.strokeStyle = "rgba(141,147,163,.25)"; sctx.lineWidth = 1;
+  const yOpt = H - 6 - (env.dist[env.start] / max) * (H - 12); sctx.setLineDash([6,6]); sctx.beginPath(); sctx.moveTo(0, yOpt); sctx.lineTo(W, yOpt); sctx.stroke(); sctx.setLineDash([]);
+  const dx = W / Math.max(1, h.length - 1);
+  w.forEach((ok, i) => { if (ok) { sctx.fillStyle = "rgba(61,220,132,.35)"; sctx.fillRect(i*dx - 1, H - 6, 3, 6); } });
+  sctx.strokeStyle = COL.lamp; sctx.lineWidth = 2.5; sctx.beginPath();
+  h.forEach((v, i) => { const x = i * dx, y = H - 6 - (v / max) * (H - 12); i ? sctx.lineTo(x, y) : sctx.moveTo(x, y); }); sctx.stroke();
+}
+
+// ---------- dibujo y modos ----------
+function draw() { if (!env) return; if (mode === "jugar") drawPlay(); else if (mode === "planificar") drawPlan(); else drawLearn(); }
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.mode === m ? "true" : "false"));
+  for (const k of ["jugar","planificar","aprender"]) document.getElementById("p-" + k).hidden = k !== m;
+  document.getElementById("dpad").classList.toggle("on", m === "jugar");
+  document.getElementById("overlay").hidden = !(m === "jugar" && play.done);
+  if (m !== "aprender") setRunning(false); if (m !== "planificar") stopVI();
+  try { localStorage.setItem("cueva-modo", m); } catch (e) {}
+  draw();
+}
+function loadMap(name) { env = makeEnv(MAPS[name]); sizeCanvas(); resetPlay(); viReset(); qReset(); draw(); }
+
+// ---------- eventos ----------
+document.querySelectorAll("nav.tabs button").forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
+document.getElementById("mapSel").addEventListener("change", e => loadMap(e.target.value));
+const KEYS = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3, w: 0, d: 1, s: 2, a: 3, W: 0, D: 1, S: 2, A: 3 };
+window.addEventListener("keydown", e => {
+  if (mode !== "jugar" || e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.key in KEYS) { e.preventDefault(); playStep(KEYS[e.key]); }
+  else if (e.key === "r" || e.key === "R") resetPlay();
+});
+document.querySelectorAll("#dpad button").forEach(b => b.addEventListener("click", () => playStep(+b.dataset.a)));
+document.getElementById("resetPlay").addEventListener("click", resetPlay);
+document.getElementById("ovAgain").addEventListener("click", resetPlay);
+document.getElementById("showMap").addEventListener("change", draw);
+function setMem(m) { play.mem = m; document.querySelectorAll("#memSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mem === m ? "true" : "false"));
+  document.getElementById("memNote").textContent = MEM_NOTE[m]; if (env) resetPlay(); }
+document.querySelectorAll("#memSeg button").forEach(b => b.addEventListener("click", () => setMem(b.dataset.mem)));
+setMem("facil");
+// swipe en el teléfono
+let touch0 = null;
+cv.addEventListener("touchstart", e => { touch0 = e.touches[0]; }, { passive: true });
+cv.addEventListener("touchend", e => { if (!touch0 || mode !== "jugar") return; const t = e.changedTouches[0], dx = t.clientX - touch0.clientX, dy = t.clientY - touch0.clientY;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) > 20) playStep(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0)); touch0 = null; });
+
+const bind = (id, out, fmt, cb) => { const el = document.getElementById(id); const f = () => { document.getElementById(out).textContent = fmt(+el.value); cb && cb(); }; el.addEventListener("input", f); f(); };
+bind("gamma", "gammaOut", v => v.toFixed(2), () => draw());
+bind("cost", "costOut", v => v.toFixed(2), () => draw());
+bind("eps", "epsOut", v => v.toFixed(2));
+bind("alpha", "alphaOut", v => v.toFixed(2));
+bind("speed", "speedOut", v => SPEEDS[v] === 1 ? "1 paso (mirar)" : SPEEDS[v].toLocaleString("es-AR") + " pasos/cuadro");
+document.getElementById("viStep").addEventListener("click", () => { stopVI(); viOnce(); });
+document.getElementById("viRun").addEventListener("click", () => {
+  if (vi.timer) { stopVI(); return; }
+  document.getElementById("viRun").textContent = "Pausar";
+  vi.timer = setInterval(() => { const d = viOnce(); if (d < 1e-6 || vi.it > 2000) stopVI(); }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 110);
+});
+document.getElementById("viReset").addEventListener("click", viReset);
+document.getElementById("viArrows").addEventListener("change", draw);
+document.getElementById("viPath").addEventListener("change", draw);
+document.getElementById("trainBtn").addEventListener("click", () => setRunning(!ql.running));
+document.getElementById("greedyBtn").addEventListener("click", runGreedy);
+document.getElementById("qReset").addEventListener("click", qReset);
+document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
+  ql.view = b.dataset.view; document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false")); draw(); }));
+window.addEventListener("resize", () => { sizeCanvas(); draw(); });
+
+loadMap("chica");
+// estado inicial con contenido: unas iteraciones de valor ya calculadas y un agente con algo de experiencia
+for (let i = 0; i < 8; i++) viOnce();
+for (let i = 0; i < 6000; i++) qlStep();
+let saved = null; try { saved = localStorage.getItem("cueva-modo"); } catch (e) {}
+setMode(saved && ["jugar","planificar","aprender"].includes(saved) ? saved : "jugar");
+</script>
+
+</body>
+</html>

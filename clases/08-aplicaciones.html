@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aplicaciones · RL a ciegas</title>
+<meta name="description" content="Clase 8: bandits en marketing, el tutor como MDP, el robot de reciclaje, deep search, RLHF y el MDP de tu proyecto.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .cap { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .graf { min-width: 0; }
+  .leyenda { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .leyenda i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 5px; }
+  .leyenda i.sq { width: 10px; height: 10px; border-radius: 2px; }
+  .jugar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .jugar .btn { padding: 8px 4px; }
+  .proyecto { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+  @media (max-width: 700px) { .proyecto { grid-template-columns: minmax(0, 1fr); } }
+  .proyecto label { display: grid; gap: 4px; font-size: 13.5px; color: var(--muted); }
+  .proyecto input[type=text] { width: 100%; }
+  .mdp td select, .mdp td input { width: 100%; min-width: 0; font-size: 13px; padding: 4px 6px; }
+  .mdp td input[type=number] { width: 72px; }
+  .mdp td .celda { display: grid; grid-template-columns: minmax(90px, 1fr) auto; gap: 4px; }
+  .mdp th, .mdp td { padding: 5px 6px; }
+  .mdp td.optima { box-shadow: inset 0 0 0 2px var(--exit); }
+  .salida-txt { min-height: 140px; }
+  .dos-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+  @media (max-width: 820px) { .dos-col { grid-template-columns: minmax(0, 1fr); } }
+  .pasos-ds { font-family: var(--mono); font-size: 12.5px; color: var(--muted); white-space: pre-wrap; margin: 0; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase 8 · Aplicaciones</div>
+    <h1>De la cueva <span class="g">al mundo</span></h1>
+    <p class="thesis">Cambiamos la cueva por anuncios, alumnos, robots, buscadores y modelos de lenguaje, y la receta sigue siendo la misma: elegir estados, acciones y recompensa, y dejar que un algoritmo encuentre la política.</p>
+  </section>
+
+  <!-- Bloque 1: bandit -->
+  <section class="bloque" aria-labelledby="t1">
+    <div class="stage">
+      <div class="graf"><canvas id="cv1" aria-label="Regret acumulado de cuatro estrategias de anuncios"></canvas></div>
+      <div class="leyenda" id="ley1"></div>
+      <div class="graf"><canvas id="cv1b" aria-label="Reparto de impresiones entre los cuatro anuncios para cada estrategia"></canvas></div>
+      <div class="row">
+        <button class="btn primary" id="b1sim">Simular de nuevo</button>
+        <span class="cap" id="cap1"></span>
+      </div>
+      <div class="cap">Jugá vos de bandit: cada botón muestra ese anuncio a 10 personas.</div>
+      <div class="jugar" id="jugar"></div>
+      <div class="row"><button class="btn" id="b1rev">Revelar CTR</button><button class="btn" id="b1borrar">Empezar de nuevo</button></div>
+      <div class="hud" id="hud1"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">1 · marketing digital</div>
+      <h2 id="t1">Cuatro anuncios, un solo estado</h2>
+      <p>Cada anuncio tiene una tasa de clics (<em>CTR</em>) que nadie conoce: 4,0%, 2,5%, 5,5% y 3,0% (el mejor es C). Es un <b>bandit multi-brazo</b> (<em>multi-armed bandit</em>): el MDP más chico, con un estado y episodios de un paso. Solo queda el dilema exploración–explotación de la clase 5.</p>
+      <p><b>A/B fijo</b> muestra 500 veces cada uno y se queda con el ganador; <b>ε-greedy</b> explora un 10% para siempre; <b>UCB</b> (<em>upper confidence bound</em>, c = 0,2) suma un bonus por incertidumbre; <b>Thompson</b> sortea un CTR plausible para cada anuncio y muestra el más alto. Promedio de 12 campañas de 20.000 impresiones.</p>
+      <div class="eq">regret_T = Σ (μ* − μ_aₜ)   ·   UCB: μ̂ₐ + c √(ln t / nₐ)</div>
+      <p class="nota pregunta">Jugá 30 o 40 rondas. ¿Cuántas impresiones necesitaste para estar seguro de cuál es el mejor? ¿Te conformaste antes de tiempo?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 2: tutor -->
+  <section class="bloque" aria-labelledby="t2">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Recompensa del tutor">
+        <button id="m2ac" aria-pressed="true">Recompensa: acierto</button>
+        <button id="m2ap" aria-pressed="false">Recompensa: aprendizaje</button>
+      </div>
+      <canvas id="cv2" aria-label="Grilla de 5 por 5 niveles de suma y resta con la política óptima del tutor"></canvas>
+      <div class="ctl">
+        <label for="b2k">Cuánto ayuda saber sumar para aprender a restar <output id="o2k">0,10</output></label>
+        <input type="range" id="b2k" min="0" max="0.2" step="0.01" value="0.1">
+      </div>
+      <div class="row"><button class="btn primary" id="b2sim">Seguir a un alumno (40 problemas)</button></div>
+      <div class="hud" id="hud2"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">2 · el tutor como MDP</div>
+      <h2 id="t2">Qué le pedimos al tutor</h2>
+      <p>Estado: el nivel del alumno en suma (→) y en resta (↑), de 0 a 4. Acción: dar una suma o una resta. Practicar suma sube un nivel con probabilidad 0,5; practicar resta, con 0,1 + 0,1 × nivel de suma. Resolvemos con iteración de valor (γ = 0,9) y dibujamos la acción óptima en cada estado; el recuadro es el alumno al empezar.</p>
+      <p>Con <b>acierto</b> (+1 si acierta, −1 si no, como en la clase 2) el tutor da solo sumas: el alumno nunca aprende a restar. Con <b>aprendizaje</b> (+1 cada vez que sube un nivel) primero suma y, en cuanto domina la suma, pasa a restas.</p>
+      <div class="eq">P(acierto | nivel) = 0,1 + 0,2 × nivel</div>
+      <p class="nota pregunta">El tutor real no ve el nivel del alumno: solo ve aciertos y errores. ¿Qué tendría que estimar, y en qué clase vimos ese problema?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 3: robot -->
+  <section class="bloque" aria-labelledby="t3">
+    <div class="stage">
+      <canvas id="cv3" aria-label="Robot de reciclaje: diagrama de los dos estados de batería y mapa de la acción óptima con batería baja"></canvas>
+      <div class="ctl">
+        <label for="b3a">α: con batería alta, prob. de seguir alta al buscar <output id="o3a">0,80</output></label>
+        <input type="range" id="b3a" min="0" max="1" step="0.01" value="0.8">
+      </div>
+      <div class="ctl">
+        <label for="b3b">β: con batería baja, prob. de no agotarse al buscar <output id="o3b">0,40</output></label>
+        <input type="range" id="b3b" min="0" max="1" step="0.01" value="0.4">
+      </div>
+      <div class="ctl">
+        <label for="b3w">r_espera: recompensa por esperar <output id="o3w">1,00</output></label>
+        <input type="range" id="b3w" min="0" max="2.5" step="0.05" value="1">
+      </div>
+      <div class="hud" id="hud3"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">3 · robótica</div>
+      <h2 id="t3">El robot de reciclaje</h2>
+      <p>Sutton y Barto, ejemplo 3.3 (<em>recycling robot</em>). Con batería alta o baja, el robot puede <b>buscar</b> latas (rinde 2), <b>esperar</b> a que se las traigan (rinde r_espera) o, con batería baja, <b>recargar</b> (0). Si busca con batería baja y se agota, hay que rescatarlo (−3) y vuelve cargado.</p>
+      <p>El diagrama marca en verde la acción óptima de cada estado (iteración de valor, γ = 0,9). El mapa de abajo muestra qué hace con batería baja para cada β y r_espera; tocalo para mover el punto.</p>
+      <div class="eq">Q(baja, buscar) = β(2 + γV(baja)) + (1−β)(−3 + γV(alta))</div>
+      <p class="nota pregunta">Nadie programó "si la batería está baja, recargá". ¿De qué números depende que esa regla aparezca?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 4: deep search -->
+  <section class="bloque" aria-labelledby="t4">
+    <div class="stage">
+      <canvas id="cv4" aria-label="Política de deep search: buscar, leer o responder en cada estado, para cada nivel de confianza"></canvas>
+      <div class="leyenda"><span><i class="sq" style="background:var(--sonar)"></i>buscar</span><span><i class="sq" style="background:var(--lamp)"></i>leer</span><span><i class="sq" style="background:var(--exit)"></i>responder</span><span>brillo = probabilidad de pasar por ese estado</span></div>
+      <div class="graf"><canvas id="cv4b" aria-label="Tasa de acierto y pasos según el costo por paso"></canvas></div>
+      <div class="ctl">
+        <label for="b4c">Costo por paso (buscar o leer) <output id="o4c">0,010</output></label>
+        <input type="range" id="b4c" min="0" max="0.2" step="0.005" value="0.01">
+      </div>
+      <div class="row"><button class="btn primary" id="b4sim">Simular una investigación</button></div>
+      <div class="hud" id="hud4"></div>
+      <pre class="pasos-ds" id="pasos4"></pre>
+    </div>
+    <div class="texto">
+      <div class="paso">4 · deep search</div>
+      <h2 id="t4">¿Seguir buscando o responder ya?</h2>
+      <p>Estado: (búsquedas hechas, documentos leídos, confianza de 0 a 4). <b>Buscar</b> encuentra un documento (hasta 5); <b>leer</b> lee el próximo y, si es relevante, sube la confianza (el primero lo es con 90%, los siguientes cada vez menos, hasta 30%); <b>responder</b> termina. Recompensa: +1 si la respuesta es correcta (de 25% con confianza 0 a 95% con confianza 4) menos el costo de cada paso.</p>
+      <p>Cada grilla es un nivel de confianza; columnas = búsquedas, filas = leídos. La política es la óptima exacta (programación dinámica); en el notebook, Q-learning aprende la misma jugando 30.000 episodios.</p>
+      <div class="eq">G = 1[acierto] − costo × (pasos)</div>
+      <p class="nota pregunta">Si a un agente nunca se le cobra por buscar, ¿cuándo responde? ¿Y quién decide el costo en un asistente real?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 5: RLHF -->
+  <section class="bloque" aria-labelledby="t5">
+    <div class="stage">
+      <canvas id="cv5" aria-label="Diagrama de RLHF en tres etapas: ajuste supervisado, modelo de recompensa y PPO"></canvas>
+      <div class="cap">Tocá cada etapa.</div>
+      <div class="hud" id="hud5"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">5 · RLHF</div>
+      <h2 id="t5">Cómo se entrena un asistente</h2>
+      <p>Un modelo de lenguaje preentrenado solo continúa texto. El <b>RL a partir de retroalimentación humana</b> (<em>RLHF</em>, Ouyang y otros, 2022) lo ajusta en tres etapas: imitar buenas respuestas (<em>SFT</em>), aprender de rankings humanos un <b>modelo de recompensa</b> r(x, y), y optimizar la política con <b>PPO</b> penalizando alejarse del modelo original.</p>
+      <div class="eq">max E[ r(x, y) ] − β · KL( π_θ ‖ π_SFT )</div>
+      <p>En el idioma del curso: agente = el modelo; acción = la respuesta; recompensa = r(x, y). Cada conversación es un bandit con un número astronómico de brazos.</p>
+      <p class="nota pregunta">¿Qué preferencias humanas podría aprender r(x, y) que no queremos (respuestas largas, seguras de sí mismas, aduladoras)? ¿Dónde vimos ese problema antes?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 6: tu proyecto -->
+  <section class="bloque" aria-labelledby="t6">
+    <div class="stage">
+      <canvas id="cv6" aria-label="Grafo del MDP del proyecto con la política óptima"></canvas>
+      <div class="proyecto">
+        <label>Problema<input type="text" id="p6nom" value="Stock de un medicamento en la farmacia"></label>
+        <label>Qué mide la recompensa<input type="text" id="p6rec" value="ventas menos costo de pedir, de guardar y de pacientes sin medicamento"></label>
+        <label>Estados (uno por línea)<textarea id="p6est" rows="4">sin stock
+stock bajo
+stock alto</textarea></label>
+        <label>Acciones (una por línea)<textarea id="p6acc" rows="4">pedir
+no pedir</textarea></label>
+      </div>
+      <div class="ctl">
+        <label for="b6g">γ (cuánto importa el futuro) <output id="o6g">0,90</output></label>
+        <input type="range" id="b6g" min="0" max="0.99" step="0.01" value="0.9">
+      </div>
+      <div class="cap">Para cada estado y acción: a qué estado pasa y qué recompensa recibe (verde = acción óptima).</div>
+      <div class="tabla mdp"><table id="t6"></table></div>
+      <div class="row"><button class="btn primary" id="b6md">Copiar como Markdown</button><button class="btn" id="b6py">Copiar como Python</button><span class="cap" id="cap6"></span></div>
+      <textarea id="p6out" class="salida-txt" readonly aria-label="Tabla del MDP para copiar"></textarea>
+    </div>
+    <div class="texto">
+      <div class="paso">6 · proyecto final</div>
+      <h2 id="t6">El MDP de tu dominio</h2>
+      <p>Elegí un problema de tu área (farmacia, laboratorio, salud, docencia, finanzas) y escribilo como MDP: pocos estados (3 a 30), pocas acciones (2 a 5) y una recompensa que refleje lo que de verdad querés. La página arma la tabla, la resuelve con iteración de valor y te la da para copiar al notebook (función <code>resolver_mdp</code>).</p>
+      <p>Para simplificar, acá cada acción lleva a un solo estado; en el notebook podés poner probabilidades. Tu borrador queda guardado en este navegador.</p>
+      <p class="nota pregunta">¿Cómo podría tu agente "hacer trampa" con la recompensa que elegiste? Cambiá un número y mirá si la política te da la razón.</p>
+      <p><a href="../difusion/estrategia.html">El ejemplo resuelto: cómo se difunde este mismo curso</a>.</p>
+    </div>
+  </section>
+
+  <!-- Para enseñarlo -->
+  <section class="bloque full" aria-labelledby="t7">
+    <div class="texto">
+      <div class="paso">Para enseñarlo</div>
+      <h2 id="t7">Cómo contar esta clase</h2>
+      <p><b>En una oración:</b> cualquier decisión repetida se puede escribir como estados, acciones y recompensa; el algoritmo hace el resto, y lo difícil es elegir bien la recompensa.</p>
+      <p class="nota pregunta">Pregunta para hacerle a quien te escucha: "¿Qué decisión tomás todos los días que podría aprender una máquina? ¿Qué número le darías como premio, y cómo te podría engañar?"</p>
+      <p><b>Ejercicio de 5 minutos:</b> en grupos de tres, cada grupo recibe un papel con un dominio (anuncios, tutor, robot, buscador). Tienen dos minutos para escribir estados, acciones y recompensa, y dos minutos para que otro grupo encuentre una forma de "hacer trampa" con esa recompensa (como el tutor que solo da sumas). Último minuto: corregir la recompensa.</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(function () {
+  const COL = Cueva.COL();
+  const quieto = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const fx = (x, d = 2) => x.toFixed(d).replace(".", ",");
+  const fmt = n => Math.round(n).toLocaleString("es-AR");
+  function ajustar(cv, alto) { const W = cv.parentElement.clientWidth - (cv.parentElement.classList.contains("stage") ? 22 : 0), dpr = devicePixelRatio || 1; cv.width = W * dpr; cv.height = alto * dpr; cv.style.width = W + "px"; cv.style.height = alto + "px"; const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx, w: W, h: alto }; }
+  function gauss(R) { const u = R() || 1e-12, v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  function gammaVar(k, R) { const d = k - 1 / 3, c = 1 / Math.sqrt(9 * d); for (;;) { let x, v; do { x = gauss(R); v = 1 + c * x; } while (v <= 0); v = v * v * v; const u = R(); if (u < 1 - 0.0331 * x * x * x * x || Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v; } }
+  const betaVar = (a, b, R) => { const x = gammaVar(a, R), y = gammaVar(b, R); return x / (x + y); };
+
+  // ================= Bloque 1: bandit =================
+  const CTR = [0.040, 0.025, 0.055, 0.030], ANUNCIOS = ["A", "B", "C", "D"], K = 4, MEJOR = 2, T = 20000, NC = 12, CADA = 100;
+  const ALGS = [
+    { id: "ab", nombre: "A/B fijo", color: "#8d93a3" },
+    { id: "eps", nombre: "ε-greedy", color: COL.lamp },
+    { id: "ucb", nombre: "UCB", color: COL.sonar },
+    { id: "ts", nombre: "Thompson", color: COL.exit }];
+  document.getElementById("ley1").innerHTML = ALGS.map(a => `<span><i style="background:${a.color}"></i>${a.nombre}</span>`).join("") + `<span><i style="background:${COL.ember}"></i>vos</span>`;
+  let sim, anim1 = null, semilla1 = 1;
+  function nuevaSim() {
+    sim = { t: 0, algs: ALGS.map((a, j) => ({ ...a, R: Cueva.rng(semilla1 * 101 + j), n: Array.from({ length: NC }, () => new Float64Array(K)), c: Array.from({ length: NC }, () => new Float64Array(K)), ab: new Int8Array(NC).fill(-1), reg: 0, curva: [0], imp: new Float64Array(K) })) };
+  }
+  function elegir(al, i, t) {
+    const n = al.n[i], c = al.c[i], R = al.R;
+    if (al.id === "ab") { if (t < 500 * K) return t % K; if (al.ab[i] < 0) { let b = 0; for (let k = 1; k < K; k++) if (c[k] / n[k] > c[b] / n[b]) b = k; al.ab[i] = b; } return al.ab[i]; }
+    if (t < K) return t;
+    if (al.id === "eps") { if (R() < 0.1) return Math.floor(R() * K); let b = 0; for (let k = 1; k < K; k++) if (c[k] / n[k] > c[b] / n[b]) b = k; return b; }
+    if (al.id === "ucb") { let b = 0, bv = -1; for (let k = 0; k < K; k++) { const v = c[k] / n[k] + 0.2 * Math.sqrt(Math.log(t + 1) / n[k]); if (v > bv) { bv = v; b = k; } } return b; }
+    let b = 0, bv = -1; for (let k = 0; k < K; k++) { const v = betaVar(1 + c[k], 1 + n[k] - c[k], R); if (v > bv) { bv = v; b = k; } } return b;
+  }
+  function avanzar(pasos) {
+    const fin = Math.min(T, sim.t + pasos);
+    for (; sim.t < fin; sim.t++) {
+      for (const al of sim.algs) {
+        for (let i = 0; i < NC; i++) { const a = elegir(al, i, sim.t); al.n[i][a]++; if (al.R() < CTR[a]) al.c[i][a]++; al.reg += (CTR[MEJOR] - CTR[a]) / NC; al.imp[a]++; }
+        if ((sim.t + 1) % CADA === 0) al.curva.push(al.reg);
+      }
+    }
+  }
+  // jugador
+  let yo = { n: [0, 0, 0, 0], c: [0, 0, 0, 0], reg: 0, curva: [[0, 0]], revelado: false }; const Ryo = Cueva.rng(Date.now() % 100000);
+  try { const g = JSON.parse(localStorage.getItem("rl6-bandit") || "null"); if (g && g.n) yo = g; } catch (e) {}
+  const guardarYo = () => { try { localStorage.setItem("rl6-bandit", JSON.stringify(yo)); } catch (e) {} };
+  const jugar = document.getElementById("jugar");
+  ANUNCIOS.forEach((nm, a) => { const b = document.createElement("button"); b.className = "btn"; b.textContent = "Mostrar " + nm; b.onclick = () => { for (let i = 0; i < 10; i++) { yo.n[a]++; if (Ryo() < CTR[a]) yo.c[a]++; yo.reg += CTR[MEJOR] - CTR[a]; } yo.curva.push([yo.n.reduce((x, y) => x + y), yo.reg]); guardarYo(); dibujar1(); }; jugar.appendChild(b); });
+  document.getElementById("b1rev").onclick = () => { yo.revelado = !yo.revelado; guardarYo(); dibujar1(); };
+  document.getElementById("b1borrar").onclick = () => { yo = { n: [0, 0, 0, 0], c: [0, 0, 0, 0], reg: 0, curva: [[0, 0]], revelado: false }; guardarYo(); dibujar1(); };
+  function dibujar1() {
+    const { ctx, w, h } = ajustar(document.getElementById("cv1"), 200);
+    const m = { l: 40, r: 92, t: 10, b: 24 }, W = w - m.l - m.r, H = h - m.t - m.b;
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    const ymax = Math.max(100, ...sim.algs.map(a => a.reg)) * 1.08;
+    const X = t => m.l + W * t / T, Y = v => m.t + H * (1 - v / ymax);
+    ctx.strokeStyle = "rgba(141,147,163,.25)"; ctx.lineWidth = 1; ctx.font = `11px ${COL.mono}`; ctx.fillStyle = COL.muted;
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (let v = 0; v <= ymax; v += 25) { ctx.beginPath(); ctx.moveTo(m.l, Y(v)); ctx.lineTo(m.l + W, Y(v)); ctx.stroke(); ctx.fillText(v, m.l - 5, Y(v)); }
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (let t = 0; t <= T; t += 5000) ctx.fillText(t ? fmt(t) : "0", X(t), m.t + H + 5);
+    ctx.textAlign = "left"; ctx.fillText("clics perdidos (regret)", m.l + 6, m.t);
+    // fin de la prueba A/B
+    ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(X(2000), m.t); ctx.lineTo(X(2000), m.t + H); ctx.stroke(); ctx.setLineDash([]);
+    for (const al of sim.algs) {
+      ctx.strokeStyle = al.color; ctx.lineWidth = 2; ctx.beginPath(); al.curva.forEach((v, i) => i ? ctx.lineTo(X(i * CADA), Y(v)) : ctx.moveTo(X(0), Y(v))); ctx.stroke();
+    }
+    if (sim.t >= T) {   // etiquetas al final, separadas para que no se pisen
+      const et = sim.algs.map(al => ({ al, y: Y(al.reg) })).sort((a, b) => a.y - b.y);
+      for (let i = 1; i < et.length; i++) et[i].y = Math.max(et[i].y, et[i - 1].y + 13);
+      et.forEach(({ al, y }) => { ctx.fillStyle = al.color; ctx.textBaseline = "middle"; ctx.fillText(`${al.nombre} ${fmt(al.reg)}`, m.l + W + 4, y); });
+    }
+    if (yo.curva.length > 1) { ctx.strokeStyle = COL.ember; ctx.lineWidth = 2.5; ctx.beginPath(); yo.curva.forEach(([t, v], i) => i ? ctx.lineTo(X(t), Y(v)) : ctx.moveTo(X(t), Y(v))); ctx.stroke(); const [t, v] = yo.curva[yo.curva.length - 1]; ctx.fillStyle = COL.ember; ctx.beginPath(); ctx.arc(X(t), Y(v), 4, 0, 7); ctx.fill(); }
+    // barras de impresiones
+    const filas = sim.algs.map(a => ({ nombre: a.nombre, imp: Array.from(a.imp) })).concat(yo.n.some(x => x) ? [{ nombre: "vos", imp: yo.n }] : []);
+    const b = ajustar(document.getElementById("cv1b"), 16 + filas.length * 22), c2 = b.ctx;
+    c2.fillStyle = "#000"; c2.fillRect(0, 0, b.w, b.h); c2.font = `11px ${COL.mono}`; c2.textBaseline = "middle";
+    const lx = 74, bw = b.w - lx - 46;
+    c2.fillStyle = COL.muted; c2.textAlign = "left"; c2.fillText("impresiones por anuncio (C = el mejor)", lx, 7);
+    const grises = ["#3a4052", "#2c3346", COL.exit, "#4a5168"];
+    filas.forEach((f, j) => {
+      const y = 16 + j * 22, tot = f.imp.reduce((x, z) => x + z, 0) || 1; let x = lx;
+      c2.fillStyle = COL.ink; c2.textAlign = "right"; c2.fillText(f.nombre, lx - 6, y + 9);
+      f.imp.forEach((v, a) => { const ww = bw * v / tot; c2.fillStyle = grises[a]; c2.fillRect(x, y, ww, 18); if (ww > 14) { c2.fillStyle = a === MEJOR ? "#0b0d12" : COL.ink; c2.textAlign = "center"; c2.fillText(ANUNCIOS[a], x + ww / 2, y + 9); } x += ww; });
+      c2.fillStyle = COL.exit; c2.textAlign = "left"; c2.fillText(Math.round(100 * f.imp[MEJOR] / tot) + "%", lx + bw + 6, y + 9);
+    });
+    document.getElementById("cap1").textContent = sim.t < T ? `simulando… ${fmt(sim.t)} impresiones` : `12 campañas · semilla ${semilla1}`;
+    const tot = yo.n.reduce((x, y) => x + y, 0);
+    let hud = `<span>vos: <b>${tot}</b> impresiones</span>` + yo.n.map((n, a) => `<span>${ANUNCIOS[a]} <b>${yo.c[a]}/${n}</b>${n ? " = " + fx(100 * yo.c[a] / n, 1) + "%" : ""}${yo.revelado ? ` <span style="color:var(--exit)">(real ${fx(100 * CTR[a], 1)}%)</span>` : ""}</span>`).join("");
+    if (tot) { const i = Math.min(Math.floor(tot / CADA), sim.algs[0].curva.length - 1); hud += `<span>tus clics perdidos <b style="color:var(--ember)">${fx(yo.reg, 1)}</b></span><span>Thompson a las ${fmt(i * CADA)} impresiones: <b>${fx(sim.algs[3].curva[i], 1)}</b></span>`; }
+    document.getElementById("hud1").innerHTML = hud;
+  }
+  function tick1() { avanzar(quieto ? 2000 : 300); if (!quieto || sim.t >= T) dibujar1(); anim1 = sim.t < T ? requestAnimationFrame(tick1) : null; }
+  document.getElementById("b1sim").onclick = () => { semilla1++; if (anim1) cancelAnimationFrame(anim1); nuevaSim(); anim1 = requestAnimationFrame(tick1); };
+  nuevaSim(); avanzar(1500);   // estado inicial: arranca con algo dibujado y sigue simulando
+
+  // ================= Bloque 2: tutor =================
+  const NIV = 5; let rec2 = "acierto", k2 = 0.1, alumno = null, anim2 = null;
+  const pAcierto = n => 0.1 + 0.2 * n, pResta = ns => Math.min(1, 0.1 + k2 * ns);
+  function resolverTutor(rec) {
+    const S = NIV * NIV, st = (ns, nr) => ns * NIV + nr; let V = new Float64Array(S); let Q;
+    const modelo = []; for (let ns = 0; ns < NIV; ns++) for (let nr = 0; nr < NIV; nr++) {
+      const pm = [ns < NIV - 1 ? 0.5 : 0, nr < NIV - 1 ? pResta(ns) : 0], dest = [st(Math.min(ns + 1, NIV - 1), nr), st(ns, Math.min(nr + 1, NIV - 1))];
+      modelo[st(ns, nr)] = [0, 1].map(a => ({ p: pm[a], d: dest[a], r: rec === "acierto" ? 2 * pAcierto([ns, nr][a]) - 1 : pm[a] }));
+    }
+    for (let it = 0; it < 2000; it++) {
+      const NV = new Float64Array(S); Q = [];
+      for (let s = 0; s < S; s++) { Q[s] = modelo[s].map(m => m.r + 0.9 * (m.p * V[m.d] + (1 - m.p) * V[s])); NV[s] = Math.max(...Q[s]); }
+      let dl = 0; for (let s = 0; s < S; s++) dl = Math.max(dl, Math.abs(NV[s] - V[s])); V = NV; if (dl < 1e-10) break;
+    }
+    return { V, Q, pi: Q.map(q => Math.abs(q[0] - q[1]) < 1e-9 ? -1 : (q[1] > q[0] ? 1 : 0)) };
+  }
+  function simularAlumnos(pi, n, seed) {
+    const R = Cueva.rng(seed); let ac = 0, fs = 0, fr = 0; const tray = [];
+    for (let i = 0; i < n; i++) { let ns = 0, nr = 0; if (i === 0) tray.push([0, 0]);
+      for (let t = 0; t < 40; t++) { let a = pi[ns * NIV + nr]; if (a < 0) a = 0; ac += R() < pAcierto([ns, nr][a]); if (a === 0 && ns < NIV - 1 && R() < 0.5) ns++; if (a === 1 && nr < NIV - 1 && R() < pResta(ns)) nr++; if (i === 0) tray.push([ns, nr]); }
+      fs += ns; fr += nr; }
+    return { ac: ac / n, fs: fs / n, fr: fr / n, tray };
+  }
+  let sol2, prom2;
+  function calcular2() { sol2 = resolverTutor(rec2); prom2 = simularAlumnos(sol2.pi, 300, 7); }
+  function dibujar2(paso = null) {
+    const cv = document.getElementById("cv2"); const W0 = cv.parentElement.clientWidth - 22; const lado = Math.min(W0, 440);
+    const { ctx } = ajustar(cv, lado); cv.style.width = lado + "px"; const ml = 30, mb = 28, cell = (lado - ml - 6) / NIV, hh = lado - mb;
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, lado, lado);
+    const vmin = Math.min(...sol2.V), vmax = Math.max(...sol2.V);
+    const cx = ns => ml + ns * cell, cy = nr => hh - (nr + 1) * cell * (hh - 6) / (NIV * cell);
+    const ch = (hh - 6) / NIV;
+    for (let ns = 0; ns < NIV; ns++) for (let nr = 0; nr < NIV; nr++) {
+      const s = ns * NIV + nr, x = cx(ns), y = hh - (nr + 1) * ch;
+      ctx.fillStyle = Cueva.rampa("valor", 0.1 + 0.8 * (sol2.V[s] - vmin) / ((vmax - vmin) || 1)); ctx.fillRect(x + 1, y + 1, cell - 2, ch - 2);
+      const a = sol2.pi[s]; ctx.fillStyle = "rgba(11,13,18,.85)"; ctx.font = `600 ${Math.round(Math.min(cell, ch) * 0.42)}px ${COL.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(a < 0 ? "—" : a === 0 ? "→" : "↑", x + cell / 2, y + ch / 2 - ch * 0.08);
+      ctx.font = `${Math.round(Math.min(cell, ch) * 0.15)}px ${COL.mono}`; ctx.fillText(a < 0 ? "igual" : a === 0 ? "suma" : "resta", x + cell / 2, y + ch * 0.78);
+    }
+    ctx.strokeStyle = COL.ink; ctx.lineWidth = 2.5; ctx.strokeRect(cx(0) + 2, hh - ch + 2, cell - 4, ch - 4);
+    ctx.fillStyle = COL.muted; ctx.font = `11px ${COL.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (let i = 0; i < NIV; i++) ctx.fillText(i, cx(i) + cell / 2, hh + 3);
+    ctx.fillText("nivel en suma →", ml + NIV * cell / 2, hh + 15);
+    ctx.textAlign = "right"; ctx.textBaseline = "middle"; for (let i = 0; i < NIV; i++) ctx.fillText(i, ml - 6, hh - (i + 0.5) * ch);
+    ctx.save(); ctx.translate(9, hh / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.fillText("nivel en resta →", 0, 0); ctx.restore();
+    if (alumno) {
+      const n = paso === null ? alumno.tray.length : Math.min(alumno.tray.length, paso + 1);
+      const pt = ([ns, nr], i) => [cx(ns) + cell / 2 + ((i * 7) % 11 - 5) * 0.6, hh - (nr + 0.5) * ch + ((i * 5) % 9 - 4) * 0.6];
+      ctx.strokeStyle = COL.ember; ctx.lineWidth = 2; ctx.beginPath(); for (let i = 0; i < n; i++) { const [x, y] = pt(alumno.tray[i], i); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+      const [x, y] = pt(alumno.tray[n - 1], n - 1); ctx.fillStyle = COL.ember; ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.fill();
+    }
+    const fin = alumno ? alumno.tray[alumno.tray.length - 1] : null;
+    document.getElementById("hud2").innerHTML = `<span>300 alumnos simulados: aciertos <b>${fx(prom2.ac, 1)}</b> de 40</span><span>nivel final: suma <b>${fx(prom2.fs, 1)}</b>, resta <b>${fx(prom2.fr, 1)}</b></span>` +
+      (fin ? `<span style="color:var(--ember)">alumno seguido: termina en suma ${fin[0]}, resta ${fin[1]}</span>` : "");
+  }
+  function modo2(r) { rec2 = r; alumno = null; document.getElementById("m2ac").setAttribute("aria-pressed", r === "acierto"); document.getElementById("m2ap").setAttribute("aria-pressed", r === "aprendizaje"); calcular2(); dibujar2(); }
+  document.getElementById("m2ac").onclick = () => modo2("acierto");
+  document.getElementById("m2ap").onclick = () => modo2("aprendizaje");
+  document.getElementById("b2k").oninput = e => { k2 = +e.target.value; document.getElementById("o2k").textContent = fx(k2); alumno = null; calcular2(); dibujar2(); };
+  let semilla2 = 1;
+  document.getElementById("b2sim").onclick = () => {
+    alumno = simularAlumnos(sol2.pi, 1, 1000 + semilla2++); if (anim2) cancelAnimationFrame(anim2);
+    if (quieto) { dibujar2(); return; }
+    let p = 0; const f = () => { p += 0.25; dibujar2(Math.floor(p)); anim2 = p < 40 ? requestAnimationFrame(f) : null; }; anim2 = requestAnimationFrame(f);
+  };
+  calcular2();
+
+  // ================= Bloque 3: robot =================
+  let al3 = 0.8, be3 = 0.4, rw3 = 1; const RB = 2, RR = -3, G3 = 0.9;
+  function resolverRobot(a, b, rw) {
+    let V = [0, 0], Q;
+    for (let it = 0; it < 3000; it++) {
+      Q = [[RB + G3 * (a * V[0] + (1 - a) * V[1]), rw + G3 * V[0], -Infinity],
+           [b * (RB + G3 * V[1]) + (1 - b) * (RR + G3 * V[0]), rw + G3 * V[1], G3 * V[0]]];
+      const NV = Q.map(q => Math.max(...q)); const dl = Math.max(Math.abs(NV[0] - V[0]), Math.abs(NV[1] - V[1])); V = NV; if (dl < 1e-10) break;
+    }
+    return { V, Q, pi: Q.map(q => q.indexOf(Math.max(...q))) };
+  }
+  const ACC3 = ["buscar", "esperar", "recargar"], COLA3 = [COL.lamp, COL.sonar, COL.exit];
+  let mapa3 = null, mapaClave = "";
+  function dibujar3() {
+    const cv = document.getElementById("cv3"); const ancho = false;
+    const alto = ancho ? 260 : 470; const { ctx, w } = ajustar(cv, alto);
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, alto);
+    const sol = resolverRobot(al3, be3, rw3);
+    // diagrama
+    const dw = ancho ? w * 0.48 : w, dh = ancho ? alto : 220;
+    const pos = [[dw * 0.2, dh * 0.5], [dw * 0.8, dh * 0.5]], R0 = Math.max(27, Math.min(32, dw * 0.07));
+    const flecha = (x1, y1, x2, y2, curva, color, ancho, etiqueta) => {
+      ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = ancho; const mx = (x1 + x2) / 2, my = (y1 + y2) / 2 + curva;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.quadraticCurveTo(mx, my, x2, y2); ctx.stroke();
+      const ang = Math.atan2(y2 - my, x2 - mx); ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(x2 - 9 * Math.cos(ang - 0.4), y2 - 9 * Math.sin(ang - 0.4)); ctx.lineTo(x2 - 9 * Math.cos(ang + 0.4), y2 - 9 * Math.sin(ang + 0.4)); ctx.fill();
+      if (etiqueta) { ctx.font = `11px ${COL.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(etiqueta, mx, (y1 + y2) / 2 + curva / 2 + (curva > 0 ? 9 : -9)); }
+    };
+    const lazo = (x, y, arriba, color, ancho, etiqueta) => { ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = ancho; const d = arriba ? -1 : 1; ctx.beginPath(); ctx.arc(x, y + d * (R0 + 18), 18, 0, 7); ctx.stroke(); ctx.font = `11px ${COL.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(etiqueta, x, y + d * (R0 + 48)); };
+    const op = (s, a) => sol.pi[s] === a;
+    const cA = (s, a) => op(s, a) ? COL.exit : "rgba(141,147,163,.45)", wA = (s, a) => op(s, a) ? 3 : 1.2;
+    const [xa, ya] = pos[0], [xb, yb] = pos[1];
+    lazo(xa, ya, true, cA(0, 0), wA(0, 0), `buscar (α=${fx(al3)}) +2`);
+    lazo(xa, ya, false, cA(0, 1), wA(0, 1), `esperar +${fx(rw3, 1)}`);
+    lazo(xb, yb, true, cA(1, 0), wA(1, 0), `buscar (β=${fx(be3)}) +2`);
+    lazo(xb, yb, false, cA(1, 1), wA(1, 1), `esperar +${fx(rw3, 1)}`);
+    flecha(xa + R0, ya - 8, xb - R0, yb - 8, -26, cA(0, 0), wA(0, 0), "buscar, 1−α");
+    flecha(xb - R0, yb + 8, xa + R0, ya + 8, 26, op(1, 2) ? COL.exit : "rgba(141,147,163,.45)", op(1, 2) ? 3 : 1.2, "");
+    ctx.font = `11px ${COL.mono}`; ctx.textAlign = "center"; ctx.fillStyle = op(1, 2) ? COL.exit : COL.muted; ctx.fillText("recargar: 0", (xa + xb) / 2, ya + 44);
+    ctx.fillStyle = op(1, 0) ? COL.exit : COL.muted; ctx.fillText("buscar y agotarse (1−β): −3", (xa + xb) / 2, ya + 58);
+    [["alta", xa, ya], ["baja", xb, yb]].forEach(([t, x, y], s) => { ctx.fillStyle = COL.rock2 || "#1e2331"; ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, R0, 0, 7); ctx.fill(); ctx.stroke(); ctx.fillStyle = COL.ink; ctx.font = `600 13px ${COL.mono}`; ctx.textBaseline = "middle"; ctx.fillText(t, x, y - 6); ctx.font = `10px ${COL.mono}`; ctx.fillStyle = COL.lamp; ctx.fillText("V " + fx(sol.V[s], 1), x, y + 9); });
+    // mapa β × r_espera para batería baja
+    const mx0 = ancho ? dw + 40 : 40, my0 = ancho ? 16 : dh + 20, mw = (ancho ? w - dw - 50 : w - 50), mh = ancho ? alto - 46 : alto - dh - 50;
+    const clave = fx(al3); const NB = 40;
+    if (clave !== mapaClave) { mapaClave = clave; mapa3 = []; for (let i = 0; i <= NB; i++) { mapa3.push([]); for (let j = 0; j <= NB; j++) mapa3[i].push(resolverRobot(al3, j / NB, 2.5 * i / NB).pi[1]); } }
+    for (let i = 0; i <= NB; i++) for (let j = 0; j <= NB; j++) { ctx.fillStyle = COLA3[mapa3[i][j]]; ctx.globalAlpha = 0.55; ctx.fillRect(mx0 + mw * j / (NB + 1), my0 + mh - mh * (i + 1) / (NB + 1), mw / (NB + 1) + 0.6, mh / (NB + 1) + 0.6); }
+    ctx.globalAlpha = 1;
+    const cuenta = [0, 0, 0], cen = [[0, 0], [0, 0], [0, 0]]; for (let i = 0; i <= NB; i++) for (let j = 0; j <= NB; j++) { const k = mapa3[i][j]; cuenta[k]++; cen[k][0] += j; cen[k][1] += i; }
+    ctx.font = `600 12px ${COL.mono}`; ctx.fillStyle = "#0b0d12"; ctx.textAlign = "center";
+    cen.forEach((c, k) => { if (cuenta[k] > 20) ctx.fillText(ACC3[k], Math.max(mx0 + 34, Math.min(mx0 + mw - 34, mx0 + mw * (c[0] / cuenta[k] + 0.5) / (NB + 1))), my0 + mh - mh * (c[1] / cuenta[k] + 0.5) / (NB + 1)); });
+    const px = mx0 + mw * be3, py = my0 + mh - mh * rw3 / 2.5;
+    ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px, py, 6, 0, 7); ctx.stroke();
+    ctx.fillStyle = COL.muted; ctx.font = `11px ${COL.mono}`; ctx.textBaseline = "top"; ctx.fillText("β →", mx0 + mw / 2, my0 + mh + 4);
+    ctx.textAlign = "left"; ctx.fillText("0", mx0, my0 + mh + 4); ctx.textAlign = "right"; ctx.fillText("1", mx0 + mw, my0 + mh + 4);
+    ctx.save(); ctx.translate(mx0 - 26, my0 + mh / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.fillText("r_espera (0 a 2,5) →", 0, 0); ctx.restore();
+    ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillStyle = COL.ink; if (!ancho) ctx.fillText("¿qué hace con batería baja?", mx0, my0 - 2);
+    cv._mapa = { mx0, my0, mw, mh };
+    const qs = s => sol.Q[s].map((q, a) => isFinite(q) ? `${ACC3[a]} <b>${fx(q, 1)}</b>` : "").filter(Boolean).join(" · ");
+    document.getElementById("hud3").innerHTML = `<span>alta → <b style="color:var(--exit)">${ACC3[sol.pi[0]]}</b> (${qs(0)})</span><span>baja → <b style="color:var(--exit)">${ACC3[sol.pi[1]]}</b> (${qs(1)})</span>`;
+  }
+  const set3 = () => { al3 = +document.getElementById("b3a").value; be3 = +document.getElementById("b3b").value; rw3 = +document.getElementById("b3w").value; document.getElementById("o3a").textContent = fx(al3); document.getElementById("o3b").textContent = fx(be3); document.getElementById("o3w").textContent = fx(rw3); dibujar3(); };
+  ["b3a", "b3b", "b3w"].forEach(id => document.getElementById(id).oninput = set3);
+  const cv3 = document.getElementById("cv3");
+  const tocar3 = e => { const m = cv3._mapa, b = cv3.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top; if (!m || x < m.mx0 || x > m.mx0 + m.mw || y < m.my0 || y > m.my0 + m.mh) return; document.getElementById("b3b").value = Math.round((x - m.mx0) / m.mw * 100) / 100; document.getElementById("b3w").value = Math.round((1 - (y - m.my0) / m.mh) * 2.5 * 20) / 20; set3(); };
+  cv3.addEventListener("pointerdown", tocar3); cv3.addEventListener("pointermove", e => { if (e.buttons) tocar3(e); });
+
+  // ================= Bloque 4: deep search =================
+  const MAXB = 5, MAXC = 4, PREL = [0.9, 0.75, 0.6, 0.45, 0.3], PAC = [0.25, 0.55, 0.75, 0.88, 0.95], ACC4 = ["buscar", "leer", "responder"], COLA4 = [COL.sonar, COL.lamp, COL.exit];
+  let costo4 = 0.01;
+  function resolverDS(costo) {   // programación dinámica exacta: V[q][d][c], pol[q][d][c]
+    const V = {}, P = {}, key = (q, d, c) => q * 100 + d * 10 + c;
+    const v = (q, d, c) => { const k = key(q, d, c); if (k in V) return V[k];
+      let best = PAC[c], a = 2;
+      if (d < q) { const p = PREL[d]; const x = -costo + p * v(q, d + 1, Math.min(c + 1, MAXC)) + (1 - p) * v(q, d + 1, c); if (x > best + 1e-12) { best = x; a = 1; } }
+      if (q < MAXB) { const x = -costo + v(q + 1, d, c); if (x > best + 1e-12) { best = x; a = 0; } }
+      V[k] = best; P[k] = a; return best; };
+    const v0 = v(0, 0, 0);
+    // probabilidades de visita y métricas
+    const alc = { [key(0, 0, 0)]: 1 }; let acierto = 0, pasos = 0;
+    for (let q = 0; q <= MAXB; q++) for (let d = 0; d <= q; d++) for (let c = 0; c <= MAXC; c++) {
+      const k = key(q, d, c), pr = alc[k] || 0; if (!pr) continue; v(q, d, c); const a = P[k];
+      if (a === 2) { acierto += pr * PAC[c]; continue; }
+      pasos += pr;
+      if (a === 0) alc[key(q + 1, d, c)] = (alc[key(q + 1, d, c)] || 0) + pr;
+      else { const p = PREL[d]; const k1 = key(q, d + 1, Math.min(c + 1, MAXC)), k2 = key(q, d + 1, c); alc[k1] = (alc[k1] || 0) + pr * p; alc[k2] = (alc[k2] || 0) + pr * (1 - p); }
+    }
+    for (let q = 0; q <= MAXB; q++) for (let d = 0; d <= q; d++) for (let c = 0; c <= MAXC; c++) v(q, d, c);
+    return { V, P, alc, acierto, pasos, v0, key };
+  }
+  const CURVA4 = Array.from({ length: 41 }, (_, i) => { const c = i * 0.005, r = resolverDS(c); return { c, ac: r.acierto, pasos: r.pasos }; });
+  let ds;
+  function dibujar4() {
+    ds = resolverDS(costo4);
+    const cv = document.getElementById("cv4"); const W0 = cv.parentElement.clientWidth - 22;
+    const porFila = W0 < 560 ? 3 : 5, gap = 12, gw = (W0 - 14 - (porFila - 1) * gap) / porFila, cell = Math.min(26, (gw - 4) / 6), altoG = cell * 6 + 40, filas = Math.ceil(5 / porFila), alto = altoG * filas;
+    const { ctx, w } = ajustar(cv, alto); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, alto);
+    for (let c = 0; c <= MAXC; c++) {
+      const x0 = 14 + (c % porFila) * (gw + gap) + (gw - cell * 6) / 2, y0 = 18 + Math.floor(c / porFila) * altoG;
+      ctx.fillStyle = COL.muted; ctx.font = `11px ${COL.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(`confianza ${c}`, x0 + cell * 3, y0 - 3);
+      for (let q = 0; q <= MAXB; q++) for (let d = 0; d <= MAXB; d++) {
+        const x = x0 + q * cell, y = y0 + d * cell;
+        if (d > q) { ctx.fillStyle = "#0b0d12"; ctx.fillRect(x + 0.5, y + 0.5, cell - 1, cell - 1); continue; }
+        const k = ds.key(q, d, c), a = ds.P[k], pr = ds.alc[k] || 0;
+        ctx.globalAlpha = 0.18 + 0.82 * Math.min(1, Math.sqrt(pr) * 1.3); ctx.fillStyle = COLA4[a]; ctx.fillRect(x + 0.5, y + 0.5, cell - 1, cell - 1); ctx.globalAlpha = 1;
+        if (pr > 0.001) { ctx.strokeStyle = COL.ink; ctx.lineWidth = 1; ctx.strokeRect(x + 1, y + 1, cell - 2, cell - 2); }
+      }
+      ctx.fillStyle = COL.muted; ctx.textBaseline = "top"; ctx.fillText("búsq. →", x0 + cell * 3, y0 + cell * 6 + 3);
+    }
+    ctx.save(); ctx.translate(6, 18 + cell * 3); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillStyle = COL.muted; ctx.fillText("← leídos", 0, 0); ctx.restore();
+    // curva de acierto vs costo
+    const g = ajustar(document.getElementById("cv4b"), 130), c2 = g.ctx, m = { l: 40, r: 40, t: 14, b: 22 }, W = g.w - m.l - m.r, H = 130 - m.t - m.b;
+    c2.fillStyle = "#000"; c2.fillRect(0, 0, g.w, 130);
+    const X = c => m.l + W * c / 0.2, Y = v => m.t + H * (1 - v), Y2 = p => m.t + H * (1 - p / 10);
+    c2.strokeStyle = "rgba(141,147,163,.3)"; c2.lineWidth = 1; c2.beginPath(); c2.moveTo(m.l, m.t); c2.lineTo(m.l, m.t + H); c2.lineTo(m.l + W, m.t + H); c2.stroke();
+    c2.strokeStyle = COL.exit; c2.lineWidth = 2; c2.beginPath(); CURVA4.forEach((p, i) => i ? c2.lineTo(X(p.c), Y(p.ac)) : c2.moveTo(X(p.c), Y(p.ac))); c2.stroke();
+    c2.strokeStyle = COL.sonar; c2.beginPath(); CURVA4.forEach((p, i) => i ? c2.lineTo(X(p.c), Y2(p.pasos)) : c2.moveTo(X(p.c), Y2(p.pasos))); c2.stroke();
+    c2.strokeStyle = COL.ink; c2.beginPath(); c2.moveTo(X(costo4), m.t); c2.lineTo(X(costo4), m.t + H); c2.stroke();
+    c2.font = `11px ${COL.mono}`; c2.textBaseline = "middle"; c2.fillStyle = COL.exit; c2.textAlign = "right"; c2.fillText("100%", m.l - 4, Y(1)); c2.fillText("0%", m.l - 4, Y(0));
+    c2.fillStyle = COL.sonar; c2.textAlign = "left"; c2.fillText("10", m.l + W + 4, Y2(10)); c2.fillText("0", m.l + W + 4, Y2(0));
+    c2.fillStyle = COL.muted; c2.textAlign = "left"; c2.textBaseline = "top"; c2.fillText("acierto (verde) · pasos (celeste)", m.l + 6, 0);
+    c2.textAlign = "center"; c2.fillText("costo por paso: 0 a 0,2", m.l + W / 2, m.t + H + 5);
+    document.getElementById("hud4").innerHTML = `<span>costo <b>${fx(costo4, 3)}</b></span><span>acierto esperado <b style="color:var(--exit)">${Math.round(100 * ds.acierto)}%</b></span><span>pasos antes de responder <b>${fx(ds.pasos, 1)}</b></span><span>recompensa neta <b>${fx(ds.v0, 2)}</b></span>`;
+  }
+  document.getElementById("b4c").oninput = e => { costo4 = +e.target.value; document.getElementById("o4c").textContent = fx(costo4, 3); document.getElementById("pasos4").textContent = ""; dibujar4(); };
+  let semilla4 = 1;
+  document.getElementById("b4sim").onclick = () => {
+    const R = Cueva.rng(semilla4++ * 13 + 1); let q = 0, d = 0, c = 0, G = 0; const lin = [];
+    for (;;) { const a = ds.P[ds.key(q, d, c)]; lin.push(`búsquedas=${q} leídos=${d} confianza=${c}  →  ${ACC4[a]}`);
+      if (a === 2) { const ok = R() < PAC[c]; G += ok ? 1 : 0; lin.push(`respuesta ${ok ? "correcta" : "incorrecta"} · recompensa total ${G >= 0 ? "+" : ""}${fx(G)}`); break; }
+      G -= costo4; if (a === 0) q++; else { if (R() < PREL[d]) c = Math.min(c + 1, MAXC); d++; } }
+    document.getElementById("pasos4").textContent = lin.join("\n");
+  };
+
+  // ================= Bloque 5: RLHF =================
+  const ETAPAS = [
+    { t: "1. SFT", sub: "ajuste supervisado", det: "Personas escriben respuestas modelo a miles de preguntas y el modelo aprende a imitarlas (aprendizaje por imitación, como la fase 2 de Go-Explore). Resultado: π_SFT." },
+    { t: "2. Recompensa", sub: "modelo r(x, y)", det: "El modelo genera varias respuestas a la misma pregunta; personas las ordenan (A mejor que B). Con esos rankings se entrena una red que puntúa respuestas: r(x, A) > r(x, B)." },
+    { t: "3. PPO", sub: "RL con la política", det: "El modelo genera, r(x, y) puntúa y PPO sube la probabilidad de lo que puntuó alto. La penalización KL lo mantiene cerca de π_SFT para que no engañe a r: el reward hacking del tutor, otra vez." }];
+  let sel5 = 2, t5 = 0, anim5 = null;
+  function dibujar5() {
+    const cv = document.getElementById("cv5"); const W0 = cv.parentElement.clientWidth - 22, vertical = W0 < 520;
+    const alto = vertical ? 470 : 300; const { ctx, w } = ajustar(cv, alto); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, alto);
+    const cajas = ETAPAS.map((e, i) => vertical ? { x: 10, y: 10 + i * 78, w: w - 20, h: 60 } : { x: 8 + i * (w - 16) / 3 + (i ? 10 : 0), y: 14, w: (w - 16) / 3 - 20 + (i ? 0 : 10), h: 74 });
+    cajas.forEach((b, i) => {
+      const on = i === sel5; ctx.fillStyle = on ? "rgba(61,220,132,.14)" : COL.rock2 || "#1e2331"; ctx.strokeStyle = on ? COL.exit : "#2c3346"; ctx.lineWidth = on ? 2 : 1;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(b.x, b.y, b.w, b.h, 6) : ctx.rect(b.x, b.y, b.w, b.h); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = COL.ink; ctx.font = `600 14px ${"Atkinson Hyperlegible, sans-serif"}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(ETAPAS[i].t, b.x + b.w / 2, b.y + b.h / 2 - 9);
+      ctx.fillStyle = COL.muted; ctx.font = `12px ${COL.mono}`; ctx.fillText(ETAPAS[i].sub, b.x + b.w / 2, b.y + b.h / 2 + 11);
+      if (i < 2) { const n = cajas[i + 1]; ctx.strokeStyle = COL.muted; ctx.fillStyle = COL.muted; ctx.lineWidth = 2; ctx.beginPath();
+        if (vertical) { ctx.moveTo(w / 2, b.y + b.h + 2); ctx.lineTo(w / 2, n.y - 4); ctx.stroke(); ctx.beginPath(); ctx.moveTo(w / 2, n.y - 2); ctx.lineTo(w / 2 - 5, n.y - 9); ctx.lineTo(w / 2 + 5, n.y - 9); ctx.fill(); }
+        else { const y = b.y + b.h / 2; ctx.moveTo(b.x + b.w + 3, y); ctx.lineTo(n.x - 4, y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(n.x - 2, y); ctx.lineTo(n.x - 9, y - 5); ctx.lineTo(n.x - 9, y + 5); ctx.fill(); } }
+    });
+    cv._cajas = cajas;
+    // escena de la etapa elegida
+    const y0 = vertical ? 252 : 110, h0 = alto - y0 - 8, cx = w / 2;
+    ctx.strokeStyle = "#2c3346"; ctx.lineWidth = 1; ctx.strokeRect(8.5, y0 + 0.5, w - 17, h0);
+    ctx.font = `12px ${COL.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const nodo = (x, y, txt, col) => { ctx.fillStyle = "#0b0d12"; ctx.strokeStyle = col; ctx.lineWidth = 1.5; const tw = ctx.measureText(txt).width + 18; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - tw / 2, y - 14, tw, 28, 5) : ctx.rect(x - tw / 2, y - 14, tw, 28); ctx.fill(); ctx.stroke(); ctx.fillStyle = col; ctx.fillText(txt, x, y); return tw; };
+    const flechaR = (x1, y1, x2, y2, col) => { ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); const a = Math.atan2(y2 - y1, x2 - x1); ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(x2 - 8 * Math.cos(a - .4), y2 - 8 * Math.sin(a - .4)); ctx.lineTo(x2 - 8 * Math.cos(a + .4), y2 - 8 * Math.sin(a + .4)); ctx.fill(); };
+    const m = y0 + h0 / 2, sx = Math.min(1, (w - 30) / 520);
+    if (sel5 === 0) {
+      nodo(cx - 170 * sx, m - 30, "pregunta x", COL.ink); nodo(cx + 140 * sx, m - 30, "respuesta humana y*", COL.lamp); nodo(cx, m + 34, "π_θ imita y*", COL.exit);
+      flechaR(cx - 120 * sx, m - 30, cx + 40 * sx, m - 30, COL.muted); flechaR(cx + 120 * sx, m - 14, cx + 30 * sx, m + 20, COL.muted);
+    } else if (sel5 === 1) {
+      nodo(cx - 150 * sx, m - 36, "respuesta A", COL.ink); nodo(cx - 150 * sx, m + 36, "respuesta B", COL.ink);
+      nodo(cx + 10 * sx, m, "persona: A > B", COL.lamp); nodo(cx + 170 * sx, m, "r(x,A) > r(x,B)", COL.exit);
+      flechaR(cx - 95 * sx, m - 30, cx - 50 * sx, m - 8, COL.muted); flechaR(cx - 95 * sx, m + 30, cx - 50 * sx, m + 8, COL.muted); flechaR(cx + 70 * sx, m, cx + 108 * sx, m, COL.muted);
+    } else {
+      const R = Math.min(h0 * 0.36, (w - 170) / 3), pts = [["π_θ (el modelo)", COL.exit], ["respuesta y", COL.ink], ["r(x, y) − β·KL", COL.lamp], ["PPO actualiza θ", COL.sonar]];
+      const P = pts.map((_, i) => [cx + R * 1.5 * Math.cos(-Math.PI / 2 + i * Math.PI / 2), m + R * Math.sin(-Math.PI / 2 + i * Math.PI / 2)]);
+      ctx.strokeStyle = "rgba(141,147,163,.4)"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(cx, m, R * 1.5, R, 0, 0, 7); ctx.stroke();
+      const ang = -Math.PI / 2 + t5; ctx.fillStyle = COL.lamp; ctx.beginPath(); ctx.arc(cx + R * 1.5 * Math.cos(ang), m + R * Math.sin(ang), 5, 0, 7); ctx.fill();
+      pts.forEach(([t, c], i) => nodo(P[i][0], P[i][1], t, c));
+    }
+    document.getElementById("hud5").innerHTML = `<span>${ETAPAS[sel5].det}</span>`;
+  }
+  const cv5 = document.getElementById("cv5");
+  cv5.addEventListener("pointerdown", e => { const b = cv5.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top; (cv5._cajas || []).forEach((c, i) => { if (x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h) { sel5 = i; dibujar5(); } }); });
+  function loop5() { t5 += 0.02; if (sel5 === 2) dibujar5(); anim5 = requestAnimationFrame(loop5); }
+  if (!quieto) new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting && !anim5) anim5 = requestAnimationFrame(loop5); else if (!en.isIntersecting && anim5) { cancelAnimationFrame(anim5); anim5 = null; } })).observe(cv5);
+
+  // ================= Bloque 6: tu proyecto =================
+  const $ = id => document.getElementById(id);
+  let celdas6 = {};   // "estado|acción" -> {sig, r}
+  const EJEMPLO = { "sin stock|pedir": { sig: "stock alto", r: -1 }, "sin stock|no pedir": { sig: "sin stock", r: -2 }, "stock bajo|pedir": { sig: "stock alto", r: 1 }, "stock bajo|no pedir": { sig: "sin stock", r: 2 }, "stock alto|pedir": { sig: "stock alto", r: 0.5 }, "stock alto|no pedir": { sig: "stock bajo", r: 3 } };
+  try { const g = JSON.parse(localStorage.getItem("rl6-proyecto") || "null"); if (g) { $("p6nom").value = g.nom; $("p6rec").value = g.rec; $("p6est").value = g.est; $("p6acc").value = g.acc; celdas6 = g.celdas || {}; } else celdas6 = { ...EJEMPLO }; } catch (e) { celdas6 = { ...EJEMPLO }; }
+  const lista = id => [...new Set($(id).value.split("\n").map(s => s.trim()).filter(Boolean))].slice(0, 30);
+  let sol6 = null;
+  function resolver6(E, A, g) {
+    const sig = (s, a) => { const c = celdas6[s + "|" + a]; return c && E.includes(c.sig) ? c.sig : s; }, rr = (s, a) => { const c = celdas6[s + "|" + a]; return c ? +c.r || 0 : 0; };
+    let V = Object.fromEntries(E.map(s => [s, 0])), Q = {};
+    for (let it = 0; it < 3000; it++) { const NV = {}; let dl = 0; for (const s of E) { Q[s] = A.map(a => rr(s, a) + g * V[sig(s, a)]); NV[s] = Math.max(...Q[s]); dl = Math.max(dl, Math.abs(NV[s] - V[s])); } V = NV; if (dl < 1e-9) break; }
+    return { V, Q, pi: Object.fromEntries(E.map(s => [s, Q[s].indexOf(Math.max(...Q[s]))])), sig };
+  }
+  function armarTabla() {
+    const E = lista("p6est"), A = lista("p6acc"), t = $("t6");
+    t.innerHTML = `<thead><tr><th>estado \\ acción</th>${A.map(a => `<th>${esc(a)}</th>`).join("")}</tr></thead><tbody>` +
+      E.map(s => `<tr><td>${esc(s)}</td>${A.map(a => { const c = celdas6[s + "|" + a] || { sig: s, r: 0 }; return `<td data-k="${esc(s + "|" + a)}"><div class="celda"><select aria-label="siguiente estado desde ${esc(s)} con ${esc(a)}">${E.map(e => `<option${e === c.sig ? " selected" : ""}>${esc(e)}</option>`).join("")}</select><input type="number" step="0.5" value="${c.r}" aria-label="recompensa"></div></td>`; }).join("")}</tr>`).join("") + "</tbody>";
+    t.querySelectorAll("td[data-k]").forEach(td => { const k = td.dataset.k; const sel = td.querySelector("select"), inp = td.querySelector("input");
+      if (!celdas6[k]) celdas6[k] = { sig: sel.value, r: 0 };
+      const upd = () => { celdas6[k] = { sig: sel.value, r: +inp.value || 0 }; actualizar6(false); }; sel.onchange = upd; inp.oninput = upd; });
+    actualizar6(false);
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  function actualizar6() {
+    const E = lista("p6est"), A = lista("p6acc"), g = +$("b6g").value; $("o6g").textContent = fx(g);
+    if (!E.length || !A.length) { sol6 = null; dibujar6(); return; }
+    sol6 = resolver6(E, A, g); sol6.E = E; sol6.A = A;
+    $("t6").querySelectorAll("td[data-k]").forEach(td => { const [s, a] = td.dataset.k.split("|"); td.classList.toggle("optima", sol6.pi[s] !== undefined && A[sol6.pi[s]] === a); });
+    // salida para copiar
+    const md = `### ${$("p6nom").value}\n\nRecompensa: ${$("p6rec").value}\n\n| estado | ${A.join(" | ")} | acción óptima | V(s) |\n|---|${A.map(() => "---|").join("")}---|---|\n` +
+      E.map(s => `| ${s} | ${A.map(a => { const c = celdas6[s + "|" + a] || { sig: s, r: 0 }; return `→ ${c.sig} (${c.r >= 0 ? "+" : ""}${c.r})`; }).join(" | ")} | ${A[sol6.pi[s]]} | ${sol6.V[s].toFixed(2)} |`).join("\n") + `\n\nγ = ${g}`;
+    const py = `ESTADOS = ${JSON.stringify(E)}\nACCIONES = ${JSON.stringify(A)}\nTABLA = {  # (estado, acción): (estado siguiente, recompensa)\n` +
+      E.flatMap(s => A.map(a => { const c = celdas6[s + "|" + a] || { sig: s, r: 0 }; return `    (${JSON.stringify(s)}, ${JSON.stringify(a)}): (${JSON.stringify(c.sig)}, ${c.r}),`; })).join("\n") +
+      `\n}\n\ndef transicion(s, a):\n    s2, r = TABLA[(s, a)]\n    return [(1.0, s2, r)]\n\nresolver_mdp(ESTADOS, ACCIONES, transicion, gamma=${g}, titulo=${JSON.stringify($("p6nom").value)})`;
+    $("p6out").value = md; $("p6out")._md = md; $("p6out")._py = py;
+    try { localStorage.setItem("rl6-proyecto", JSON.stringify({ nom: $("p6nom").value, rec: $("p6rec").value, est: $("p6est").value, acc: $("p6acc").value, celdas: celdas6 })); } catch (e) {}
+    dibujar6();
+  }
+  function dibujar6() {
+    const cv = $("cv6"), { ctx, w, h } = ajustar(cv, 290); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    if (!sol6) { ctx.fillStyle = COL.muted; ctx.font = `13px ${COL.mono}`; ctx.textAlign = "center"; ctx.fillText("Escribí al menos un estado y una acción.", w / 2, h / 2); return; }
+    const E = sol6.E, n = E.length, cx = w / 2, cy = h / 2, R = Math.min(w * 0.3, (h - 100) / 2);
+    const P = Object.fromEntries(E.map((s, i) => [s, n === 1 ? [cx, cy] : [cx + R * 1.25 * Math.cos(-Math.PI / 2 + 2 * Math.PI * i / n), cy + R * Math.sin(-Math.PI / 2 + 2 * Math.PI * i / n)]]));
+    const vmin = Math.min(...E.map(s => sol6.V[s])), vmax = Math.max(...E.map(s => sol6.V[s]));
+    ctx.font = `12px ${COL.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    // todas las transiciones en gris y la óptima en verde
+    for (const s of E) sol6.A.forEach((a, j) => {
+      const s2 = sol6.sig(s, a), opt = sol6.pi[s] === j, [x1, y1] = P[s], [x2, y2] = P[s2];
+      ctx.strokeStyle = opt ? COL.exit : "rgba(141,147,163,.3)"; ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = opt ? 2.5 : 1;
+      if (s2 === s) { ctx.beginPath(); const dx = (x1 - cx) || 0, dy = (y1 - cy) || -1, L = Math.hypot(dx, dy) || 1; ctx.arc(x1 + dx / L * 30, y1 + dy / L * 30, 12, 0, 7); ctx.stroke(); if (opt) ctx.fillText(a, x1 + dx / L * 58, y1 + dy / L * 52); return; }
+      const mx = (x1 + x2) / 2 + (y2 - y1) * 0.12, my = (y1 + y2) / 2 - (x2 - x1) * 0.12;
+      const a2 = Math.atan2(y2 - my, x2 - mx), ex = x2 - 24 * Math.cos(a2), ey = y2 - 24 * Math.sin(a2);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.quadraticCurveTo(mx, my, ex, ey); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex - 9 * Math.cos(a2 - .4), ey - 9 * Math.sin(a2 - .4)); ctx.lineTo(ex - 9 * Math.cos(a2 + .4), ey - 9 * Math.sin(a2 + .4)); ctx.fill();
+      if (opt) { ctx.fillStyle = COL.exit; ctx.fillText(a, mx, my - 8); }
+    });
+    for (const s of E) { const [x, y] = P[s]; ctx.fillStyle = Cueva.rampa("valor", 0.15 + 0.75 * (sol6.V[s] - vmin) / ((vmax - vmin) || 1)); ctx.strokeStyle = COL.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, 22, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#0b0d12"; ctx.font = `600 11px ${COL.mono}`; ctx.fillText(fx(sol6.V[s], 1), x, y);
+      ctx.fillStyle = COL.ink; ctx.font = `12px ${COL.mono}`; const t = s.length > 18 ? s.slice(0, 17) + "…" : s; ctx.fillText(t, x, y + (y > cy ? 34 : -34)); }
+  }
+  ["p6est", "p6acc"].forEach(id => $(id).addEventListener("input", armarTabla));
+  ["p6nom", "p6rec"].forEach(id => $(id).addEventListener("input", actualizar6));
+  $("b6g").oninput = actualizar6;
+  const copiar = txt => { $("p6out").value = txt; const ok = () => { $("cap6").textContent = "copiado"; setTimeout(() => $("cap6").textContent = "", 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, () => { $("p6out").select(); document.execCommand && document.execCommand("copy"); ok(); });
+    else { $("p6out").select(); try { document.execCommand("copy"); } catch (e) {} ok(); } };
+  $("b6md").onclick = () => copiar($("p6out")._md);
+  $("b6py").onclick = () => copiar($("p6out")._py);
+
+  // ================= dibujo general =================
+  function todo() { dibujar1(); dibujar2(); dibujar3(); dibujar4(); dibujar5(); dibujar6(); }
+  armarTabla(); todo();
+  anim1 = requestAnimationFrame(tick1);
+  let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(todo, 80); });
+  window.P6 = { resolverRobot, resolverTutor, resolverDS, sim: () => sim };
+
+  Cueva.pagina("8", { lecturas: [
+    { texto: "Sutton y Barto, cap. 2 (bandits) y ejemplo 3.3 (robot de reciclaje).", url: "http://incompleteideas.net/book/the-book-2nd.html" },
+    { texto: "Ouyang y otros (2022). Training language models to follow instructions with human feedback.", url: "https://arxiv.org/abs/2203.02155" },
+    { texto: "Russo y otros (2018). A tutorial on Thompson sampling.", url: "https://arxiv.org/abs/1707.02038" }] });
+})();
+</script>
+</body>
+</html>

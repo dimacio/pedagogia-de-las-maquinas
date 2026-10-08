@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>03 · La salida es verde · RL a ciegas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../../../assets/estilo.css">
+<link rel="stylesheet" href="post.css">
+<style>
+  .lbl { position:absolute; font-family: var(--mono); font-weight:600; font-size: 46px; color: var(--lamp); }
+</style>
+</head>
+<body class="a1" data-n="3">
+<div class="post">
+  <div class="cab"></div>
+
+  <h1 class="tit">La salida es <span class="g">verde</span>.</h1>
+  <div class="fig"><canvas id="cv" class="marco"></canvas></div>
+  <div style="display:grid;gap:16px">
+    <p class="txt">Una sola señal: <b style="color:var(--lamp)">+1</b> cuando llegás. Todo lo demás es silencio.</p>
+    <p class="voz">Nadie te dice por dónde ir. Solo si llegaste.</p>
+  </div>
+  <div class="pie"></div>
+</div>
+<script src="../../../assets/cueva.js"></script>
+<script src="post.js"></script>
+<script>
+
+  const env = Cueva.makeEnv(Cueva.MAPS.chica);
+  const T = Post.cueva(document.getElementById("cv"), env, 52);
+  Post.listo(() => {
+    const ctx = T.ctx, c = T.cell, [rg, cg] = env.free[env.goal];
+    T.fondo("#000");
+    const x = cg * c + c / 2, y = rg * c + c / 2, g = ctx.createRadialGradient(x, y, 4, x, y, c * 4);
+    g.addColorStop(0, "rgba(61,220,132,.22)"); g.addColorStop(1, "rgba(61,220,132,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, env.W * c, env.H * c);
+    ctx.save(); ctx.shadowColor = "#3ddc84"; ctx.shadowBlur = c * 1.2; T.casilla(rg, cg, "#3ddc84", 4); T.casilla(rg, cg, "#3ddc84", 4); ctx.restore();
+    ctx.font = `600 ${c * .8}px "JetBrains Mono"`; ctx.fillStyle = "#f2b35a"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("+1", x - c * 0.1, y - c * 1.2);
+    ctx.globalAlpha = .55; T.entrada(); T.sprite(env.start, 1); ctx.globalAlpha = 1;
+  });
+</script>
+</body>
+</html>

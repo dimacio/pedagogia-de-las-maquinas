@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Redes recurrentes: cuando el estado no alcanza · RL a ciegas</title>
+<meta name="description" content="Clase 7: de la cadena de Markov a la red recurrente. La cueva con solo bigotes, n-gramas de letras, una RNN en el navegador y un agente con memoria.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .lz { min-width: 0; }
+  .seg { flex-wrap: wrap; }
+  .cap { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .cap b { color: var(--ink); font-weight: 600; }
+  canvas:focus-visible { outline: 2px solid var(--exit); outline-offset: 2px; }
+  .juego { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+  .dpad { display: grid; grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(2, 34px); gap: 4px; }
+  .dpad button { padding: 0; font-family: var(--mono); font-size: 16px; }
+  .dpad .u { grid-column: 2; grid-row: 1; } .dpad .l { grid-column: 1; grid-row: 2; } .dpad .d { grid-column: 2; grid-row: 2; } .dpad .r { grid-column: 3; grid-row: 2; }
+  .gen { font-family: var(--mono); font-size: 13px; line-height: 1.55; background: var(--rock); border: 1px solid var(--rock-2); border-radius: 3px;
+    padding: 8px 10px; min-height: 7.5em; max-height: 12em; overflow-y: auto; overflow-wrap: anywhere; color: var(--ink); }
+  .gen .cop { background: rgba(242,179,90,.22); box-shadow: inset 0 -2px 0 var(--lamp); }
+  .gen .cur { color: var(--cave); background: var(--sonar); }
+  .entrada { display: grid; gap: 4px; }
+  .entrada input { width: 100%; font-family: var(--mono); font-size: 14px; }
+  .leyenda { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .leyenda i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase 7</div>
+    <h1>Redes <span class="g">recurrentes</span></h1>
+    <p class="thesis">Cuando lo que sentís ahora no alcanza para saber dónde estás, hace falta un resumen del camino: una red recurrente aprende ese resumen, y es la misma idea que después escribe texto.</p>
+  </section>
+
+  <!-- Bloque 1: Markov -->
+  <section class="bloque" aria-labelledby="t1">
+    <div class="stage">
+      <div class="lz"><canvas id="cv1" tabindex="0" aria-label="La cueva chica con un caminante al azar y la nube de probabilidad de dónde puede estar"></canvas></div>
+      <div class="lz"><canvas id="cv1m" aria-label="La matriz de transición P de 60 por 60, con la fila de la casilla actual marcada"></canvas></div>
+      <div class="legend"><span>p = 0</span><span class="bar" id="leg1"></span><span>p alta</span></div>
+      <div class="hud" id="hud1"></div>
+      <div class="row">
+        <button class="btn primary" id="b1play">Animar</button>
+        <button class="btn" id="b1paso">Un paso</button>
+        <button class="btn" id="b1reset">Reiniciar</button>
+      </div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 1 · el caminante sin memoria</div>
+      <h2 id="t1">El futuro depende solo del presente</h2>
+      <p>Un caminante al azar tira un dado de cuatro caras en cada paso; si choca, se queda. Adónde va depende solo de dónde está ahora: eso es una <b>cadena de Markov</b> (<i>Markov chain</i>). La nube de color es la probabilidad de encontrarlo en cada casilla; abajo, la <b>matriz de transición</b> P: una fila por casilla de partida, una columna por casilla de llegada.</p>
+      <p>Tocá una casilla para largar desde ahí, o pasá el puntero por la matriz para ver qué fila es qué casilla.</p>
+      <div class="eq">pₜ₊₁ = pₜ · P</div>
+      <p class="nota pregunta">El caminante vuelve a chocar con la misma pared una y otra vez. ¿Qué le faltaría para no hacerlo?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 2: POMDP -->
+  <section class="bloque" aria-labelledby="t2">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Con qué decide dónde está" id="seg2">
+        <button aria-pressed="false" data-m="sin">Sin memoria: solo lo que siente ahora</button>
+        <button aria-pressed="true" data-m="con">Con memoria: todo el camino</button>
+      </div>
+      <div class="lz"><canvas id="cv2" tabindex="0" aria-label="La cueva chica: en celeste, las casillas donde podría estar el jugador según lo que sintió"></canvas></div>
+      <div class="juego">
+        <p class="cap" id="cap2"></p>
+        <div class="dpad" id="dpad2" aria-label="Mover">
+          <button class="btn u" data-a="0" aria-label="Arriba">↑</button>
+          <button class="btn l" data-a="3" aria-label="Izquierda">←</button>
+          <button class="btn d" data-a="2" aria-label="Abajo">↓</button>
+          <button class="btn r" data-a="1" aria-label="Derecha">→</button>
+        </div>
+      </div>
+      <div class="lz"><canvas id="cv2g" aria-label="Cuántas casillas son posibles en cada paso, sin memoria y con memoria"></canvas></div>
+      <div class="hud" id="hud2"></div>
+      <div class="row">
+        <button class="btn" id="b2otra">Otra casilla al azar</button>
+        <label class="check"><input type="checkbox" id="b2ver" checked> Ver dónde está de verdad</label>
+      </div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 2 · solo bigotes</div>
+      <h2 id="t2">Cuando la observación no es el estado</h2>
+      <p>En el modo difícil del juego no ves la casilla: solo sentís cuatro <b>bigotes</b>. La cueva chica tiene 60 casillas y apenas 12 lecturas distintas. Movete con las flechas: en celeste, las casillas compatibles con lo que sentiste. Sin memoria la nube nunca se achica; con memoria, el camino la va recortando hasta dejar una.</p>
+      <p>Esto es un <b>MDP parcialmente observable</b> (<i>POMDP</i>): el estado existe, pero el agente recibe una observación que no alcanza. El conjunto celeste es el resumen de la historia que sí alcanza: un <b>estado de creencia</b> (<i>belief state</i>).</p>
+      <div class="eq">bₜ₊₁ = { mover(s, aₜ) : s ∈ bₜ }<br>      ∩ { s′ : bigotes(s′) = oₜ₊₁ }</div>
+      <p class="nota pregunta">¿Cuántos pasos te lleva quedarte con una sola casilla? ¿Te conviene caminar por un pasillo largo o buscar esquinas?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 3: n-gramas -->
+  <section class="bloque" aria-labelledby="t3">
+    <div class="stage">
+      <div class="lz"><canvas id="cv3" aria-label="A la izquierda, qué letra puede venir después del contexto actual; a la derecha, el error en un texto no visto según n"></canvas></div>
+      <div class="ctl">
+        <label for="b3n">n (cuántas letras mira: n − 1 de contexto) <output id="o3n">4</output></label>
+        <input type="range" id="b3n" min="1" max="10" step="1" value="4">
+      </div>
+      <div class="gen" id="gen3" aria-live="polite"></div>
+      <div class="hud" id="hud3"></div>
+      <div class="row">
+        <button class="btn primary" id="b3gen">Generar otra vez</button>
+        <span class="small muted">Subrayado: tramos de 20 letras copiados tal cual del texto de entrenamiento.</span>
+      </div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 3 · el texto como cadena de Markov</div>
+      <h2 id="t3">Contar no alcanza</h2>
+      <p>Un texto también es un camino: una letra detrás de otra. Un <b>n-grama</b> (<i>n-gram</i>) cuenta, en un corpus, qué letra vino después de cada grupo de n − 1 letras, y genera tirando el dado con esas cuentas. Es una cadena de Markov cuyo estado son las últimas n − 1 letras. El corpus es un diario de la cueva de unas 5.400 letras, escrito para este curso.</p>
+      <p>Con n chico inventa palabras; con n grande copia el corpus. La curva de error mide el error sobre un tramo que la tabla no vio: baja hasta n = 3 y después sube, porque cada contexto largo se vio una sola vez. Y nunca recuerda más de n − 1 letras.</p>
+      <div class="eq">P(xₜ | contexto) = cuenta(contexto + xₜ) / cuenta(contexto)</div>
+      <p class="nota pregunta">El corpus abre paréntesis y los cierra veinte letras después. ¿Qué n necesitarías para cerrarlos bien, y cuántas veces viste cada contexto de ese largo?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 4: la RNN -->
+  <section class="bloque" aria-labelledby="t4">
+    <div class="stage">
+      <div class="entrada">
+        <label class="cap" for="b4txt">Texto que lee la red (podés escribir)</label>
+        <input type="text" id="b4txt" maxlength="90" value="toco la pared (la de la izquierda) y " autocomplete="off" spellcheck="false">
+      </div>
+      <div class="lz"><canvas id="cv4a" aria-label="Mapa de calor: las 32 dimensiones del estado oculto, una columna por letra leída, y abajo las tres letras que la red espera después"></canvas></div>
+      <div class="lz"><canvas id="cv4b" aria-label="El estado oculto en un plano: cada letra empuja el punto; el fondo son estados del corpus pintados según qué predicen"></canvas></div>
+      <div class="leyenda" id="ley4"></div>
+      <div class="ctl">
+        <label for="b4temp">Temperatura al generar <output id="o4temp">0,7</output></label>
+        <input type="range" id="b4temp" min="0.1" max="1.5" step="0.1" value="0.7">
+      </div>
+      <div class="hud" id="hud4"></div>
+      <div class="row">
+        <button class="btn primary" id="b4gen">Que siga escribiendo</button>
+        <button class="btn" id="b4reset">Volver al texto de ejemplo</button>
+      </div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 4 · una red con un lazo</div>
+      <h2 id="t4">Leer en orden es acumular</h2>
+      <p>Una <b>red recurrente</b> (<i>recurrent neural network</i>, RNN) lee una letra por vez y carga un <b>estado oculto</b> hₜ de 32 números: cada letra empuja el estado, y la misma tabla de pesos se usa en todos los pasos. Arriba, el estado como mapa de calor (una columna por letra) y debajo las tres letras que espera después. Tocá una columna. Esta red tiene unos 3.600 pesos, se entrenó con el mismo diario y corre en tu navegador.</p>
+      <p>El estado no tiene letras, así que no se lee por sus coordenadas: se lo ve por lo que predice. En el plano, el fondo son estados del corpus pintados según qué esperan (vocal, consonante, espacio, signo), y la línea es tu texto. La <b>GRU</b> le agrega una perilla z que decide cuánto moverse; la <b>LSTM</b> es la versión anterior, con más perillas.</p>
+      <div class="eq">hₜ = tanh(W_hh hₜ₋₁ + W_xh xₜ + b)<br>ŷₜ = softmax(W_hy hₜ)</div>
+      <p class="nota pregunta">Escribí "la pa" y después "el pa". ¿Cambia lo que espera? ¿Qué parte del texto está guardada en el estado?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 5: el agente con memoria -->
+  <section class="bloque" aria-labelledby="t5">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué mostrar sobre la cueva" id="seg5">
+        <button aria-pressed="true" data-m="cree">Lo que cree la red con memoria</button>
+        <button aria-pressed="false" data-m="nada">Solo los caminos</button>
+      </div>
+      <div class="lz"><canvas id="cv5" aria-label="La cueva grande con dos agentes que solo sienten bigotes: uno sin memoria y uno con memoria"></canvas></div>
+      <div class="leyenda"><span><i style="background:var(--ember)"></i>sin memoria (red común)</span><span><i style="background:var(--lamp)"></i>con memoria (GRU)</span><span><i style="background:var(--sonar)"></i>dónde cree que está la GRU</span></div>
+      <div class="hud" id="hud5"></div>
+      <div class="row">
+        <button class="btn primary" id="b5play">Jugar</button>
+        <button class="btn" id="b5paso">Un paso</button>
+        <button class="btn" id="b5atasco">Otra salida donde se traba</button>
+      </div>
+      <p class="cap" id="cap5">Tocá una casilla para que los dos larguen desde ahí.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 5 · de vuelta a la cueva</div>
+      <h2 id="t5">Un agente con memoria</h2>
+      <p>Dos redes juegan la cueva grande (155 casillas, 13 lecturas) sintiendo solo los bigotes y su última acción. Una es una red común; la otra, una <b>GRU</b> con un estado de 32 números. Las dos se entrenaron igual, por <b>imitación</b> (<i>behavior cloning</i>): copiando a un experto que ve el mapa, con aprendizaje supervisado. No usamos RL acá porque DQN con memoria (DRQN) no llega a converger en los minutos de CPU de una clase; en el notebook se cuenta el intento.</p>
+      <p>La red común se traba dando vueltas en muchas salidas. La GRU sale de todas. Lo celeste es lo que una <b>sonda</b> (<i>probe</i>) lineal lee de su estado: dónde cree que está. Arranca dudando y se concentra a medida que camina.</p>
+      <div class="eq">hₜ = GRU(hₜ₋₁, [bigotesₜ, aₜ₋₁])<br>aₜ = argmax W hₜ</div>
+      <p class="nota pregunta">La última acción ya es memoria de un paso. ¿Por qué no alcanza en la cueva grande? Mirá dónde se traba la red común.</p>
+    </div>
+  </section>
+
+  <!-- Bloque 6: puente -->
+  <section class="bloque" aria-labelledby="t6">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Cómo lee" id="seg6">
+        <button aria-pressed="true" data-m="rnn">Recorrer (red recurrente)</button>
+        <button aria-pressed="false" data-m="tr">Mirar todo (transformer)</button>
+      </div>
+      <div class="lz"><canvas id="cv6" tabindex="0" aria-label="Cuánto pesa cada letra en el estado final de la red, y la escala de un modelo de lenguaje"></canvas></div>
+      <div class="hud" id="hud6"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 6 · el puente</div>
+      <h2 id="t6">Un modelo de lenguaje es esto, a escala</h2>
+      <p>Las barras miden, en la red del paso 4 recién inicializada (pesos al azar, como antes de entrenar) y en la entrenada, cuánto mueve cada letra al estado final: el gradiente |∂h_T/∂xᵢ|. Tocá una letra para que sea la última. Sin entrenar, el efecto se apaga a pocas letras; entrenar es, en parte, aprender a no olvidar. Ese olvido es el <b>gradiente que se desvanece</b> (<i>vanishing gradient</i>).</p>
+      <p>Un modelo de lenguaje como los que van a manejar los agentes de las clases 10 y 11 hace lo mismo que esta red: predecir lo que sigue. Un <b>transformer</b>, en una frase: en vez de recorrer el camino, en cada paso mira a la vez todas las letras anteriores y elige a cuáles atender.</p>
+      <div class="eq">3.558 pesos  →  494 millones (Qwen2.5-0.5B)</div>
+      <p class="nota pregunta">Si un transformer puede mirar todo, ¿qué pierde respecto de la red recurrente? Pensá en cuánto cuesta leer el paso 1.000.</p>
+    </div>
+  </section>
+
+  <!-- Para enseñarlo -->
+  <section class="bloque full" aria-labelledby="t7">
+    <div class="texto prose">
+      <div class="paso">Para enseñarlo</div>
+      <h2 id="t7">Cómo contar esta clase</h2>
+      <p><b>En una oración:</b> "Cuando lo que ves ahora no te dice dónde estás, llevás un cuaderno; una red recurrente es un cuaderno que aprende solo qué anotar, y con el mismo cuaderno se escribe texto."</p>
+      <p class="nota pregunta">Pregunta para hacerle a la otra persona: si te despertaras en un pasillo de un hotel que no conocés, ¿qué harías para saber en qué piso estás? ¿Qué anotarías mientras caminás?</p>
+      <p><b>Ejercicio de 5 minutos:</b> en ronda, cada persona dice una letra para formar una frase. Primera vuelta: cada una solo escucha la letra anterior (un 2-grama). Segunda vuelta: escuchan la frase entera hasta ahí (una red recurrente). Anoten las dos frases en el pizarrón y comparen. Después pregunten qué guardaba cada persona en la cabeza en la segunda vuelta: ese es su estado oculto.</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+const PESOS = __PESOS__;
+(async () => {
+  const tarea = f => new Promise(r => setTimeout(() => r(f()), 0));
+  Cueva.pagina("7", { lecturas: [
+    { texto: "Shannon (1948), A Mathematical Theory of Communication: aproximaciones al inglés con n-gramas de letras", url: "https://doi.org/10.1002/j.1538-7305.1948.tb01338.x" },
+    { texto: "Elman (1990), Finding Structure in Time: la red recurrente simple", url: "https://doi.org/10.1207/s15516709cog1402_1" },
+    { texto: "Hochreiter y Schmidhuber (1997), Long Short-Term Memory", url: "https://doi.org/10.1162/neco.1997.9.8.1735" },
+    { texto: "Cho et al. (2014): la GRU y el encoder-decoder", url: "https://arxiv.org/abs/1406.1078" },
+    { texto: "Hausknecht y Stone (2015), Deep Recurrent Q-Learning for POMDPs (DRQN)", url: "https://arxiv.org/abs/1507.06527" },
+    { texto: "Karpathy (2015), The Unreasonable Effectiveness of Recurrent Neural Networks", url: "https://karpathy.github.io/2015/05/21/rnn-effectiveness/" },
+    { texto: "Sutton y Barto, cap. 17.3: observaciones y estado", url: "http://incompleteideas.net/book/the-book-2nd.html" }
+  ] });
+  const COL = Cueva.COL(), AR = Cueva.ARROW, MONO = COL.mono || "monospace";
+  const reducir = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const f2 = x => x.toFixed(2).replace(".", ","), f1 = x => x.toFixed(1).replace(".", ",");
+  const envC = Cueva.makeEnv(Cueva.MAPS.chica), envG = Cueva.makeEnv(Cueva.MAPS.grande);
+  const lectura = (env, s) => { const [r, c] = env.free[s]; return Cueva.DR.map(([dr, dc]) => env.isWall(r + dr, c + dc) ? 1 : 0); };
+  const txtLect = l => l.map((w, a) => `${AR[a]}${w ? "■" : "□"}`).join(" ");
+  const sig = x => 1 / (1 + Math.exp(-x));
+  const visible = (el, cb) => new IntersectionObserver(es => es.forEach(e => cb(e.isIntersecting))).observe(el);
+  function bigotesEn(T, env, s) {   // dibuja los cuatro bigotes de la casilla s
+    const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s], x = c * cell + cell / 2, y = r * cell + cell / 2;
+    lectura(env, s).forEach((w, a) => { const [dr, dc] = Cueva.DR[a]; ctx.strokeStyle = w ? COL.chalk : "rgba(141,147,163,.7)"; ctx.lineWidth = w ? 2.5 : 1.5; ctx.setLineDash(w ? [] : [2, 3]);
+      ctx.beginPath(); ctx.moveTo(x + dc * cell * .25, y + dr * cell * .25); ctx.lineTo(x + dc * cell * .66, y + dr * cell * .66); ctx.stroke(); ctx.setLineDash([]); });
+  }
+
+  // =====================================================================
+  // 1. Cadena de Markov: caminante al azar, nube pₜ y matriz P
+  // =====================================================================
+  const b1 = await tarea(() => {
+    const env = envC, n = env.nS, cv = document.getElementById("cv1"), cvm = document.getElementById("cv1m"), hud = document.getElementById("hud1"), btn = document.getElementById("b1play");
+    document.getElementById("leg1").style.background = Cueva.gradienteCSS("visitas");
+    const T = Cueva.tablero(cv, env, { maxCell: 40 });
+    const P = Array.from({ length: n }, () => new Float64Array(n));
+    Cueva.transiciones(env, 0).forEach((fila, s) => fila.forEach(lst => lst.forEach(([s2, p]) => { P[s][s2] += p / 4; })));
+    const R = Cueva.rng(7);
+    let s, p, t, jugando = false, raf = 0, ultimo = 0, acum = 0, hover = -1, rastro;
+    function reset(s0 = env.start) { s = s0; t = 0; p = new Float64Array(n); p[s0] = 1; rastro = [s0]; }
+    function paso() {
+      const q = new Float64Array(n); for (let i = 0; i < n; i++) if (p[i]) for (let j = 0; j < n; j++) q[j] += p[i] * P[i][j]; p = q;
+      if (s !== env.goal) { const [s2] = env.move(s, Math.floor(R() * 4)); s = s2; } rastro.push(s); if (rastro.length > 30) rastro.shift(); t++;
+    }
+    let mk = 5;
+    function dibujar() {
+      T.fondo("#000").paredes(COL.rock2);
+      const hi = Math.max(...p);
+      for (let i = 0; i < n; i++) if (p[i] > 1e-6) { const [r, c] = env.free[i]; T.casilla(r, c, Cueva.rampa("visitas", Math.sqrt(p[i] / hi)), 1); }
+      T.salida();
+      if (hover >= 0) { const ctx = T.ctx, cell = T.cell; for (let j = 0; j < n; j++) if (P[hover][j] > 0 && j !== hover) { const [r, c] = env.free[j]; ctx.strokeStyle = COL.lamp; ctx.lineWidth = 2; ctx.strokeRect(c * cell + 2, r * cell + 2, cell - 4, cell - 4); }
+        const [r, c] = env.free[hover]; ctx.strokeStyle = COL.ink; ctx.lineWidth = 2.5; ctx.strokeRect(c * cell + 1.5, r * cell + 1.5, cell - 3, cell - 3); }
+      T.trayecto(rastro, "rgba(242,179,90,.45)", .1); T.sprite(s, 2, t % 2);
+      // matriz P
+      const W = Math.min(cvm.parentElement.clientWidth - 40, 240); mk = Math.max(3, Math.floor(W / n)); const dpr = devicePixelRatio || 1, lado = mk * n;
+      const AW = Math.min(cvm.parentElement.clientWidth - 2, lado + 210); cvm.width = AW * dpr; cvm.height = (lado + 16) * dpr; cvm.style.width = AW + "px"; cvm.style.height = (lado + 16) + "px";
+      const ctx = cvm.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, AW, lado + 16);
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) if (P[i][j] > 0) { ctx.fillStyle = Cueva.rampa("valor", P[i][j]); ctx.fillRect(j * mk, i * mk, mk, mk); }
+      const fila = hover >= 0 ? hover : s;
+      ctx.strokeStyle = COL.exit; ctx.lineWidth = 1.5; ctx.strokeRect(.75, fila * mk - .5, lado - 1.5, mk + 1);
+      // el vector pₜ como columna a la derecha
+      for (let i = 0; i < n; i++) { ctx.fillStyle = p[i] > 1e-6 ? Cueva.rampa("visitas", Math.sqrt(p[i] / hi)) : "#14182a"; ctx.fillRect(lado + 14, i * mk, 12, mk); }
+      ctx.font = `11px ${MONO}`; ctx.fillStyle = COL.muted; ctx.textBaseline = "top"; ctx.textAlign = "left";
+      ctx.fillText("P (60×60)", 0, lado + 3); ctx.fillText("pₜ", lado + 14, lado + 3);
+      if (AW > lado + 120) { ctx.textBaseline = "top"; let yy = 4; for (const l of ["fila = casilla de partida", "columna = de llegada", "verde: la fila de ahora", "", "pₜ: la nube, como vector"]) { ctx.fillText(l, lado + 36, yy); yy += 15; } }
+      const vec = [0, 1, 2, 3].map(a => { const [s2, ch] = env.move(fila, a); return `${AR[a]} <b>${fila === env.goal ? "queda" : ch ? "choca" : "casilla " + s2}</b>`; });
+      hud.innerHTML = `<span>t <b>${t}</b></span><span>${hover >= 0 ? "fila" : "casilla"} <b>${fila}</b></span><span>cada flecha 1/4: ${vec.join(" · ")}</span><span>P(ya salió) <b>${f2(p[env.goal])}</b></span>`;
+    }
+    function loop(now) {
+      raf = 0; if (!jugando) return; const dt = Math.min(100, now - (ultimo || now)); ultimo = now; acum += dt;
+      if (acum > 260) { acum = 0; paso(); dibujar(); if (t >= 400) { play(false); } }
+      raf = requestAnimationFrame(loop);
+    }
+    function play(on) { jugando = on; btn.textContent = on ? "Pausa" : "Animar"; ultimo = 0; if (on && !raf) raf = requestAnimationFrame(loop); }
+    btn.onclick = () => play(!jugando);
+    document.getElementById("b1paso").onclick = () => { play(false); paso(); dibujar(); };
+    document.getElementById("b1reset").onclick = () => { reset(); dibujar(); };
+    cv.addEventListener("pointerdown", e => { const [r, c] = T.celdaEn(e); const q = env.idx[r + "," + c]; if (q !== undefined) { reset(q); dibujar(); } });
+    cvm.addEventListener("pointermove", e => { const b = cvm.getBoundingClientRect(); const i = Math.floor((e.clientY - b.top) / mk), j = e.clientX - b.left; const h = (i >= 0 && i < n && j < mk * n) ? i : -1; if (h !== hover) { hover = h; dibujar(); } });
+    cvm.addEventListener("pointerleave", () => { hover = -1; dibujar(); });
+    reset(); for (let k = 0; k < 6; k++) paso();
+    visible(cv, v => { if (!v && raf) { cancelAnimationFrame(raf); raf = 0; } else if (v && jugando && !raf) { ultimo = 0; raf = requestAnimationFrame(loop); } });
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); }, cv };
+  });
+
+  // =====================================================================
+  // 2. Solo bigotes: estado de creencia
+  // =====================================================================
+  const b2 = await tarea(() => {
+    const env = envC, n = env.nS, cv = document.getElementById("cv2"), cvg = document.getElementById("cv2g"), hud = document.getElementById("hud2"), cap = document.getElementById("cap2"), ver = document.getElementById("b2ver");
+    const T = Cueva.tablero(cv, env, { maxCell: 40 });
+    const firma = Array.from({ length: n }, (_, s) => lectura(env, s).join(""));
+    const nLect = new Set(firma).size;
+    const R = Cueva.rng(21);
+    let s, B, modo = "con", hist, dir = 2;
+    const compat = q => { const out = new Set(); for (let k = 0; k < n; k++) if (firma[k] === firma[q]) out.add(k); return out; };
+    function reset(s0) { s = s0; B = compat(s); hist = [{ sin: B.size, con: B.size }]; }
+    function mover(a) {
+      const [s2] = env.move(s, a); s = s2; dir = a;
+      const C = compat(s), nb = new Set(); for (const q of B) { const q2 = env.move(q, a)[0]; if (C.has(q2)) nb.add(q2); }
+      B = nb; hist.push({ sin: C.size, con: B.size }); if (hist.length > 60) hist.shift();
+      dibujar();
+    }
+    function dibujar() {
+      const ctx = T.ctx, cell = T.cell;
+      T.fondo("#000"); if (ver.checked) T.paredes("#1a1f2c");
+      const nube = modo === "con" ? B : compat(s);
+      for (const q of nube) { const [r, c] = env.free[q]; T.casilla(r, c, "rgba(94,200,216,.42)", 1); }
+      T.salida();
+      if (ver.checked) { T.sprite(s, dir, hist.length % 2); bigotesEn(T, env, s); }
+      // gráfico: cuántas casillas posibles
+      const { w, h, ctx: g } = Cueva.lienzo(cvg, 110)();
+      g.fillStyle = "#000"; g.fillRect(0, 0, w, h); const m = { l: 30, r: 8, t: 10, b: 18 };
+      const top = Math.max(5, ...hist.map(q => Math.max(q.sin, q.con))) * 1.1;
+      const X = i => m.l + i / Math.max(1, hist.length - 1) * (w - m.l - m.r), Y = v => h - m.b - (v / top) * (h - m.t - m.b);
+      g.font = `10.5px ${MONO}`; g.fillStyle = COL.muted; g.textAlign = "right"; g.textBaseline = "middle";
+      for (const v of top > 12 ? [1, 5, 10, 15] : [1, 3, 5]) { g.strokeStyle = "rgba(141,147,163,.18)"; g.beginPath(); g.moveTo(m.l, Y(v) + .5); g.lineTo(w - m.r, Y(v) + .5); g.stroke(); g.fillText(v, m.l - 4, Y(v)); }
+      g.textAlign = "left"; g.textBaseline = "bottom"; g.fillText("casillas posibles por paso", m.l, h - 2);
+      for (const [k, col] of [["sin", COL.ember], ["con", COL.sonar]]) {
+        g.strokeStyle = col; g.lineWidth = modo === k ? 2.5 : 1.3; g.beginPath(); hist.forEach((q, i) => i ? g.lineTo(X(i), Y(q[k])) : g.moveTo(X(i), Y(q[k]))); g.stroke();
+      }
+      g.textAlign = "right"; g.textBaseline = "top"; g.fillStyle = COL.ember; g.fillText("sin memoria", w - m.r, 2); g.fillStyle = COL.sonar; g.fillText("con memoria", w - m.r, 14);
+      const ult = hist[hist.length - 1];
+      hud.innerHTML = `<span>siente <b>${txtLect(lectura(env, s))}</b></span><span>posibles sin memoria <b>${ult.sin}</b></span><span>con memoria <b>${ult.con}</b></span><span>lecturas distintas <b>${nLect}</b> para <b>${n}</b> casillas</span>`;
+      cap.innerHTML = modo === "con" ? (B.size === 1 ? "<b>Ubicado:</b> el camino dejó una sola casilla posible." : `El camino deja <b>${B.size}</b> casilla${B.size > 1 ? "s" : ""} posible${B.size > 1 ? "s" : ""}. Seguí caminando.`)
+        : `Solo con la lectura de ahora: <b>${ult.sin}</b> casillas se sienten igual.`;
+    }
+    function setModo(m) { modo = m; document.querySelectorAll("#seg2 button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === m)); dibujar(); }
+    document.querySelectorAll("#seg2 button").forEach(b => b.onclick = () => setModo(b.dataset.m));
+    document.querySelectorAll("#dpad2 button").forEach(b => b.onclick = () => mover(+b.dataset.a));
+    const TECLAS = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3 };
+    cv.addEventListener("keydown", e => { if (e.key in TECLAS) { e.preventDefault(); mover(TECLAS[e.key]); } });
+    cv.addEventListener("pointerdown", () => cv.focus());
+    ver.onchange = dibujar;
+    document.getElementById("b2otra").onclick = () => { let q; do q = Math.floor(R() * n); while (q === env.goal); reset(q); dibujar(); };
+    reset(env.idx["8,10"]); for (const a of [3, 3]) mover(a);
+    return { dibujar: () => { T.medir(); dibujar(); }, mover };
+  });
+
+  // =====================================================================
+  // 3. n-gramas de letras
+  // =====================================================================
+  const CORPUS = PESOS.corpus, VOCAB = [...PESOS.vocab];
+  const b3 = await tarea(() => {
+    const cv = document.getElementById("cv3"), out = document.getElementById("gen3"), hud = document.getElementById("hud3"), sl = document.getElementById("b3n"), on = document.getElementById("o3n");
+    const corte = CORPUS.indexOf("segundo día"), ENT = CORPUS.slice(0, corte), PRU = CORPUS.slice(corte);
+    const tablas = {}, tabla = (txt, n, k) => { const key = k + n; if (tablas[key]) return tablas[key]; const tb = new Map();
+      for (let i = 0; i + n <= txt.length; i++) { const c = txt.slice(i, i + n - 1), x = txt[i + n - 1]; let m = tb.get(c); if (!m) tb.set(c, m = new Map()); m.set(x, (m.get(x) || 0) + 1); } return (tablas[key] = tb); };
+    // error (nats por letra) en el tramo no visto, suavizado de Laplace α = 0,1 (como el notebook)
+    const V = new Set(CORPUS).size, ALFA = 0.1;
+    const ce = n => { const tb = tabla(ENT, n, "e"); let tot = 0, k = 0; for (let i = n - 1; i < PRU.length; i++) { const m = tb.get(PRU.slice(i - n + 1, i)); let N = 0, c = 0; if (m) { for (const v of m.values()) N += v; c = m.get(PRU[i]) || 0; } tot -= Math.log((c + ALFA) / (N + ALFA * V)); k++; } return tot / k; };
+    const CE = Array.from({ length: 10 }, (_, i) => ce(i + 1));
+    const tramos = new Set(); for (let i = 0; i + 20 <= CORPUS.length; i++) tramos.add(CORPUS.slice(i, i + 20));
+    let n = +sl.value, semilla = 1, texto = "", objetivo = "", raf = 0, ultimo = 0;
+    function generar() {
+      const R = Cueva.rng(semilla * 101 + n), tb = tabla(CORPUS, n, "c"); let s = CORPUS.slice(0, n - 1);
+      while (s.length < 260) { const m = tb.get(n > 1 ? s.slice(s.length - (n - 1)) : ""); if (!m) { s += " "; continue; }
+        let N = 0; for (const v of m.values()) N += v; let u = R() * N; for (const [x, v] of m) { u -= v; if (u <= 0) { s += x; break; } } }
+      return s;
+    }
+    function marcarCopiado(s) {
+      const cop = new Uint8Array(s.length); for (let i = 0; i + 20 <= s.length; i++) if (tramos.has(s.slice(i, i + 20))) cop.fill(1, i, i + 20);
+      return cop;
+    }
+    function mostrarTexto() {
+      const cop = marcarCopiado(texto); let html = "", dentro = false;
+      const esc = c => c === "<" ? "&lt;" : c === "&" ? "&amp;" : c;
+      for (let i = 0; i < texto.length; i++) { if (cop[i] && !dentro) { html += '<span class="cop">'; dentro = true; } if (!cop[i] && dentro) { html += "</span>"; dentro = false; } html += esc(texto[i]); }
+      if (dentro) html += "</span>"; if (texto.length < objetivo.length) html += '<span class="cur">&nbsp;</span>';
+      out.innerHTML = html; out.scrollTop = out.scrollHeight;
+      const fin = texto.length >= objetivo.length, pc = cop.reduce((a, b) => a + b, 0) / Math.max(1, texto.length);
+      let abiertos = 0, malos = 0; for (const c of texto) { if (c === "(") abiertos++; else if (c === ")") { if (abiertos) abiertos--; else malos++; } }
+      hud.innerHTML = `<span>contextos distintos <b>${tabla(CORPUS, n, "c").size.toLocaleString("es-AR")}</b></span><span>copiado tal cual <b>${fin ? Math.round(100 * pc) + " %" : "…"}</b></span>` +
+        `<span>error en texto no visto <b>${f2(CE[n - 1])}</b> nats/letra</span>` + (fin ? `<span>paréntesis sin cerrar <b>${abiertos}</b> · cerrados sin abrir <b>${malos}</b></span>` : "");
+    }
+    function dibujar() {
+      const ancho = cv.parentElement.clientWidth, apilado = ancho < 520, alto = apilado ? 330 : 190;
+      const { w, h, ctx } = Cueva.lienzo(cv, alto)(); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      const A = apilado ? { x: 0, y: 0, w, h: 150 } : { x: 0, y: 0, w: w * .5 - 8, h }, Bx = apilado ? { x: 0, y: 165, w, h: h - 165 } : { x: w * .5 + 8, y: 0, w: w * .5 - 8, h };
+      // A: qué letra viene después del contexto actual
+      const ctxTxt = n > 1 ? texto.slice(Math.max(0, texto.length - (n - 1))) : "";
+      const m = tabla(CORPUS, n, "c").get(ctxTxt); let filas = [];
+      if (m) { let N = 0; for (const v of m.values()) N += v; filas = [...m].map(([x, v]) => [x, v / N]).sort((a, b) => b[1] - a[1]).slice(0, 6); }
+      ctx.font = `600 12px ${MONO}`; ctx.fillStyle = COL.ink; ctx.textAlign = "left"; ctx.textBaseline = "top";
+      ctx.fillText(n > 1 ? `después de «${ctxTxt.replace(/ /g, "␣")}»` : "sin contexto (n = 1)", A.x + 4, A.y + 4);
+      const bh = Math.min(18, (A.h - 30) / 6), x0 = A.x + 34;
+      filas.forEach(([x, p], i) => { const y = A.y + 26 + i * (bh + 2);
+        ctx.fillStyle = COL.muted; ctx.font = `13px ${MONO}`; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(x === " " ? "␣" : x, x0 - 8, y + bh / 2);
+        ctx.fillStyle = i === 0 ? COL.lamp : "rgba(242,179,90,.55)"; ctx.fillRect(x0, y, Math.max(2, p * (A.w - 90)), bh);
+        ctx.fillStyle = COL.ink; ctx.textAlign = "left"; ctx.font = `11px ${MONO}`; ctx.fillText(f2(p), x0 + Math.max(2, p * (A.w - 90)) + 5, y + bh / 2); });
+      // B: error en texto no visto según n
+      const g = { l: Bx.x + 34, r: Bx.x + Bx.w - 6, t: Bx.y + 22, b: Bx.y + Bx.h - 20 };
+      const lo = 1.6, hi = 3.3, X = k => g.l + (k - 1) / 9 * (g.r - g.l), Y = v => g.b - (v - lo) / (hi - lo) * (g.b - g.t);
+      ctx.font = `600 12px ${MONO}`; ctx.fillStyle = COL.ink; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText("error en texto no visto", Bx.x + 4, Bx.y + 4);
+      ctx.font = `10.5px ${MONO}`; ctx.fillStyle = COL.muted; ctx.textBaseline = "middle"; ctx.textAlign = "right";
+      for (const v of [2, 2.5, 3]) { ctx.strokeStyle = "rgba(141,147,163,.18)"; ctx.beginPath(); ctx.moveTo(g.l, Y(v) + .5); ctx.lineTo(g.r, Y(v) + .5); ctx.stroke(); ctx.fillText(f1(v), g.l - 5, Y(v)); }
+      ctx.textAlign = "center"; ctx.textBaseline = "top"; for (let k = 1; k <= 10; k++) ctx.fillText(k, X(k), g.b + 5);
+      ctx.strokeStyle = COL.sonar; ctx.lineWidth = 2; ctx.beginPath(); CE.forEach((v, i) => { const yy = Y(Math.min(hi, v)); i ? ctx.lineTo(X(i + 1), yy) : ctx.moveTo(X(i + 1), yy); }); ctx.stroke();
+      CE.forEach((v, i) => { ctx.fillStyle = i + 1 === n ? COL.lamp : COL.sonar; ctx.beginPath(); ctx.arc(X(i + 1), Y(Math.min(hi, v)), i + 1 === n ? 6 : 3, 0, 7); ctx.fill(); });
+      // la RNN del notebook (GRU frenada a tiempo): referencia medida
+      const gru = 1.76; ctx.setLineDash([4, 4]); ctx.strokeStyle = COL.exit; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(g.l, Y(gru)); ctx.lineTo(g.r, Y(gru)); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = COL.exit; ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText("GRU del notebook", g.r, Y(gru) - 2);
+      ctx.fillStyle = COL.muted; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillText("n →", g.l - 30, g.b + 18);
+    }
+    function animar(now) {
+      raf = 0; const dt = Math.min(80, now - (ultimo || now)); ultimo = now;
+      const k = Math.max(1, Math.round(dt / 14)); texto = objetivo.slice(0, Math.min(objetivo.length, texto.length + k));
+      mostrarTexto(); dibujar(); if (texto.length < objetivo.length) raf = requestAnimationFrame(animar);
+    }
+    function correr() { cancelAnimationFrame(raf); objetivo = generar(); if (reducir) { texto = objetivo; mostrarTexto(); dibujar(); } else { texto = objetivo.slice(0, n - 1); ultimo = 0; raf = requestAnimationFrame(animar); } }
+    sl.oninput = () => { n = +sl.value; on.textContent = n; correr(); };
+    document.getElementById("b3gen").onclick = () => { semilla++; correr(); };
+    objetivo = generar(); texto = objetivo; mostrarTexto(); dibujar();
+    return { dibujar };
+  });
+
+  // =====================================================================
+  // 4. La RNN de juguete (Elman, 32 estados, entrenada con el mismo diario)
+  // =====================================================================
+  const EL = PESOS.elman, HN = EL.Whh.length, VI = new Map(VOCAB.map((c, i) => [c, i]));
+  function pasoElman(h, k) { const o = new Float64Array(HN); for (let j = 0; j < HN; j++) { let z = EL.b[j] + EL.Wxh[j][k]; const w = EL.Whh[j]; for (let i = 0; i < HN; i++) z += w[i] * h[i]; o[j] = Math.tanh(z); } return o; }
+  function salidaElman(h) { const V = VOCAB.length, lo = new Float64Array(V); let mx = -1e9; for (let v = 0; v < V; v++) { let z = EL.by[v]; const w = EL.Why[v]; for (let i = 0; i < HN; i++) z += w[i] * h[i]; lo[v] = z; mx = Math.max(mx, z); } let S = 0; for (let v = 0; v < V; v++) { lo[v] = Math.exp(lo[v] - mx); S += lo[v]; } for (let v = 0; v < V; v++) lo[v] /= S; return lo; }
+  const limpiar = s => [...s.toLowerCase()].filter(c => VI.has(c)).join("");
+  function leer(texto) { let h = new Float64Array(HN); const H = [], P = []; for (const c of texto) { h = pasoElman(h, VI.get(c)); H.push(h); P.push(salidaElman(h)); } return { H, P }; }
+  const CLASES = ["espacio", "vocal", "consonante", "signo"], COLCL = ["#5ec8d8", "#f2b35a", "#c58cf2", "#e0645a"];
+  document.getElementById("ley4").innerHTML = CLASES.map((c, i) => `<span><i style="background:${COLCL[i]}"></i>predice ${c}</span>`).join("") + `<span><i style="background:var(--ink)"></i>tu texto</span>`;
+  const b4 = await tarea(() => {
+    const inp = document.getElementById("b4txt"), cva = document.getElementById("cv4a"), cvb = document.getElementById("cv4b"), hud = document.getElementById("hud4"), temp = document.getElementById("b4temp");
+    const EJEMPLO = inp.value; let texto = limpiar(EJEMPLO), L = leer(texto), sel = texto.length - 1, raf = 0, generando = 0, ultimo = 0, acum = 0, R = Cueva.rng(5);
+    const proy = h => { let x = 0, y = 0; for (let i = 0; i < HN; i++) { const d = h[i] - EL.mu[i]; x += d * EL.pc[0][i]; y += d * EL.pc[1][i]; } return [x, y]; };
+    const F = EL.fondo; let ex = [Infinity, -Infinity], ey = [Infinity, -Infinity]; for (const [x, y] of F) { ex = [Math.min(ex[0], x), Math.max(ex[1], x)]; ey = [Math.min(ey[0], y), Math.max(ey[1], y)]; }
+    let colsVis = 0, x0col = 0, cw = 10, top = 22;
+    function dibujarA() {
+      const ancho = cva.parentElement.clientWidth; cw = Math.max(9, Math.min(15, Math.floor((ancho - 6) / Math.max(24, texto.length))));
+      colsVis = Math.min(texto.length, Math.floor((ancho - 6) / cw)); x0col = texto.length - colsVis; if (sel < x0col) sel = x0col;
+      const rh = 3, alto = top + HN * rh + 8 + 3 * 17 + 6; const { w, h, ctx } = Cueva.lienzo(cva, alto)();
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      for (let t = x0col; t < texto.length; t++) {
+        const x = 3 + (t - x0col) * cw, c = texto[t];
+        ctx.font = `12px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = t === sel ? COL.lamp : COL.ink; ctx.fillText(c === " " ? "␣" : c, x + cw / 2, 10);
+        for (let j = 0; j < HN; j++) { const v = L.H[t][j]; ctx.fillStyle = Cueva.rampa("signo", (v + 1) / 2); ctx.fillRect(x, top + j * rh, cw - 1, rh); }
+      }
+      const xs = 3 + (sel - x0col) * cw; ctx.strokeStyle = COL.lamp; ctx.lineWidth = 1.5; ctx.strokeRect(xs - .5, top - 1, cw, HN * rh + 2);
+      // ramitas: las tres letras que espera después de la columna elegida
+      const p = L.P[sel], top3 = [...p.keys()].sort((a, b) => p[b] - p[a]).slice(0, 3), yb = top + HN * rh + 8;
+      top3.forEach((k, i) => { const y = yb + i * 17, x = Math.max(3, Math.min(w - 140, xs - 20));
+        ctx.fillStyle = COL.muted; ctx.font = `12px ${MONO}`; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(VOCAB[k] === " " ? "␣" : VOCAB[k], x + 12, y + 7);
+        ctx.fillStyle = i ? "rgba(242,179,90,.55)" : COL.lamp; ctx.fillRect(x + 18, y + 1, Math.max(2, p[k] * 90), 12);
+        ctx.fillStyle = COL.ink; ctx.textAlign = "left"; ctx.font = `11px ${MONO}`; ctx.fillText(f2(p[k]), x + 22 + Math.max(2, p[k] * 90), y + 7); });
+      return { top3, p };
+    }
+    function dibujarB() {
+      const ancho = cvb.parentElement.clientWidth, alto = Math.round(Math.min(330, Math.max(240, ancho * .62)));
+      const { w, h, ctx } = Cueva.lienzo(cvb, alto)(); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      const pad = 14, X = x => pad + (x - ex[0]) / (ex[1] - ex[0]) * (w - 2 * pad), Y = y => h - pad - (y - ey[0]) / (ey[1] - ey[0]) * (h - 2 * pad);
+      F.forEach(([x, y], i) => { ctx.fillStyle = COLCL[EL.fondoClase[i]]; ctx.globalAlpha = .35; ctx.beginPath(); ctx.arc(X(x), Y(y), 2.2, 0, 7); ctx.fill(); }); ctx.globalAlpha = 1;
+      const Z = L.H.map(proy), desde = Math.max(0, Math.min(sel, texto.length - 1) - 11), hasta = Math.min(texto.length, desde + 12);
+      for (let t = desde + 1; t < hasta; t++) { const a = .15 + .75 * (t - desde) / (hasta - desde); ctx.strokeStyle = `rgba(232,230,223,${a.toFixed(2)})`; ctx.lineWidth = 1 + 1.5 * a;
+        ctx.beginPath(); ctx.moveTo(X(Z[t - 1][0]), Y(Z[t - 1][1])); ctx.lineTo(X(Z[t][0]), Y(Z[t][1])); ctx.stroke(); }
+      ctx.font = `600 11px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      for (let t = desde; t < hasta; t++) { const [x, y] = Z[t], c = texto[t], es = t === sel, a = .35 + .65 * (t - desde + 1) / (hasta - desde);
+        ctx.fillStyle = es ? COL.lamp : `rgba(232,230,223,${a.toFixed(2)})`; ctx.beginPath(); ctx.arc(X(x), Y(y), es ? 9 : 6.5, 0, 7); ctx.fill();
+        ctx.fillStyle = "#0b0d12"; ctx.fillText(c === " " ? "␣" : c, X(x), Y(y) + .5); }
+      ctx.fillStyle = COL.muted; ctx.font = `10.5px ${MONO}`; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText("hₜ en un plano (últimas 12 letras)", 6, 4);
+    }
+    function dibujar() {
+      const { top3, p } = dibujarA(); dibujarB();
+      const c = texto[sel];
+      hud.innerHTML = `<span>paso <b>${sel + 1}</b> de ${texto.length}</span><span>leyó <b>«${texto.slice(Math.max(0, sel - 11), sel + 1).replace(/ /g, "␣")}»</b></span><span>espera <b>${top3.map(k => `'${VOCAB[k] === " " ? "␣" : VOCAB[k]}' ${f2(p[k])}`).join(" · ")}</b></span>`;
+    }
+    function muestrear() { const p = L.P[L.P.length - 1], T = +temp.value; let S = 0; const q = p.map(v => Math.pow(v, 1 / T)); for (const v of q) S += v; let u = R() * S; for (let k = 0; k < q.length; k++) { u -= q[k]; if (u <= 0) return k; } return q.length - 1; }
+    function agregar(k) { const c = VOCAB[k]; const h = pasoElman(L.H[L.H.length - 1], k); texto += c; L.H.push(h); L.P.push(salidaElman(h)); sel = texto.length - 1; }
+    function loop(now) {
+      raf = 0; const dt = Math.min(100, now - (ultimo || now)); ultimo = now; acum += dt;
+      while (acum > 70 && generando > 0) { acum -= 70; agregar(muestrear()); generando--; }
+      dibujar(); if (generando > 0) raf = requestAnimationFrame(loop); else { inp.value = texto.slice(-90); }
+    }
+    document.getElementById("b4gen").onclick = () => {
+      if (texto.length > 150) { texto = texto.slice(-60); L = leer(texto); }
+      if (reducir) { for (let i = 0; i < 50; i++) agregar(muestrear()); inp.value = texto.slice(-90); dibujar(); return; }
+      generando = 50; acum = 0; ultimo = 0; if (!raf) raf = requestAnimationFrame(loop);
+    };
+    temp.oninput = () => { document.getElementById("o4temp").textContent = f1(+temp.value); };
+    inp.addEventListener("input", () => { generando = 0; const t = limpiar(inp.value); texto = t.length ? t : " "; L = leer(texto); sel = texto.length - 1; dibujar(); });
+    document.getElementById("b4reset").onclick = () => { generando = 0; inp.value = EJEMPLO; inp.dispatchEvent(new Event("input")); };
+    const elegir = e => { const b = cva.getBoundingClientRect(); const t = x0col + Math.floor((e.clientX - b.left - 3) / cw); if (t >= x0col && t < texto.length && t !== sel) { sel = t; dibujar(); } };
+    cva.addEventListener("pointerdown", elegir); cva.addEventListener("pointermove", e => { if (e.buttons || e.pointerType === "mouse") elegir(e); });
+    cvb.addEventListener("pointerdown", e => { const b = cvb.getBoundingClientRect(), w = b.width, h = b.height, pad = 14; let best = -1, bd = 400;
+      L.H.forEach((hh, t) => { if (t < sel - 11 || t > sel) return; const [x, y] = proy(hh); const px = pad + (x - ex[0]) / (ex[1] - ex[0]) * (w - 2 * pad), py = h - pad - (y - ey[0]) / (ey[1] - ey[0]) * (h - 2 * pad); const d = (px - e.clientX + b.left) ** 2 + (py - e.clientY + b.top) ** 2; if (d < bd) { bd = d; best = t; } });
+      if (best >= 0) { sel = best; dibujar(); } });
+    dibujar();
+    return { dibujar };
+  });
+
+  // =====================================================================
+  // 5. El agente con memoria (cueva grande, imitación)
+  // =====================================================================
+  const AG = PESOS.agente;
+  const mv = (W, x, b) => W.map((f, j) => { let z = b[j]; for (let i = 0; i < x.length; i++) z += f[i] * x[i]; return z; });
+  const obsAg = (s, ap) => { const o = lectura(envG, s).concat([0, 0, 0, 0]); if (ap !== null) o[4 + ap] = 1; return o; };
+  const argmax = v => { let a = 0; for (let k = 1; k < v.length; k++) if (v[k] > v[a]) a = k; return a; };
+  function actSin(o) { const S = AG.sin; const a1 = mv(S.W1, o, S.b1).map(Math.tanh), a2 = mv(S.W2, a1, S.b2).map(Math.tanh); return argmax(mv(S.W3, a2, S.b3)); }
+  function pasoGRU(h, o) {
+    const G = AG.con, H = h.length, gi = mv(G.Wih, o, G.bih), gh = mv(G.Whh, h, G.bhh), out = new Array(H);
+    for (let j = 0; j < H; j++) { const r = sig(gi[j] + gh[j]), z = sig(gi[H + j] + gh[H + j]), nn = Math.tanh(gi[2 * H + j] + r * gh[2 * H + j]); out[j] = (1 - z) * nn + z * h[j]; }
+    return out;
+  }
+  const actCon = h => argmax(mv(AG.con.Wo, h, AG.con.bo));
+  function creeGRU(h) { const lo = mv(AG.sonda.W, h, AG.sonda.b); const mx = Math.max(...lo); let S = 0; const p = lo.map(v => { const e = Math.exp(v - mx); S += e; return e; }); return p.map(v => v / S); }
+  function partida(s0, T = 200) {
+    const sin = [s0], con = [s0], cree = []; let s = s0, ap = null;
+    for (let t = 0; t < T && s !== envG.goal; t++) { const a = actSin(obsAg(s, ap)); s = envG.move(s, a)[0]; ap = a; sin.push(s); }
+    s = s0; ap = null; let h = new Array(AG.con.Whh[0].length).fill(0);
+    for (let t = 0; t < T && s !== envG.goal; t++) { h = pasoGRU(h, obsAg(s, ap)); cree.push(creeGRU(h)); const a = actCon(h); s = envG.move(s, a)[0]; ap = a; con.push(s); }
+    return { sin, con, cree };
+  }
+  const b5 = await tarea(() => {
+    const env = envG, cv = document.getElementById("cv5"), hud = document.getElementById("hud5"), btn = document.getElementById("b5play"), cap = document.getElementById("cap5");
+    const T = Cueva.tablero(cv, env, { maxCell: 28 });
+    let modo = "cree", s0, J, t, jugando = false, raf = 0, ultimo = 0, acum = 0, atascadas = [], iAtasco = 0, global = null;
+    function nueva(s) { s0 = s; J = partida(s); t = Math.max(J.sin.length, J.con.length) - 1; }
+    const largo = () => Math.max(J.sin.length, J.con.length) - 1;
+    function dibujar() {
+      const ctx = T.ctx, cell = T.cell; T.fondo("#000").paredes("#1a1f2c");
+      const kc = Math.min(t, J.con.length - 1), ks = Math.min(t, J.sin.length - 1);
+      if (modo === "cree" && J.cree.length) { const p = J.cree[Math.min(Math.max(0, t - 1), J.cree.length - 1)], mx = Math.max(...p);
+        for (let s = 0; s < env.nS; s++) if (p[s] > .01 * mx) { const [r, c] = env.free[s]; T.casilla(r, c, `rgba(94,200,216,${(.15 + .75 * p[s] / mx).toFixed(3)})`, 1); } }
+      T.salida(); T.entrada();
+      const [r0, c0] = env.free[s0]; ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.strokeRect(c0 * cell + 1.5, r0 * cell + 1.5, cell - 3, cell - 3);
+      const off = Math.max(1.5, cell * .12);
+      const linea = (path, k, color, d) => { ctx.strokeStyle = color; ctx.lineWidth = Math.max(2, cell * .13); ctx.lineJoin = "round"; ctx.lineCap = "round"; ctx.beginPath();
+        path.slice(0, k + 1).forEach((s, i) => { const [r, c] = env.free[s]; const x = c * cell + cell / 2 + d, y = r * cell + cell / 2 + d; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke(); };
+      linea(J.sin, ks, "rgba(224,100,90,.75)", -off); linea(J.con, kc, "rgba(242,179,90,.85)", off);
+      const punto = (s, color, d) => { const [r, c] = env.free[s]; ctx.fillStyle = color; ctx.beginPath(); ctx.arc(c * cell + cell / 2 + d, r * cell + cell / 2 + d, Math.max(3, cell * .3), 0, 7); ctx.fill(); ctx.strokeStyle = "#000"; ctx.lineWidth = 1; ctx.stroke(); };
+      punto(J.sin[ks], COL.ember, -off); punto(J.con[kc], COL.lamp, off);
+      const estado = (path, k) => path[path.length - 1] === env.goal ? (k >= path.length - 1 ? `<b style="color:var(--exit)">salió en ${path.length - 1}</b>` : `paso <b>${k}</b>`) : (k >= path.length - 1 ? `<b style="color:var(--ember)">trabada (200 pasos)</b>` : `paso <b>${k}</b>`);
+      hud.innerHTML = `<span style="color:var(--ember)">sin memoria</span><span>${estado(J.sin, ks)}</span><span style="color:var(--lamp)">con memoria</span><span>${estado(J.con, kc)}</span><span>óptimo <b>${env.dist[s0]}</b></span>` +
+        (global ? `<span>desde todas: sin memoria sale de <b>${global.sin}</b> de ${global.n} · con memoria de <b>${global.con}</b></span>` : `<span>evaluando las ${env.nS - 1} salidas…</span>`);
+    }
+    function loop(now) {
+      raf = 0; if (!jugando) return; const dt = Math.min(100, now - (ultimo || now)); ultimo = now; acum += dt;
+      while (acum > 90) { acum -= 90; t++; } if (t >= Math.min(largo(), 120) && largo() > 0) { t = largo(); dibujar(); play(false); return; }
+      dibujar(); raf = requestAnimationFrame(loop);
+    }
+    function play(on) { jugando = on; btn.textContent = on ? "Pausa" : "Jugar"; ultimo = 0; if (on && !raf) { if (t >= largo()) t = 0; raf = requestAnimationFrame(loop); } }
+    btn.onclick = () => play(!jugando);
+    document.getElementById("b5paso").onclick = () => { play(false); if (t >= largo()) t = 0; else t++; dibujar(); };
+    document.getElementById("b5atasco").onclick = () => { if (!atascadas.length) return; play(false); iAtasco = (iAtasco + 1) % atascadas.length; nueva(atascadas[iAtasco]); t = 0; play(!reducir); if (reducir) { t = largo(); dibujar(); } };
+    cv.addEventListener("pointerdown", e => { const [r, c] = T.celdaEn(e); const s = env.idx[r + "," + c]; if (s === undefined || s === env.goal) return; play(false); nueva(s); t = 0; if (reducir) { t = largo(); dibujar(); } else play(true); });
+    document.querySelectorAll("#seg5 button").forEach(b => b.onclick = () => { modo = b.dataset.m; document.querySelectorAll("#seg5 button").forEach(x => x.setAttribute("aria-pressed", x === b)); dibujar(); });
+    nueva(env.start); dibujar();
+    // evaluación desde todas las salidas, en tandas para no trabar la página
+    (async () => {
+      let sin = 0, con = 0; const lista = [];
+      for (let s = 0; s < env.nS; s++) { if (s === env.goal) continue; const p = partida(s); if (p.sin[p.sin.length - 1] === env.goal) sin++; else lista.push(s); if (p.con[p.con.length - 1] === env.goal) con++; if (s % 12 === 11) await new Promise(r => setTimeout(r, 0)); }
+      atascadas = lista; global = { sin, con, n: env.nS - 1 }; dibujar();
+      cap.innerHTML = `Tocá una casilla para que los dos larguen desde ahí. La red común se traba desde <b>${lista.length}</b> de ${env.nS - 1} casillas.`;
+    })();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // 6. Puente: olvido medido con el gradiente, y la escala
+  // =====================================================================
+  const b6 = await tarea(() => {
+    const cv = document.getElementById("cv6"), hud = document.getElementById("hud6");
+    const FRASE = limpiar("toco la pared (la de la izquierda) y doblo");
+    // red sin entrenar: mismos tamaños, pesos al azar (uniforme ±1/√32, como PyTorch al inicializar)
+    const Rr = Cueva.rng(3), lim = 1 / Math.sqrt(HN), U = () => (Rr() * 2 - 1) * lim;
+    const AZAR = { Wxh: EL.Wxh.map(f => f.map(U)), Whh: EL.Whh.map(f => f.map(U)), b: EL.b.map(() => 2 * U()) };
+    function gradiente(Wt, texto) {   // |∂‖h_T‖/∂x_i| para cada letra i (retropropagación a mano)
+      let h = new Float64Array(HN); const Hs = [];
+      for (const c of texto) { const k = VI.get(c), o = new Float64Array(HN); for (let j = 0; j < HN; j++) { let z = Wt.b[j] + Wt.Wxh[j][k]; for (let i = 0; i < HN; i++) z += Wt.Whh[j][i] * h[i]; o[j] = Math.tanh(z); } Hs.push(o); h = o; }
+      const nT = Math.hypot(...h) || 1; let g = Array.from(h, v => v / nT); const out = new Array(texto.length);
+      for (let t = texto.length - 1; t >= 0; t--) {
+        const a = g.map((v, j) => v * (1 - Hs[t][j] ** 2));
+        // la entrada es one-hot: el gradiente respecto de x_i es la columna entera W_xhᵀ a; medimos su norma
+        let nrm = 0; for (let k = 0; k < VOCAB.length; k++) { let q = 0; for (let j = 0; j < HN; j++) q += Wt.Wxh[j][k] * a[j]; nrm += q * q; } out[t] = Math.sqrt(nrm);
+        const gn = new Array(HN).fill(0); for (let i = 0; i < HN; i++) { let q = 0; for (let j = 0; j < HN; j++) q += Wt.Whh[j][i] * a[j]; gn[i] = q; } g = gn;
+      }
+      return out;
+    }
+    let modo = "rnn", fin = FRASE.length - 1;
+    const QWEN = 494e6, NUES = HN * (VOCAB.length + HN + 2) + VOCAB.length * (HN + 1);
+    function dibujar() {
+      const ancho = cv.parentElement.clientWidth, alto = 300; const { w, h, ctx } = Cueva.lienzo(cv, alto)(); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      const texto = FRASE.slice(0, fin + 1), n = texto.length, cw = Math.min(16, (w - 42) / FRASE.length), x0 = 36, yL = 176;
+      ctx.font = `12px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      for (let i = 0; i < FRASE.length; i++) { ctx.fillStyle = i === fin ? COL.lamp : i < n ? COL.ink : "rgba(141,147,163,.4)"; ctx.fillText(FRASE[i] === " " ? "␣" : FRASE[i], x0 + i * cw + cw / 2, yL); }
+      const xF = x0 + fin * cw + cw / 2;
+      if (modo === "rnn") {
+        const ga = gradiente(AZAR, texto), ge = gradiente(EL, texto), base = 152, top = 42;
+        const norm = arr => { const m = arr[n - 1] || 1; return arr.map(v => v / m); }, A = norm(ga), E = norm(ge);
+        const DEC = 6, Y = v => base - Math.max(0, Math.min(DEC + .3, Math.log10(Math.max(v, 1e-12)) + DEC)) / (DEC + .3) * (base - top);
+        ctx.font = `10px ${MONO}`; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+        for (const [e, lab] of [[0, "1"], [-2, "10⁻²"], [-4, "10⁻⁴"], [-6, "10⁻⁶"]]) { ctx.strokeStyle = "rgba(141,147,163,.16)"; ctx.beginPath(); ctx.moveTo(x0, Y(10 ** e) + .5); ctx.lineTo(w - 6, Y(10 ** e) + .5); ctx.stroke(); ctx.fillStyle = COL.muted; ctx.fillText(lab, x0 - 4, Y(10 ** e)); }
+        for (let i = 0; i < n; i++) { const x = x0 + i * cw; ctx.fillStyle = "rgba(141,147,163,.8)"; ctx.fillRect(x + 1, Y(A[i]), cw / 2 - 1.5, base - Y(A[i])); ctx.fillStyle = COL.lamp; ctx.fillRect(x + cw / 2, Y(E[i]), cw / 2 - 1.5, base - Y(E[i])); }
+        // la cadena: cada letra le pasa el estado a la siguiente
+        ctx.strokeStyle = "rgba(242,179,90,.5)"; ctx.lineWidth = 1.2; for (let i = 0; i < n - 1; i++) { const x = x0 + i * cw + cw / 2; ctx.beginPath(); ctx.moveTo(x + 4, yL + 13); ctx.lineTo(x + cw - 4, yL + 13); ctx.stroke(); }
+        ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.font = `11px ${MONO}`; ctx.fillStyle = "rgba(141,147,163,.95)"; ctx.fillText("■ sin entrenar", 6, 6); ctx.fillStyle = COL.lamp; ctx.fillText("■ entrenada", 120, 6);
+        ctx.fillStyle = COL.muted; ctx.fillText("|∂h_T/∂xᵢ| / |∂h_T/∂x_T|, en escala log", 6, 18);
+        const k = Math.max(0, n - 16); hud.innerHTML = `<span>última letra <b>'${FRASE[fin] === " " ? "␣" : FRASE[fin]}'</b></span><span>la letra de hace ${n - 1 - k} pasos pesa: sin entrenar <b>${A[k].toExponential(1).replace(".", ",")}</b>, entrenada <b>${f2(E[k])}</b></span>`;
+      } else {
+        // esquema (no medido): desde la última letra, una flecha a cada letra anterior; grosor ilustrativo
+        const R = Cueva.rng(fin + 11);
+        for (let i = 0; i < n - 1; i++) { const x = x0 + i * cw + cw / 2, wgt = .15 + .85 * (texto[i] === "(" || texto[i] === ")" || i > n - 4 ? 1 : R() * .5);
+          ctx.strokeStyle = `rgba(94,200,216,${(.2 + .7 * wgt).toFixed(2)})`; ctx.lineWidth = .6 + 2.6 * wgt; ctx.beginPath(); ctx.moveTo(xF, yL - 10); ctx.quadraticCurveTo((xF + x) / 2, yL - 20 - Math.min(130, Math.abs(xF - x) * .55), x, yL - 10); ctx.stroke(); }
+        ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.font = `11px ${MONO}`; ctx.fillStyle = COL.muted; ctx.fillText("esquema: la última letra mira a todas en un solo paso", 6, 6);
+        hud.innerHTML = `<span>última letra <b>'${FRASE[fin] === " " ? "␣" : FRASE[fin]}'</b></span><span>mira directo a <b>${n - 1}</b> letras anteriores, sin pasar por la cadena</span><span>es un dibujo, no un modelo entrenado</span>`;
+      }
+      // escala, en logaritmo
+      const yE = 226, lg = v => Math.log10(v), X = v => 8 + (lg(v) - 3) / (lg(QWEN) - 3 + .3) * (w - 16);
+      ctx.font = `11px ${MONO}`; ctx.textBaseline = "middle";
+      for (const [v, nom, col, y] of [[NUES, "esta red: " + NUES.toLocaleString("es-AR") + " pesos", COL.lamp, yE], [QWEN, "Qwen2.5-0.5B: 494 millones", COL.sonar, yE + 30]]) {
+        ctx.fillStyle = col; ctx.fillRect(8, y - 6, Math.max(3, X(v) - 8), 12); ctx.fillStyle = COL.ink; const tx = X(v) + 6; ctx.textAlign = tx > w - 190 ? "right" : "left"; ctx.fillText(nom, tx > w - 190 ? X(v) - 6 : tx, y); if (tx > w - 190) { ctx.fillStyle = "#0b0d12"; ctx.fillText(nom, X(v) - 6, y); }
+      }
+      ctx.fillStyle = COL.muted; ctx.textAlign = "left"; ctx.fillText("cantidad de pesos (escala logarítmica)", 8, h - 9);
+    }
+    document.querySelectorAll("#seg6 button").forEach(b => b.onclick = () => { modo = b.dataset.m; document.querySelectorAll("#seg6 button").forEach(x => x.setAttribute("aria-pressed", x === b)); dibujar(); });
+    cv.addEventListener("pointerdown", e => { const b = cv.getBoundingClientRect(), cw = Math.min(16, (b.width - 42) / FRASE.length), i = Math.floor((e.clientX - b.left - 36) / cw); if (i >= 1 && i < FRASE.length) { fin = i; dibujar(); } });
+    cv.addEventListener("keydown", e => { if (e.key === "ArrowLeft" && fin > 1) { fin--; dibujar(); } if (e.key === "ArrowRight" && fin < FRASE.length - 1) { fin++; dibujar(); } });
+    dibujar();
+    return { dibujar };
+  });
+
+  let tm = 0;
+  addEventListener("resize", () => { clearTimeout(tm); tm = setTimeout(() => { b1.dibujar(); b2.dibujar(); b3.dibujar(); b4.dibujar(); b5.dibujar(); b6.dibujar(); }, 80); });
+  Cueva.alCargarSprites(() => { b1.dibujar(); b2.dibujar(); });
+})();
+</script>
+</body>
+</html>

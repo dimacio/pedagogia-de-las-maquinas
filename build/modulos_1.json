@@ -1,0 +1,137 @@
+{
+  "objetivos": [
+    "Distinguir educación bancaria de educación problematizadora (Freire) y explicar por qué el curso propone enseñarle a una máquina en lugar de recibir contenidos.",
+    "Explicar qué significa que un feed optimice con γ ≈ 0 y relacionarlo con la recompensa inmediata.",
+    "Explicar la relación entre cuidado de sí y conocimiento de sí que plantea Foucault, y leerla como la pregunta de quién elige la función de recompensa.",
+    "Usar fidelidad, fecundidad y longevidad (Dawkins) para explicar cómo se propaga el curso."
+  ],
+  "tiempo": {
+    "pagina": 40
+  },
+  "previos": [],
+  "requisitos": [
+    "Ninguno: es la puerta de entrada del curso.",
+    "Antes de la clase 2, jugar la cueva en modo fácil y en modo difícil."
+  ],
+  "cuestionario": [
+    {
+      "pregunta": "Para Freire, ¿qué caracteriza a la educación bancaria?",
+      "opciones": [
+        {
+          "texto": "Que el docente deposita contenidos en un alumno que los recibe pasivamente.",
+          "explicacion": "Correcto. Es la imagen del depósito: el saber va en una sola dirección y el alumno no actúa sobre el mundo."
+        },
+        {
+          "texto": "Que enseña finanzas y economía.",
+          "explicacion": "No: «bancaria» es una metáfora del depósito, no el tema que se enseña."
+        },
+        {
+          "texto": "Que parte de un problema real y se resuelve en diálogo.",
+          "explicacion": "No: eso describe la educación problematizadora, la que Freire le opone."
+        },
+        {
+          "texto": "Que se cobra por cada clase.",
+          "explicacion": "No: la crítica de Freire no es sobre el costo sino sobre la relación entre quien enseña y quien aprende."
+        }
+      ],
+      "correcta": 0
+    },
+    {
+      "pregunta": "En la figura del feed se dice que funciona con γ ≈ 0. ¿Qué significa?",
+      "opciones": [
+        {
+          "texto": "Que no muestra ningún contenido.",
+          "explicacion": "No: muestra contenido sin parar; γ no mide cuánto muestra."
+        },
+        {
+          "texto": "Que pesa el futuro tanto como el presente.",
+          "explicacion": "No: eso sería γ cerca de 1."
+        },
+        {
+          "texto": "Que elige cada contenido mirando solo la recompensa inmediata, el próximo clic.",
+          "explicacion": "Correcto. Con γ ≈ 0 lo que pase después no cuenta en la decisión de ahora."
+        },
+        {
+          "texto": "Que el usuario elige cada tarjeta.",
+          "explicacion": "No: en la figura las tarjetas llegan solas; tus decisiones quedan en 0."
+        }
+      ],
+      "correcta": 2
+    },
+    {
+      "pregunta": "¿Qué sostiene Foucault en La hermenéutica del sujeto sobre el «conócete a ti mismo»?",
+      "opciones": [
+        {
+          "texto": "Que es una invención moderna sin antecedentes griegos.",
+          "explicacion": "No: el gnothi seauton es un precepto antiguo; lo que analiza Foucault es su relación con el cuidado de sí."
+        },
+        {
+          "texto": "Que en la Antigüedad era una parte del cuidado de sí, y que la modernidad lo separó y lo puso por delante.",
+          "explicacion": "Correcto. Esa inversión es la que el curso relee como la pregunta de quién elige la recompensa."
+        },
+        {
+          "texto": "Que conocerse a uno mismo es imposible y conviene dejarlo.",
+          "explicacion": "No: el curso no le atribuye esa tesis; habla de la relación entre conocerse y cuidarse."
+        },
+        {
+          "texto": "Que el cuidado de sí consiste en consumir menos tecnología.",
+          "explicacion": "No: es una lectura que el curso no hace; cuidarse, en esta clase, es poder ver y elegir los propios pesos."
+        }
+      ],
+      "correcta": 1
+    },
+    {
+      "pregunta": "En la figura del meme, cada persona enseña a 2 personas en promedio, la copia sale bien el 40 % de las veces y cada una enseña una sola ronda. ¿Qué pasa?",
+      "opciones": [
+        {
+          "texto": "La luz cruza toda la cueva, porque 2 es mayor que 1.",
+          "explicacion": "No: la fecundidad sola no alcanza; las copias infieles no enseñan."
+        },
+        {
+          "texto": "Depende solo de dónde se siembra.",
+          "explicacion": "El lugar influye en un pasillo cerrado, pero lo que decide es R."
+        },
+        {
+          "texto": "Crece sin límite, porque la longevidad es 1.",
+          "explicacion": "No: longevidad 1 es la mínima; no agrega rondas."
+        },
+        {
+          "texto": "Tiende a apagarse: R ≈ 2 × 0,4 × 1 = 0,8, menor que 1.",
+          "explicacion": "Correcto. Con R menor que 1 cada ronda hay, en promedio, menos personas enseñando que en la anterior."
+        }
+      ],
+      "correcta": 3
+    },
+    {
+      "pregunta": "¿Qué dice el curso sobre la dopamina y las redes?",
+      "opciones": [
+        {
+          "texto": "Que el «loop de dopamina» está demostrado y explica la adicción a las redes.",
+          "explicacion": "No: el curso lo presenta como metáfora y aclara que la adicción a redes es un tema en debate."
+        },
+        {
+          "texto": "Que hay evidencia de que la dopamina señala un error de predicción de recompensa (Schultz, Dayan y Montague, 1997), y que el «loop de dopamina» es una metáfora.",
+          "explicacion": "Correcto. Lo primero se ve en la clase 4 junto al aprendizaje por diferencias temporales; lo segundo es una advertencia honesta."
+        },
+        {
+          "texto": "Que la dopamina no tiene relación con la recompensa.",
+          "explicacion": "No: justamente el trabajo de 1997 la vincula con el error de predicción de recompensa."
+        },
+        {
+          "texto": "Que el curso cura el uso excesivo del celular.",
+          "explicacion": "No: el curso no promete eso; propone ver el mecanismo."
+        }
+      ],
+      "correcta": 1
+    }
+  ],
+  "actividad": {
+    "titulo": "¿Qué te premia?",
+    "consigna": "Elegí los pesos de tu día en la figura de Foucault y publicá los cuatro números, junto con una actividad de ayer cuyo premio eligió otra persona o una app. Contá además qué tuviste que recordar para salir de la cueva en modo difícil. Otra persona te devuelve con la rúbrica.",
+    "rubrica": [
+      "Los pesos están justificados con un ejemplo concreto del propio día, no en abstracto.",
+      "Se identifica quién eligió la recompensa de la actividad nombrada y se dice si se la elegiría igual.",
+      "Lo recordado en modo difícil se describe como historia y se separa la parte que alcanzó para decidir (el estado)."
+    ]
+  }
+}

@@ -1,0 +1,141 @@
+{
+  "objetivos": [
+    "Explicar con la cueva qué es una cadena de Markov y leer su matriz de transición P.",
+    "Distinguir observación de estado y explicar por qué la cueva con solo bigotes es un POMDP que pide memoria.",
+    "Generar texto con n-gramas de letras y explicar su límite: nunca recuerdan más de n − 1 letras y con n grande copian.",
+    "Describir una red recurrente (hₜ = tanh(W_hh hₜ₋₁ + W_xh xₜ + b)) y comparar un agente con memoria (GRU) contra uno sin memoria."
+  ],
+  "tiempo": {
+    "pagina": 35,
+    "notebook": 75
+  },
+  "previos": [
+    "2",
+    "6"
+  ],
+  "requisitos": [
+    "Conviene haber jugado la cueva en modo difícil (clase 2).",
+    "El notebook usa PyTorch en CPU (en Colab ya viene instalado) y corre en un par de minutos."
+  ],
+  "cuestionario": [
+    {
+      "pregunta": "El caminante al azar de la cueva es una cadena de Markov. ¿Qué quiere decir eso?",
+      "opciones": [
+        {
+          "texto": "Que adónde va en el próximo paso depende solo de la casilla en la que está ahora.",
+          "explicacion": "Correcto. Por eso todo su comportamiento entra en una tabla P de 60 × 60: una fila por casilla de partida."
+        },
+        {
+          "texto": "Que recuerda las paredes que ya tocó.",
+          "explicacion": "Es al revés: no recuerda nada, y por eso vuelve a chocar con la misma pared una y otra vez."
+        },
+        {
+          "texto": "Que siempre termina en la salida en menos de 20 pasos.",
+          "explicacion": "Termina llegando, pero muy de a poco: a los 80 pasos la nube todavía casi no salió."
+        },
+        {
+          "texto": "Que la matriz P cambia en cada paso.",
+          "explicacion": "No: la tabla es la misma en todos los pasos; lo que cambia es la nube pₜ que se multiplica por ella."
+        }
+      ],
+      "correcta": 0
+    },
+    {
+      "pregunta": "En la cueva chica hay 60 casillas y solo 12 lecturas distintas de los bigotes. ¿Qué consecuencia tiene para el agente?",
+      "opciones": [
+        {
+          "texto": "Ninguna: con los bigotes alcanza para saber dónde está.",
+          "explicacion": "No: un pasillo vertical se siente igual en toda la cueva, y en unos conviene subir y en otros bajar."
+        },
+        {
+          "texto": "La observación no alcanza para decidir: es un POMDP, y hace falta un resumen de la historia.",
+          "explicacion": "Correcto. Ese resumen (el conjunto de casillas compatibles con lo vivido) es el estado de creencia; con memoria se achica hasta una sola casilla."
+        },
+        {
+          "texto": "Hay que agregar más bigotes hasta tener 60 lecturas.",
+          "explicacion": "Con cuatro bigotes hay como mucho 16 lecturas. La salida no es sentir más, sino recordar."
+        },
+        {
+          "texto": "El agente tiene que moverse al azar.",
+          "explicacion": "Moverse al azar es lo que hace el caminante sin memoria del paso 1: llega, pero tarde."
+        }
+      ],
+      "correcta": 1
+    },
+    {
+      "pregunta": "En el paso 3, el error del n-grama sobre un texto no visto baja hasta n = 3 y después sube. ¿Por qué sube?",
+      "opciones": [
+        {
+          "texto": "Porque con n grande la tabla tiene menos contextos.",
+          "explicacion": "Es al revés: la tabla crece con n (de 38 contextos con n = 2 a miles con n = 8)."
+        },
+        {
+          "texto": "Porque las letras del texto no visto son distintas.",
+          "explicacion": "Son las mismas 38. El problema es la combinación: los contextos largos nuevos casi nunca aparecieron antes."
+        },
+        {
+          "texto": "Porque cada contexto largo se vio pocas veces (muchos, una sola): la tabla copia el corpus y no sabe qué hacer con un contexto nuevo.",
+          "explicacion": "Correcto. Por eso con n = 8 el texto generado copia tramos enteros del diario, y con un contexto que nunca vio no tiene nada que contar."
+        },
+        {
+          "texto": "Porque el corpus está mal escrito.",
+          "explicacion": "No: el problema aparece con cualquier corpus finito. Con más texto el mínimo se corre a un n más grande, pero no desaparece."
+        }
+      ],
+      "correcta": 2
+    },
+    {
+      "pregunta": "En la red recurrente hₜ = tanh(W_hh hₜ₋₁ + W_xh xₜ + b), ¿qué cambia de un paso al siguiente?",
+      "opciones": [
+        {
+          "texto": "Las tablas W_hh y W_xh, que se reentrenan con cada letra.",
+          "explicacion": "No: las tablas son las mismas en todos los pasos. Por eso la red no crece con el texto."
+        },
+        {
+          "texto": "El estado hₜ: cada letra lo empuja, y resume lo que se leyó hasta ahí.",
+          "explicacion": "Correcto. La regla no cambia; el estado sí. Es un sistema dinámico donde las letras son las fuerzas."
+        },
+        {
+          "texto": "La cantidad de dimensiones de hₜ, que crece con el texto.",
+          "explicacion": "No: son siempre 32 números, se lean 5 letras o 5.000."
+        },
+        {
+          "texto": "Nada: la red solo mira la última letra, como un 2-grama.",
+          "explicacion": "Mira la última letra y el estado que dejaron todas las anteriores; eso es lo que la diferencia de un n-grama."
+        }
+      ],
+      "correcta": 1
+    },
+    {
+      "pregunta": "En la cueva grande, sintiendo bigotes y su última acción, la red común sale desde 88 de 154 casillas y la GRU desde todas. Las dos se entrenaron por imitación. ¿Qué explica la diferencia?",
+      "opciones": [
+        {
+          "texto": "La GRU tiene un estado que resume el camino, y con eso distingue casillas que se sienten igual; la red común, ante la misma lectura, decide siempre lo mismo y se traba yendo y viniendo.",
+          "explicacion": "Correcto. La sonda lo muestra: desde el estado de la GRU se puede leer en qué casilla está, cada vez mejor a medida que camina."
+        },
+        {
+          "texto": "La GRU se entrenó con RL y la red común por imitación.",
+          "explicacion": "No: las dos se entrenaron igual, copiando a un experto (behavior cloning). DRQN, la versión con RL, no converge en los minutos de una clase."
+        },
+        {
+          "texto": "La GRU ve el mapa.",
+          "explicacion": "No: recibe exactamente los mismos 8 números que la red común."
+        },
+        {
+          "texto": "La red común tiene muy pocos pesos.",
+          "explicacion": "Tiene menos (1.476 contra 4.164), pero no es eso: una red sin memoria, del tamaño que sea, ante la misma lectura y la misma última acción decide siempre lo mismo."
+        }
+      ],
+      "correcta": 0
+    }
+  ],
+  "actividad": {
+    "titulo": "Un cuaderno para la cueva",
+    "consigna": "Elegí una casilla de la cueva chica y escribí la lista de acciones que harías desde ahí sin ver el mapa, sintiendo solo los bigotes. Al lado de cada paso anotá qué guardás en la cabeza (tu cuaderno) y cuántas casillas siguen siendo posibles (podés contarlas con la figura del paso 2). Publicá la lista y en una oración explicá qué anotación fue la que te ubicó. Un compañero repite tu recorrido desde otra casilla con la misma lectura inicial y te devuelve la rúbrica.",
+    "rubrica": [
+      "Cada paso dice qué se sintió, qué se hizo y qué se anotó, de forma que otra persona lo pueda repetir.",
+      "Se cuenta cuántas casillas quedan posibles después de cada paso y se ve cómo se achica la nube.",
+      "La explicación final nombra qué parte de la historia ubicó al jugador y la relaciona con el estado oculto de una red recurrente."
+    ]
+  }
+}

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Título corto de la clase · RL a ciegas</title>
+<meta name="description" content="Una oración sobre la clase.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  /* estilos propios de esta página, solo con tokens de estilo.css */
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase N · bloque</div>
+    <h1>Título de la <span class="g">clase</span></h1>
+    <p class="thesis">La idea central en una oración, dicha desde la cueva.</p>
+  </section>
+
+  <!-- Bloque 1: primero la figura interactiva, después el texto corto (ver y después leer) -->
+  <section class="bloque">
+    <div class="stage">
+      <canvas id="cv1" aria-label="Descripción de la figura"></canvas>
+      <div class="hud" id="hud1"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 1</div>
+      <h2>Qué estamos viendo</h2>
+      <p>Dos o tres oraciones.</p>
+      <div class="eq">fórmula corta</div>
+      <div class="row"><button class="btn primary" id="b1">Acción</button></div>
+      <p class="nota pregunta">Pregunta para pensar.</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+  const env = Cueva.makeEnv(Cueva.MAPS.chica);
+  const T = Cueva.tablero(document.getElementById("cv1"), env);
+  function dibujar() { T.medir().fondo().paredes().salida().entrada().sprite(env.start, 2); }
+  Cueva.alCargarSprites(dibujar); dibujar();
+  addEventListener("resize", dibujar);
+  Cueva.pagina("1", { lecturas: [{ texto: "Sutton y Barto, cap. 1", url: "http://incompleteideas.net/book/the-book-2nd.html" }] });
+</script>
+</body>
+</html>
