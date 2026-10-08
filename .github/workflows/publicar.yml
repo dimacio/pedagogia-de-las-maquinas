@@ -1,0 +1,116 @@
+# Publica una versión: en cada tag v* corre los chequeos rápidos, publica el sitio en GitHub Pages y crea el release
+# con la sección de CHANGELOG.md de esa versión (CONVENCIONES §4).
+# Requiere Settings → Pages → Source: "GitHub Actions".
+name: publicar
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  chequeos:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-fabrica.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Entrada del CHANGELOG
+        run: python fabrica/chequeos/changelog.py "${GITHUB_REF_NAME}" > notas.md
+
+      - name: Dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-fabrica.txt
+          python -m ipykernel install --user --name python3
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Chequeos (modo rápido)
+        run: python fabrica/chequeos/correr.py --rapido --reporte fabrica/reportes/reporte.md
+
+      - name: Subir reporte
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: publicar-${{ github.ref_name }}
+          path: |
+            fabrica/reportes/reporte.md
+            fabrica/reportes/trazabilidad.html
+            fabrica/reportes/capturas/
+          if-no-files-found: warn
+
+      - name: Armar el sitio
+        run: |
+          mkdir _site
+          rsync -a --exclude-from=- ./ _site/ <<'LISTA'
+          .git/
+          .github/
+          build/
+          fabrica/
+          specs/
+          node_modules/
+          _site/
+          notas.md
+          requirements-fabrica.txt
+          package.json
+          package-lock.json
+          __pycache__/
+          .ipynb_checkpoints/
+          LISTA
+          touch _site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Guardar notas del release
+        uses: actions/upload-artifact@v4
+        with:
+          name: notas
+          path: notas.md
+
+  pages:
+    needs: chequeos
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+  release:
+    needs: pages
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: notas
+      - name: Crear release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release create "${GITHUB_REF_NAME}" --title "RL a ciegas ${GITHUB_REF_NAME}" --notes-file notas.md --verify-tag

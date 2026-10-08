@@ -825,4 +825,4 @@ print(f"Tiempo total del notebook: {(time.time() - T0) / 60:.1f} min · modelo: 
 """))
 
 if __name__ == "__main__":
-    save(cells, "10-agentes-de-lenguaje.ipynb")
+    save(cells, "10-agentes-de-lenguaje.ipynb", lento=True)

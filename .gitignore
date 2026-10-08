@@ -3,3 +3,11 @@ __pycache__/
 .ipynb_checkpoints/
 build/shots/
 build/img_*/
+
+# fábrica: salidas de los chequeos
+node_modules/
+fabrica/reportes/capturas/
+fabrica/reportes/reporte.md
+
+# referencias externas con derechos: no se versionan
+referencias/**/*.pdf

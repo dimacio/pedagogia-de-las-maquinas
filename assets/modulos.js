@@ -1,11 +1,13 @@
 /* modulos.js — datos de cada clase de "RL a ciegas" (MOOC libre).
    Lo lee Cueva.pagina() para armar "Antes de empezar", el cuestionario y la actividad entre pares.
+   Una entrada por clase, en orden: 0a, 0b, 0c (nivelación) y 1 … 12.
    Cada clase:
-     objetivos     3–4 verbos observables
+     objetivos     4 verbos observables; el i-ésimo es Oi en specs/<id>.md
      tiempo        minutos estimados { pagina, notebook }
      previos       ids de clases que conviene haber hecho
      requisitos    otros requisitos (texto)
-     cuestionario  5 preguntas: { pregunta, opciones: [{ texto, explicacion }], correcta: índice }
+     cuestionario  5 o 6 preguntas: { objetivo: "Ox", pregunta, opciones: [{ texto, explicacion }], correcta: índice }
+                   objetivo = id del objetivo del spine que evalúa la pregunta (fabrica/CONVENCIONES.md §2)
      actividad     { titulo, consigna, rubrica: [3 criterios] } para devolver en GitHub Discussions
    Texto plano: Cueva.pagina() escapa todo, no usar HTML acá. */
 window.MODULOS = {
@@ -21,6 +23,7 @@ window.MODULOS = {
     requisitos: ["Ninguno: es el punto de partida del curso.", "Para el notebook, una cuenta de Google para abrirlo en Colab (o Python con NumPy y Matplotlib)."],
     cuestionario: [
       {
+        objetivo: "O2",
         pregunta: "En la matriz M de la cueva, la entrada S está en M[1, 1] y no en M[0, 0]. ¿Por qué?",
         opciones: [
           { texto: "Porque los índices empiezan en 0 y la fila 0 y la columna 0 son el borde de pared.", explicacion: "Correcto. El borde es todo #, así que la primera casilla libre está en la fila 1, columna 1." },
@@ -31,6 +34,7 @@ window.MODULOS = {
         correcta: 0
       },
       {
+        objetivo: "O3",
         pregunta: "Las acciones son desplazamientos (dr, dc). ¿Cuál corresponde a ir hacia arriba (↑)?",
         opciones: [
           { texto: "[1, 0]", explicacion: "No: sumar 1 a la fila baja una casilla, porque las filas crecen hacia abajo." },
@@ -41,6 +45,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O2",
         pregunta: "¿Qué devuelve M[:, 3]?",
         opciones: [
           { texto: "La fila 3 completa.", explicacion: "No: la fila 3 es M[3] o M[3, :]. Los dos puntos van en la posición que se recorre entera." },
@@ -51,6 +56,7 @@ window.MODULOS = {
         correcta: 2
       },
       {
+        objetivo: "O1",
         pregunta: "La cueva chica tiene 10 filas y 14 columnas. Como imagen a color, ¿qué forma tiene el arreglo?",
         opciones: [
           { texto: "(10, 14, 3)", explicacion: "Correcto. Alto × ancho × 3 canales (rojo, verde y azul) para cada pixel." },
@@ -61,6 +67,7 @@ window.MODULOS = {
         correcta: 0
       },
       {
+        objetivo: "O4",
         pregunta: "El camino más corto a la salida tiene 20 pasos y el agente al azar tarda cientos o miles. ¿Por qué no mejora de una partida a la siguiente?",
         opciones: [
           { texto: "Porque el límite de 5000 pasos por partida es muy bajo.", explicacion: "No: con más paciencia llega más seguido, pero sigue sin mejorar entre partidas." },
@@ -94,6 +101,7 @@ window.MODULOS = {
     requisitos: ["Fracciones y porcentajes; no hace falta haber cursado probabilidad."],
     cuestionario: [
       {
+        objetivo: "O1",
         pregunta: "Con slip = 0,2, el agente intenta ir hacia abajo desde una casilla sin paredes a los costados. ¿Con qué probabilidad termina en la casilla de la derecha?",
         opciones: [
           { texto: "0,8", explicacion: "Esa es la probabilidad de ir adonde quería (1 − slip), hacia abajo." },
@@ -104,6 +112,7 @@ window.MODULOS = {
         correcta: 2
       },
       {
+        objetivo: "O1",
         pregunta: "La frecuencia observada se acerca a la probabilidad exacta al repetir. ¿Cuántas tiradas más hacen falta para reducir el error a la mitad?",
         opciones: [
           { texto: "El doble.", explicacion: "No: el error típico baja como 1/√n, así que duplicar n lo reduce solo a un 71 %." },
@@ -114,6 +123,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O3",
         pregunta: "Cada intento sale bien con probabilidad p = 1 − slip. Si el piso resbala la mitad de las veces, ¿cuántos intentos esperás en promedio hasta el primer éxito?",
         opciones: [
           { texto: "1", explicacion: "Solo si nunca resbalara (p = 1)." },
@@ -124,6 +134,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O4",
         pregunta: "El agente conoce el mapa pero no sabe dónde está. Intenta ir hacia arriba y choca. ¿Qué hace la regla de Bayes con su creencia?",
         opciones: [
           { texto: "Nada: chocar no da información.", explicacion: "No: chocar es información. Descarta todas las casillas donde arriba no hay pared." },
@@ -134,6 +145,7 @@ window.MODULOS = {
         correcta: 2
       },
       {
+        objetivo: "O2",
         pregunta: "Recompensa +1 al llegar a la salida, 0 en el resto, y la partida dura exactamente 20 pasos. ¿Cuánto vale el retorno G = Σ γᵗ·r[t+1]?",
         opciones: [
           { texto: "1", explicacion: "Solo si γ = 1. Con descuento, una recompensa que llega tarde pesa menos." },
@@ -167,6 +179,7 @@ window.MODULOS = {
     requisitos: ["Saber multiplicar una matriz por un vector (se repasa en la clase)."],
     cuestionario: [
       {
+        objetivo: "O2",
         pregunta: "Con la política al azar, una casilla tiene dos vecinas libres y dos paredes. ¿Qué tiene su fila de P?",
         opciones: [
           { texto: "¼ en cada vecina libre y ½ en la diagonal.", explicacion: "Correcto. Cada flecha vale ¼; las dos que chocan dejan al agente donde estaba, y eso suma ½ en la diagonal." },
@@ -177,6 +190,7 @@ window.MODULOS = {
         correcta: 0
       },
       {
+        objetivo: "O3",
         pregunta: "Arrancando con V = 0, ¿cuántas multiplicaciones V ← R + γPV hacen falta para que la entrada S tenga un valor distinto de cero?",
         opciones: [
           { texto: "1", explicacion: "Después de una multiplicación solo valen algo las vecinas de la salida." },
@@ -187,6 +201,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O4",
         pregunta: "Si la cueva tuviera un millón de casillas, ¿qué convendría?",
         opciones: [
           { texto: "Resolver (I − γP)V = R con eliminación gaussiana.", explicacion: "Con un millón de incógnitas la eliminación es carísima en tiempo y memoria." },
@@ -197,16 +212,18 @@ window.MODULOS = {
         correcta: 1
       },
       {
-        pregunta: "¿Qué controla la velocidad con la que cae el error de la iteración?",
+        objetivo: "O1",
+        pregunta: "En la cueva mini, las 11 casillas libres se numeran de izquierda a derecha y de arriba abajo, empezando en 0 por la entrada S. ¿Qué número le toca a la casilla libre que está justo debajo de S?",
         opciones: [
-          { texto: "El orden en que numeramos las casillas.", explicacion: "No: renumerar cambia el dibujo de la matriz, no sus autovalores ni la velocidad." },
-          { texto: "El valor de la recompensa en la salida.", explicacion: "No: R escala el resultado pero no la velocidad con la que se llega." },
-          { texto: "El descuento γ: el error se multiplica por a lo sumo γ en cada vuelta.", explicacion: "Correcto. En escala log el error cae como una recta, nunca más despacio que la pendiente log γ." },
-          { texto: "La cantidad de paredes.", explicacion: "Las paredes cambian P, pero la cota de velocidad la fija γ." }
+          { texto: "5", explicacion: "Correcto. La fila de S tiene cinco casillas libres (0 a 4, con la salida en el 4), así que la primera libre de la fila siguiente es la 5." },
+          { texto: "1", explicacion: "No: 1 es la vecina de la derecha de S, en la misma fila." },
+          { texto: "15", explicacion: "No: 15 es la posición en la grilla completa (fila 2 × 7 columnas + columna 1), contando paredes. El vector solo numera las casillas libres." },
+          { texto: "6", explicacion: "No: 6 es la primera casilla de la fila de abajo de todo; la de debajo de S es la única libre de la fila del medio." }
         ],
-        correcta: 2
+        correcta: 0
       },
       {
+        objetivo: "O3",
         pregunta: "¿Por qué ningún autovalor de P puede ser mayor que 1 en valor absoluto?",
         opciones: [
           { texto: "Porque P es simétrica.", explicacion: "No: P en general no es simétrica (hay casillas con más choques que sus vecinas)." },
@@ -228,13 +245,84 @@ window.MODULOS = {
     }
   },
 
-  // placeholder: lo completa quien escribe la clase 1
   "1": {
-    objetivos: [],
-    tiempo: {},
+    objetivos: [
+      "Distinguir educación bancaria de educación problematizadora (Freire) y explicar por qué el curso propone enseñarle a una máquina en lugar de recibir contenidos.",
+      "Explicar qué significa que un feed optimice con γ ≈ 0 y relacionarlo con la recompensa inmediata.",
+      "Explicar la relación entre cuidado de sí y conocimiento de sí que plantea Foucault, y leerla como la pregunta de quién elige la función de recompensa.",
+      "Usar fidelidad, fecundidad y longevidad (Dawkins) para explicar cómo se propaga el curso."
+    ],
+    tiempo: { pagina: 40 },
     previos: [],
-    requisitos: []
+    requisitos: ["Ninguno: es la puerta de entrada del curso.", "Antes de la clase 2, jugar la cueva en modo fácil y en modo difícil."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "Para Freire, ¿qué caracteriza a la educación bancaria?",
+        opciones: [
+          { texto: "Que el docente deposita contenidos en un alumno que los recibe pasivamente.", explicacion: "Correcto. Es la imagen del depósito: el saber va en una sola dirección y el alumno no actúa sobre el mundo." },
+          { texto: "Que enseña finanzas y economía.", explicacion: "No: «bancaria» es una metáfora del depósito, no el tema que se enseña." },
+          { texto: "Que parte de un problema real y se resuelve en diálogo.", explicacion: "No: eso describe la educación problematizadora, la que Freire le opone." },
+          { texto: "Que se cobra por cada clase.", explicacion: "No: la crítica de Freire no es sobre el costo sino sobre la relación entre quien enseña y quien aprende." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O2",
+        pregunta: "En la figura del feed se dice que funciona con γ ≈ 0. ¿Qué significa?",
+        opciones: [
+          { texto: "Que no muestra ningún contenido.", explicacion: "No: muestra contenido sin parar; γ no mide cuánto muestra." },
+          { texto: "Que pesa el futuro tanto como el presente.", explicacion: "No: eso sería γ cerca de 1." },
+          { texto: "Que elige cada contenido mirando solo la recompensa inmediata, el próximo clic.", explicacion: "Correcto. Con γ ≈ 0 lo que pase después no cuenta en la decisión de ahora." },
+          { texto: "Que el usuario elige cada tarjeta.", explicacion: "No: en la figura las tarjetas llegan solas; tus decisiones quedan en 0." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O3",
+        pregunta: "¿Qué sostiene Foucault en La hermenéutica del sujeto sobre el «conócete a ti mismo»?",
+        opciones: [
+          { texto: "Que es una invención moderna sin antecedentes griegos.", explicacion: "No: el gnothi seauton es un precepto antiguo; lo que analiza Foucault es su relación con el cuidado de sí." },
+          { texto: "Que en la Antigüedad era una parte del cuidado de sí, y que la modernidad lo separó y lo puso por delante.", explicacion: "Correcto. Esa inversión es la que el curso relee como la pregunta de quién elige la recompensa." },
+          { texto: "Que conocerse a uno mismo es imposible y conviene dejarlo.", explicacion: "No: el curso no le atribuye esa tesis; habla de la relación entre conocerse y cuidarse." },
+          { texto: "Que el cuidado de sí consiste en consumir menos tecnología.", explicacion: "No: es una lectura que el curso no hace; cuidarse, en esta clase, es poder ver y elegir los propios pesos." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O4",
+        pregunta: "En la figura del meme, cada persona enseña a 2 personas en promedio, la copia sale bien el 40 % de las veces y cada una enseña una sola ronda. ¿Qué pasa?",
+        opciones: [
+          { texto: "La luz cruza toda la cueva, porque 2 es mayor que 1.", explicacion: "No: la fecundidad sola no alcanza; las copias infieles no enseñan." },
+          { texto: "Depende solo de dónde se siembra.", explicacion: "El lugar influye en un pasillo cerrado, pero lo que decide es R." },
+          { texto: "Crece sin límite, porque la longevidad es 1.", explicacion: "No: longevidad 1 es la mínima; no agrega rondas." },
+          { texto: "Tiende a apagarse: R ≈ 2 × 0,4 × 1 = 0,8, menor que 1.", explicacion: "Correcto. Con R menor que 1 cada ronda hay, en promedio, menos personas enseñando que en la anterior." }
+        ],
+        correcta: 3
+      },
+      {
+        objetivo: "O2",
+        pregunta: "¿Qué dice el curso sobre la dopamina y las redes?",
+        opciones: [
+          { texto: "Que el «loop de dopamina» está demostrado y explica la adicción a las redes.", explicacion: "No: el curso lo presenta como metáfora y aclara que la adicción a redes es un tema en debate." },
+          { texto: "Que hay evidencia de que la dopamina señala un error de predicción de recompensa (Schultz, Dayan y Montague, 1997), y que el «loop de dopamina» es una metáfora.", explicacion: "Correcto. Lo primero se ve en la clase 4 junto al aprendizaje por diferencias temporales; lo segundo es una advertencia honesta." },
+          { texto: "Que la dopamina no tiene relación con la recompensa.", explicacion: "No: justamente el trabajo de 1997 la vincula con el error de predicción de recompensa." },
+          { texto: "Que el curso cura el uso excesivo del celular.", explicacion: "No: el curso no promete eso; propone ver el mecanismo." }
+        ],
+        correcta: 1
+      }
+    ],
+    actividad: {
+      titulo: "¿Qué te premia?",
+      consigna: "Elegí los pesos de tu día en la figura de Foucault y publicá los cuatro números, junto con una actividad de ayer cuyo premio eligió otra persona o una app. Contá además qué tuviste que recordar para salir de la cueva en modo difícil. Otra persona te devuelve con la rúbrica.",
+      rubrica: [
+        "Los pesos están justificados con un ejemplo concreto del propio día, no en abstracto.",
+        "Se identifica quién eligió la recompensa de la actividad nombrada y se dice si se la elegiría igual.",
+        "Lo recordado en modo difícil se describe como historia y se separa la parte que alcanzó para decidir (el estado)."
+      ]
+    }
   },
+
   "2": {
     objetivos: [
       "Identificar agente, entorno, acción, observación y recompensa en la cueva y en otro problema.",
@@ -247,6 +335,7 @@ window.MODULOS = {
     requisitos: ["Haber jugado un rato a la cueva a ciegas en modo fácil."],
     cuestionario: [
       {
+        objetivo: "O1",
         pregunta: "En la cueva el agente recibe 0 durante 21 pasos seguidos y +1 al final. ¿Qué dificultad muestra eso?",
         opciones: [
           { texto: "Que la recompensa es escasa y llega tarde: mientras recibe 0, perderse y acercarse se ven igual.", explicacion: "Correcto. Sin pistas intermedias, el agente no sabe si iba bien hasta que llega." },
@@ -257,6 +346,7 @@ window.MODULOS = {
         correcta: 0
       },
       {
+        objetivo: "O2",
         pregunta: "¿Qué es el estado?",
         opciones: [
           { texto: "La historia completa de acciones, observaciones y recompensas.", explicacion: "Eso es la historia hₜ. El estado es un resumen de ella." },
@@ -267,16 +357,18 @@ window.MODULOS = {
         correcta: 1
       },
       {
-        pregunta: "Las historias A y B son distintas pero terminan en la misma casilla. Si el agente sabe su casilla, ¿qué dice el supuesto de Markov?",
+        objetivo: "O4",
+        pregunta: "Para enderezar al tutor cambiás la recompensa: +1 por cada resta acertada y 0 por todo lo demás. ¿Qué trampa nueva podría aparecer?",
         opciones: [
-          { texto: "Que hay que elegir según cuál de las dos historias fue más corta.", explicacion: "No: el largo del camino previo no cambia qué conviene hacer ahora." },
-          { texto: "Que desde ahí conviene lo mismo: dada la casilla, el camino previo no importa.", explicacion: "Correcto. p(sₜ₊₁ | sₜ, aₜ) = p(sₜ₊₁ | hₜ, aₜ)." },
-          { texto: "Que el futuro es completamente al azar.", explicacion: "No: Markov habla de qué información alcanza, no de azar." },
-          { texto: "Que hay que guardar las dos historias.", explicacion: "Justamente lo contrario: con la casilla alcanza." }
+          { texto: "Ninguna: si solo se premian las restas, el tutor tiene que enseñar a restar.", explicacion: "No: premiar restas acertadas no es lo mismo que premiar que el alumno aprenda; el tutor puede cobrar sin que aprenda." },
+          { texto: "Dar restas cada vez más fáciles (como 5 − 0) para cobrar aciertos sin que el alumno aprenda a restar de verdad.", explicacion: "Correcto. El tutor sigue optimizando el número que le pedimos: si lo que paga es acertar restas, conviene que sean triviales." },
+          { texto: "Volver a dar solo sumas, porque son más fáciles.", explicacion: "No: con esta recompensa una suma acertada paga 0, así que las sumas dejaron de convenir." },
+          { texto: "Dejar de dar problemas, porque ya no hay castigo por equivocarse.", explicacion: "No: sin problemas no cobra nada; la recompensa sigue empujando a dar restas, y el riesgo está en cuáles." }
         ],
         correcta: 1
       },
       {
+        objetivo: "O2",
         pregunta: "Si el agente solo siente cuatro bigotes (paredes vecinas), las 60 casillas dan 12 lecturas distintas. ¿Por qué eso rompe el supuesto de Markov?",
         opciones: [
           { texto: "Porque 12 lecturas son demasiadas para aprender.", explicacion: "No: el problema no es la cantidad, es que se mezclan casillas distintas." },
@@ -287,6 +379,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O3",
         pregunta: "El tutor cobra +1 si el alumno acierta y −1 si se equivoca. ¿Qué política le da más recompensa?",
         opciones: [
           { texto: "Alternar sumas y restas.", explicacion: "Ese alumno aprende más, pero el tutor cobra menos: el alumno se equivoca mucho al principio." },
@@ -320,6 +413,7 @@ window.MODULOS = {
     requisitos: [],
     cuestionario: [
       {
+        objetivo: "O1",
         pregunta: "¿Un γ grande hace que pesen más las recompensas inmediatas?",
         opciones: [
           { texto: "Sí: γ grande significa apuro.", explicacion: "Al revés: con γ = 0,5 la curva de pesos se desploma en pocos pasos; con γ = 0,99 casi no baja." },
@@ -330,6 +424,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O2",
         pregunta: "Evaluando la política al azar, V(S) ≈ 0,014. ¿Qué dice ese número?",
         opciones: [
           { texto: "Que S está a 14 pasos de la salida.", explicacion: "No: V no mide distancia; la salida está a 20 pasos." },
@@ -340,6 +435,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O3",
         pregunta: "¿Qué cambia de la evaluación de una política a la iteración de valor?",
         opciones: [
           { texto: "En vez de promediar las acciones con π(a|s), se queda con la mejor (max).", explicacion: "Correcto. Es la ecuación de Bellman de optimalidad: V*(s) = maxₐ [ … ]." },
@@ -350,6 +446,7 @@ window.MODULOS = {
         correcta: 0
       },
       {
+        objetivo: "O4",
         pregunta: "Con γ = 1 y sin costo por paso, ¿qué pasa en la iteración de valor?",
         opciones: [
           { texto: "El agente llega más rápido que nunca.", explicacion: "Al revés: no llega." },
@@ -360,6 +457,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O4",
         pregunta: "Con slip = 0,4 en esta cueva, ¿qué cambia en la política óptima?",
         opciones: [
           { texto: "Las flechas cambian por completo.", explicacion: "No: sin pozos ni peligros, la mejor dirección sigue siendo la misma." },
@@ -393,6 +491,7 @@ window.MODULOS = {
     requisitos: [],
     cuestionario: [
       {
+        objetivo: "O1",
         pregunta: "¿En qué se diferencia TD(0) de Monte Carlo?",
         opciones: [
           { texto: "TD necesita el mapa y Monte Carlo no.", explicacion: "No: ninguno de los dos usa P ni R; los dos aprenden de lo que pasó." },
@@ -403,6 +502,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O1",
         pregunta: "Con partidas cortadas a 200 pasos, Monte Carlo se estanca. ¿Qué le falta al retorno de una partida cortada?",
         opciones: [
           { texto: "La parte del futuro que no se jugó: si no llegó a la salida, el retorno es 0 aunque estuviera cerca.", explicacion: "Correcto. Monte Carlo solo promedia lo que vio; TD, en cambio, usa su estimación del lugar donde quedó." },
@@ -413,6 +513,7 @@ window.MODULOS = {
         correcta: 0
       },
       {
+        objetivo: "O2",
         pregunta: "Q(s,a) = 0,2, α = 0,5, r = 0, γ = 0,9 y maxₐ' Q(s',a') = 0,6. ¿Cuánto vale Q(s,a) después de la actualización de Q-learning?",
         opciones: [
           { texto: "0,54", explicacion: "Ese es el objetivo r + γ·max Q = 0,54. Con α = 0,5 solo se avanza la mitad del camino." },
@@ -423,6 +524,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O3",
         pregunta: "Con ε = 0,4, SARSA estima un V(S) más bajo que Q-learning aunque los dos encuentran el mismo camino. ¿Por qué?",
         opciones: [
           { texto: "Porque SARSA aprende más despacio.", explicacion: "No es una cuestión de velocidad: después de 500 partidas la diferencia se mantiene." },
@@ -433,6 +535,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O4",
         pregunta: "En el mapa de visitas, las flechas aprendidas que no son óptimas están casi todas en casillas por las que el agente dejó de pasar. ¿Qué enseña eso?",
         opciones: [
           { texto: "Que Q-learning está mal implementado.", explicacion: "No: es un comportamiento esperable del algoritmo." },
@@ -466,6 +569,7 @@ window.MODULOS = {
     requisitos: [],
     cuestionario: [
       {
+        objetivo: "O1",
         pregunta: "En la cueva grande la recompensa es 0 en todos lados salvo la salida. ¿Por qué ε-greedy no la encuentra?",
         opciones: [
           { texto: "Porque ε = 0,1 es demasiado chico; con ε = 0,5 la encontraría.", explicacion: "El problema no es ε: sin recompensa, la parte greedy tampoco sabe adónde ir." },
@@ -476,6 +580,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O2",
         pregunta: "El optimismo inicial (Q = 1 en todo) gana por lejos en la tabla. ¿Por qué no se puede usar igual en Atari?",
         opciones: [
           { texto: "Porque en Atari la recompensa máxima no es 1.", explicacion: "Se podría elegir otro valor alto; el obstáculo es otro." },
@@ -486,6 +591,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O3",
         pregunta: "Go-Explore corrige el desapego con ___ y el descarrilamiento con ___.",
         opciones: [
           { texto: "un premio por novedad / un ε más chico.", explicacion: "El premio por novedad es la curiosidad, que justamente sufre de desapego." },
@@ -496,6 +602,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O3",
         pregunta: "Con P(volver sin desviarse) ≈ (1 − ¾ε)^L, ε = 0,1 y un camino de 40 pasos, ¿qué fracción de los intentos llega?",
         opciones: [
           { texto: "Alrededor del 90 %.", explicacion: "Eso sería para un solo paso con ε = 0,1 o poco más. Cuarenta pasos multiplican el riesgo." },
@@ -506,6 +613,7 @@ window.MODULOS = {
         correcta: 2
       },
       {
+        objetivo: "O4",
         pregunta: "Go-Explore reduce cada pantalla a una celda chica en tonos de gris. ¿Qué pasa si la reducción es muy fina?",
         opciones: [
           { texto: "Todo se mezcla y el archivo no distingue lugares.", explicacion: "Eso pasa si es muy gruesa." },
@@ -539,6 +647,7 @@ window.MODULOS = {
     requisitos: ["Haber visto alguna vez una red neuronal ayuda, pero no es necesario.", "El notebook usa PyTorch en CPU (en Colab ya viene instalado)."],
     cuestionario: [
       {
+        objetivo: "O1",
         pregunta: "¿Qué tamaño tiene la tabla Q de la cueva chica?",
         opciones: [
           { texto: "60 × 4: una fila por casilla libre y una columna por acción.", explicacion: "Correcto. Por eso se puede mirar como una imagen de 60 × 4." },
@@ -549,6 +658,7 @@ window.MODULOS = {
         correcta: 0
       },
       {
+        objetivo: "O2",
         pregunta: "Una red lineal sin sesgo con entrada one-hot, ¿en qué se diferencia de la tabla Q?",
         opciones: [
           { texto: "En nada: sus pesos son la tabla, y cada paso de gradiente cambia un solo casillero.", explicacion: "Correcto. La red empieza a ser útil cuando la entrada describe la casilla y casillas parecidas se parecen." },
@@ -559,6 +669,7 @@ window.MODULOS = {
         correcta: 0
       },
       {
+        objetivo: "O3",
         pregunta: "En DQN el objetivo r + γ max Q(s′, a′) usa la misma red que se está entrenando. ¿Para qué sirve la red objetivo?",
         opciones: [
           { texto: "Para explorar más.", explicacion: "La exploración la controla ε, no la red objetivo." },
@@ -569,6 +680,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O4",
         pregunta: "En las casillas poco visitadas, el error de la tabla es 0,660 y el de la red 0,044. ¿Por qué la red acierta más ahí?",
         opciones: [
           { texto: "Porque tiene más parámetros que la tabla.", explicacion: "Tiene más (1.412 contra 240), pero la ventaja no viene de ahí: viene de compartirlos." },
@@ -579,6 +691,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O3",
         pregunta: "En el notebook, DQN sin memoria de repetición no llega a una política que salga. ¿Por qué?",
         opciones: [
           { texto: "Porque sin memoria no hay exploración.", explicacion: "ε sigue funcionando igual; el problema es otro." },
@@ -600,13 +713,84 @@ window.MODULOS = {
     }
   },
 
-  // placeholder: lo completa quien escribe la clase 7
   "7": {
-    objetivos: [],
-    tiempo: {},
-    previos: [],
-    requisitos: []
+    objetivos: [
+      "Explicar con la cueva qué es una cadena de Markov y leer su matriz de transición P.",
+      "Distinguir observación de estado y explicar por qué la cueva con solo bigotes es un POMDP que pide memoria.",
+      "Generar texto con n-gramas de letras y explicar su límite: nunca recuerdan más de n − 1 letras y con n grande copian.",
+      "Describir una red recurrente (hₜ = tanh(W_hh hₜ₋₁ + W_xh xₜ + b)) y comparar un agente con memoria (GRU) contra uno sin memoria."
+    ],
+    tiempo: { pagina: 35, notebook: 75 },
+    previos: ["2", "6"],
+    requisitos: ["Conviene haber jugado la cueva en modo difícil (clase 2).", "El notebook usa PyTorch en CPU (en Colab ya viene instalado) y corre en un par de minutos."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "El caminante al azar de la cueva es una cadena de Markov. ¿Qué quiere decir eso?",
+        opciones: [
+          { texto: "Que adónde va en el próximo paso depende solo de la casilla en la que está ahora.", explicacion: "Correcto. Por eso todo su comportamiento entra en una tabla P de 60 × 60: una fila por casilla de partida." },
+          { texto: "Que recuerda las paredes que ya tocó.", explicacion: "Es al revés: no recuerda nada, y por eso vuelve a chocar con la misma pared una y otra vez." },
+          { texto: "Que siempre termina en la salida en menos de 20 pasos.", explicacion: "Termina llegando, pero muy de a poco: a los 80 pasos la nube todavía casi no salió." },
+          { texto: "Que la matriz P cambia en cada paso.", explicacion: "No: la tabla es la misma en todos los pasos; lo que cambia es la nube pₜ que se multiplica por ella." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O2",
+        pregunta: "En la cueva chica hay 60 casillas y solo 12 lecturas distintas de los bigotes. ¿Qué consecuencia tiene para el agente?",
+        opciones: [
+          { texto: "Ninguna: con los bigotes alcanza para saber dónde está.", explicacion: "No: un pasillo vertical se siente igual en toda la cueva, y en unos conviene subir y en otros bajar." },
+          { texto: "La observación no alcanza para decidir: es un POMDP, y hace falta un resumen de la historia.", explicacion: "Correcto. Ese resumen (el conjunto de casillas compatibles con lo vivido) es el estado de creencia; con memoria se achica hasta una sola casilla." },
+          { texto: "Hay que agregar más bigotes hasta tener 60 lecturas.", explicacion: "Con cuatro bigotes hay como mucho 16 lecturas. La salida no es sentir más, sino recordar." },
+          { texto: "El agente tiene que moverse al azar.", explicacion: "Moverse al azar es lo que hace el caminante sin memoria del paso 1: llega, pero tarde." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O3",
+        pregunta: "En el paso 3, el error del n-grama sobre un texto no visto baja hasta n = 3 y después sube. ¿Por qué sube?",
+        opciones: [
+          { texto: "Porque con n grande la tabla tiene menos contextos.", explicacion: "Es al revés: la tabla crece con n (de 38 contextos con n = 2 a miles con n = 8)." },
+          { texto: "Porque las letras del texto no visto son distintas.", explicacion: "Son las mismas 38. El problema es la combinación: los contextos largos nuevos casi nunca aparecieron antes." },
+          { texto: "Porque cada contexto largo se vio pocas veces (muchos, una sola): la tabla copia el corpus y no sabe qué hacer con un contexto nuevo.", explicacion: "Correcto. Por eso con n = 8 el texto generado copia tramos enteros del diario, y con un contexto que nunca vio no tiene nada que contar." },
+          { texto: "Porque el corpus está mal escrito.", explicacion: "No: el problema aparece con cualquier corpus finito. Con más texto el mínimo se corre a un n más grande, pero no desaparece." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O4",
+        pregunta: "En la red recurrente hₜ = tanh(W_hh hₜ₋₁ + W_xh xₜ + b), ¿qué cambia de un paso al siguiente?",
+        opciones: [
+          { texto: "Las tablas W_hh y W_xh, que se reentrenan con cada letra.", explicacion: "No: las tablas son las mismas en todos los pasos. Por eso la red no crece con el texto." },
+          { texto: "El estado hₜ: cada letra lo empuja, y resume lo que se leyó hasta ahí.", explicacion: "Correcto. La regla no cambia; el estado sí. Es un sistema dinámico donde las letras son las fuerzas." },
+          { texto: "La cantidad de dimensiones de hₜ, que crece con el texto.", explicacion: "No: son siempre 32 números, se lean 5 letras o 5.000." },
+          { texto: "Nada: la red solo mira la última letra, como un 2-grama.", explicacion: "Mira la última letra y el estado que dejaron todas las anteriores; eso es lo que la diferencia de un n-grama." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O4",
+        pregunta: "En la cueva grande, sintiendo bigotes y su última acción, la red común sale desde 88 de 154 casillas y la GRU desde todas. Las dos se entrenaron por imitación. ¿Qué explica la diferencia?",
+        opciones: [
+          { texto: "La GRU tiene un estado que resume el camino, y con eso distingue casillas que se sienten igual; la red común, ante la misma lectura, decide siempre lo mismo y se traba yendo y viniendo.", explicacion: "Correcto. La sonda lo muestra: desde el estado de la GRU se puede leer en qué casilla está, cada vez mejor a medida que camina." },
+          { texto: "La GRU se entrenó con RL y la red común por imitación.", explicacion: "No: las dos se entrenaron igual, copiando a un experto (behavior cloning). DRQN, la versión con RL, no converge en los minutos de una clase." },
+          { texto: "La GRU ve el mapa.", explicacion: "No: recibe exactamente los mismos 8 números que la red común." },
+          { texto: "La red común tiene muy pocos pesos.", explicacion: "Tiene menos (1.476 contra 4.164), pero no es eso: una red sin memoria, del tamaño que sea, ante la misma lectura y la misma última acción decide siempre lo mismo." }
+        ],
+        correcta: 0
+      }
+    ],
+    actividad: {
+      titulo: "Un cuaderno para la cueva",
+      consigna: "Elegí una casilla de la cueva chica y escribí la lista de acciones que harías desde ahí sin ver el mapa, sintiendo solo los bigotes. Al lado de cada paso anotá qué guardás en la cabeza (tu cuaderno) y cuántas casillas siguen siendo posibles (podés contarlas con la figura del paso 2). Publicá la lista y en una oración explicá qué anotación fue la que te ubicó. Un compañero repite tu recorrido desde otra casilla con la misma lectura inicial y te devuelve la rúbrica.",
+      rubrica: [
+        "Cada paso dice qué se sintió, qué se hizo y qué se anotó, de forma que otra persona lo pueda repetir.",
+        "Se cuenta cuántas casillas quedan posibles después de cada paso y se ve cómo se achica la nube.",
+        "La explicación final nombra qué parte de la historia ubicó al jugador y la relaciona con el estado oculto de una red recurrente."
+      ]
+    }
   },
+
   "8": {
     objetivos: [
       "Plantear un problema como bandit y comparar A/B fijo, ε-greedy, UCB y Thompson por su regret.",
@@ -619,16 +803,18 @@ window.MODULOS = {
     requisitos: ["Pensar de antemano un problema de tu área para el proyecto final."],
     cuestionario: [
       {
-        pregunta: "¿Por qué el problema de los cuatro anuncios es un bandit?",
+        objetivo: "O4",
+        pregunta: "En «El MDP de tu dominio» (stock de un medicamento: sin stock, stock bajo, stock alto; pedir o no pedir), ¿qué tenés que escribir para que la iteración de valor encuentre la política?",
         opciones: [
-          { texto: "Porque los anuncios son tragamonedas de verdad.", explicacion: "Es una metáfora: cada anuncio es una palanca con una tasa de éxito desconocida." },
-          { texto: "Porque es el MDP más chico: un solo estado y episodios de un paso.", explicacion: "Correcto. No hay consecuencias a futuro; solo queda el dilema exploración–explotación." },
-          { texto: "Porque la recompensa es negativa.", explicacion: "No: la recompensa es el clic (1 o 0)." },
-          { texto: "Porque hay cuatro acciones, como en la cueva.", explicacion: "La cantidad de acciones no lo define; lo define que haya un solo estado." }
+          { texto: "Solo la recompensa de cada estado: las transiciones las deduce el algoritmo.", explicacion: "No: la iteración de valor necesita el modelo; sin transiciones no sabe adónde lleva cada acción." },
+          { texto: "Ejemplos de qué acción tomar en cada estado, para que los imite.", explicacion: "No: eso sería aprender por imitación. La iteración de valor encuentra la política a partir de transiciones y recompensas, sin ejemplos." },
+          { texto: "Para cada estado y acción, a qué estado pasa y qué recompensa recibe, además de γ.", explicacion: "Correcto. Eso es P, R y γ: con el modelo escrito, la iteración de valor de la clase 3 hace el resto." },
+          { texto: "Miles de partidas jugadas, como en Q-learning.", explicacion: "No: con el modelo escrito no hace falta jugar; jugar es lo que se hace cuando no hay mapa (clase 4)." }
         ],
-        correcta: 1
+        correcta: 2
       },
       {
+        objetivo: "O1",
         pregunta: "¿Qué hace Thompson sampling para elegir el próximo anuncio?",
         opciones: [
           { texto: "Muestra cada anuncio la misma cantidad de veces y después elige.", explicacion: "Eso es el A/B fijo." },
@@ -639,6 +825,7 @@ window.MODULOS = {
         correcta: 2
       },
       {
+        objetivo: "O2",
         pregunta: "En el tutor como MDP, ¿qué hace la política óptima con la recompensa \"aprendizaje\" (+1 cada vez que el alumno sube un nivel)?",
         opciones: [
           { texto: "Da solo sumas.", explicacion: "Eso pasa con la recompensa por acierto, como en la clase 2." },
@@ -649,6 +836,7 @@ window.MODULOS = {
         correcta: 2
       },
       {
+        objetivo: "O3",
         pregunta: "En el MDP de deep search, ¿qué pasa si buscar y leer no cuestan nada?",
         opciones: [
           { texto: "Responde de entrada y adivina.", explicacion: "Eso pasa con un costo muy alto: responde con confianza 0 y acierta un 25 %." },
@@ -659,6 +847,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O3",
         pregunta: "En RLHF se maximiza E[r(x, y)] − β·KL(π_θ ‖ π_SFT). ¿Para qué está el término KL?",
         opciones: [
           { texto: "Para que el modelo responda más rápido.", explicacion: "No tiene que ver con la velocidad." },
@@ -682,16 +871,28 @@ window.MODULOS = {
 
   "9": {
     objetivos: [
-      "Mapear el ciclo observación–acción–recompensa de la cueva al de un agente de LLM que investiga.",
+      "Describir el bucle ReAct (pensamiento → acción → observación), reconocerlo en la cueva y en un agente de LLM que investiga, y explicar por qué un modelo chico sin memoria de posición ni recompensa juega peor que Q-learning.",
       "Explicar por qué un ranking miope es un MDP con γ = 0 y qué pierde a largo plazo.",
       "Estimar el valor de una política nueva con registros de la vieja (IS, WIS, método directo) y reconocer cuándo explota la varianza.",
       "Reconocer el cambio de distribución en RL offline."
     ],
-    tiempo: { pagina: 40, notebook: 90 },
+    tiempo: { pagina: 45, notebook: 90 },
     previos: ["4", "8"],
     requisitos: [],
     cuestionario: [
       {
+        objetivo: "O1",
+        pregunta: "En el notebook, Qwen2.5-0.5B juega la cueva con el bucle ReAct: escribe un pensamiento y una acción, y la herramienta le devuelve \"avancé\" o \"choqué con una pared\". En 30 pasos no sale y repite choques que ya conocía, mientras Q-learning sale en 20. ¿Cuál es la mejor explicación?",
+        opciones: [
+          { texto: "Su única memoria es el texto de la traza, sin posición, y nunca recibe recompensa: no aprende entre pasos ni entre partidas. Q-learning guarda en su tabla lo que le enseñaron cientos de partidas.", explicacion: "Correcto. ReAct ordena el ciclo, pero no aprende: los pesos no cambian. Además el modelo es chico y copia frases del ejemplo del prompt aunque contradigan lo que sintió." },
+          { texto: "ReAct no tiene acciones: el modelo solo piensa.", explicacion: "No: cada paso termina en una acción (mover o sentir) que la cueva ejecuta." },
+          { texto: "El modelo ve el mapa entero y se confunde.", explicacion: "Al revés: no ve nada; solo le llegan las observaciones de texto." },
+          { texto: "La cueva del notebook tiene piso resbaloso.", explicacion: "No: la cueva es determinística; el problema está en el agente." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O2",
         pregunta: "Según lo publicado por Meta, el feed predice P(ver), P(like), P(compartir), etc., las suma con pesos y ordena. En lenguaje de RL, ¿qué es eso?",
         opciones: [
           { texto: "Un MDP con γ = 0: maximiza lo que pasa hoy.", explicacion: "Correcto. Es aprendizaje supervisado y miope: no se pregunta qué le pasa al usuario mañana." },
@@ -702,6 +903,7 @@ window.MODULOS = {
         correcta: 0
       },
       {
+        objetivo: "O2",
         pregunta: "En el simulador de juguete, ¿qué pasa con la política miope comparada con la de largo plazo?",
         opciones: [
           { texto: "Gana en todo momento.", explicacion: "Gana el primer día (6 contra 3 clics), pero pierde después." },
@@ -712,6 +914,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O3",
         pregunta: "Importance sampling repesa cada partida por Πₜ π_nueva(aₜ|sₜ) / π_vieja(aₜ|sₜ). ¿Qué pasa cuando la política nueva se aleja mucho de la vieja o las partidas son largas?",
         opciones: [
           { texto: "La estimación se vuelve más precisa.", explicacion: "Al revés: el producto de muchos cocientes explota o se anula." },
@@ -722,6 +925,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O3",
         pregunta: "En el ejercicio del colectivo y el subte, IS suma tiempo × 3 en los días de subte y divide por 12; WIS promedia los días de subte. ¿Qué es cierto?",
         opciones: [
           { texto: "IS varía menos que WIS entre personas.", explicacion: "Al revés: IS depende de cuántos días de subte salieron, y eso lo hace variar más." },
@@ -732,6 +936,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O4",
         pregunta: "En RL offline, ¿qué pasa en las casillas por donde la política vieja nunca pasó?",
         opciones: [
           { texto: "Se aprende igual de bien que en el resto.", explicacion: "No: sin datos, Q no se mueve de su valor inicial." },
@@ -753,13 +958,84 @@ window.MODULOS = {
     }
   },
 
-  // placeholder: lo completa quien escribe la clase 10
   "10": {
-    objetivos: [],
-    tiempo: {},
-    previos: [],
-    requisitos: []
+    objetivos: [
+      "Describir un modelo de lenguaje como política: estado = texto hasta ahora, acción = próximo token, episodio = respuesta, recompensa al final.",
+      "Explicar cómo la temperatura cambia la política y por qué muestrear es explorar.",
+      "Distinguir RLHF (modelo de recompensa aprendido con comparaciones humanas) de las recompensas verificables, y calcular las ventajas de GRPO de un grupo de respuestas.",
+      "Reconocer las piezas de un agente de lenguaje (modelo, arnés, herramientas, ventana de contexto) y los riesgos de optimizar una recompensa que se puede engañar."
+    ],
+    tiempo: { pagina: 40, notebook: 60 },
+    previos: ["7", "8", "9"],
+    requisitos: ["Para el notebook: Colab (sin token ni licencia; descarga un modelo abierto de ≈1 GB). Con GPU tarda uno o dos minutos; en CPU, entre 3 y 8."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "Si un modelo de lenguaje es una política, ¿qué es el estado?",
+        opciones: [
+          { texto: "Todo el texto hasta ahora: la conversación y lo que el modelo ya respondió.", explicacion: "Correcto. Cada token nuevo se agrega al estado; por eso el proceso es de Markov por construcción, a cambio de que el estado crezca." },
+          { texto: "La última palabra que escribió el modelo.", explicacion: "No: con solo la última palabra no alcanza para decidir la siguiente. El modelo lee toda la ventana." },
+          { texto: "Los pesos del modelo.", explicacion: "No: los pesos son la política (la regla que elige), no el estado sobre el que decide." },
+          { texto: "La recompensa que recibió en el paso anterior.", explicacion: "No: en un modelo de lenguaje la recompensa llega recién al final de la respuesta." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O2",
+        pregunta: "¿Qué hace subir la temperatura T al muestrear el próximo token?",
+        opciones: [
+          { texto: "Hace al modelo más preciso.", explicacion: "No: con T alta aparecen tokens poco probables, y con T muy alta, texto sin sentido." },
+          { texto: "Aplana la distribución: la política explora más.", explicacion: "Correcto. Divide los logits por T antes del softmax; con T chica la política es casi greedy." },
+          { texto: "Agranda la ventana de contexto.", explicacion: "No: la ventana es un límite del modelo y del arnés, no de la temperatura." },
+          { texto: "Cambia los pesos del modelo.", explicacion: "No: la temperatura solo cambia cómo se muestrea de la misma política." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O3",
+        pregunta: "GRPO muestrea 8 respuestas a una cuenta y el verificador da 1 a las 8. ¿Qué ventajas reciben?",
+        opciones: [
+          { texto: "Todas positivas: el modelo acertó.", explicacion: "No: la ventaja es relativa al grupo, y nadie fue mejor que el promedio." },
+          { texto: "Todas cero: la pregunta no aporta señal para el paso de actualización.", explicacion: "Correcto. (r − media) / desvío vale 0 si todas son iguales. Pasa lo mismo si todas valen 0: es la recompensa escasa de la clase 5." },
+          { texto: "La primera +1 y el resto −1.", explicacion: "No: el orden en que se muestrearon no importa." },
+          { texto: "No se pueden calcular sin un crítico que estime V(s).", explicacion: "No: justamente GRPO no usa crítico; el grupo hace de línea de base." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O4",
+        pregunta: "En el bucle de agente de la clase, el modelo pidió calcular(\"2026 - year_of_publication\"). ¿Qué pasó?",
+        opciones: [
+          { texto: "La calculadora adivinó el año y respondió 5.", explicacion: "No: la herramienta no adivina; solo acepta números." },
+          { texto: "El arnés devolvió un error legible y el modelo de 500 millones respondió solo la mitad de la pregunta.", explicacion: "Correcto. El arnés valida y acota el daño, pero no hace al modelo más inteligente: encadenar dos herramientas le quedó grande." },
+          { texto: "El modelo recordó el año de una conversación anterior.", explicacion: "No: el modelo no tiene memoria entre llamadas; solo ve lo que el arnés pone en la ventana." },
+          { texto: "El arnés cortó por llegar al límite de pasos.", explicacion: "No: respondió en el paso 2 de 4, sin el cálculo." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O4",
+        pregunta: "Un verificador da recompensa 1 si el número correcto aparece en algún lugar de la respuesta. ¿Qué riesgo tiene entrenar con él?",
+        opciones: [
+          { texto: "Ninguno: si el número aparece, la respuesta es correcta.", explicacion: "No: \"puede ser 40, 41, 42, 43 o 44\" contiene el 42 y no sabe sumar." },
+          { texto: "Que la política aprenda a listar muchos números y cobre sin saber resolver: reward hacking.", explicacion: "Correcto. GRPO le daría ventaja positiva a la trampa. Por eso: verificadores estrictos, otro modelo como juez y un humano que mire muestras." },
+          { texto: "Que el entrenamiento sea más lento.", explicacion: "No es el problema principal: el problema es qué aprende, no cuánto tarda." },
+          { texto: "Que la temperatura deje de importar.", explicacion: "No: la temperatura sigue controlando la exploración; lo que falla es la recompensa." }
+        ],
+        correcta: 1
+      }
+    ],
+    actividad: {
+      titulo: "Diseñar la recompensa de un agente de lenguaje",
+      consigna: "Elegí una tarea que te gustaría delegar en un agente de lenguaje (por ejemplo, corregir ejercicios, contestar consultas de un comercio o resumir papers). Describí: el estado (qué entra en la ventana), las herramientas que necesita, el límite de pasos y qué valida el arnés. Proponé una recompensa verificable o, si no la hay, quién compara respuestas. Después escribí una respuesta trampa que cobraría con tu recompensa sin hacer bien la tarea, y cómo la detectarías. Publicalo y devolvé la propuesta de otra persona buscándole una trampa nueva.",
+      rubrica: [
+        "Estado, herramientas, límite de pasos y validaciones del arnés están descritos y son coherentes con la tarea.",
+        "La recompensa está bien definida: se dice quién o qué la calcula y cuándo llega.",
+        "La respuesta trampa es plausible y se propone una forma concreta de detectarla (verificador más estricto, otro juez o un humano que mire muestras)."
+      ]
+    }
   },
+
   "11": {
     objetivos: [
       "Plantear un agente de difusión y un agente tutor como dos MDP con la misma forma y distinta recompensa.",
@@ -772,6 +1048,7 @@ window.MODULOS = {
     requisitos: ["Para el notebook: Colab con GPU T4 gratis (recomendado) o CPU. Un token de Hugging Face es opcional: sin él se usa un modelo abierto sin trámite."],
     cuestionario: [
       {
+        objetivo: "O1",
         pregunta: "Un agente de marketing y un agente tutor resuelven el mismo problema: sostener la atención de alguien. ¿Cuál es la diferencia?",
         opciones: [
           { texto: "Que uno usa RL y el otro no.", explicacion: "Los dos se pueden plantear como MDP con la misma forma." },
@@ -782,6 +1059,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O3",
         pregunta: "En la fábrica de contenido, ¿por qué el evaluador es un modelo distinto del generador?",
         opciones: [
           { texto: "Porque un solo modelo no puede hacer dos tareas.", explicacion: "Técnicamente puede; el problema es qué mide." },
@@ -792,6 +1070,7 @@ window.MODULOS = {
         correcta: 1
       },
       {
+        objetivo: "O2",
         pregunta: "La rúbrica del evaluador tiene cinco criterios de 1 a 10 y un umbral de 6. ¿Qué pasa si un post queda por debajo?",
         opciones: [
           { texto: "Se borra automáticamente.", explicacion: "No: el umbral no bloquea." },
@@ -802,6 +1081,7 @@ window.MODULOS = {
         correcta: 2
       },
       {
+        objetivo: "O1",
         pregunta: "El tutor elige la próxima pregunta con un bandit. ¿Qué recompensa evita la trampa de la clase 2?",
         opciones: [
           { texto: "+1 cada vez que el alumno acierta.", explicacion: "Con esa recompensa el tutor da solo preguntas fáciles: es el tutor que solo da sumas." },
@@ -812,14 +1092,15 @@ window.MODULOS = {
         correcta: 1
       },
       {
-        pregunta: "¿Qué relación hay entre la dopamina y lo visto en el curso?",
+        objetivo: "O4",
+        pregunta: "Una app pone una pausa de unos segundos antes de abrir la red social. ¿Qué la hace un nudge y no un patrón oscuro?",
         opciones: [
-          { texto: "La dopamina mide el placer, como la recompensa r.", explicacion: "No: lo que codifica es la sorpresa respecto de lo esperado." },
-          { texto: "Codifica el error de predicción de recompensa, que es el error de TD de la clase 4; \"loop de dopamina\" es una metáfora y la evidencia sobre adicción a redes está en debate.", explicacion: "Correcto (Schultz, Dayan y Montague, 1997)." },
-          { texto: "Está probado que las redes son adictivas por la dopamina.", explicacion: "No: la evidencia sobre adicción a redes está en debate." },
-          { texto: "Ninguna: RL no tiene que ver con el cerebro.", explicacion: "Sí tiene: el error de TD fue uno de los puentes más fuertes entre RL y neurociencia." }
+          { texto: "Que sea corta: hasta 10 segundos es un nudge y más es un patrón oscuro.", explicacion: "No: la distinción no está en la dosis sino en a favor de quién juega el empujón." },
+          { texto: "Que cambie el algoritmo del feed en lugar del entorno de la persona.", explicacion: "No: la pausa justamente no toca el algoritmo; cambia las transiciones del entorno de la persona." },
+          { texto: "Ninguna: cualquier empujón decide por otro, así que siempre es un patrón oscuro.", explicacion: "No: la tensión existe y la clase la nombra, pero un nudge empuja hacia lo que la persona querría; un patrón oscuro, hacia lo que quiere la plataforma." },
+          { texto: "Que empuje hacia lo que la persona elegiría pensándolo bien, y no hacia lo que le conviene a la plataforma.", explicacion: "Correcto. La diferencia es a favor de quién empuja; mejor todavía si la persona puede ver y cambiar el largo de la pausa." }
         ],
-        correcta: 1
+        correcta: 3
       }
     ],
     actividad: {
@@ -832,734 +1113,82 @@ window.MODULOS = {
       ]
     }
   },
-  // placeholder: lo completa quien escribe la clase 12
+
   "12": {
-    objetivos: [],
-    tiempo: {},
-    previos: [],
-    requisitos: []
+    objetivos: [
+      "Recorrer las once clases anteriores sobre la misma cueva y nombrar la herramienta que agregó cada una.",
+      "Plantear un problema propio como MDP, diciendo quién define la recompensa, quién la ve y cómo podría el agente hacer trampa.",
+      "Presentar el proyecto entre pares y devolver otros con una rúbrica.",
+      "Explicar la difusión del curso como bandit y el curso entero a otra persona."
+    ],
+    tiempo: { pagina: 60 },
+    previos: ["8", "11"],
+    requisitos: ["Haber completado las clases 1 a 11 (la nivelación es optativa).", "Una cuenta de GitHub para publicar el proyecto en Discussions."],
+    cuestionario: [
+      {
+        objetivo: "O2",
+        pregunta: "¿Qué agrega la ficha del proyecto final a la plantilla de la clase 8?",
+        opciones: [
+          { texto: "Más estados y acciones.", explicacion: "No: se siguen pidiendo pocos estados y pocas acciones." },
+          { texto: "Un gráfico de la política óptima.", explicacion: "No: para resolver el MDP la ficha remite a la clase 8 o al notebook 08." },
+          { texto: "Quién define la recompensa, quién la ve y cómo podría el agente hacer trampa.", explicacion: "Correcto. Son las preguntas de la clase 11 incorporadas al proyecto." },
+          { texto: "Un modelo de lenguaje que escribe la ficha.", explicacion: "No: la ficha la escribís vos; está hecha para pensar la recompensa." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O4",
+        pregunta: "En la campaña de difusión, ¿cuál es un ejemplo de reward hacking?",
+        opciones: [
+          { texto: "Publicar los cuatro tipos de post una vez cada uno al principio.", explicacion: "No: eso es exploración planificada." },
+          { texto: "Maximizar guardados con posts de intriga que nunca llevan al material.", explicacion: "Correcto. Sube el número premiado sin lograr lo que se quería: que el curso se aprenda y se enseñe." },
+          { texto: "Cargar las métricas reales a los 7 días.", explicacion: "No: es la forma de medir la recompensa." },
+          { texto: "Cambiar el tipo de post cuando Thompson recomienda otro.", explicacion: "No: es seguir la política." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O1",
+        pregunta: "En el recorrido «Once clases, una sola cueva», cada parada deja una herramienta sobre el mismo mapa. ¿Cuál deja la clase 7?",
+        opciones: [
+          { texto: "Curiosidad por conteo: ir adonde menos se estuvo.", explicacion: "No: esa es la de la clase 5, explorar a ciegas." },
+          { texto: "Memoria: cuando la casilla no alcanza, una red recurrente resume la historia.", explicacion: "Correcto. La clase 7 agrega el estado hₜ para el agente que solo siente bigotes." },
+          { texto: "Q-learning: las flechas se aprenden sin conocer el mapa.", explicacion: "No: esa es la de la clase 4." },
+          { texto: "Evaluar con registros de lo que ya pasó, sin simulador.", explicacion: "No: esa es la de la clase 9." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O4",
+        pregunta: "¿Cómo elige el tipo de post la campaña desde el quinto post?",
+        opciones: [
+          { texto: "Para cada tipo sortea una tasa posible de su distribución Beta y publica el que salió más alto.", explicacion: "Correcto. Es Thompson sampling: explora mientras hay duda y explota cuando la duda se achica." },
+          { texto: "Siempre publica el tipo con mejor promedio hasta ahora.", explicacion: "No: eso es pura explotación (greedy) y puede quedarse con un tipo por mala suerte temprana." },
+          { texto: "Elige al azar con la misma probabilidad para cada tipo.", explicacion: "No: eso sería explorar siempre, sin usar lo aprendido." },
+          { texto: "Los publica en orden fijo: intriga, concepto, demo, enseñar.", explicacion: "No: ese orden es solo el de los cuatro primeros." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O3",
+        pregunta: "Te toca devolver una ficha de proyecto que dice: «Recompensa: +1 por cada venta. Trampa posible: ninguna.» Según la rúbrica, ¿qué le marcás?",
+        opciones: [
+          { texto: "Logrado: una recompensa simple es más fácil de optimizar.", explicacion: "No: la rúbrica no premia la simpleza sino que la recompensa mida lo que se quiere y tenga nombrada su trampa." },
+          { texto: "Pendiente: un proyecto final necesita más de 30 estados.", explicacion: "No: la rúbrica pide estados y acciones que alcancen para decidir y que sean pocos." },
+          { texto: "Nada: la rúbrica solo evalúa la explicación de 5 minutos.", explicacion: "No: la rúbrica tiene cuatro criterios, y la explicación de 5 minutos es solo uno." },
+          { texto: "Pendiente: falta nombrar al menos una trampa posible con una forma concreta de evitarla, y decir quién eligió la recompensa y quién la ve.", explicacion: "Correcto. Son dos criterios de la rúbrica: vender más se puede lograr sin hacer lo que de verdad se quería." }
+        ],
+        correcta: 3
+      }
+    ],
+    actividad: {
+      titulo: "Proyecto final: tu MDP y cómo lo enseñarías",
+      consigna: "Publicá la ficha de tu proyecto (copiala como Markdown desde la página) con el título indicado. Después devolvé los proyectos de dos personas con la rúbrica y, por último, enseñale una idea del curso a alguien que no lo hizo y contá en el mismo hilo qué entendió y qué no.",
+      rubrica: [
+        "Estados, acciones y recompensa están definidos y son pocos; los estados alcanzan para decidir.",
+        "Se dice quién define la recompensa y quién la ve, y hay al menos una trampa posible con una forma concreta de evitarla.",
+        "La explicación de 5 minutos se entiende sin haber hecho el curso."
+      ]
+    }
   }
 };
-
-/* Clases 1, 7, 9 (con ReAct), 10 y 12: datos completos que reemplazan las entradas de arriba. */
-Object.assign(window.MODULOS, {
- "1": {
-  "objetivos": [
-   "Distinguir educación bancaria de educación problematizadora (Freire) y explicar por qué el curso propone enseñarle a una máquina en lugar de recibir contenidos.",
-   "Explicar qué significa que un feed optimice con γ ≈ 0 y relacionarlo con la recompensa inmediata.",
-   "Explicar la relación entre cuidado de sí y conocimiento de sí que plantea Foucault, y leerla como la pregunta de quién elige la función de recompensa.",
-   "Usar fidelidad, fecundidad y longevidad (Dawkins) para explicar cómo se propaga el curso."
-  ],
-  "tiempo": {
-   "pagina": 40
-  },
-  "previos": [],
-  "requisitos": [
-   "Ninguno: es la puerta de entrada del curso.",
-   "Antes de la clase 2, jugar la cueva en modo fácil y en modo difícil."
-  ],
-  "cuestionario": [
-   {
-    "pregunta": "Para Freire, ¿qué caracteriza a la educación bancaria?",
-    "opciones": [
-     {
-      "texto": "Que el docente deposita contenidos en un alumno que los recibe pasivamente.",
-      "explicacion": "Correcto. Es la imagen del depósito: el saber va en una sola dirección y el alumno no actúa sobre el mundo."
-     },
-     {
-      "texto": "Que enseña finanzas y economía.",
-      "explicacion": "No: «bancaria» es una metáfora del depósito, no el tema que se enseña."
-     },
-     {
-      "texto": "Que parte de un problema real y se resuelve en diálogo.",
-      "explicacion": "No: eso describe la educación problematizadora, la que Freire le opone."
-     },
-     {
-      "texto": "Que se cobra por cada clase.",
-      "explicacion": "No: la crítica de Freire no es sobre el costo sino sobre la relación entre quien enseña y quien aprende."
-     }
-    ],
-    "correcta": 0
-   },
-   {
-    "pregunta": "En la figura del feed se dice que funciona con γ ≈ 0. ¿Qué significa?",
-    "opciones": [
-     {
-      "texto": "Que no muestra ningún contenido.",
-      "explicacion": "No: muestra contenido sin parar; γ no mide cuánto muestra."
-     },
-     {
-      "texto": "Que pesa el futuro tanto como el presente.",
-      "explicacion": "No: eso sería γ cerca de 1."
-     },
-     {
-      "texto": "Que elige cada contenido mirando solo la recompensa inmediata, el próximo clic.",
-      "explicacion": "Correcto. Con γ ≈ 0 lo que pase después no cuenta en la decisión de ahora."
-     },
-     {
-      "texto": "Que el usuario elige cada tarjeta.",
-      "explicacion": "No: en la figura las tarjetas llegan solas; tus decisiones quedan en 0."
-     }
-    ],
-    "correcta": 2
-   },
-   {
-    "pregunta": "¿Qué sostiene Foucault en La hermenéutica del sujeto sobre el «conócete a ti mismo»?",
-    "opciones": [
-     {
-      "texto": "Que es una invención moderna sin antecedentes griegos.",
-      "explicacion": "No: el gnothi seauton es un precepto antiguo; lo que analiza Foucault es su relación con el cuidado de sí."
-     },
-     {
-      "texto": "Que en la Antigüedad era una parte del cuidado de sí, y que la modernidad lo separó y lo puso por delante.",
-      "explicacion": "Correcto. Esa inversión es la que el curso relee como la pregunta de quién elige la recompensa."
-     },
-     {
-      "texto": "Que conocerse a uno mismo es imposible y conviene dejarlo.",
-      "explicacion": "No: el curso no le atribuye esa tesis; habla de la relación entre conocerse y cuidarse."
-     },
-     {
-      "texto": "Que el cuidado de sí consiste en consumir menos tecnología.",
-      "explicacion": "No: es una lectura que el curso no hace; cuidarse, en esta clase, es poder ver y elegir los propios pesos."
-     }
-    ],
-    "correcta": 1
-   },
-   {
-    "pregunta": "En la figura del meme, cada persona enseña a 2 personas en promedio, la copia sale bien el 40 % de las veces y cada una enseña una sola ronda. ¿Qué pasa?",
-    "opciones": [
-     {
-      "texto": "La luz cruza toda la cueva, porque 2 es mayor que 1.",
-      "explicacion": "No: la fecundidad sola no alcanza; las copias infieles no enseñan."
-     },
-     {
-      "texto": "Depende solo de dónde se siembra.",
-      "explicacion": "El lugar influye en un pasillo cerrado, pero lo que decide es R."
-     },
-     {
-      "texto": "Crece sin límite, porque la longevidad es 1.",
-      "explicacion": "No: longevidad 1 es la mínima; no agrega rondas."
-     },
-     {
-      "texto": "Tiende a apagarse: R ≈ 2 × 0,4 × 1 = 0,8, menor que 1.",
-      "explicacion": "Correcto. Con R menor que 1 cada ronda hay, en promedio, menos personas enseñando que en la anterior."
-     }
-    ],
-    "correcta": 3
-   },
-   {
-    "pregunta": "¿Qué dice el curso sobre la dopamina y las redes?",
-    "opciones": [
-     {
-      "texto": "Que el «loop de dopamina» está demostrado y explica la adicción a las redes.",
-      "explicacion": "No: el curso lo presenta como metáfora y aclara que la adicción a redes es un tema en debate."
-     },
-     {
-      "texto": "Que hay evidencia de que la dopamina señala un error de predicción de recompensa (Schultz, Dayan y Montague, 1997), y que el «loop de dopamina» es una metáfora.",
-      "explicacion": "Correcto. Lo primero se ve en la clase 4 junto al aprendizaje por diferencias temporales; lo segundo es una advertencia honesta."
-     },
-     {
-      "texto": "Que la dopamina no tiene relación con la recompensa.",
-      "explicacion": "No: justamente el trabajo de 1997 la vincula con el error de predicción de recompensa."
-     },
-     {
-      "texto": "Que el curso cura el uso excesivo del celular.",
-      "explicacion": "No: el curso no promete eso; propone ver el mecanismo."
-     }
-    ],
-    "correcta": 1
-   }
-  ],
-  "actividad": {
-   "titulo": "¿Qué te premia?",
-   "consigna": "Elegí los pesos de tu día en la figura de Foucault y publicá los cuatro números, junto con una actividad de ayer cuyo premio eligió otra persona o una app. Contá además qué tuviste que recordar para salir de la cueva en modo difícil. Otra persona te devuelve con la rúbrica.",
-   "rubrica": [
-    "Los pesos están justificados con un ejemplo concreto del propio día, no en abstracto.",
-    "Se identifica quién eligió la recompensa de la actividad nombrada y se dice si se la elegiría igual.",
-    "Lo recordado en modo difícil se describe como historia y se separa la parte que alcanzó para decidir (el estado)."
-   ]
-  }
- },
- "7": {
-  "objetivos": [
-   "Explicar con la cueva qué es una cadena de Markov y leer su matriz de transición P.",
-   "Distinguir observación de estado y explicar por qué la cueva con solo bigotes es un POMDP que pide memoria.",
-   "Generar texto con n-gramas de letras y explicar su límite: nunca recuerdan más de n − 1 letras y con n grande copian.",
-   "Describir una red recurrente (hₜ = tanh(W_hh hₜ₋₁ + W_xh xₜ + b)) y comparar un agente con memoria (GRU) contra uno sin memoria."
-  ],
-  "tiempo": {
-   "pagina": 35,
-   "notebook": 75
-  },
-  "previos": [
-   "2",
-   "6"
-  ],
-  "requisitos": [
-   "Conviene haber jugado la cueva en modo difícil (clase 2).",
-   "El notebook usa PyTorch en CPU (en Colab ya viene instalado) y corre en un par de minutos."
-  ],
-  "cuestionario": [
-   {
-    "pregunta": "El caminante al azar de la cueva es una cadena de Markov. ¿Qué quiere decir eso?",
-    "opciones": [
-     {
-      "texto": "Que adónde va en el próximo paso depende solo de la casilla en la que está ahora.",
-      "explicacion": "Correcto. Por eso todo su comportamiento entra en una tabla P de 60 × 60: una fila por casilla de partida."
-     },
-     {
-      "texto": "Que recuerda las paredes que ya tocó.",
-      "explicacion": "Es al revés: no recuerda nada, y por eso vuelve a chocar con la misma pared una y otra vez."
-     },
-     {
-      "texto": "Que siempre termina en la salida en menos de 20 pasos.",
-      "explicacion": "Termina llegando, pero muy de a poco: a los 80 pasos la nube todavía casi no salió."
-     },
-     {
-      "texto": "Que la matriz P cambia en cada paso.",
-      "explicacion": "No: la tabla es la misma en todos los pasos; lo que cambia es la nube pₜ que se multiplica por ella."
-     }
-    ],
-    "correcta": 0
-   },
-   {
-    "pregunta": "En la cueva chica hay 60 casillas y solo 12 lecturas distintas de los bigotes. ¿Qué consecuencia tiene para el agente?",
-    "opciones": [
-     {
-      "texto": "Ninguna: con los bigotes alcanza para saber dónde está.",
-      "explicacion": "No: un pasillo vertical se siente igual en toda la cueva, y en unos conviene subir y en otros bajar."
-     },
-     {
-      "texto": "La observación no alcanza para decidir: es un POMDP, y hace falta un resumen de la historia.",
-      "explicacion": "Correcto. Ese resumen (el conjunto de casillas compatibles con lo vivido) es el estado de creencia; con memoria se achica hasta una sola casilla."
-     },
-     {
-      "texto": "Hay que agregar más bigotes hasta tener 60 lecturas.",
-      "explicacion": "Con cuatro bigotes hay como mucho 16 lecturas. La salida no es sentir más, sino recordar."
-     },
-     {
-      "texto": "El agente tiene que moverse al azar.",
-      "explicacion": "Moverse al azar es lo que hace el caminante sin memoria del paso 1: llega, pero tarde."
-     }
-    ],
-    "correcta": 1
-   },
-   {
-    "pregunta": "En el paso 3, el error del n-grama sobre un texto no visto baja hasta n = 3 y después sube. ¿Por qué sube?",
-    "opciones": [
-     {
-      "texto": "Porque con n grande la tabla tiene menos contextos.",
-      "explicacion": "Es al revés: la tabla crece con n (de 38 contextos con n = 2 a miles con n = 8)."
-     },
-     {
-      "texto": "Porque las letras del texto no visto son distintas.",
-      "explicacion": "Son las mismas 38. El problema es la combinación: los contextos largos nuevos casi nunca aparecieron antes."
-     },
-     {
-      "texto": "Porque cada contexto largo se vio pocas veces (muchos, una sola): la tabla copia el corpus y no sabe qué hacer con un contexto nuevo.",
-      "explicacion": "Correcto. Por eso con n = 8 el texto generado copia tramos enteros del diario, y con un contexto que nunca vio no tiene nada que contar."
-     },
-     {
-      "texto": "Porque el corpus está mal escrito.",
-      "explicacion": "No: el problema aparece con cualquier corpus finito. Con más texto el mínimo se corre a un n más grande, pero no desaparece."
-     }
-    ],
-    "correcta": 2
-   },
-   {
-    "pregunta": "En la red recurrente hₜ = tanh(W_hh hₜ₋₁ + W_xh xₜ + b), ¿qué cambia de un paso al siguiente?",
-    "opciones": [
-     {
-      "texto": "Las tablas W_hh y W_xh, que se reentrenan con cada letra.",
-      "explicacion": "No: las tablas son las mismas en todos los pasos. Por eso la red no crece con el texto."
-     },
-     {
-      "texto": "El estado hₜ: cada letra lo empuja, y resume lo que se leyó hasta ahí.",
-      "explicacion": "Correcto. La regla no cambia; el estado sí. Es un sistema dinámico donde las letras son las fuerzas."
-     },
-     {
-      "texto": "La cantidad de dimensiones de hₜ, que crece con el texto.",
-      "explicacion": "No: son siempre 32 números, se lean 5 letras o 5.000."
-     },
-     {
-      "texto": "Nada: la red solo mira la última letra, como un 2-grama.",
-      "explicacion": "Mira la última letra y el estado que dejaron todas las anteriores; eso es lo que la diferencia de un n-grama."
-     }
-    ],
-    "correcta": 1
-   },
-   {
-    "pregunta": "En la cueva grande, sintiendo bigotes y su última acción, la red común sale desde 88 de 154 casillas y la GRU desde todas. Las dos se entrenaron por imitación. ¿Qué explica la diferencia?",
-    "opciones": [
-     {
-      "texto": "La GRU tiene un estado que resume el camino, y con eso distingue casillas que se sienten igual; la red común, ante la misma lectura, decide siempre lo mismo y se traba yendo y viniendo.",
-      "explicacion": "Correcto. La sonda lo muestra: desde el estado de la GRU se puede leer en qué casilla está, cada vez mejor a medida que camina."
-     },
-     {
-      "texto": "La GRU se entrenó con RL y la red común por imitación.",
-      "explicacion": "No: las dos se entrenaron igual, copiando a un experto (behavior cloning). DRQN, la versión con RL, no converge en los minutos de una clase."
-     },
-     {
-      "texto": "La GRU ve el mapa.",
-      "explicacion": "No: recibe exactamente los mismos 8 números que la red común."
-     },
-     {
-      "texto": "La red común tiene muy pocos pesos.",
-      "explicacion": "Tiene menos (1.476 contra 4.164), pero no es eso: una red sin memoria, del tamaño que sea, ante la misma lectura y la misma última acción decide siempre lo mismo."
-     }
-    ],
-    "correcta": 0
-   }
-  ],
-  "actividad": {
-   "titulo": "Un cuaderno para la cueva",
-   "consigna": "Elegí una casilla de la cueva chica y escribí la lista de acciones que harías desde ahí sin ver el mapa, sintiendo solo los bigotes. Al lado de cada paso anotá qué guardás en la cabeza (tu cuaderno) y cuántas casillas siguen siendo posibles (podés contarlas con la figura del paso 2). Publicá la lista y en una oración explicá qué anotación fue la que te ubicó. Un compañero repite tu recorrido desde otra casilla con la misma lectura inicial y te devuelve la rúbrica.",
-   "rubrica": [
-    "Cada paso dice qué se sintió, qué se hizo y qué se anotó, de forma que otra persona lo pueda repetir.",
-    "Se cuenta cuántas casillas quedan posibles después de cada paso y se ve cómo se achica la nube.",
-    "La explicación final nombra qué parte de la historia ubicó al jugador y la relaciona con el estado oculto de una red recurrente."
-   ]
-  }
- },
- "9": {
-  "objetivos": [
-   "Describir el bucle ReAct (pensamiento → acción → observación), reconocerlo en la cueva y en un agente de LLM que investiga, y explicar por qué un modelo chico sin memoria de posición ni recompensa juega peor que Q-learning.",
-   "Explicar por qué un ranking miope es un MDP con γ = 0 y qué pierde a largo plazo.",
-   "Estimar el valor de una política nueva con registros de la vieja (IS, WIS, método directo) y reconocer cuándo explota la varianza.",
-   "Reconocer el cambio de distribución en RL offline."
-  ],
-  "tiempo": {
-   "pagina": 45,
-   "notebook": 90
-  },
-  "previos": [
-   "4",
-   "8"
-  ],
-  "requisitos": [],
-  "cuestionario": [
-   {
-    "pregunta": "En el notebook, Qwen2.5-0.5B juega la cueva con el bucle ReAct: escribe un pensamiento y una acción, y la herramienta le devuelve \"avancé\" o \"choqué con una pared\". En 30 pasos no sale y repite choques que ya conocía, mientras Q-learning sale en 20. ¿Cuál es la mejor explicación?",
-    "opciones": [
-     {
-      "texto": "Su única memoria es el texto de la traza, sin posición, y nunca recibe recompensa: no aprende entre pasos ni entre partidas. Q-learning guarda en su tabla lo que le enseñaron cientos de partidas.",
-      "explicacion": "Correcto. ReAct ordena el ciclo, pero no aprende: los pesos no cambian. Además el modelo es chico y copia frases del ejemplo del prompt aunque contradigan lo que sintió."
-     },
-     {
-      "texto": "ReAct no tiene acciones: el modelo solo piensa.",
-      "explicacion": "No: cada paso termina en una acción (mover o sentir) que la cueva ejecuta."
-     },
-     {
-      "texto": "El modelo ve el mapa entero y se confunde.",
-      "explicacion": "Al revés: no ve nada; solo le llegan las observaciones de texto."
-     },
-     {
-      "texto": "La cueva del notebook tiene piso resbaloso.",
-      "explicacion": "No: la cueva es determinística; el problema está en el agente."
-     }
-    ],
-    "correcta": 0
-   },
-   {
-    "pregunta": "Según lo publicado por Meta, el feed predice P(ver), P(like), P(compartir), etc., las suma con pesos y ordena. En lenguaje de RL, ¿qué es eso?",
-    "opciones": [
-     {
-      "texto": "Un MDP con γ = 0: maximiza lo que pasa hoy.",
-      "explicacion": "Correcto. Es aprendizaje supervisado y miope: no se pregunta qué le pasa al usuario mañana."
-     },
-     {
-      "texto": "Un MDP con γ alto que cuida al usuario.",
-      "explicacion": "No: nada en ese esquema mira más allá de la sesión."
-     },
-     {
-      "texto": "Go-Explore aplicado a publicaciones.",
-      "explicacion": "No: no hay archivo ni exploración sistemática."
-     },
-     {
-      "texto": "RL offline con importance sampling.",
-      "explicacion": "No: es predicción supervisada de eventos inmediatos."
-     }
-    ],
-    "correcta": 0
-   },
-   {
-    "pregunta": "En el simulador de juguete, ¿qué pasa con la política miope comparada con la de largo plazo?",
-    "opciones": [
-     {
-      "texto": "Gana en todo momento.",
-      "explicacion": "Gana el primer día (6 contra 3 clics), pero pierde después."
-     },
-     {
-      "texto": "Gana el primer día, pero al día 30 ya no le queda ningún usuario; la de largo plazo conserva un tercio.",
-      "explicacion": "Correcto. El contenido gancho baja la satisfacción y la gente deja de volver: es la \"suma fácil\" del feed."
-     },
-     {
-      "texto": "Empatan.",
-      "explicacion": "No: las curvas de clics acumulados se cruzan antes de las dos semanas."
-     },
-     {
-      "texto": "Pierde desde el primer día.",
-      "explicacion": "No: el primer día el gancho rinde el doble de clics."
-     }
-    ],
-    "correcta": 1
-   },
-   {
-    "pregunta": "Importance sampling repesa cada partida por Πₜ π_nueva(aₜ|sₜ) / π_vieja(aₜ|sₜ). ¿Qué pasa cuando la política nueva se aleja mucho de la vieja o las partidas son largas?",
-    "opciones": [
-     {
-      "texto": "La estimación se vuelve más precisa.",
-      "explicacion": "Al revés: el producto de muchos cocientes explota o se anula."
-     },
-     {
-      "texto": "Unas pocas partidas concentran casi todo el peso y la varianza explota.",
-      "explicacion": "Correcto. Pocas partidas \"cuentan de verdad\" (ESS baja), y el error crece exponencialmente con el horizonte."
-     },
-     {
-      "texto": "Los pesos valen todos 1.",
-      "explicacion": "Eso solo pasa si las dos políticas son iguales."
-     },
-     {
-      "texto": "No cambia nada: IS es insesgado.",
-      "explicacion": "Que sea insesgado no impide que tenga una varianza enorme."
-     }
-    ],
-    "correcta": 1
-   },
-   {
-    "pregunta": "En el ejercicio del colectivo y el subte, IS suma tiempo × 3 en los días de subte y divide por 12; WIS promedia los días de subte. ¿Qué es cierto?",
-    "opciones": [
-     {
-      "texto": "IS varía menos que WIS entre personas.",
-      "explicacion": "Al revés: IS depende de cuántos días de subte salieron, y eso lo hace variar más."
-     },
-     {
-      "texto": "WIS normaliza por la suma de pesos: tiene un poco de sesgo, pero mucha menos varianza.",
-      "explicacion": "Correcto. Si a alguien no le sale ningún 5 ni 6, IS da 0 y WIS queda indefinido: no hay datos de la política nueva."
-     },
-     {
-      "texto": "Los dos dan siempre 27 minutos.",
-      "explicacion": "27 es el valor verdadero; los estimadores lo rodean con error."
-     },
-     {
-      "texto": "El factor 3 es arbitrario.",
-      "explicacion": "No: es π_nueva / π_vieja = 1 / (2/6) para el subte."
-     }
-    ],
-    "correcta": 1
-   },
-   {
-    "pregunta": "En RL offline, ¿qué pasa en las casillas por donde la política vieja nunca pasó?",
-    "opciones": [
-     {
-      "texto": "Se aprende igual de bien que en el resto.",
-      "explicacion": "No: sin datos, Q no se mueve de su valor inicial."
-     },
-     {
-      "texto": "Q queda en su valor inicial y la flecha es un empate o un invento: es el cambio de distribución.",
-      "explicacion": "Correcto. Por eso el RL offline suele ser pesimista con lo que no vio."
-     },
-     {
-      "texto": "El algoritmo pide partidas nuevas.",
-      "explicacion": "Justamente no puede: offline significa aprender solo con los registros."
-     },
-     {
-      "texto": "Se copia la política vieja.",
-      "explicacion": "No: Q-learning sobre los registros no imita, estima valores."
-     }
-    ],
-    "correcta": 1
-   }
-  ],
-  "actividad": {
-   "titulo": "Evaluar sin jugar",
-   "consigna": "Armá la tabla de 12 días de la clase: un dado elige cómo vas al trabajo (1–4 colectivo, 5–6 subte) y otro el tiempo (colectivo: 30 + 5 × dado; subte: 20 + 2 × dado). Estimá cuánto tardaría alguien que va siempre en subte con IS y con WIS, y publicá la tabla y los dos números. Respondé: con los registros de cómo se atendió un negocio el año pasado, ¿para qué formas nuevas de atender podrías estimar el resultado y para cuáles no? Un compañero compara tus números con los de otras respuestas del hilo y te devuelve la rúbrica.",
-   "rubrica": [
-    "La tabla y las dos cuentas están completas y bien hechas.",
-    "Se comparan los números con el valor verdadero (27 minutos) y se dice cuál de los dos estimadores varía más en el hilo.",
-    "Se explica qué pasa si no salió ningún 5 ni 6, y se conecta con qué formas nuevas se pueden evaluar con registros viejos."
-   ]
-  }
- },
- "10": {
-  "objetivos": [
-   "Describir un modelo de lenguaje como política: estado = texto hasta ahora, acción = próximo token, episodio = respuesta, recompensa al final.",
-   "Explicar cómo la temperatura cambia la política y por qué muestrear es explorar.",
-   "Distinguir RLHF (modelo de recompensa aprendido con comparaciones humanas) de las recompensas verificables, y calcular las ventajas de GRPO de un grupo de respuestas.",
-   "Reconocer las piezas de un agente de lenguaje (modelo, arnés, herramientas, ventana de contexto) y los riesgos de optimizar una recompensa que se puede engañar."
-  ],
-  "tiempo": {
-   "pagina": 40,
-   "notebook": 60
-  },
-  "previos": [
-   "7",
-   "8",
-   "9"
-  ],
-  "requisitos": [
-   "Para el notebook: Colab (sin token ni licencia; descarga un modelo abierto de ≈1 GB). Con GPU tarda uno o dos minutos; en CPU, entre 3 y 8."
-  ],
-  "cuestionario": [
-   {
-    "pregunta": "Si un modelo de lenguaje es una política, ¿qué es el estado?",
-    "opciones": [
-     {
-      "texto": "Todo el texto hasta ahora: la conversación y lo que el modelo ya respondió.",
-      "explicacion": "Correcto. Cada token nuevo se agrega al estado; por eso el proceso es de Markov por construcción, a cambio de que el estado crezca."
-     },
-     {
-      "texto": "La última palabra que escribió el modelo.",
-      "explicacion": "No: con solo la última palabra no alcanza para decidir la siguiente. El modelo lee toda la ventana."
-     },
-     {
-      "texto": "Los pesos del modelo.",
-      "explicacion": "No: los pesos son la política (la regla que elige), no el estado sobre el que decide."
-     },
-     {
-      "texto": "La recompensa que recibió en el paso anterior.",
-      "explicacion": "No: en un modelo de lenguaje la recompensa llega recién al final de la respuesta."
-     }
-    ],
-    "correcta": 0
-   },
-   {
-    "pregunta": "¿Qué hace subir la temperatura T al muestrear el próximo token?",
-    "opciones": [
-     {
-      "texto": "Hace al modelo más preciso.",
-      "explicacion": "No: con T alta aparecen tokens poco probables, y con T muy alta, texto sin sentido."
-     },
-     {
-      "texto": "Aplana la distribución: la política explora más.",
-      "explicacion": "Correcto. Divide los logits por T antes del softmax; con T chica la política es casi greedy."
-     },
-     {
-      "texto": "Agranda la ventana de contexto.",
-      "explicacion": "No: la ventana es un límite del modelo y del arnés, no de la temperatura."
-     },
-     {
-      "texto": "Cambia los pesos del modelo.",
-      "explicacion": "No: la temperatura solo cambia cómo se muestrea de la misma política."
-     }
-    ],
-    "correcta": 1
-   },
-   {
-    "pregunta": "GRPO muestrea 8 respuestas a una cuenta y el verificador da 1 a las 8. ¿Qué ventajas reciben?",
-    "opciones": [
-     {
-      "texto": "Todas positivas: el modelo acertó.",
-      "explicacion": "No: la ventaja es relativa al grupo, y nadie fue mejor que el promedio."
-     },
-     {
-      "texto": "Todas cero: la pregunta no aporta señal para el paso de actualización.",
-      "explicacion": "Correcto. (r − media) / desvío vale 0 si todas son iguales. Pasa lo mismo si todas valen 0: es la recompensa escasa de la clase 5."
-     },
-     {
-      "texto": "La primera +1 y el resto −1.",
-      "explicacion": "No: el orden en que se muestrearon no importa."
-     },
-     {
-      "texto": "No se pueden calcular sin un crítico que estime V(s).",
-      "explicacion": "No: justamente GRPO no usa crítico; el grupo hace de línea de base."
-     }
-    ],
-    "correcta": 1
-   },
-   {
-    "pregunta": "En el bucle de agente de la clase, el modelo pidió calcular(\"2026 - year_of_publication\"). ¿Qué pasó?",
-    "opciones": [
-     {
-      "texto": "La calculadora adivinó el año y respondió 5.",
-      "explicacion": "No: la herramienta no adivina; solo acepta números."
-     },
-     {
-      "texto": "El arnés devolvió un error legible y el modelo de 500 millones respondió solo la mitad de la pregunta.",
-      "explicacion": "Correcto. El arnés valida y acota el daño, pero no hace al modelo más inteligente: encadenar dos herramientas le quedó grande."
-     },
-     {
-      "texto": "El modelo recordó el año de una conversación anterior.",
-      "explicacion": "No: el modelo no tiene memoria entre llamadas; solo ve lo que el arnés pone en la ventana."
-     },
-     {
-      "texto": "El arnés cortó por llegar al límite de pasos.",
-      "explicacion": "No: respondió en el paso 2 de 4, sin el cálculo."
-     }
-    ],
-    "correcta": 1
-   },
-   {
-    "pregunta": "Un verificador da recompensa 1 si el número correcto aparece en algún lugar de la respuesta. ¿Qué riesgo tiene entrenar con él?",
-    "opciones": [
-     {
-      "texto": "Ninguno: si el número aparece, la respuesta es correcta.",
-      "explicacion": "No: \"puede ser 40, 41, 42, 43 o 44\" contiene el 42 y no sabe sumar."
-     },
-     {
-      "texto": "Que la política aprenda a listar muchos números y cobre sin saber resolver: reward hacking.",
-      "explicacion": "Correcto. GRPO le daría ventaja positiva a la trampa. Por eso: verificadores estrictos, otro modelo como juez y un humano que mire muestras."
-     },
-     {
-      "texto": "Que el entrenamiento sea más lento.",
-      "explicacion": "No es el problema principal: el problema es qué aprende, no cuánto tarda."
-     },
-     {
-      "texto": "Que la temperatura deje de importar.",
-      "explicacion": "No: la temperatura sigue controlando la exploración; lo que falla es la recompensa."
-     }
-    ],
-    "correcta": 1
-   }
-  ],
-  "actividad": {
-   "titulo": "Diseñar la recompensa de un agente de lenguaje",
-   "consigna": "Elegí una tarea que te gustaría delegar en un agente de lenguaje (por ejemplo, corregir ejercicios, contestar consultas de un comercio o resumir papers). Describí: el estado (qué entra en la ventana), las herramientas que necesita, el límite de pasos y qué valida el arnés. Proponé una recompensa verificable o, si no la hay, quién compara respuestas. Después escribí una respuesta trampa que cobraría con tu recompensa sin hacer bien la tarea, y cómo la detectarías. Publicalo y devolvé la propuesta de otra persona buscándole una trampa nueva.",
-   "rubrica": [
-    "Estado, herramientas, límite de pasos y validaciones del arnés están descritos y son coherentes con la tarea.",
-    "La recompensa está bien definida: se dice quién o qué la calcula y cuándo llega.",
-    "La respuesta trampa es plausible y se propone una forma concreta de detectarla (verificador más estricto, otro juez o un humano que mire muestras)."
-   ]
-  }
- },
- "12": {
-  "objetivos": [
-   "Recorrer las once clases anteriores sobre la misma cueva y nombrar la herramienta que agregó cada una.",
-   "Plantear un problema propio como MDP, diciendo quién define la recompensa, quién la ve y cómo podría el agente hacer trampa.",
-   "Presentar el proyecto entre pares y devolver otros con una rúbrica.",
-   "Explicar la difusión del curso como bandit y el curso entero a otra persona."
-  ],
-  "tiempo": {
-   "pagina": 60
-  },
-  "previos": [
-   "8",
-   "11"
-  ],
-  "requisitos": [
-   "Haber completado las clases 1 a 11 (la nivelación es optativa).",
-   "Una cuenta de GitHub para publicar el proyecto en Discussions."
-  ],
-  "cuestionario": [
-   {
-    "pregunta": "¿Qué agrega la ficha del proyecto final a la plantilla de la clase 8?",
-    "opciones": [
-     {
-      "texto": "Más estados y acciones.",
-      "explicacion": "No: se siguen pidiendo pocos estados y pocas acciones."
-     },
-     {
-      "texto": "Un gráfico de la política óptima.",
-      "explicacion": "No: para resolver el MDP la ficha remite a la clase 8 o al notebook 08."
-     },
-     {
-      "texto": "Quién define la recompensa, quién la ve y cómo podría el agente hacer trampa.",
-      "explicacion": "Correcto. Son las preguntas de la clase 11 incorporadas al proyecto."
-     },
-     {
-      "texto": "Un modelo de lenguaje que escribe la ficha.",
-      "explicacion": "No: la ficha la escribís vos; está hecha para pensar la recompensa."
-     }
-    ],
-    "correcta": 2
-   },
-   {
-    "pregunta": "En la campaña de difusión, ¿cuál es un ejemplo de reward hacking?",
-    "opciones": [
-     {
-      "texto": "Publicar los cuatro tipos de post una vez cada uno al principio.",
-      "explicacion": "No: eso es exploración planificada."
-     },
-     {
-      "texto": "Maximizar guardados con posts de intriga que nunca llevan al material.",
-      "explicacion": "Correcto. Sube el número premiado sin lograr lo que se quería: que el curso se aprenda y se enseñe."
-     },
-     {
-      "texto": "Cargar las métricas reales a los 7 días.",
-      "explicacion": "No: es la forma de medir la recompensa."
-     },
-     {
-      "texto": "Cambiar el tipo de post cuando Thompson recomienda otro.",
-      "explicacion": "No: es seguir la política."
-     }
-    ],
-    "correcta": 1
-   },
-   {
-    "pregunta": "¿Por qué en la recompensa de la campaña una visita al repositorio pesa 5 y un guardado 1?",
-    "opciones": [
-     {
-      "texto": "Porque las visitas son más fáciles de conseguir.",
-      "explicacion": "No: suelen ser más escasas; por eso informan más."
-     },
-     {
-      "texto": "Porque Instagram no muestra los guardados.",
-      "explicacion": "No: los guardados están en las estadísticas del post."
-     },
-     {
-      "texto": "Porque el peso tiene que ser un número primo.",
-      "explicacion": "No: los pesos son una decisión de quien da el curso, no una regla matemática."
-     },
-     {
-      "texto": "Porque la visita mide fidelidad: la persona llega a la fuente completa y no a un resumen.",
-      "explicacion": "Correcto. Guardado es longevidad, compartido es fecundidad y visita es fidelidad."
-     }
-    ],
-    "correcta": 3
-   },
-   {
-    "pregunta": "¿Cómo elige el tipo de post la campaña desde el quinto post?",
-    "opciones": [
-     {
-      "texto": "Para cada tipo sortea una tasa posible de su distribución Beta y publica el que salió más alto.",
-      "explicacion": "Correcto. Es Thompson sampling: explora mientras hay duda y explota cuando la duda se achica."
-     },
-     {
-      "texto": "Siempre publica el tipo con mejor promedio hasta ahora.",
-      "explicacion": "No: eso es pura explotación (greedy) y puede quedarse con un tipo por mala suerte temprana."
-     },
-     {
-      "texto": "Elige al azar con la misma probabilidad para cada tipo.",
-      "explicacion": "No: eso sería explorar siempre, sin usar lo aprendido."
-     },
-     {
-      "texto": "Los publica en orden fijo: intriga, concepto, demo, enseñar.",
-      "explicacion": "No: ese orden es solo el de los cuatro primeros."
-     }
-    ],
-    "correcta": 0
-   },
-   {
-    "pregunta": "En la figura «¿Quién elige tu recompensa?», con γ = 0,9 el horizonte efectivo es de unos 10 pasos. ¿Qué pasa si la salida está a 20 pasos?",
-    "opciones": [
-     {
-      "texto": "El valor llega igual de fuerte a toda la cueva.",
-      "explicacion": "No: cada paso multiplica el valor por γ; a 20 pasos queda muy atenuado."
-     },
-     {
-      "texto": "La salida deja de existir.",
-      "explicacion": "No: la salida está; lo que cambia es cuánto pesa vista desde lejos."
-     },
-     {
-      "texto": "El valor de la salida llega muy débil a la entrada y, con un costo por paso, puede no compensar el camino.",
-      "explicacion": "Correcto. Es la miopía de la clase 1: con γ chico la luz no pasa de cerca de la salida."
-     },
-     {
-      "texto": "El agente se mueve más rápido.",
-      "explicacion": "No: γ no cambia la velocidad, cambia cuánto importa el futuro."
-     }
-    ],
-    "correcta": 2
-   }
-  ],
-  "actividad": {
-   "titulo": "Proyecto final: tu MDP y cómo lo enseñarías",
-   "consigna": "Publicá la ficha de tu proyecto (copiala como Markdown desde la página) con el título indicado. Después devolvé los proyectos de dos personas con la rúbrica y, por último, enseñale una idea del curso a alguien que no lo hizo y contá en el mismo hilo qué entendió y qué no.",
-   "rubrica": [
-    "Estados, acciones y recompensa están definidos y son pocos; los estados alcanzan para decidir.",
-    "Se dice quién define la recompensa y quién la ve, y hay al menos una trampa posible con una forma concreta de evitarla.",
-    "La explicación de 5 minutos se entiende sin haber hecho el curso."
-   ]
-  }
- }
-});

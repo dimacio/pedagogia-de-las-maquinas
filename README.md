@@ -52,7 +52,7 @@ La nivelación es el pre curso (Python, probabilidad y álgebra lineal, todo des
 
 1. Crear el repositorio (por ejemplo `rl-a-ciegas`) y subir esta carpeta.
 2. En `assets/cueva.js`, cambiar `const REPO = "USUARIO/rl-a-ciegas"` por el usuario y el repositorio. Eso arregla los enlaces a GitHub, Colab y Discussions de todas las páginas.
-3. En el repositorio: *Settings → Pages → Deploy from a branch → main / (root)*.
+3. En el repositorio: *Settings → Pages → Source: GitHub Actions*. La publicación la hace `.github/workflows/publicar.yml` al etiquetar una versión (ver `CONTRIBUTING.md`).
 4. Activar Discussions: *Settings → General → Features → Discussions*. Conviene crear una categoría por clase o una sola, «Actividades», donde los títulos llevan el prefijo `[Clase N]`.
 5. Volver a renderizar el post 12, que muestra la dirección del repositorio: `node build/render_posts.js 12` (con un servidor local en la raíz: `python3 -m http.server 8765`).
 
@@ -81,3 +81,8 @@ build/                scripts que generan notebooks y posts, y pruebas de las p�
 ## Licencia
 
 A definir.
+
+## Cómo se produce y se mantiene
+
+El curso se produce con una fábrica: un *spine* por clase (`specs/`), agentes y skills de Claude Code (`.claude/`, instrucciones en `CLAUDE.md`)
+y un control de calidad automático (`fabrica/chequeos/`, en cada PR por GitHub Actions). El ciclo completo está en `CONTRIBUTING.md`.

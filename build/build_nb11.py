@@ -1071,4 +1071,4 @@ cells.append(code(r"""
 print(f"Tiempo total del notebook: {(time.time() - T0) / 60:.1f} min · generador: {GENERADOR_USADO} · evaluador: {MODELO_EVALUADOR}")
 """))
 
-save(cells, "11-agentes-aplicados.ipynb")
+save(cells, "11-agentes-aplicados.ipynb", lento=True)

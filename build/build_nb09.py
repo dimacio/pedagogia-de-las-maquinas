@@ -1182,4 +1182,4 @@ Clase 10: **agentes de lenguaje**, el agente ReAct de este notebook visto de cer
 Más adelante volvemos al propio curso como MDP: ¿qué publicar para que esto llegue a más gente que aprenda? Es el bandit de la sección final del notebook 08 (*Ejemplo resuelto: la difusión de este curso como bandit*) y la página `difusion/estrategia.html`, donde el curso se propaga por una red de personas, como un agente que actúa sobre el mundo y recibe recompensa de él.
 """))
 
-save(cells, "09-agentes-mundo-real.ipynb")
+save(cells, "09-agentes-mundo-real.ipynb", lento=True)

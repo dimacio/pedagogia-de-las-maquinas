@@ -1,0 +1,95 @@
+# Control de calidad rápido en cada PR y en cada push a main (fabrica/chequeos/correr.py --rapido).
+name: calidad
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: calidad-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chequeos:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-fabrica.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Dependencias de Python
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-fabrica.txt
+          python -m ipykernel install --user --name python3
+
+      - name: Playwright y chromium
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Chequeos (modo rápido)
+        id: chequeos
+        run: |
+          set +e
+          python fabrica/chequeos/correr.py --rapido --reporte fabrica/reportes/reporte.md
+          echo "codigo=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Reporte en el resumen del job
+        if: always()
+        run: cat fabrica/reportes/reporte.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Subir reporte y capturas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: calidad-${{ github.run_number }}
+          path: |
+            fabrica/reportes/reporte.md
+            fabrica/reportes/trazabilidad.html
+            fabrica/reportes/capturas/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Comentar el reporte en el PR
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          [ -f fabrica/reportes/reporte.md ] || exit 0
+          {
+            echo "<!-- fabrica-calidad -->"
+            head -c 60000 fabrica/reportes/reporte.md
+            echo
+            echo "_Capturas y matriz de trazabilidad: artefacto \`calidad-${{ github.run_number }}\` de [esta corrida](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})._"
+          } > comentario.md
+          # edita el comentario anterior de la fábrica si existe; si no, crea uno (en PRs desde forks el token no puede escribir)
+          gh pr comment "$PR" --edit-last --body-file comentario.md 2>/dev/null \
+            || gh pr comment "$PR" --body-file comentario.md \
+            || echo "::warning::No se pudo comentar en el PR (¿PR desde un fork?)."
+
+      - name: Resultado
+        if: always()
+        run: |
+          if [ "${{ steps.chequeos.outputs.codigo }}" != "0" ]; then
+            echo "::error::Hay chequeos que fallan: ver el reporte."
+            exit 1
+          fi
