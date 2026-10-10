@@ -507,7 +507,7 @@ window.MODULOS = {
         opciones: [
           { texto: "V^π(cruce) está mal calculado: el valor de una casilla es el de su mejor acción, así que debería dar 0,1070.", explicacion: "No: quedarse con el máximo es el valor óptimo V*. Para la política al azar, V^π es el promedio de las cuatro Q, pesado con 1/4 cada una." },
           { texto: "Para saber qué acción conviene en el cruce hay que jugar muchas partidas desde ahí con cada acción y comparar los retornos promedio.", explicacion: "No: con el mapa a la vista no hace falta jugar. Q^π(s,a) = R(s,a) + γ Σ P(s′|s,a) V^π(s′) se calcula con P, R y los valores de la política." },
-          { texto: "Q(cruce, →) = 0,1070 es mayor que V(5,7) = 0,1081 porque al valor de adonde voy se le suma el premio de este paso.", explicacion: "No: 0,1070 es menor que 0,1081. Este paso no cobra nada (R = 0), así que Q = 0 + 0,99 · 0,1081: el descuento le saca un poco." },
+          { texto: "Q(cruce, →) debería ser igual a V(5,7) = 0,1081, porque el paso que lleva de una casilla a la otra no cobra nada.", explicacion: "No: el paso no cobra nada (R = 0), pero el valor de la casilla de destino se descuenta. Q = 0 + 0,99 · 0,1081 = 0,1070." },
           { texto: "→ es la de mayor Q y la mejora pone esa flecha; el promedio de las cuatro Q da 0,0771 porque el dado elige cada una con 1/4.", explicacion: "Correcto. Mejorar es quedarse en cada casilla con la acción de mayor Q^π. Y como V^π es el promedio de las cuatro Q, alguna tiene que estar por encima." }
         ],
         correcta: 3

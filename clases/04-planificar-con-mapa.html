@@ -30,6 +30,13 @@
   .cuenta .v { color: var(--lamp); }
   .tabla td.op { color: var(--exit); font-weight: 700; }
   .tabla td.mejor { box-shadow: inset 0 0 0 2px var(--exit); }
+  /* la tabla del robot entra entera en pantallas chicas: la columna ganadora se ve sin desplazar */
+  .tabla.robot th { vertical-align: bottom; }
+  @media (max-width: 560px) {
+    .tabla.robot table { font-size: 12.5px; }
+    .tabla.robot th { font-size: 11px; }
+    .tabla.robot th, .tabla.robot td { padding: 6px 4px; }
+  }
 </style>
 </head>
 <body>
@@ -71,7 +78,7 @@
     <div class="texto">
       <div class="paso">Paso 2</div>
       <h2>Con la política fija, vuelve a ser una cadena</h2>
-      <p>Una <b>política</b> (<i>policy</i>) π(a|s), como en la clase 2, dice con qué probabilidad se elige cada acción en cada casilla. Con la política fija, cada casilla vuelve a tener una sola distribución de destinos, el promedio de las cuatro tablas pesado por π. Un MDP con la política fija es entonces un proceso de recompensa de Markov (MRP) como el de la clase 3. Con la política al azar se recupera el caminante del dado, con V(S) = 0,0136 y V(cruce) = 0,0771.</p>
+      <p>Una <b>política</b> (<i>policy</i>) π(a|s), como en la clase 2, dice con qué probabilidad se elige cada acción en cada casilla. Con la política fija, cada casilla vuelve a tener una sola distribución de destinos, el promedio de las cuatro tablas pesado por π. Un MDP con la política fija es entonces un proceso de recompensa de Markov (MRP) como el de la clase 3, con R<sup>π</sup>(s) = Σₐ π(a|s) R(s,a) en el lugar de su R(s). Con la política al azar se recupera el caminante del dado, con V(S) = 0,0136 y V(cruce) = 0,0771.</p>
       <div class="eq">P<sup>π</sup>(s′|s) = Σₐ π(a|s) P(s′|s,a)</div>
       <p class="nota pregunta">Con «todas ↑» todo vale 0. ¿Por qué ninguna casilla cobra nunca nada?</p>
     </div>
@@ -107,7 +114,7 @@
     <div class="texto">
       <div class="paso">Paso 4</div>
       <h2>Mejorar: quedarse con la mejor acción</h2>
-      <p>La <b>mejora de la política</b> (<i>policy improvement</i>) pone en cada casilla la flecha de la acción con mayor Q<sup>π</sup>. La política nueva nunca es peor que la vieja, porque su valor no baja en ninguna casilla. Una sola mejora desde el dado lleva V(S) de 0,0136 a 0,8262 y hace subir el valor de las 59 casillas. Ese 0,8262 es 0,99¹⁹, lo que vale ir derecho a la salida en 20 pasos.</p>
+      <p>La <b>mejora de la política</b> (<i>policy improvement</i>) pone en cada casilla la flecha de la acción con mayor Q<sup>π</sup>. La política nueva nunca es peor que la vieja, es decir, su valor no baja en ninguna casilla. Una sola mejora desde el dado lleva V(S) de 0,0136 a 0,8262 y hace subir el valor de las 59 casillas. Ese 0,8262 es 0,99¹⁹, lo que vale ir derecho a la salida en 20 pasos.</p>
       <div class="eq">π′(s) = argmaxₐ Q<sup>π</sup>(s,a)</div>
       <p class="nota pregunta">Si una sola mejora ya lleva de S a la salida en 20 pasos, ¿hace falta seguir? ¿Cómo lo sabrías?</p>
     </div>
@@ -134,7 +141,7 @@
     <div class="texto">
       <div class="paso">Paso 5</div>
       <h2>Iteración de política: evaluar, mejorar, repetir</h2>
-      <p>La <b>iteración de política</b> (<i>policy iteration</i>) alterna dos pasos hasta que ninguna flecha cambia. Primero evalúa la política actual de un saque, con la ecuación de Bellman del paso 2. Después la mejora casilla por casilla con su Q. Desde el dado alcanzan 4 vueltas, contando la última que solo confirma, pero desde «todas ↑» hacen falta 21.</p>
+      <p>La <b>iteración de política</b> (<i>policy iteration</i>) alterna dos pasos hasta llegar a la <b>política óptima</b> (<i>optimal policy</i>) π*, la que ya no cambia ninguna flecha al mejorarla. Primero evalúa la política actual de un saque, con la ecuación de Bellman del paso 2. Después la mejora casilla por casilla con su Q. Desde el dado alcanzan 4 vueltas, contando la última que solo confirma, pero desde «todas ↑» hacen falta 21.</p>
       <div class="eq">π₀ → V<sup>π₀</sup> → π₁ → V<sup>π₁</sup> → … → π*</div>
       <p class="nota pregunta">Empezá con «todas ↑» y avanzá de a una vuelta. ¿Por qué las flechas se acomodan desde la salida hacia atrás, un tramo por vuelta?</p>
     </div>
@@ -156,43 +163,57 @@
     <div class="texto">
       <div class="paso">Paso 6</div>
       <h2>Iteración de valor: el máximo en cada vuelta</h2>
-      <p>La <b>iteración de valor</b> (<i>value iteration</i>) repite la cuenta de la clase 3 con un solo cambio, quedarse con la mejor acción en vez de promediarlas. No hay política que evaluar, porque las flechas salen solas de la acción que da el máximo. El valor se derrama desde la salida y converge en 22 vueltas, con todas las flechas óptimas desde la vuelta 19. Cada vuelta es un solo barrido, más barato que evaluar una política entera, y llega al mismo V*(S) = 0,8262 que la iteración de política.</p>
+      <p>La <b>iteración de valor</b> (<i>value iteration</i>) repite la cuenta de la clase 3 con un solo cambio, quedarse con la mejor acción en vez de promediarlas. No hay política que evaluar, porque las flechas salen solas de la acción que da el máximo. El valor se derrama desde la salida y converge en 22 vueltas, con todas las flechas óptimas desde la vuelta 19. Cada vuelta es un solo barrido, más barato que evaluar una política entera, y llega al mismo <b>valor óptimo</b> (<i>optimal value</i>) V*(S) = 0,8262 que la iteración de política.</p>
       <div class="eq">V(s) ← maxₐ [ R(s,a) + γ Σₛ′ P(s′|s,a) V(s′) ]</div>
       <p class="nota pregunta">S está a 20 pasos de la salida. ¿Por qué hacen falta 22 vueltas para terminar?</p>
     </div>
   </section>
 
-  <!-- B7: slip, costo y γ -->
-  <section class="bloque" id="b-perillas" data-objetivos="O4">
+  <!-- B7: piso resbaloso -->
+  <section class="bloque" id="b-slip" data-objetivos="O4">
     <div class="stage">
-      <div class="lz"><canvas id="cvPer" aria-label="Valor óptimo, flechas de la política óptima y trayecto desde S para los valores elegidos de gamma, costo por paso y slip"></canvas></div>
-      <div class="ctls">
-        <div class="ctl"><label for="slG"><span>γ</span> <output id="outG"></output></label><input type="range" id="slG" min="0.5" max="1" step="0.01" value="0.99"></div>
-        <div class="ctl"><label for="slCosto"><span>costo por paso</span> <output id="outCosto"></output></label><input type="range" id="slCosto" min="0" max="0.1" step="0.01" value="0"></div>
-        <div class="ctl"><label for="slSlip"><span>slip</span> <output id="outSlip"></output></label><input type="range" id="slSlip" min="0" max="0.6" step="0.05" value="0.2"></div>
-      </div>
-      <div class="row">
-        <button class="btn" data-pre="0.99,0,0">piso normal</button><button class="btn" data-pre="0.99,0,0.2">slip 0,2</button><button class="btn" data-pre="1,0,0">γ = 1 sin costo</button><button class="btn" data-pre="1,0.01,0">γ = 1, costo 0,01</button><button class="btn" data-pre="0.99,0.01,0">γ = 0,99, costo 0,01</button>
-      </div>
-      <div class="hud" id="hudPer"></div>
       <div class="duo">
-        <div><h3>12 partidas, <b>piso normal</b></h3><div class="lz"><canvas id="cvP0" aria-label="Doce partidas superpuestas con piso normal: una sola línea"></canvas></div></div>
-        <div><h3>12 partidas, <b>slip = 0,2</b></h3><div class="lz"><canvas id="cvP1" aria-label="Doce partidas superpuestas con piso resbaloso: cada una distinta"></canvas></div></div>
+        <div><h3>12 partidas, <b>piso normal</b></h3><div class="lz"><canvas id="cvP0" aria-label="Doce partidas superpuestas con piso normal sobre las flechas de su política óptima: una sola línea"></canvas></div></div>
+        <div><h3>12 partidas, <b>slip = 0,2</b></h3><div class="lz"><canvas id="cvP1" aria-label="Doce partidas superpuestas con piso resbaloso sobre las flechas de su política óptima: cada una distinta"></canvas></div></div>
       </div>
       <div class="row"><button class="btn primary" id="otras">Otras 12 partidas</button></div>
       <div class="hud" id="hudPart"></div>
-      <p class="cap">Todo calculado en el navegador. Las partidas están simuladas en el navegador con otra semilla que el notebook, cada una con la política óptima de su cueva.</p>
+      <p class="cap">Cada cueva con las flechas de su política óptima, calculada en el navegador como en el notebook. Las partidas están simuladas en el navegador con otra semilla que el notebook.</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 7</div>
-      <h2>Piso resbaloso, costo por paso y γ</h2>
-      <p>Con un piso resbaloso (<i>slip</i>) de 0,2, el caminante se desvía a un costado una de cada cinco veces, así que V*(S) baja de 0,8262 a 0,7742 sin que cambie ninguna flecha, porque en esta cueva no hay pozos y resbalar solo hace perder tiempo. Sin slip, las 12 partidas del notebook tardan 20 pasos, pero con slip cada una es distinta y tardan entre 21 y 29, por eso V es un retorno esperado. Con γ = 1 y sin costo todas las casillas valen 1 y el caminante no llega en 60 pasos, mientras que un costo de 0,01 por paso devuelve el apuro, con V*(S) = 0,81. Con γ = 0,99 y el mismo costo, las dos cosas apuran y V*(S) baja a 0,6523.</p>
-      <div class="eq">rₜ = +1 si el paso entra a la salida, −costo si no</div>
+      <h2>Piso resbaloso</h2>
+      <p>Con un piso resbaloso (<i>slip</i>) de 0,2, la acción hace lo que pide con probabilidad 0,8 y desvía al caminante hacia cada costado con 0,1. Sin slip, las 12 partidas del notebook tardan 20 pasos y dibujan una sola línea, pero con slip cada una es distinta y tardan entre 21 y 29. Por eso V es un retorno esperado, el promedio sobre todas las partidas posibles. En esta cueva no hay pozos y resbalar solo hace perder tiempo, así que V*(S) baja de 0,8262 a 0,7742 sin que cambie ninguna flecha.</p>
+      <div class="eq">P(s′|s,↓) = 0,8 hacia ↓, 0,1 hacia ←, 0,1 hacia →</div>
       <p class="nota pregunta">Si hubiera un pozo al costado del pasillo, ¿la flecha óptima con slip seguiría siendo la misma?</p>
     </div>
   </section>
 
-  <!-- B8: robot de reciclaje -->
+  <!-- B8: costo por paso y γ -->
+  <section class="bloque" id="b-perillas" data-objetivos="O4">
+    <div class="stage">
+      <div class="lz"><canvas id="cvPer" aria-label="Valor óptimo, flechas de la política óptima y trayecto desde S para los valores elegidos de gamma y del costo por paso"></canvas></div>
+      <div class="legend"><span id="legPlo"></span><span class="bar" id="legP"></span><span id="legPhi"></span></div>
+      <div class="ctls">
+        <div class="ctl"><label for="slG"><span>γ</span> <output id="outG"></output></label><input type="range" id="slG" min="0.5" max="1" step="0.01" value="1"></div>
+        <div class="ctl"><label for="slCosto"><span>costo por paso</span> <output id="outCosto"></output></label><input type="range" id="slCosto" min="0" max="0.1" step="0.01" value="0.01"></div>
+      </div>
+      <div class="row">
+        <button class="btn" data-pre="1,0">γ = 1 sin costo</button><button class="btn" data-pre="1,0.01">γ = 1, costo 0,01</button><button class="btn" data-pre="0.99,0">γ = 0,99</button><button class="btn" data-pre="0.9,0">γ = 0,9</button><button class="btn" data-pre="0.5,0">γ = 0,5</button>
+      </div>
+      <div class="hud" id="hudPer"></div>
+      <p class="cap">Iteración de valor en el navegador, como en el notebook. Cuando los valores van de millonésimas a 1, el mapa de calor pasa a escala logarítmica.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 8</div>
+      <h2>Costo por paso y γ</h2>
+      <p>Con γ = 1 y sin costo por paso, llegar ahora o dentro de mil pasos da lo mismo, así que todas las casillas valen 1. Las cuatro acciones empatan en todas partes y el desempate elige ↑, por eso el caminante se queda chocando arriba de S y no llega. Un costo de 0,01 por paso devuelve el apuro, con V*(S) = 0,81 y el camino de 20 pasos. Sin costo, bajar γ a 0,9 o a 0,5 no cambia ninguna flecha, pero V*(S) cae de 0,826 a 0,135 y a 1,91 · 10⁻⁶.</p>
+      <div class="eq">rₜ = +1 si el paso entra a la salida, −costo si no</div>
+      <p class="nota pregunta">Con γ = 0,5, S vale una millonésima. Si ese valor hubiera que estimarlo jugando, con ruido, ¿se notaría la diferencia entre dos flechas?</p>
+    </div>
+  </section>
+
+  <!-- B9: robot de reciclaje -->
   <section class="bloque" id="b-robot" data-objetivos="O4">
     <div class="stage">
       <div class="lz"><canvas id="cvRobot" aria-label="Robot de reciclaje: diagrama de los dos estados de batería con la acción óptima de cada uno en verde, y mapa de la acción óptima con batería baja según beta y la recompensa por esperar"></canvas></div>
@@ -208,9 +229,9 @@
         <label for="slW"><span>r_espera: recompensa por esperar</span> <output id="outW"></output></label>
         <input type="range" id="slW" min="0" max="2.5" step="0.05" value="1">
       </div>
-      <div class="tabla">
+      <div class="tabla robot">
         <table>
-          <thead><tr><th>batería</th><th>elige</th><th>V*</th><th>Q buscar</th><th>Q esperar</th><th>Q recargar</th></tr></thead>
+          <thead><tr><th>batería</th><th>elige</th><th>V*</th><th>Q<br>buscar</th><th>Q<br>esperar</th><th>Q<br>recargar</th></tr></thead>
           <tbody id="tbRobot"></tbody>
         </table>
       </div>
@@ -218,7 +239,7 @@
       <p class="cap">Iteración de valor de dos estados en el navegador, como en el notebook (buscar rinde 2, rescate −3, γ = 0,9). Tocá el mapa para mover β y r_espera.</p>
     </div>
     <div class="texto">
-      <div class="paso">Paso 8</div>
+      <div class="paso">Paso 9</div>
       <h2>El mismo molde fuera de la cueva: el robot de reciclaje</h2>
       <p>El robot de reciclaje de Sutton y Barto (ejemplo 3.3) es un MDP de dos estados, batería alta o baja, con tres acciones, buscar latas, esperar o recargar. Buscar rinde 2 y esperar rinde 1, pero con batería baja buscar puede agotar al robot, que cuesta un rescate de −3. Con α = 0,8, β = 0,4 y γ = 0,9, conviene buscar con batería alta y recargar con batería baja, donde recargar vale 15,25, esperar 14,73 y buscar 13,64. Con α = 0,8, buscar con batería baja conviene recién cuando β supera 0,863.</p>
       <div class="eq">Q(baja, buscar) = β(2 + γV(baja)) + (1−β)(−3 + γV(alta))</div>
@@ -226,7 +247,7 @@
     </div>
   </section>
 
-  <!-- B9: Para enseñarlo -->
+  <!-- B10: Para enseñarlo -->
   <section class="bloque full" id="b-ensenar" data-objetivos="O2 O3">
     <div class="texto prose">
       <div class="paso">Para enseñarlo</div>
@@ -574,7 +595,7 @@
   });
 
   // =====================================================================
-  // B7. Slip, costo por paso y γ; 12 partidas con y sin slip
+  // B7 y B8. Iteración de valor con slip, costo por paso y γ
   // =====================================================================
   function viCompleta({ gamma = 0.99, costo = 0, slip = 0 } = {}) {   // misma cuenta que Cueva.iteracionValor, con P armada una vez
     const P = Cueva.transiciones(env, slip);
@@ -591,39 +612,19 @@
     }
     return { V, it };
   }
-  const per = await tarea(() => {
-    const cv = $("cvPer"), hud = $("hudPer"), sg = $("slG"), sc = $("slCosto"), ss = $("slSlip");
-    const T = Cueva.tablero(cv, env, { maxCell: 40 });
-    let est = null;
-    function calcular() {
-      const op = { gamma: +sg.value, costo: +sc.value, slip: +ss.value };
-      $("outG").textContent = fmt(op.gamma, 2); $("outCosto").textContent = op.costo ? `−${fmt(op.costo, 2)}` : "0"; $("outSlip").textContent = fmt(op.slip, 2);
-      const { V, it } = viCompleta(op), pol = Cueva.politicaGreedy(env, V, op), path = Cueva.camino(env, pol, 60);
-      est = { op, V, it, pol, path, llega: path[path.length - 1] === GOAL, distintas: pol.reduce((t, a, s) => t + (s !== GOAL && !OPT[s][a] ? 1 : 0), 0) };
-      document.querySelectorAll("#b-perillas [data-pre]").forEach(b => { const [g, c, sp] = b.dataset.pre.split(",").map(Number); b.setAttribute("aria-pressed", g === op.gamma && c === op.costo && sp === op.slip); });
-    }
-    function dibujar() {
-      const { V, pol, path, llega, it, op, distintas } = est;
-      const vals = V.filter((_, s) => s !== GOAL), lo = Math.min(...vals), hi = Math.max(...vals);
-      T.fondo("#000").paredes(PARED).valores(V).salida();
-      flechas(T, pol, V, { lo, hi });
-      if (llega) T.trayecto(path, "rgba(61,220,132,.85)", .1);
-      borde(T, START, COL.sonar, 2);
-      const empate = hi - lo < 1e-9;
-      hud.innerHTML = `<span>V*(S) <b>${fmt(V[START], 4)}</b></span><span>vueltas <b>${it}</b></span><span>flechas distintas de las del piso normal <b>${distintas}</b></span>` +
-        (llega ? `<span>desde S: <b style="color:var(--exit)">${path.length - 1} pasos</b>${op.slip ? " si no resbala" : ""}</span>` : `<span><b style="color:var(--ember)">no llega</b>${empate ? ": todas las casillas valen lo mismo y las acciones empatan" : ""}</span>`);
-    }
-    for (const el of [sg, sc, ss]) el.oninput = () => { calcular(); dibujar(); };
-    document.querySelectorAll("#b-perillas [data-pre]").forEach(b => b.onclick = () => { const [g, c, sp] = b.dataset.pre.split(","); sg.value = g; sc.value = c; ss.value = sp; calcular(); dibujar(); });
-    calcular(); dibujar();
-    return { dibujar: () => { T.medir(); dibujar(); }, viCompleta };
-  });
+  // valores muy chicos en notación científica: 1,91 · 10⁻⁶
+  const SUP = { "-": "⁻", 0: "⁰", 1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹" };
+  const fmtV = x => { if (x === 0 || Math.abs(x) >= 1e-3) return fmt(x, 4); const e = Math.floor(Math.log10(Math.abs(x)));
+    return `${fmt(x / 10 ** e, 2)} · 10${String(e).split("").map(c => SUP[c]).join("")}`; };
 
+  // B7. 12 partidas con y sin slip, sobre las flechas de la política óptima de cada cueva
   const partidas = await tarea(() => {
     const N = 12, SLIP = 0.2, hud = $("hudPart");
     const T0 = Cueva.tablero($("cvP0"), env, { maxCell: 30 }), T1 = Cueva.tablero($("cvP1"), env, { maxCell: 30 });
-    const pol0 = Cueva.politicaGreedy(env, viCompleta({ gamma: GAMMA }).V, { gamma: GAMMA });
-    const pol1 = Cueva.politicaGreedy(env, viCompleta({ gamma: GAMMA, slip: SLIP }).V, { gamma: GAMMA, slip: SLIP });
+    const V0 = viCompleta({ gamma: GAMMA }).V, V1 = viCompleta({ gamma: GAMMA, slip: SLIP }).V;
+    const pol0 = Cueva.politicaGreedy(env, V0, { gamma: GAMMA });
+    const pol1 = Cueva.politicaGreedy(env, V1, { gamma: GAMMA, slip: SLIP });
+    const distintas = pol1.reduce((t, a, s) => t + (s !== GOAL && !OPT[s][a] ? 1 : 0), 0);
     let semilla = 1, tr0 = [], tr1 = [], prog = 1, raf = 0;
     function jugar(slip, u, pol, lim = 200) {
       let s = START; const p = [s];
@@ -631,9 +632,10 @@
       return p;
     }
     function simular() { const u = Cueva.rng(semilla * 7919); tr0 = Array.from({ length: N }, () => jugar(0, u, pol0)); tr1 = Array.from({ length: N }, () => jugar(SLIP, u, pol1)); }
-    function trazar(T, trs, color) {
+    function trazar(T, trs, pol, color) {
       const ctx = T.ctx, cell = T.cell;
       T.fondo("#000").paredes(PARED).salida().entrada();
+      for (let s = 0; s < n; s++) if (s !== GOAL && s !== START) T.texto(s, AR[pol[s]], "rgba(141,147,163,.4)", .42);
       trs.forEach((p, i) => {
         const off = (i - (N - 1) / 2) / N * cell * .5, m = Math.max(1, Math.floor((p.length - 1) * prog));
         ctx.strokeStyle = color; ctx.lineWidth = Math.max(1.5, cell * .07); ctx.lineJoin = "round"; ctx.globalAlpha = .55;
@@ -642,10 +644,11 @@
       });
     }
     function dibujar() {
-      trazar(T0, tr0, COL.lamp); trazar(T1, tr1, COL.sonar);
+      trazar(T0, tr0, pol0, COL.lamp); trazar(T1, tr1, pol1, COL.sonar);
       const l0 = tr0.map(p => p.length - 1), l1 = tr1.map(p => p.length - 1), media = l1.reduce((a, b) => a + b, 0) / N;
       hud.innerHTML = `<span>piso normal: <b>${Math.min(...l0) === Math.max(...l0) ? `${l0[0]} pasos` : `entre ${Math.min(...l0)} y ${Math.max(...l0)}`}</b> las 12</span>` +
-        `<span>slip 0,2: entre <b>${Math.min(...l1)}</b> y <b>${Math.max(...l1)}</b> pasos, promedio <b>${fmt(media, 1)}</b></span><span>(simulado en el navegador)</span>`;
+        `<span>slip 0,2: entre <b>${Math.min(...l1)}</b> y <b>${Math.max(...l1)}</b> pasos, promedio <b>${fmt(media, 1)}</b> (simulado)</span>` +
+        `<span>V*(S): <b>${fmt(V0[START], 4)}</b> → <b>${fmt(V1[START], 4)}</b></span><span>flechas que cambian con slip <b>${distintas}</b></span>`;
     }
     function animar() {
       cancelAnimationFrame(raf);
@@ -659,8 +662,42 @@
     return { dibujar: () => { T0.medir(); T1.medir(); dibujar(); } };
   });
 
+  // B8. Costo por paso y γ sobre V* y las flechas
+  const per = await tarea(() => {
+    const cv = $("cvPer"), hud = $("hudPer"), sg = $("slG"), sc = $("slCosto");
+    const T = Cueva.tablero(cv, env, { maxCell: 40 });
+    $("legP").style.background = Cueva.gradienteCSS("valor");
+    let est = null;
+    function calcular() {
+      const op = { gamma: +sg.value, costo: +sc.value };
+      $("outG").textContent = fmt(op.gamma, 2); $("outCosto").textContent = op.costo ? `−${fmt(op.costo, 2)}` : "0";
+      const { V, it } = viCompleta(op), pol = Cueva.politicaGreedy(env, V, op), path = Cueva.camino(env, pol, 60);
+      est = { op, V, it, pol, path, llega: path[path.length - 1] === GOAL, distintas: pol.reduce((t, a, s) => t + (s !== GOAL && !OPT[s][a] ? 1 : 0), 0) };
+      document.querySelectorAll("#b-perillas [data-pre]").forEach(b => { const [g, c] = b.dataset.pre.split(",").map(Number); b.setAttribute("aria-pressed", g === op.gamma && c === op.costo); });
+    }
+    function dibujar() {
+      const { V, pol, path, llega, it, distintas } = est;
+      const vals = V.filter((_, s) => s !== GOAL), lo = Math.min(...vals), hi = Math.max(...vals);
+      const log = lo > 0 && hi / lo > 100;   // de millonésimas a 1: escala logarítmica
+      T.fondo("#000").paredes(PARED);
+      if (log) { const L = V.map(v => Math.log10(v)), a = Math.log10(lo), b = Math.log10(hi); T.valores(L, { lo: a, hi: b }); flechas(T, pol, L, { lo: a, hi: b }); }
+      else { T.valores(V); flechas(T, pol, V, { lo, hi }); }
+      T.salida();
+      if (llega) T.trayecto(path, "rgba(61,220,132,.85)", .1);
+      borde(T, START, COL.sonar, 2);
+      $("legPlo").textContent = fmtV(lo); $("legPhi").textContent = `${fmtV(hi)}${log ? " (escala log)" : ""}`;
+      const empate = hi - lo < 1e-9;
+      hud.innerHTML = `<span>V*(S) <b>${fmtV(V[START])}</b></span><span>vueltas <b>${it}</b></span><span>flechas distintas de las de γ = 0,99 sin costo <b>${distintas}</b></span>` +
+        (llega ? `<span>desde S: <b style="color:var(--exit)">${path.length - 1} pasos</b></span>` : `<span><b style="color:var(--ember)">no llega</b>${empate ? ": todas las casillas valen lo mismo y las acciones empatan" : ""}</span>`);
+    }
+    for (const el of [sg, sc]) el.oninput = () => { calcular(); dibujar(); };
+    document.querySelectorAll("#b-perillas [data-pre]").forEach(b => b.onclick = () => { const [g, c] = b.dataset.pre.split(","); sg.value = g; sc.value = c; calcular(); dibujar(); });
+    calcular(); dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); }, viCompleta };
+  });
+
   // =====================================================================
-  // B8. El robot de reciclaje
+  // B9. El robot de reciclaje
   // =====================================================================
   const robot = await tarea(() => {
     const RB = 2, RR = -3, G = 0.9, ACC = ["buscar", "esperar", "recargar"], COLA = [COL.lamp, COL.sonar, COL.exit];
@@ -742,7 +779,7 @@
   // para verificar a mano en la consola (las cifras del notebook)
 
   let tRes = 0;
-  addEventListener("resize", () => { clearTimeout(tRes); tRes = setTimeout(() => { for (const f of [mdp, mrp, qq, mejora, pit, vit, per, partidas, robot]) f.dibujar(); }, 120); });
+  addEventListener("resize", () => { clearTimeout(tRes); tRes = setTimeout(() => { for (const f of [mdp, mrp, qq, mejora, pit, vit, partidas, per, robot]) f.dibujar(); }, 120); });
 })();
 </script>
 </body>
