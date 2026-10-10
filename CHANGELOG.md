@@ -14,6 +14,7 @@ Formato: una sección por versión (SemVer sobre el curso, ver `fabrica/CONVENCI
 ### Cambiado
 - Estructura de 16 clases en cuatro unidades (`build/PLAN-16-clases.md`); clases 3–16 en preparación; material de la v1 en
   `build/v1/` y `specs/v1/`.
+- Clase 1: spine rediseñado (B1 y B2 separados, γ solo como adelanto, B3 y B4 más cortos, recuadro «Esto hoy se mide» con Cyborg Psychology).
 
 ### Aviso
 - El progreso de los cuestionarios guardado en el navegador vuelve a cero (los ids cambian de significado).
