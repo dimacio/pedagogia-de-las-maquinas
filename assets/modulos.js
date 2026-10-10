@@ -269,12 +269,12 @@ window.MODULOS = {
       },
       {
         objetivo: "O2",
-        pregunta: "En la figura «El feed mira solo el próximo clic», ¿qué optimiza el feed al elegir cada tarjeta y qué pierde al decidir así?",
+        pregunta: "En la figura «Un feed que mira solo el próximo clic», ¿qué optimiza ese feed al elegir cada tarjeta y qué pierde al decidir así?",
         opciones: [
-          { texto: "Elige la tarjeta que más te sirve a lo largo del día; no pierde nada, porque cada clic también suma para después.", explicacion: "No: en la figura el feed elige «Clip 15 s» o «Clickbait» aunque dejen casi 0 para después; lo que llega tarde no entra en su cuenta." },
-          { texto: "Elige la tarjeta con más chances de clic ahora; junta más clics, pero pierde lo que cada tarjeta deja para después: lo aprendido, la charla con alguien, el resto del día.", explicacion: "Correcto. Es un agente que decide solo por la recompensa inmediata. En la clase 3 esto se llama descuento γ, y en este feed vale casi 0." },
-          { texto: "Elige sumando el clic de ahora y lo que deja para después; por eso junta menos clics que la otra fila.", explicacion: "No: eso describe la segunda fila, la de quien elige sumando lo que viene después; el feed mira solo el clic de ahora." },
-          { texto: "Elige al azar entre las cuatro candidatas; lo que pierde son clics.", explicacion: "No: el feed no elige al azar, se queda siempre con la candidata de barra «clic ahora» más larga, y es la fila que más clics junta." }
+          { texto: "Elige la que más te sirve en el día; no pierde nada, porque cada clic también suma para después.", explicacion: "No: en la figura el feed elige «Clip de 15 s» o «¡No vas a creer…!» aunque dejen casi 0 para después; lo que llega tarde no entra en su cuenta." },
+          { texto: "Elige la de más chances de clic ahora; pierde lo que cada tarjeta deja para después.", explicacion: "Correcto. Es un agente que decide solo por la recompensa inmediata. En la clase 3 esto se llama descuento γ, y en este feed vale casi 0." },
+          { texto: "Elige sumando el clic de ahora y lo que deja para después; por eso junta menos clics.", explicacion: "No: eso describe la segunda fila, la de quien elige sumando lo que viene después; el feed mira solo el clic de ahora." },
+          { texto: "Elige al azar entre las cuatro candidatas; lo que pierde son los clics que podría haber juntado.", explicacion: "No: el feed no elige al azar, se queda siempre con la candidata de barra «clic ahora» más larga, y es la fila que más clics junta." }
         ],
         correcta: 1
       },
@@ -304,9 +304,9 @@ window.MODULOS = {
         objetivo: "O3",
         pregunta: "En el recuadro «Esto hoy se mide», el estudio de cuatro semanas con 981 personas (Fang et al., 2025), ¿qué encontró y qué no se puede concluir de él?",
         opciones: [
-          { texto: "Que el chatbot causa soledad: las condiciones que asignaron los investigadores aumentaron la soledad y la dependencia.", explicacion: "No: según el recuadro, las condiciones asignadas no cambiaron los resultados; afirmar que el chatbot causa soledad es sobreafirmar." },
+          { texto: "Que el chatbot causa soledad: las condiciones que asignaron los investigadores aumentaron la soledad y la dependencia.", explicacion: "No: según el recuadro, las condiciones asignadas no tuvieron un efecto significativo; afirmar que el chatbot causa soledad es sobreafirmar." },
           { texto: "Que el uso intenso aumenta la soledad en cualquier persona y por años, porque el estudio fue grande.", explicacion: "No: fueron cuatro semanas con un grupo concreto; no se puede generalizar al largo plazo ni a todas las personas, y además es una asociación, no un efecto." },
-          { texto: "Que quienes usaron más el chatbot por su cuenta reportaron más soledad y más dependencia emocional; es una asociación, y no se puede concluir que el chatbot cause la soledad.", explicacion: "Correcto. El recuadro dice qué se midió y su límite: el uso voluntario intenso va junto con más soledad, pero eso no prueba causa." },
+          { texto: "Que quienes más usaron el chatbot por su cuenta reportaron más soledad y dependencia, sin probar que lo cause.", explicacion: "Correcto. El recuadro dice qué se midió y su límite: el uso voluntario intenso va junto con más soledad, pero eso no prueba causa." },
           { texto: "Que, como hoy se mide, la pregunta de Foucault ya está respondida y no hace falta elegir los propios pesos.", explicacion: "No: el recuadro dice que la pregunta de Foucault no se responde con un experimento; los estudios la acompañan, no la reemplazan." }
         ],
         correcta: 2
