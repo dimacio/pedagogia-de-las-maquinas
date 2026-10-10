@@ -162,7 +162,7 @@
       <div class="eq">δ = r + γV(s′) − V(s)</div>
       <div class="aviso mide">
         <h3>Esto se midió</h3>
-        <p>Schultz, Dayan y Montague (1997) mostraron que ciertas neuronas de dopamina de monos responden como un <b>error de predicción de recompensa</b> (<i>reward prediction error</i>), la conexión que anunciamos en la clase 1. Se disparan con un jugo inesperado, pasan a dispararse con la señal que lo anuncia cuando el mono aprende y bajan de su nivel normal si el jugo anunciado no llega, como en las tres vistas de la figura. Es un modelo de una señal neuronal medida en el laboratorio, no una explicación de la conducta ni de la adicción.</p>
+        <p>Schultz, Dayan y Montague (1997) mostraron que ciertas neuronas de dopamina de monos responden como un <b>error de predicción de recompensa</b> (<i>reward prediction error</i>), la conexión que anunciamos en la clase 1. Se disparan con un jugo inesperado, pasan a dispararse con la señal que lo anuncia cuando el mono aprende y bajan de su nivel normal si el jugo anunciado no llega, como en las vistas 1 y 3 de la figura (la 2 muestra solo la mitad del traslado, porque en la cueva no hay una señal que anuncie el premio). Es un modelo de una señal neuronal medida en el laboratorio, no una explicación de la conducta ni de la adicción.</p>
       </div>
       <p class="nota pregunta">Si después de aprender la salida pagara +2 en vez de +1, ¿qué δ verías en el último paso?</p>
     </div>
@@ -194,8 +194,8 @@
     <div class="texto">
       <div class="paso">Paso 6</div>
       <h2>Sesgo y varianza</h2>
-      <p>El <b>sesgo</b> (<i>bias</i>) es errar siempre para el mismo lado, mientras que la <b>varianza</b> (<i>variance</i>) es temblar de partida en partida. Con α = 0,1, TD empieza sesgado porque se apoya en valores que arrancaron en 0, con las 10 semillas del cruce por debajo del verdadero (sesgo de −0,61 a las 100 partidas y de −0,17 a las 300). Con el mismo α fijo, TD tiembla menos que Monte Carlo una vez que llega a su piso, con un desvío en el cruce de 0,0100 contra 0,0272. Aun así, Monte Carlo con α = 1/n no tiene sesgo y su paso se achica solo, así que en esta cueva es el más preciso de los incrementales, con un error RMS (<i>root mean square</i>) de 0,0055 a las 3000 partidas contra 0,0127 de TD con α = 0,1.</p>
-      <div class="eq">error cuadrático = sesgo² + varianza</div>
+      <p>El <b>sesgo</b> (<i>bias</i>) es errar siempre para el mismo lado, mientras que la <b>varianza</b> (<i>variance</i>) es temblar de partida en partida. Con α = 0,1, TD empieza sesgado porque se apoya en valores que arrancaron en 0, con las 10 semillas del cruce por debajo del verdadero (sesgo de −0,61 a las 100 partidas y de −0,17 a las 300). Con el mismo α fijo, TD termina más abajo que Monte Carlo (0,0127 contra 0,0233 a las 3000 partidas) porque tiembla menos, con un desvío en el cruce de 0,0100 contra 0,0272. Aun así, Monte Carlo con α = 1/n no tiene sesgo, su paso se achica solo y acá las partidas son cortas y sus retornos varían poco, así que en esta cueva es el más preciso de los incrementales, con un error RMS (<i>root mean square</i>) de 0,0055 a las 3000 partidas contra 0,0127 de TD con α = 0,1.</p>
+      <div class="eq">error cuadrático medio = sesgo² + varianza</div>
       <p class="nota pregunta">Si las partidas duraran mil pasos, como con el dado, ¿cuál de los dos temblaría más? ¿Por qué?</p>
     </div>
   </section>
@@ -216,7 +216,7 @@
     <div class="texto">
       <div class="paso">Paso 7</div>
       <h2>Armar el mapa con lo jugado</h2>
-      <p>La <b>equivalencia de certeza</b> (<i>certainty equivalence</i>) usa las partidas para armar el mapa y después resuelve Bellman como en las clases 3 y 4, como si ese mapa fuera el verdadero. Cuenta cuántas veces pasó de s a s′ para estimar P̂ y promedia el premio cobrado al salir de s para estimar R̂. Con las mismas 300 partidas del notebook da V̂(S) = 0,5029 y un error RMS de 0,0101, contra 0,0169 de Monte Carlo. Usa mejor los datos, con 0,0027 a las 3000 partidas contra 0,0055 de Monte Carlo y 0,0127 de TD, pero hay que guardar una tabla de 60 × 60 y resolver un sistema.</p>
+      <p>La <b>equivalencia de certeza</b> (<i>certainty equivalence</i>) usa las partidas para armar el mapa (la cadena P^π de esta política, como en la clase 4, sin separar por acción) y después resuelve Bellman como en las clases 3 y 4, como si ese mapa fuera el verdadero. Cuenta cuántas veces pasó de s a s′ para estimar P̂ y promedia el premio cobrado al salir de s para estimar R̂. Con las mismas 300 partidas del notebook da V̂(S) = 0,5029 y un error RMS de 0,0101, contra 0,0169 de Monte Carlo. Usa mejor los datos, con 0,0027 a las 3000 partidas contra 0,0055 de Monte Carlo y 0,0127 de TD, pero hay que guardar una tabla de 60 × 60 y resolver un sistema.</p>
       <div class="eq"><span class="hat">V̂</span> = (I − γ<span class="hat">P̂</span>)⁻¹ <span class="hat">R̂</span></div>
       <p class="nota pregunta">Si la cueva tuviera un millón de casillas, ¿qué parte de la equivalencia de certeza dejaría de ser posible?</p>
     </div>
@@ -605,7 +605,7 @@
         hud.innerHTML = [99, 299].map(i => `<span>N = ${i + 1}: semillas por debajo MC <b>${debajo(kMC(), i)}</b>, TD <b>${debajo(kTD(), i)}</b> · sesgo TD <b>${fmtS(sesgo(kTD(), i), 2)}</b></span>`).join("") +
           `<span>temblor final (simulado): MC <b>${fmt(temblor(kMC()), 4)}</b>, TD <b>${fmt(temblor(kTD()), 4)}</b></span>`;
       }
-      tb.innerHTML = ["MC 1/n", kMC(), kTD()].map(k => `<tr><td>${k.replace("1/n", "α = 1/n").replace(/ (0\.\d+)$/, (_, a) => `, α = ${coma(a)}`)}</td>${NB_RMS[k].map(v => `<td class="num">${fmt(v, 4)}</td>`).join("")}</tr>`).join("");
+      tb.innerHTML = ["MC 1/n", kMC(), kTD()].map(k => `<tr><td>${k.replace(" 1/n", ", α = 1/n").replace(/ (0\.\d+)$/, (_, a) => `, α = ${coma(a)}`)}</td>${NB_RMS[k].map(v => `<td class="num">${fmt(v, 4)}</td>`).join("")}</tr>`).join("");
     }
     document.querySelectorAll("#segVista button").forEach(b => b.onclick = () => { vista = b.dataset.v; marcar("#segVista button", "v", vista); dibujar(); });
     document.querySelectorAll("#segAlfa button").forEach(b => b.onclick = () => { alfa = +b.dataset.a; marcar("#segAlfa button", "a", b.dataset.a); dibujar(); });
