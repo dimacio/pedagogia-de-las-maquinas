@@ -11,3 +11,6 @@ fabrica/reportes/reporte.md
 
 # referencias externas con derechos: no se versionan
 referencias/**/*.pdf
+
+# entorno local de Python (no se versiona)
+.venv/
