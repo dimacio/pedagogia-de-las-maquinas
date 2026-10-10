@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Policy gradient y actor-crítico · RL a ciegas</title>
+<meta name="description" content="Clase 11: las flechas de la cueva como probabilidades con softmax, REINFORCE con una actualización a mano, imitar ponderando por el retorno, la línea de base, el actor-crítico con el δ de la clase 5 y la idea del recorte de PPO.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .lz { min-width: 0; }
+  .seg { flex-wrap: wrap; }
+  .seg button { min-width: 0; }
+  .cap { font-size: 13px; color: var(--muted); }
+  .cap b { color: var(--ink); }
+  .duo { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+  .duo > div { min-width: 0; display: grid; gap: 6px; align-content: start; }
+  .duo h3 { font-family: var(--mono); font-size: 12.5px; font-weight: 400; color: var(--muted); }
+  .duo h3 b { color: var(--ink); font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+  .chips span { display: inline-flex; align-items: center; gap: 6px; }
+  .chips i { width: 14px; height: 3px; display: inline-block; border-radius: 1px; }
+  /* las fórmulas largas se parten en un punto elegido (los espacios duros no cortan) */
+  .eq.parte { white-space: normal; }
+  .eq .nw { white-space: nowrap; margin-right: 1.2em; }
+  .eq .nw.sigue { margin-right: .3em; }
+  /* la cuenta de una actualización */
+  .cuenta { font-family: var(--mono); font-size: 13px; line-height: 1.6; background: var(--rock); border: 1px solid var(--rock-2); border-radius: 3px;
+    padding: 8px 10px; overflow-x: auto; white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .cuenta b { color: var(--ink); font-weight: 600; }
+  .cuenta .v { color: var(--sonar); }
+  .cuenta .d { color: var(--lamp); }
+  .cuenta .apag { opacity: .28; }
+  @media (max-width: 560px) { .cuenta { white-space: normal; } }
+  /* las cuatro preferencias de S */
+  .prefs { display: grid; gap: 8px; align-content: start; }
+  /* tablas de cifras del notebook */
+  .tabla.nb table { font-size: 13px; }
+  .tabla.nb tr.sel td { color: var(--lamp); }
+  .tabla.nb tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--lamp); }
+  @media (max-width: 560px) { .tabla.nb table { font-size: 12px; } .tabla.nb th, .tabla.nb td { padding: 6px 5px; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase 11</div>
+    <h1>Policy gradient y <span class="g">actor-crítico</span></h1>
+    <p class="thesis">En vez de aprender cuánto vale cada casilla, el agente aprende qué tan seguido ir para cada lado y engrosa las flechas de las partidas que salieron bien.</p>
+  </section>
+
+  <!-- B1: flechas que son probabilidades -->
+  <section class="bloque" id="b-softmax" data-objetivos="O1">
+    <div class="stage">
+      <div class="lz"><canvas id="cvSoft" aria-label="La cueva con cuatro flechas en cada casilla, más gruesas cuanto más probables; en S las flechas siguen las preferencias elegidas y en el resto son iguales"></canvas></div>
+      <div class="duo">
+        <div><h3>la casilla <b>S</b>, ampliada</h3><div class="lz"><canvas id="cvSoftS" aria-label="La casilla S ampliada con sus cuatro flechas y la probabilidad de cada una"></canvas></div></div>
+        <div class="prefs" id="prefs">
+          <h3>preferencias <b>θ(S, ·)</b></h3>
+        </div>
+      </div>
+      <div class="row"><button class="btn" id="softReset">Volver a (−1; 1; 0,5; −1)</button><button class="btn" id="softCero">Todas en 0 (el dado)</button></div>
+      <div class="hud" id="hudSoft"></div>
+      <p class="cap">Softmax calculado en el navegador. En las demás casillas θ = 0, el dado, con 1/4 en cada flecha (también contra las paredes). Con el dado en todas las casillas, V(S) = 0,0136 en el notebook, contra V*(S) = 0,8262.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 1</div>
+      <h2>Flechas que son probabilidades</h2>
+      <p>La política estocástica π(a|s) de la clase 2 pone en cada casilla cuatro flechas, más gruesas cuanto más probables. Para poder moverlas de a poco, cada casilla guarda cuatro preferencias θ(s,a) y la función exponencial normalizada (<i>softmax</i>) las vuelve probabilidades que suman 1. En el notebook, con θ(S) = (−1; 1; 0,5; −1) en el orden ↑ → ↓ ←, S va hacia → con 0,5327, hacia ↓ con 0,3231 y hacia ↑ o ← con 0,0721. Como un cambio chico de θ da un cambio chico de π, el gradiente de política (<i>policy gradient</i>) mejora la política directamente, sin pasar por Q.</p>
+      <div class="eq">π(a|s) = e<sup>θ(s,a)</sup> / Σ<sub>b</sub> e<sup>θ(s,b)</sup></div>
+      <p class="nota pregunta">Si le sumás 1 a las cuatro preferencias de S, ¿cambian las flechas? Probalo con los controles.</p>
+    </div>
+  </section>
+
+  <!-- B2: REINFORCE y una actualización a mano -->
+  <section class="bloque" id="b-reinforce" data-objetivos="O2">
+    <div class="stage">
+      <div class="lz"><canvas id="cvRf" aria-label="La cueva con el recorrido de una partida del dado que salió y, en las casillas que pisó, las flechas después de la actualización"></canvas></div>
+      <div class="duo">
+        <div><h3>la casilla <b>S</b>, antes (gris) y después</h3><div class="lz"><canvas id="cvRfS" aria-label="La casilla S ampliada: las cuatro probabilidades antes de la actualización y después"></canvas></div></div>
+      </div>
+      <div class="cuenta" id="cuentaRf" aria-live="polite"></div>
+      <div class="row"><button class="btn primary" id="rfSig">Siguiente paso de la cuenta</button><button class="btn" id="rf300">Jugar 300 partidas</button><button class="btn" id="rfVolver">Volver a la partida</button></div>
+      <div class="hud" id="hudRf"></div>
+      <p class="cap">La cuenta es la del notebook. La partida dibujada es otra partida del dado, simulada en el navegador con el mismo largo (161 pasos), la misma primera acción (↓) y una sola visita a S, así que la cuenta en S es idéntica. El botón juega 300 partidas de REINFORCE en lotes de 10 partidas por actualización, con α = 3, simuladas en el navegador como en el notebook, que con eso llega a V(S) = 0,4276. El color de fondo es el valor de la política, calculado con el mapa solo para medir.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 2</div>
+      <h2>Subir la probabilidad de lo que salió bien</h2>
+      <p><b><i>REINFORCE</i></b> (Williams, 1992) juega una partida entera y después empuja θ para que las acciones que tomó sean más probables, en proporción al retorno G que cobró desde cada una. En el notebook, la primera partida del dado que salió tardó 161 pasos, así que desde S cobró G₀ = 0,99¹⁶⁰ = 0,2003. En S había tomado ↓ con π = 0,25 en las cuatro, de modo que con α = 1 el paso es (−0,0501; −0,0501; +0,1502; −0,0501) y π queda en (0,2369; 0,2369; 0,2894; 0,2369). Aplicada a todos los pasos de la partida, la cuenta lleva V(S) de 0,0136, el valor del dado, a 0,0974.</p>
+      <div class="eq">θ ← θ + α G ∇ log π(a|s)</div>
+      <p class="nota pregunta">Si la misma partida hubiera salido en 21 pasos, ¿el empuje en S sería más grande o más chico? ¿Y si no hubiera salido?</p>
+    </div>
+  </section>
+
+  <!-- B3: imitar ponderado -->
+  <section class="bloque" id="b-imitar" data-objetivos="O2">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Cuánto pesa cada paso" id="segIm">
+        <button aria-pressed="false" data-p="todas">Clonar todas</button>
+        <button aria-pressed="false" data-p="exitosas">Clonar las exitosas</button>
+        <button aria-pressed="true" data-p="G">Pesar por G</button>
+      </div>
+      <div class="lz"><canvas id="cvIm" aria-label="La cueva con las flechas de la política que sale de contar lo que hizo el dado en 2000 partidas, con el valor de cada casilla de fondo"></canvas></div>
+      <div class="legend"><span>V 0</span><span class="bar" id="legIm"></span><span>0,83</span></div>
+      <div class="lz"><canvas id="cvImBar" aria-label="Barras con el valor de S de cada política en el notebook: el dado, clonar todas, clonar las exitosas y pesar por G, con V* punteado"></canvas></div>
+      <div class="row"><button class="btn" id="imOtra">Otras 2000 partidas</button></div>
+      <div class="hud" id="hudIm"></div>
+      <p class="cap">La cueva: 2000 partidas del dado desde S simuladas en el navegador, contando qué hizo en cada casilla con el peso elegido. Las barras son las del notebook.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 3</div>
+      <h2>Es imitar, pero ponderado</h2>
+      <p>Si G valiera siempre 1, REINFORCE sería clonar el comportamiento (<i>behavior cloning</i>) de la clase 10, que copia lo que se hizo en cada casilla. Con el G de verdad, una partida que no salió pesa 0 y una que salió rápido pesa más que una que salió tarde. Con 2000 partidas del dado, de las que salieron 48, el notebook obtiene V(S) = 0,0127 al clonar todas, 0,2442 al clonar las exitosas y 0,2923 al pesar por G. Las dos últimas superan de lejos al jugador que imitan, porque el peso decide qué vale la pena copiar.</p>
+      <div class="eq">peso del paso = 1 (clonar) o Gₜ (REINFORCE)</div>
+      <p class="nota pregunta">¿Por qué clonar sin pesos a un jugador nunca puede salir mejor que él?</p>
+    </div>
+  </section>
+
+  <!-- B4: la línea de base -->
+  <section class="bloque" id="b-base" data-objetivos="O3">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Tamaño del paso α" id="segAlfa">
+        <button aria-pressed="false" data-a="3">α = 3</button>
+        <button aria-pressed="true" data-a="10">α = 10</button>
+      </div>
+      <div class="lz"><canvas id="cvBase" aria-label="Curvas de aprendizaje de REINFORCE con y sin línea de base: el valor de S de la política partida a partida, promedio y banda de las semillas, con V* punteado"></canvas></div>
+      <div class="chips"><span><i style="background:var(--ember)"></i>sin línea de base</span><span><i style="background:var(--sonar)"></i>con línea de base</span><span>guiones: V*(S)</span></div>
+      <div class="row"><button class="btn" id="baseOtra">Otras 8 semillas</button></div>
+      <div class="hud" id="hudBase"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>notebook (8 semillas)</th><th>llega a V(S) = 0,75</th><th>V(S) final</th></tr></thead>
+          <tbody id="tbBase"></tbody>
+        </table>
+      </div>
+      <p class="cap">Curvas simuladas en el navegador como en el notebook: REINFORCE en lotes de 10 partidas, 1000 partidas, 8 semillas (otras que las del notebook). Con otras semillas la cantidad de trabadas cambia, y a veces también se traba alguna con línea de base. La línea de base es el retorno promedio desde cada casilla, aprendido con b(s) += 0,1 (G − b(s)). La línea es el promedio y la banda, ± 1 desvío. La tabla es la del notebook (mediana de partidas hasta llegar a 0,75).</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 4</div>
+      <h2>La línea de base</h2>
+      <p>Cuando el agente ya sale casi siempre, todas las partidas traen G &gt; 0 y REINFORCE empuja para arriba todo lo que hizo, rodeos incluidos. Restar una línea de base (<i>baseline</i>) b(s), el retorno promedio desde cada casilla, hace subir solo lo que salió mejor que lo esperado, sin cambiar hacia dónde apunta el gradiente en promedio. En el notebook, la varianza (<i>variance</i>) del gradiente de una partida baja de 23,06 a 4,20, unas 5 veces menos, aunque con α = 3 no aprende antes (llega a V(S) = 0,75 en 430 partidas sin línea de base y en 485 con ella). Su ventaja es que admite pasos más grandes con semillas más parejas, porque con α = 10 sin línea de base 7 de 8 semillas quedan trabadas, mientras que con ella aprende en 150 partidas y termina en 0,811 ± 0,007.</p>
+      <div class="eq parte"><span class="nw sigue">θ&nbsp;←&nbsp;θ&nbsp;+ α&nbsp;(G&nbsp;−&nbsp;b(s))</span> <span class="nw">∇&nbsp;log&nbsp;π(a|s)</span></div>
+      <p class="nota pregunta">Si todas las partidas cobraran lo mismo, G = 0,5, ¿qué empujaría REINFORCE sin línea de base? ¿Y con b = 0,5?</p>
+    </div>
+  </section>
+
+  <!-- B5: el crítico -->
+  <section class="bloque" id="b-critico" data-objetivos="O3">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué mirar" id="segAc">
+        <button aria-pressed="true" data-v="critico">El crítico</button>
+        <button aria-pressed="false" data-v="actor">El actor</button>
+        <button aria-pressed="false" data-v="acierta">Dónde acierta</button>
+      </div>
+      <div class="lz"><canvas id="cvAc" aria-label="La cueva después de 1000 partidas de actor-crítico: el mapa de V que aprendió el crítico, las flechas del actor con su valor verdadero, o las casillas donde el crítico acierta"></canvas></div>
+      <div class="legend"><span id="legAcLo"></span><span class="bar" id="legAc"></span><span id="legAcHi"></span></div>
+      <div class="row"><button class="btn" id="acOtra">Otra semilla</button></div>
+      <div class="hud" id="hudAc"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>notebook (8 semillas)</th><th>aprende en</th><th>V(S) final</th><th>pasos</th></tr></thead>
+          <tbody>
+            <tr><td>REINFORCE sin línea de base (α = 3)</td><td class="num">430</td><td class="num">0,7834 ± 0,0565</td><td class="num">29,7</td></tr>
+            <tr><td>REINFORCE con línea de base (α = 10)</td><td class="num">150</td><td class="num">0,8113 ± 0,0074</td><td class="num">21,8</td></tr>
+            <tr class="sel"><td>actor-crítico (α = 10, α<sub>V</sub> = 0,5)</td><td class="num">145</td><td class="num">0,8210 ± 0,0072</td><td class="num">20,6</td></tr>
+            <tr><td>V* (clase 4)</td><td class="num"></td><td class="num">0,8262</td><td class="num">20</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">Actor-crítico con α = 10 y α<sub>V</sub> = 0,5, 1000 partidas desde S simuladas en el navegador. «Aprende en» es la mediana de partidas hasta que V(S) llega a 0,75. En el notebook, el crítico queda a menos de 0,05 del valor verdadero del actor en solo el 39 % de las casillas, porque acierta sobre el camino del actor y no fuera de él.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 5</div>
+      <h2>El crítico: un mapa de V que juzga</h2>
+      <p>REINFORCE espera al final de la partida para conocer G, mientras que el actor-crítico (<i>actor-critic</i>) aprende en cada paso con dos tablas. El crítico (<i>critic</i>) aprende V con TD(0), como en la clase 5. El actor, que son las preferencias θ, usa el mismo error δ como ventaja (<i>advantage</i>), que dice cuánto mejor o peor salió el paso de lo que el crítico esperaba. En el notebook aprende en 145 partidas, a la par de REINFORCE con línea de base (150), pero termina más cerca de V*, con 0,8210 ± 0,0072 y caminos de 20,6 pasos.</p>
+      <div class="eq">A = r + γV(s′) − V(s)</div>
+      <p class="nota pregunta">¿Qué pasaría si el crítico se equivocara mucho en una casilla por la que el actor tiene que pasar?</p>
+    </div>
+  </section>
+
+  <!-- B6: PPO -->
+  <section class="bloque" id="b-ppo" data-objetivos="O4">
+    <div class="stage">
+      <div class="lz"><canvas id="cvClip" aria-label="Lo que se sube por cada paso del lote según la razón entre la probabilidad nueva y la vieja, sin recorte en guiones y con recorte en línea llena, para ventaja positiva y negativa; la banda verde es [1 − ε, 1 + ε]"></canvas></div>
+      <div class="ctl"><label for="epsClip">recorte ε <output id="epsOut">0,2</output></label><input type="range" id="epsClip" min="0.05" max="0.5" step="0.05" value="0.2"></div>
+      <div class="lz"><canvas id="cvRazon" aria-label="Histograma en escala logarítmica de la razón de cada paso de un lote después de 50 pasadas, sin recorte y con recorte"></canvas></div>
+      <div class="chips"><span><i style="background:var(--ember)"></i>sin recorte</span><span><i style="background:var(--sonar)"></i>con recorte</span><span>banda verde: [1 − ε, 1 + ε]</span></div>
+      <div class="row"><button class="btn" id="ppoOtro">Otro lote</button></div>
+      <div class="hud" id="hudPpo"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>notebook (20 lotes, ε = 0,2)</th><th>V(S) después</th><th>mejora en</th></tr></thead>
+          <tbody>
+            <tr><td>50 pasadas, sin recorte</td><td class="num">0,0047</td><td class="num">0 de 20</td></tr>
+            <tr class="sel"><td>50 pasadas, con recorte</td><td class="num">0,3263</td><td class="num">18 de 20</td></tr>
+            <tr><td>una pasada de paso 10, sin recorte</td><td class="num">0,2628</td><td class="num">12 de 20</td></tr>
+            <tr><td>una pasada de paso 10, con recorte</td><td class="num">0,2628</td><td class="num">12 de 20</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">El histograma está simulado en el navegador: una política a medio aprender (REINFORCE con línea de base, 100 partidas), un lote de 10 partidas y 50 pasadas con paso 1. El recorte actúa cuando se reusa el lote, porque en la primera pasada la razón vale 1, y por eso con una sola pasada da lo mismo con o sin él. Tampoco es un candado perfecto, ya que algunas razones se escapan de la banda, aunque en un lote del notebook la razón mediana queda en 1,043 con recorte contra 0,070 sin él. La misma idea se usa para ajustar modelos de lenguaje (clases 12 y 13).</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 6</div>
+      <h2>No alejarse demasiado: PPO</h2>
+      <p>Jugar partidas cuesta, así que tienta reusar el mismo lote en muchas pasadas de gradiente, aunque después de unas pocas la política ya no es la que jugó esas partidas. PPO (<i>Proximal Policy Optimization</i>; Schulman et al., 2017) mira la razón entre la probabilidad nueva y la vieja de cada acción del lote. Con el recorte (<i>clipping</i>), una acción deja de empujar cuando su razón ya salió de [1 − ε, 1 + ε] hacia el lado que le conviene. En el notebook, desde V(S) = 0,2178 y con 50 pasadas sobre un lote de 10 partidas, sin recorte V(S) cae a 0,0047 (mejora en 0 de 20 lotes) y con recorte sube a 0,3263 (18 de 20).</p>
+      <div class="eq parte"><span class="nw sigue">razón = π<sub>nueva</sub>(a|s) / π<sub>vieja</sub>(a|s),</span> <span class="nw">recortada en [1 − ε, 1 + ε]</span></div>
+      <p class="nota pregunta">Con una sola pasada sobre el lote, ¿qué hace el recorte? Pensá cuánto vale la razón al empezar.</p>
+    </div>
+  </section>
+
+  <!-- B7: Para enseñarlo -->
+  <section class="bloque full" id="b-ensenar" data-objetivos="O2 O3">
+    <div class="texto prose">
+      <div class="paso">Para enseñarlo</div>
+      <h2>Cómo contar esta clase en una oración</h2>
+      <p>"Policy gradient es reforzar lo que salió bien: hacer más probable lo que hiciste en las partidas buenas, comparadas con lo que esperabas."</p>
+      <p class="nota pregunta">Pregunta para hacerle a quien te escucha: si alguien que siempre saca 9 en los exámenes saca un 7, ¿merece el mismo festejo que alguien que siempre saca 4 y esta vez sacó 7?</p>
+      <p><b>Ejercicio de 5 minutos:</b> dibujen en el pizarrón una casilla con cuatro flechas y anoten una preferencia 0 al lado de cada una. Una persona tira un dado de cuatro caras para elegir la flecha. Si salió → o ↓ tira además una moneda, que con cara vale G = 1, mientras que ↑, ← o ceca valen G = 0. Con α = 1, súmenle 0,75 · G a la preferencia de la flecha elegida y réstenle 0,25 · G a cada una de las otras tres. Después de diez tiros calculen las probabilidades con softmax. Repitan en otra casilla restándole a cada G una línea de base b = 0,25 y comparen cuánto bajaron ↑ y ← en cada caso.</p>
+      <p class="small muted">Adelanto: hasta acá la recompensa venía dada, +1 al entrar a la salida. ¿Y si nadie sabe escribirla, pero sí decir cuál de dos cosas prefiere? Viene la clase 12, aprender la recompensa.</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(async () => {
+  // cada figura se arma en su propia tarea, para no trabar el navegador al cargar
+  const tarea = f => new Promise(r => setTimeout(() => r(f()), 0));
+  Cueva.pagina("11", { lecturas: [
+    { texto: "Williams (1992), Simple statistical gradient-following algorithms for connectionist reinforcement learning (REINFORCE), Machine Learning 8, 229–256", url: "https://doi.org/10.1007/BF00992696" },
+    { texto: "Sutton y Barto (2018), Reinforcement Learning: An Introduction, 2.ª ed., cap. 13 (13.1–13.5: gradiente de política, REINFORCE, línea de base, actor-crítico)", url: "http://incompleteideas.net/book/the-book-2nd.html" },
+    { texto: "Schulman, Wolski, Dhariwal, Radford y Klimov (2017), Proximal Policy Optimization Algorithms", url: "https://arxiv.org/abs/1707.06347" },
+    { texto: "Stanford CS234 (Brunskill, 2026), clases 5 y 6: policy gradient, línea de base, actor-crítico y PPO; Stanford CS224R (2026), clases 3 a 5", url: "https://web.stanford.edu/class/cs234/" }
+  ] });
+
+  const env = Cueva.makeEnv(Cueva.MAPS.chica), n = env.nS, GOAL = env.goal, START = env.start;
+  const COL = Cueva.COL(), MONO = COL.mono || "monospace", AR = Cueva.ARROW;
+  const PARED = "#2c3346", GAMMA = 0.99, MAXP = 200;
+  const reducir = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = id => document.getElementById(id);
+  const coma = s => String(s).replace(".", ",").replace(/^-/, "−");
+  const fmt = (x, d = 3) => coma(x.toFixed(d));
+  const marcar = (sel, attr, v) => document.querySelectorAll(sel).forEach(b => b.setAttribute("aria-pressed", b.dataset[attr] === v));
+  const NOMETA = Array.from({ length: n }, (_, s) => s).filter(s => s !== GOAL);
+  const media = a => a.reduce((x, y) => x + y, 0) / a.length;
+  const desvio = a => { const m = media(a); return Math.sqrt(media(a.map(x => (x - m) ** 2))); };
+
+  // ---------- la cueva: (s, a) → s′; +1 al entrar a la salida ----------
+  const NXT = Array.from({ length: n }, (_, s) => [0, 1, 2, 3].map(a => s === GOAL ? GOAL : env.move(s, a)[0]));
+
+  // ---------- la política: preferencias θ (n × 4) y softmax por casilla ----------
+  function softFila(th, s, out) {
+    const o = s * 4, m = Math.max(th[o], th[o + 1], th[o + 2], th[o + 3]);
+    let z = 0; for (let a = 0; a < 4; a++) { out[a] = Math.exp(th[o + a] - m); z += out[a]; }
+    for (let a = 0; a < 4; a++) out[a] /= z;
+    return out;
+  }
+  function softTodo(th) { const P = new Float64Array(n * 4), f = [0, 0, 0, 0]; for (let s = 0; s < n; s++) { softFila(th, s, f); for (let a = 0; a < 4; a++) P[s * 4 + a] = f[a]; } return P; }
+  // V^π con el mapa (clases 3 y 4), solo para medir: (I − γ P^π) V = R^π
+  function valorDePi(P) {
+    const A = Array.from({ length: n }, () => new Float64Array(n + 1));
+    for (let s = 0; s < n; s++) {
+      A[s][s] = 1; if (s === GOAL) continue;
+      for (let a = 0; a < 4; a++) { const p = P[s * 4 + a], s2 = NXT[s][a]; if (s2 === GOAL) A[s][n] += p; else A[s][s2] -= GAMMA * p; }
+    }
+    for (let c = 0; c < n; c++) {
+      let piv = c; for (let r = c + 1; r < n; r++) if (Math.abs(A[r][c]) > Math.abs(A[piv][c])) piv = r;
+      [A[c], A[piv]] = [A[piv], A[c]];
+      for (let r = 0; r < n; r++) { if (r === c) continue; const f = A[r][c] / A[c][c]; if (!f) continue; for (let k = c; k <= n; k++) A[r][k] -= f * A[c][k]; }
+    }
+    return Array.from({ length: n }, (_, s) => A[s][n] / A[s][s]);
+  }
+  const valorDe = th => valorDePi(softTodo(th));
+
+  // ---------- jugar: lo único que tiene el agente ----------
+  const FILA = [0, 0, 0, 0];
+  function elegir(th, s, u) { softFila(th, s, FILA); const x = u(); let a = 0, ac = FILA[0]; while (x > ac && a < 3) { a++; ac += FILA[a]; } return a; }
+  function jugar(th, u) {
+    const S = [], A = []; let s = START;
+    while (S.length < MAXP) { const a = elegir(th, s, u); S.push(s); A.push(a); s = NXT[s][a]; if (s === GOAL) break; }
+    return { S, A, salio: s === GOAL };
+  }
+  // G_t de cada paso: el único premio es el +1 al final
+  const retornos = p => p.S.map((_, t) => p.salio ? Math.pow(GAMMA, p.S.length - 1 - t) : 0);
+  // lo que una partida le pide a θ: Σ_t (G_t − b(s_t)) (1[a_t] − π(·|s_t))
+  function sumarGradiente(g, th, p, base, escala = 1) {
+    const G = retornos(p), f = [0, 0, 0, 0];
+    for (let t = 0; t < p.S.length; t++) {
+      const s = p.S[t], a = p.A[t], w = (G[t] - (base ? base[s] : 0)) * escala; if (!w) continue;
+      softFila(th, s, f); for (let c = 0; c < 4; c++) g[s * 4 + c] += w * ((c === a ? 1 : 0) - f[c]);
+    }
+  }
+  // REINFORCE en lotes de 10 partidas, como en el notebook
+  function reinforce(alfa, nPart, semilla, { lb = false, alfaV = 0.1, lote = 10, alPaso = null } = {}) {
+    const u = Cueva.rng(semilla), th = new Float64Array(n * 4), b = new Float64Array(n), VS = [];
+    for (let k = 0; k < nPart / lote; k++) {
+      const ps = []; for (let i = 0; i < lote; i++) ps.push(jugar(th, u));
+      const g = new Float64Array(n * 4); for (const p of ps) sumarGradiente(g, th, p, lb ? b : null);
+      for (let i = 0; i < g.length; i++) th[i] += alfa * g[i] / lote;
+      for (const p of ps) { const G = retornos(p); p.S.forEach((s, t) => { b[s] += alfaV * (G[t] - b[s]); }); }
+      VS.push(valorDe(th)[START]);
+      if (alPaso) alPaso(k, th, ps);
+    }
+    return { th, b, VS };
+  }
+  // actor-crítico de un paso: δ = r + γV(s′) − V(s); crítico V(s) += α_V δ; actor θ(s,·) += α δ (1[a] − π)
+  function actorCritico(alfa, alfaV, nPart, semilla) {
+    const u = Cueva.rng(semilla), th = new Float64Array(n * 4), V = new Float64Array(n), VS = [], f = [0, 0, 0, 0];
+    for (let k = 0; k < nPart; k++) {
+      let s = START;
+      for (let t = 0; t < MAXP; t++) {
+        const a = elegir(th, s, u), s2 = NXT[s][a], r = s2 === GOAL ? 1 : 0;
+        const d = r + (s2 === GOAL ? 0 : GAMMA * V[s2]) - V[s];
+        V[s] += alfaV * d;
+        softFila(th, s, f); for (let c = 0; c < 4; c++) th[s * 4 + c] += alfa * d * ((c === a ? 1 : 0) - f[c]);
+        s = s2; if (s === GOAL) break;
+      }
+      if ((k + 1) % 10 === 0) VS.push(valorDe(th)[START]);
+    }
+    return { th, V, VS };
+  }
+  const primeraVez = (VS, umbral) => { const i = VS.findIndex(v => v >= umbral); return i < 0 ? null : (i + 1) * 10; };
+
+  // ---------- dibujo ----------
+  function rotulo(T, s, txt, color = COL.ink, escala = .34) {
+    const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s];
+    ctx.font = `600 ${Math.max(8, Math.round(cell * escala))}px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.85)"; ctx.strokeText(txt, c * cell + cell / 2, r * cell + cell / 2 + 1);
+    ctx.fillStyle = color; ctx.fillText(txt, c * cell + cell / 2, r * cell + cell / 2 + 1);
+  }
+  function borde(T, s, color, ancho = 2, inset = 1.5) {
+    const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s];
+    ctx.strokeStyle = color; ctx.lineWidth = ancho; ctx.strokeRect(c * cell + inset, r * cell + inset, cell - 2 * inset, cell - 2 * inset);
+  }
+  function calor(T, V, lo, hi, rampa = "valor") {
+    for (const s of NOMETA) { const v = V[s]; if (!isFinite(v)) continue; const [r, c] = env.free[s]; T.casilla(r, c, Cueva.rampa(rampa, (v - lo) / ((hi - lo) || 1))); }
+  }
+  // una flecha desde (cx, cy) hacia (dx, dy), con largo, grosor y punta
+  function flecha(ctx, cx, cy, dx, dy, largo, grosor, color) {
+    const punta = Math.max(grosor * 1.9, largo * .38), ancho = Math.max(grosor * 2.2, 3);
+    const ex = cx + dx * largo, ey = cy + dy * largo, bx = ex - dx * punta, by = ey - dy * punta, px = -dy, py = dx;
+    ctx.fillStyle = color; ctx.strokeStyle = color; ctx.lineWidth = grosor; ctx.lineCap = "butt";
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(bx, by); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(bx + px * ancho / 2, by + py * ancho / 2); ctx.lineTo(bx - px * ancho / 2, by - py * ancho / 2); ctx.closePath(); ctx.fill();
+  }
+  const DXY = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+  // las flechas de la cueva como probabilidades: grosor y largo según π(a|s)
+  function flechasProb(T, P, { casillas = null, color = COL.sonar } = {}) {
+    const ctx = T.ctx, cell = T.cell;
+    for (const s of NOMETA) {
+      if (casillas && !casillas.has(s)) continue;
+      const [r, c] = env.free[s], cx = c * cell + cell / 2, cy = r * cell + cell / 2;
+      for (let a = 0; a < 4; a++) {
+        const p = P[s * 4 + a]; if (p < 0.04) continue;
+        flecha(ctx, cx, cy, DXY[a][0], DXY[a][1], cell * (0.14 + 0.34 * p), Math.max(1, cell * (0.02 + 0.13 * p)), color);
+      }
+    }
+  }
+  // una casilla ampliada con sus cuatro flechas y la probabilidad de cada una (fantasma: otra π de fondo, en gris)
+  function casillaGrande(cv, pi, { fantasma = null, resaltar = -1 } = {}) {
+    const pe = cv.parentElement, w = pe.clientWidth - 2, alto = Math.max(170, Math.min(230, w * .75));
+    const { ctx } = Cueva.lienzo(cv, alto)(); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, alto);
+    const cx = w / 2, cy = alto / 2, R = Math.min(w, alto) / 2 - 8, L = R * 0.62;
+    ctx.fillStyle = "#14182a"; ctx.fillRect(cx - L / 2, cy - L / 2, L, L);
+    ctx.strokeStyle = COL.muted; ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.strokeRect(cx - L / 2 + .5, cy - L / 2 + .5, L - 1, L - 1); ctx.setLineDash([]);
+    const largo = p => R * (0.18 + 0.62 * p), grosor = p => Math.max(1.5, R * (0.025 + 0.16 * p));
+    if (fantasma) for (let a = 0; a < 4; a++) flecha(ctx, cx, cy, DXY[a][0], DXY[a][1], largo(fantasma[a]), grosor(fantasma[a]), "rgba(141,147,163,.35)");
+    for (let a = 0; a < 4; a++) flecha(ctx, cx, cy, DXY[a][0], DXY[a][1], largo(pi[a]), grosor(pi[a]), a === resaltar ? COL.lamp : COL.sonar);
+    ctx.font = `600 12px ${MONO}`; ctx.textBaseline = "middle";
+    const pos = [[cx, 10, "center"], [w - 4, cy - 12, "right"], [cx, alto - 10, "center"], [4, cy - 12, "left"]];
+    for (let a = 0; a < 4; a++) { ctx.textAlign = pos[a][2]; ctx.fillStyle = a === resaltar ? COL.lamp : COL.ink; ctx.fillText(`${AR[a]} ${fmt(pi[a], 4)}`, pos[a][0], pos[a][1]); }
+    ctx.textAlign = "center"; ctx.fillStyle = COL.muted; ctx.fillText("S", cx, cy);
+  }
+  // un gráfico con ejes (x en escala log si se pide)
+  function ejes(cv, alto, { x0, x1, y0, y1, xlog = false, ticksX = [], ticksY = [], fx = coma, fy = coma, tituloX = "", tituloY = "", m = { l: 44, r: 12, t: 22, b: 30 }, ox = 0, ancho = null, limpiar = true }) {
+    const { w: W, h, ctx } = Cueva.lienzo(cv, alto)();
+    if (limpiar) { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, h); }
+    const w = ancho ?? W, gx = xlog ? Math.log10 : v => v;
+    const X = v => ox + m.l + (gx(v) - gx(x0)) / (gx(x1) - gx(x0)) * (w - m.l - m.r);
+    const Y = v => h - m.b - (v - y0) / (y1 - y0) * (h - m.t - m.b);
+    ctx.font = `11px ${MONO}`; ctx.strokeStyle = "rgba(141,147,163,.18)"; ctx.lineWidth = 1; ctx.fillStyle = COL.muted;
+    for (const t of ticksY) { const y = Math.round(Y(t)) + .5; ctx.beginPath(); ctx.moveTo(ox + m.l, y); ctx.lineTo(ox + w - m.r, y); ctx.stroke(); ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(fy(t), ox + m.l - 5, y); }
+    for (const t of ticksX) { const x = Math.round(X(t)) + .5; ctx.beginPath(); ctx.moveTo(x, m.t); ctx.lineTo(x, h - m.b); ctx.stroke(); ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(fx(t), x, h - m.b + 5); }
+    ctx.textAlign = "right"; ctx.textBaseline = "top"; ctx.fillText(tituloX, ox + w - m.r, h - 12);
+    ctx.textAlign = "left"; ctx.fillText(tituloY, ox + 4, 4);
+    const recortar = () => { ctx.save(); ctx.beginPath(); ctx.rect(ox + m.l, m.t - 2, w - m.l - m.r, h - m.t - m.b + 4); ctx.clip(); };
+    return { ctx, w, W, h, m, X, Y, recortar };
+  }
+  function horizontal(g, v, color, guiones) { const { ctx, m, w, Y } = g; ctx.setLineDash(guiones); ctx.strokeStyle = color; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(m.l, Y(v) + .5); ctx.lineTo(w - m.r, Y(v) + .5); ctx.stroke(); ctx.setLineDash([]); }
+
+  // =====================================================================
+  // B1. Flechas que son probabilidades
+  // =====================================================================
+  const TH_S = [-1, 1, 0.5, -1];   // celda 10 del notebook
+  const b1 = await tarea(() => {
+    const T = Cueva.tablero($("cvSoft"), env, { maxCell: 40 }), hud = $("hudSoft"), cajas = $("prefs");
+    const th = new Float64Array(n * 4); TH_S.forEach((v, a) => { th[START * 4 + a] = v; });
+    const sliders = [0, 1, 2, 3].map(a => {
+      const d = document.createElement("div"); d.className = "ctl";
+      d.innerHTML = `<label for="thS${a}">θ(S, ${AR[a]}) <output id="thSo${a}"></output></label><input type="range" id="thS${a}" min="-3" max="3" step="0.5">`;
+      cajas.appendChild(d); const inp = d.querySelector("input"); inp.addEventListener("input", () => { th[START * 4 + a] = +inp.value; dibujar(); }); return inp;
+    });
+    function dibujar() {
+      const P = softTodo(th), pi = [0, 1, 2, 3].map(a => P[START * 4 + a]);
+      sliders.forEach((inp, a) => { inp.value = th[START * 4 + a]; $("thSo" + a).textContent = coma(th[START * 4 + a].toFixed(1)); });
+      T.fondo("#000").paredes(PARED).salida();
+      flechasProb(T, P);
+      borde(T, START, COL.lamp, 2);
+      casillaGrande($("cvSoftS"), pi);
+      const e = [0, 1, 2, 3].map(a => Math.exp(th[START * 4 + a])), z = e.reduce((x, y) => x + y, 0);
+      hud.innerHTML = `<span>e<sup>θ</sup>: ${e.map((v, a) => `${AR[a]} <b>${fmt(v, 4)}</b>`).join(" ")}</span><span>suma <b>${fmt(z, 4)}</b></span>` +
+        `<span>π(·|S): ${pi.map((v, a) => `${AR[a]} <b>${fmt(v, 4)}</b>`).join(" ")}</span>`;
+    }
+    $("softReset").onclick = () => { TH_S.forEach((v, a) => { th[START * 4 + a] = v; }); dibujar(); };
+    $("softCero").onclick = () => { for (let a = 0; a < 4; a++) th[START * 4 + a] = 0; dibujar(); };
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B2. REINFORCE: una actualización a mano (celdas 17, 19 y 21 del notebook)
+  // =====================================================================
+  // una partida del dado con el mismo largo (161 pasos), la misma primera acción (↓) y una sola visita a S que la del notebook
+  function partidaMano() {
+    const u = Cueva.rng(811);
+    while (true) {
+      const S = [], A = []; let s = START;
+      while (S.length < MAXP) { const a = Math.floor(u() * 4); S.push(s); A.push(a); s = NXT[s][a]; if (s === GOAL) break; }
+      if (s === GOAL) return { S, A, salio: true };
+    }
+  }
+  const b2 = await tarea(() => {
+    const T = Cueva.tablero($("cvRf"), env, { maxCell: 40 }), hud = $("hudRf"), cuenta = $("cuentaRf");
+    const P0 = partidaMano(), camino = new Set([...P0.S, GOAL]), recorrido = [...P0.S, GOAL];
+    const th0 = new Float64Array(n * 4), th1 = new Float64Array(n * 4); sumarGradiente(th1, th0, P0, null, 1);   // α = 1
+    const V1 = valorDe(th1)[START];
+    const PI0 = [.25, .25, .25, .25], PI1 = [0.2369, 0.2369, 0.2894, 0.2369];
+    let paso = 4, modo = "mano", th300 = null, partidas = 0, raf = 0, ultimoLote = 0;
+    const LIN = [
+      `s = S, a = <b>↓</b>, 161 pasos, G₀ = 0,99¹⁶⁰ = <b>0,2003</b>, α = 1`,
+      `1. π(·|S) con θ = 0: ↑ 0,2500 → 0,2500 ↓ 0,2500 ← 0,2500`,
+      `2. ∇ log π = 1[a] − π: ↑ −0,2500 → −0,2500 <span class="v">↓ +0,7500</span> ← −0,2500`,
+      `3. α · G · (1[a] − π): ↑ −0,0501 → −0,0501 <span class="d">↓ +0,1502</span> ← −0,0501`,
+      `4. π(·|S) nuevo: ↑ 0,2369 → 0,2369 <b>↓ 0,2894</b> ← 0,2369`
+    ];
+    function dibujar() {
+      cuenta.innerHTML = LIN.map((l, i) => i <= paso ? l : `<span class="apag">${l}</span>`).join("<br>");
+      T.fondo("#000").paredes(PARED);
+      if (modo === "mano") {
+        T.salida(); T.trayecto(recorrido, "rgba(242,179,90,.45)", .1);
+        flechasProb(T, softTodo(paso >= 4 ? th1 : th0), { casillas: camino });
+        casillaGrande($("cvRfS"), paso >= 4 ? PI1 : PI0, { fantasma: paso >= 4 ? PI0 : null, resaltar: 2 });
+        hud.innerHTML = `<span>V(S) del dado <b>0,0136</b></span><span>tras esta partida (simulado) <b>${fmt(V1, 4)}</b></span><span>en el notebook <b>0,0974</b></span>`;
+      } else {
+        const P = softTodo(th300), V = valorDePi(P);
+        calor(T, V, 0, 0.83); T.salida(); flechasProb(T, P, { color: "rgba(94,200,216,.95)" });
+        casillaGrande($("cvRfS"), [0, 1, 2, 3].map(a => P[START * 4 + a]), { fantasma: PI0 });
+        hud.innerHTML = `<span>simulado: partidas <b>${partidas}</b></span><span>salieron en el último lote <b>${ultimoLote} de 10</b></span><span>V(S) <b>${fmt(V[START], 4)}</b></span><span>notebook tras 300: <b>0,4276</b></span>`;
+      }
+      rotulo(T, START, "S", COL.ink, .4);
+    }
+    function aprender300() {
+      cancelAnimationFrame(raf); modo = "300"; paso = 4;
+      const fotos = [];
+      reinforce(3, 300, 4242, { alPaso: (k, th, ps) => fotos.push({ th: th.slice(), k: (k + 1) * 10, ok: ps.filter(p => p.salio).length }) });
+      const mostrar = i => { th300 = fotos[i].th; partidas = fotos[i].k; ultimoLote = fotos[i].ok; dibujar(); };
+      if (reducir) { mostrar(fotos.length - 1); return; }
+      let i = 0, t0 = 0;
+      const anim = now => { if (!t0) t0 = now; const j = Math.min(fotos.length - 1, Math.floor((now - t0) / 90)); if (j !== i || j === 0) { i = j; mostrar(i); } if (j < fotos.length - 1) raf = requestAnimationFrame(anim); };
+      raf = requestAnimationFrame(anim);
+    }
+    $("rfSig").onclick = () => { cancelAnimationFrame(raf); modo = "mano"; paso = (paso + 1) % 5; dibujar(); };
+    $("rf300").onclick = aprender300;
+    $("rfVolver").onclick = () => { cancelAnimationFrame(raf); modo = "mano"; paso = 4; dibujar(); };
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B3. Imitar, pero ponderado (celda 24 del notebook)
+  // =====================================================================
+  const NB_IM = [["el dado (los datos)", 0.0136, null], ["clonar todas", 0.0127, "todas"], ["clonar las exitosas", 0.2442, "exitosas"], ["pesar por G", 0.2923, "G"]];
+  function imitar(ps, peso) {
+    const C = new Float64Array(n * 4);
+    for (const p of ps) {
+      const w = peso === "todas" ? p.S.map(() => 1) : peso === "exitosas" ? p.S.map(() => p.salio ? 1 : 0) : retornos(p);
+      p.S.forEach((s, t) => { C[s * 4 + p.A[t]] += w[t]; });
+    }
+    const P = new Float64Array(n * 4);
+    for (let s = 0; s < n; s++) { const z = C[s * 4] + C[s * 4 + 1] + C[s * 4 + 2] + C[s * 4 + 3]; for (let a = 0; a < 4; a++) P[s * 4 + a] = z > 0 ? C[s * 4 + a] / z : 0.25; }
+    return P;
+  }
+  const b3 = await tarea(() => {
+    const T = Cueva.tablero($("cvIm"), env, { maxCell: 40 }), cvb = $("cvImBar"), hud = $("hudIm");
+    $("legIm").style.background = Cueva.gradienteCSS("valor");
+    let peso = "G", semilla = 10, datos = null, pols = null;
+    function generar() {
+      const u = Cueva.rng(semilla), th0 = new Float64Array(n * 4); datos = []; for (let i = 0; i < 2000; i++) datos.push(jugar(th0, u));
+      pols = {}; for (const k of ["todas", "exitosas", "G"]) { const P = imitar(datos, k); pols[k] = { P, V: valorDePi(P) }; }
+    }
+    function barras() {
+      const w = cvb.parentElement.clientWidth - 2, alto = 150;
+      const { ctx } = Cueva.lienzo(cvb, alto)(); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, alto);
+      const m = { l: Math.min(150, w * .42), r: 52, t: 20, b: 8 }, X = v => m.l + v / 0.9 * (w - m.l - m.r), bh = 18, gap = (alto - m.t - m.b) / NB_IM.length;
+      ctx.font = `12px ${MONO}`; ctx.textBaseline = "middle";
+      NB_IM.forEach(([t, v, k], i) => {
+        const y = m.t + i * gap + (gap - bh) / 2, sel = k === peso;
+        ctx.fillStyle = sel ? COL.ink : COL.muted; ctx.textAlign = "right"; ctx.fillText(t, m.l - 8, y + bh / 2);
+        ctx.fillStyle = sel ? COL.lamp : "rgba(141,147,163,.45)"; ctx.fillRect(m.l, y, Math.max(2, X(v) - m.l), bh);
+        ctx.fillStyle = COL.ink; ctx.textAlign = "left"; ctx.fillText(fmt(v, 4), X(v) + 6, y + bh / 2);
+      });
+      const xv = X(0.8262) + .5; ctx.strokeStyle = COL.exit; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(xv, m.t - 6); ctx.lineTo(xv, alto - m.b); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = COL.exit; ctx.textAlign = "right"; ctx.textBaseline = "top"; ctx.fillText("V* = 0,8262", Math.min(w - 2, xv + 40), 2);
+      ctx.fillStyle = COL.muted; ctx.textAlign = "left"; ctx.fillText("V(S), notebook", 2, 2);
+    }
+    function dibujar() {
+      const { P, V } = pols[peso];
+      T.fondo("#000").paredes(PARED); calor(T, V, 0, 0.83); T.salida(); flechasProb(T, P, { color: "rgba(94,200,216,.95)" });
+      rotulo(T, START, "S", COL.ink, .38);
+      barras();
+      const ok = datos.filter(p => p.salio).length;
+      hud.innerHTML = `<span>simulado: salieron <b>${ok} de 2000</b></span><span>V(S): ${["todas", "exitosas", "G"].map(k => `${k === "G" ? "por G" : k} <b${k === peso ? ' style="color:var(--lamp)"' : ""}>${fmt(pols[k].V[START], 4)}</b>`).join(" ")}</span>`;
+    }
+    document.querySelectorAll("#segIm button").forEach(b => b.onclick = () => { peso = b.dataset.p; marcar("#segIm button", "p", peso); dibujar(); });
+    $("imOtra").onclick = () => { semilla++; generar(); dibujar(); };
+    generar(); dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B4. La línea de base: curvas con y sin (celda 35 del notebook)
+  // =====================================================================
+  const NB_BASE = {
+    "3": [["sin línea de base", "430", "0,783 ± 0,057"], ["con línea de base", "485", "0,781 ± 0,011"]],
+    "10": [["sin línea de base", "185; 4 de 8 nunca", "0,090 ± 0,231 (7 de 8 trabadas)"], ["con línea de base", "150", "0,811 ± 0,007"]]
+  };
+  const SEM = 8, NPART = 1000;
+  const cacheBase = {};
+  function curvasBase(alfa, sem0) {
+    const clave = alfa + ":" + sem0;
+    if (!cacheBase[clave]) {
+      const c = { sin: [], con: [] };
+      for (let k = 0; k < SEM; k++) { c.sin.push(reinforce(+alfa, NPART, sem0 + k).VS); c.con.push(reinforce(+alfa, NPART, sem0 + k, { lb: true }).VS); }
+      cacheBase[clave] = c;
+    }
+    return cacheBase[clave];
+  }
+  const b4 = await tarea(() => {
+    const cv = $("cvBase"), hud = $("hudBase"), tb = $("tbBase");
+    let alfa = "10", sem0 = 636;
+    function banda(g, series, color) {
+      const N = series[0].length, ctx = g.ctx, mu = [], sd = [];
+      for (let i = 0; i < N; i++) { const col = series.map(s => s[i]); mu.push(media(col)); sd.push(desvio(col)); }
+      ctx.fillStyle = color; ctx.globalAlpha = .16; ctx.beginPath();
+      for (let i = 0; i < N; i++) { const x = g.X((i + 1) * 10), y = g.Y(Math.min(.9, mu[i] + sd[i])); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      for (let i = N - 1; i >= 0; i--) ctx.lineTo(g.X((i + 1) * 10), g.Y(Math.max(0, mu[i] - sd[i])));
+      ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.strokeStyle = color; ctx.lineWidth = 1.8; ctx.beginPath(); mu.forEach((v, i) => { const x = g.X((i + 1) * 10), y = g.Y(v); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+    }
+    function dibujar() {
+      const c = curvasBase(alfa, sem0);
+      const g = ejes(cv, 240, { x0: 0, x1: NPART, y0: 0, y1: .9, ticksX: [0, 200, 400, 600, 800, 1000], ticksY: [0, .2, .4, .6, .8], fx: v => String(v), fy: v => coma(v.toFixed(1)), tituloX: "partidas →", tituloY: "V(S) de la política" });
+      g.recortar();
+      horizontal(g, 0.8262, COL.ink, [6, 4]);
+      banda(g, c.sin, COL.ember); banda(g, c.con, COL.sonar);
+      g.ctx.restore();
+      const trab = s => s.filter(v => v[v.length - 1] < 0.1).length;
+      const med = s => { const pv = s.map(v => primeraVez(v, 0.75)).filter(v => v !== null).sort((x, y) => x - y); return pv.length ? pv[Math.floor((pv.length - 1) / 2)] : "—"; };
+      const fin = s => s.map(v => v[v.length - 1]);
+      hud.innerHTML = `<span>simulado, α = ${alfa}: sin línea de base llega a 0,75 en <b>${med(c.sin)}</b>, termina en <b>${fmt(media(fin(c.sin)), 3)} ± ${fmt(desvio(fin(c.sin)), 3)}</b>, trabadas <b>${trab(c.sin)} de ${SEM}</b></span>` +
+        `<span>con línea de base llega en <b>${med(c.con)}</b>, termina en <b>${fmt(media(fin(c.con)), 3)} ± ${fmt(desvio(fin(c.con)), 3)}</b>, trabadas <b>${trab(c.con)} de ${SEM}</b></span>`;
+      tb.innerHTML = Object.entries(NB_BASE).map(([a, filas]) => filas.map(([t, x, y]) => `<tr${a === alfa ? ' class="sel"' : ""}><td>α = ${a}, ${t}</td><td class="num">${x}</td><td class="num">${y}</td></tr>`).join("")).join("");
+    }
+    document.querySelectorAll("#segAlfa button").forEach(b => b.onclick = () => { alfa = b.dataset.a; marcar("#segAlfa button", "a", alfa); dibujar(); });
+    $("baseOtra").onclick = () => { sem0 += SEM; dibujar(); };
+    dibujar();
+    return { dibujar };
+  });
+
+  // =====================================================================
+  // B5. El crítico (celdas 38 y 40 del notebook)
+  // =====================================================================
+  const b5 = await tarea(() => {
+    const T = Cueva.tablero($("cvAc"), env, { maxCell: 40 }), hud = $("hudAc");
+    let vista = "critico", semilla = 70, R = null, Vact = null, P = null;
+    function entrenar() { R = actorCritico(10, 0.5, 1000, semilla); P = softTodo(R.th); Vact = valorDePi(P); }
+    function dibujar() {
+      T.fondo("#000").paredes(PARED);
+      const acierta = NOMETA.filter(s => Math.abs(R.V[s] - Vact[s]) < 0.05);
+      if (vista === "critico") {
+        calor(T, R.V, 0, 1); $("legAc").style.background = Cueva.gradienteCSS("valor"); $("legAcLo").textContent = "V 0"; $("legAcHi").textContent = "1";
+      } else if (vista === "actor") {
+        calor(T, Vact, 0, 1); $("legAc").style.background = Cueva.gradienteCSS("valor"); $("legAcLo").textContent = "V 0"; $("legAcHi").textContent = "1";
+      } else {
+        const ok = new Set(acierta);
+        for (const s of NOMETA) { const [r, c] = env.free[s]; T.casilla(r, c, ok.has(s) ? "rgba(61,220,132,.30)" : "rgba(224,100,90,.30)"); }
+        $("legAc").style.background = "linear-gradient(90deg, rgba(224,100,90,.6) 50%, rgba(61,220,132,.5) 50%)"; $("legAcLo").textContent = "erra por 0,05 o más"; $("legAcHi").textContent = "acierta";
+      }
+      T.salida();
+      if (vista !== "critico") flechasProb(T, P, { color: vista === "actor" ? "rgba(94,200,216,.95)" : "rgba(232,230,223,.8)" });
+      rotulo(T, START, "S", COL.ink, .38);
+      const pv = primeraVez(R.VS, 0.75);
+      hud.innerHTML = `<span>simulado: V(S) del crítico <b>${fmt(R.V[START], 4)}</b>, verdadero del actor <b>${fmt(Vact[START], 4)}</b></span>` +
+        `<span>llegó a 0,75 en <b>${pv === null ? "nunca" : pv + " partidas"}</b></span><span>el crítico acierta (a menos de 0,05) en <b>${Math.round(100 * acierta.length / NOMETA.length)} %</b> de las casillas (notebook: 39 %)</span>`;
+    }
+    document.querySelectorAll("#segAc button").forEach(b => b.onclick = () => { vista = b.dataset.v; marcar("#segAc button", "v", vista); dibujar(); });
+    $("acOtra").onclick = () => { semilla++; entrenar(); dibujar(); };
+    entrenar(); dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B6. PPO: la razón recortada (celdas 43, 45 y 47 del notebook)
+  // =====================================================================
+  function ppoActualizar(thV, base, lote, lr, pasadas, eps) {
+    const S = [], A = [], ADV = [];
+    for (const p of lote) { const G = retornos(p); p.S.forEach((s, t) => { S.push(s); A.push(p.A[t]); ADV.push(G[t] - base[s]); }); }
+    const P0 = softTodo(thV), viejo = S.map((s, i) => P0[s * 4 + A[i]]), th = thV.slice(), m = S.length;
+    let razon = viejo.map(() => 1);
+    for (let k = 0; k < pasadas; k++) {
+      const P = softTodo(th), g = new Float64Array(n * 4);
+      for (let i = 0; i < m; i++) {
+        const s = S[i], a = A[i], rz = P[s * 4 + a] / viejo[i];
+        const activa = eps === null || !((ADV[i] > 0 && rz > 1 + eps) || (ADV[i] < 0 && rz < 1 - eps));
+        if (!activa) continue;
+        const w = rz * ADV[i] / lote.length;
+        for (let c = 0; c < 4; c++) g[s * 4 + c] += w * ((c === a ? 1 : 0) - P[s * 4 + c]);
+      }
+      for (let j = 0; j < g.length; j++) th[j] += lr * g[j];
+    }
+    const P = softTodo(th); razon = S.map((s, i) => P[s * 4 + A[i]] / viejo[i]);
+    return { th, razon };
+  }
+  const b6 = await tarea(() => {
+    const cvC = $("cvClip"), cvR = $("cvRazon"), hud = $("hudPpo"), rango = $("epsClip");
+    const base = reinforce(3, 100, 930, { lb: true }), Vantes = valorDe(base.th)[START];
+    let eps = 0.2, semilla = 100, res = null;
+    function correr() {
+      const u = Cueva.rng(semilla), lote = []; for (let i = 0; i < 10; i++) lote.push(jugar(base.th, u));
+      const sin = ppoActualizar(base.th, base.b, lote, 1, 50, null), con = ppoActualizar(base.th, base.b, lote, 1, 50, eps);
+      res = { sin: { ...sin, V: valorDe(sin.th)[START] }, con: { ...con, V: valorDe(con.th)[START] } };
+    }
+    function recorte() {
+      const W = cvC.parentElement.clientWidth - 2, lado = W >= 520, alto = lado ? 190 : 340;
+      const { ctx } = Cueva.lienzo(cvC, alto)(); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, alto);
+      [[1, "ventaja A > 0"], [-1, "ventaja A < 0"]].forEach(([A, tit], k) => {
+        const w = lado ? W / 2 : W, h = lado ? alto : alto / 2, ox = lado ? k * w : 0, oy = lado ? 0 : k * h;
+        const m = { l: 34, r: 10, t: 22, b: 26 }, X = v => ox + m.l + v / 2 * (w - m.l - m.r), Y = v => oy + h - m.b - (v + 2) / 4 * (h - m.t - m.b);
+        ctx.fillStyle = "rgba(61,220,132,.14)"; ctx.fillRect(X(1 - eps), oy + m.t, X(1 + eps) - X(1 - eps), h - m.t - m.b);
+        ctx.font = `11px ${MONO}`; ctx.fillStyle = COL.muted; ctx.strokeStyle = "rgba(141,147,163,.18)"; ctx.lineWidth = 1;
+        for (const t of [-2, -1, 0, 1, 2]) { const y = Math.round(Y(t)) + .5; ctx.beginPath(); ctx.moveTo(X(0), y); ctx.lineTo(X(2), y); ctx.stroke(); ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(coma(String(t)), X(0) - 4, y); }
+        for (const t of [0, 0.5, 1, 1.5, 2]) { const x = Math.round(X(t)) + .5; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(coma(String(t)), x, oy + h - m.b + 5); }
+        ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillStyle = COL.ink; ctx.fillText(tit, ox + m.l, oy + 4);
+        ctx.fillStyle = COL.muted; ctx.textAlign = "right"; ctx.fillText("razón", ox + w - m.r, oy + h - 13);
+        // sin recorte: razón · A
+        ctx.strokeStyle = COL.muted; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(X(0), Y(0)); ctx.lineTo(X(2), Y(2 * A)); ctx.stroke(); ctx.setLineDash([]);
+        // PPO: min(razón · A, recorte(razón) · A)
+        ctx.strokeStyle = COL.sonar; ctx.lineWidth = 2.4; ctx.beginPath();
+        for (let i = 0; i <= 200; i++) { const r = i / 100, cl = Math.min(Math.max(r, 1 - eps), 1 + eps), y = Math.min(r * A, cl * A); i ? ctx.lineTo(X(r), Y(y)) : ctx.moveTo(X(r), Y(y)); }
+        ctx.stroke();
+      });
+    }
+    function histograma() {
+      const g = ejes(cvR, 200, { x0: 1e-4, x1: 100, y0: 0, y1: 1, xlog: true, ticksX: [1e-4, 1e-3, 1e-2, 0.1, 1, 10, 100], ticksY: [], fx: v => v >= 1 ? String(v) : coma(String(v)), tituloX: "razón (log) →", tituloY: "pasos del lote" });
+      const nb = 48, lo = -4, hi = 2, idx = r => Math.min(nb - 1, Math.max(0, Math.floor((Math.log10(r) - lo) / (hi - lo) * nb)));
+      const hs = { sin: new Array(nb).fill(0), con: new Array(nb).fill(0) };
+      for (const k of ["sin", "con"]) for (const r of res[k].razon) hs[k][idx(r)]++;
+      const top = Math.max(...hs.sin, ...hs.con), ctx = g.ctx, Yc = v => g.Y(v / top * .95);
+      ctx.fillStyle = "rgba(61,220,132,.14)"; ctx.fillRect(g.X(1 - eps), g.m.t, g.X(1 + eps) - g.X(1 - eps), g.h - g.m.t - g.m.b);
+      for (const [k, color] of [["sin", "rgba(224,100,90,.7)"], ["con", "rgba(94,200,216,.7)"]]) {
+        ctx.fillStyle = color;
+        hs[k].forEach((c, i) => { if (!c) return; const x0 = g.X(Math.pow(10, lo + i * (hi - lo) / nb)), x1 = g.X(Math.pow(10, lo + (i + 1) * (hi - lo) / nb)); ctx.fillRect(x0, Yc(c), Math.max(1, x1 - x0 - 1), g.Y(0) - Yc(c)); });
+      }
+    }
+    function dibujar() {
+      recorte(); histograma();
+      const medi = a => { const s = a.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+      const dentro = a => Math.round(100 * a.filter(r => r >= 1 - eps - 1e-9 && r <= 1 + eps + 1e-9).length / a.length);
+      hud.innerHTML = `<span>simulado: V(S) antes <b>${fmt(Vantes, 4)}</b></span><span>sin recorte <b style="color:var(--ember)">${fmt(res.sin.V, 4)}</b>, razón mediana <b>${fmt(medi(res.sin.razon), 3)}</b>, en la banda <b>${dentro(res.sin.razon)} %</b></span>` +
+        `<span>con recorte <b style="color:var(--sonar)">${fmt(res.con.V, 4)}</b>, razón mediana <b>${fmt(medi(res.con.razon), 3)}</b>, en la banda <b>${dentro(res.con.razon)} %</b></span>`;
+    }
+    rango.addEventListener("input", () => { eps = +rango.value; $("epsOut").textContent = coma(eps.toFixed(2).replace(/0$/, "")); correr(); dibujar(); });
+    $("ppoOtro").onclick = () => { semilla++; correr(); dibujar(); };
+    correr(); dibujar();
+    return { dibujar };
+  });
+
+  let tRes = 0;
+  addEventListener("resize", () => { clearTimeout(tRes); tRes = setTimeout(() => { for (const f of [b1, b2, b3, b4, b5, b6]) f.dibujar(); }, 120); });
+})();
+</script>
+</body>
+</html>
