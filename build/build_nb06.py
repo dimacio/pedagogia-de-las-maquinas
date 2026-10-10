@@ -1,497 +1,768 @@
-"""Arma 06-redes-neuronales.ipynb (Clase 6: Deep RL, DQN)."""
-import nbformat as nbf
-from pathlib import Path
+"""Arma notebooks/06-controlar-sin-mapa.ipynb (Clase 6 — Controlar sin mapa: SARSA y Q-learning). Spine: specs/6.md.
 
-ROOT = Path(__file__).resolve().parent.parent
-ENV_SRC = (ROOT / "notebooks" / "cave_env.py").read_text()
-OUT = ROOT / "notebooks" / "06-redes-neuronales.ipynb"
+Elegir acciones SIN conocer P ni R: por qué Q y no V -> ε-greedy -> SARSA (una actualización a mano) -> Q-learning
+(la misma experiencia) -> SARSA contra Q-learning con varios ε (on-policy contra off-policy) -> mapa de visitas y errores.
+(El builder viejo de la clase 6, «de la tabla a la red», está archivado en build/v1/builders/build_nb06.py y se reutiliza
+en la clase 8; el material de SARSA, Q-learning y el mapa de visitas viene de build/v1/builders/build_nb04.py.)
+"""
+from _nbutil import md, code, writefile_cell, save
 
 cells = []
-def md(s): cells.append(nbf.v4.new_markdown_cell(s.strip("\n")))
-def code(s, hidden=False):
-    c = nbf.v4.new_code_cell(s.strip("\n"))
-    if hidden:
-        c.metadata["cellView"] = "form"
-        c.metadata["jupyter"] = {"source_hidden": True}
-    cells.append(c)
 
-# ---------------------------------------------------------------- portada
-md(r"""
-# Clase 6 — De la tabla a la red
+cells.append(md(r"""
+# Clase 6 — Controlar sin mapa: SARSA y Q-learning
 
-**Mini curso "RL a ciegas" · vía profunda (notebooks)**
+**RL a ciegas** · curso de aprendizaje por refuerzo (*reinforcement learning*, RL) · vía profunda
 
-Hasta ahora el agente guardaba lo que sabía en una **tabla** $Q(s,a)$: una fila por casilla, una columna por acción.
-En la cueva hay unas decenas de casillas y la tabla entra cómoda. En un juego de Atari el "estado" es la **pantalla**:
-84×84 pixeles con 256 tonos de gris → más pantallas posibles que átomos en el universo. Ninguna tabla alcanza.
+Basado en Sutton & Barto, cap. 2.2–2.3 ($\varepsilon$-greedy) y cap. 6 (6.4 SARSA, 6.5 Q-learning), en Stanford CS234 (Brunskill), clase 4 (primera mitad), y en Watkins y Dayan (1992).
 
-La salida es reemplazar la tabla por una **función aprendida**: una **red neuronal** que recibe una descripción del
-estado y devuelve los 4 valores $Q(s,\cdot)$. Eso es **Deep RL**, y el algoritmo que lo hizo famoso es
-**DQN** (*Deep Q-Network*, Mnih et al., *Nature* 2015).
+**La pregunta de hoy:** sin mapa, ¿cómo encontrás la salida si para saber qué conviene tenés que probar, y probar cuesta?
 
-Plan:
+En la clase 5 el agente **evaluaba** una política que le dábamos. Hoy la tiene que **elegir** él, y sigue sin tener `env.P` ni `env.R`: solo juega. Nosotros sí tenemos el mapa y lo usamos para una sola cosa: calcular la respuesta correcta ($Q^*$ y $V^*$ por iteración de valor, como en la clase 4) y ver qué tan cerca queda el agente. Vamos a ver:
 
-| Paso | Qué hacemos |
-|---|---|
-| 1 | Una red con entrada *one-hot* **es** la tabla (lo comprobamos) |
-| 2 | DQN con una entrada más rica: posición + 4 "bigotes" que sienten paredes |
-| 3 | Qué aprendió la red: $V(s)$, política y trayectoria |
-| 4 | Generalización: valores para casillas que casi no visitó |
-| 5 | Ablación: ¿qué pasa sin *replay buffer*? |
-""")
+1. **Por qué $Q$ y no $V$**: sin mapa, $V$ no alcanza para elegir.
+2. **$\varepsilon$-greedy**: probar a veces, y qué pasa con $\varepsilon = 0$ y con $\varepsilon = 1$.
+3. **SARSA**: una actualización a mano, con números.
+4. **Q-learning**: la misma experiencia, con la otra regla.
+5. **SARSA contra Q-learning con varios $\varepsilon$**: qué valor aprende cada uno.
+6. **El mapa de visitas**: dónde se equivoca lo aprendido.
 
-md(r"""
+Y un ejercicio: cambiar $\varepsilon$ y $\alpha$.
+
+> Cómo usar este notebook: ejecutar las celdas en orden (Colab: *Entorno de ejecución → Ejecutar todas*). Tarda alrededor de un minuto.
+"""))
+
+cells.append(md(r"""
 ## Preparación
 
-La primera celda escribe el entorno `cave_env.py` (el mismo de todas las clases), así el notebook funciona solo en Colab.
-""")
-code("%%writefile cave_env.py\n" + ENV_SRC)
+La primera celda escribe el archivo `cave_env.py` con **la cueva** de todo el curso. Así el notebook funciona solo, también en Colab. No hace falta leerla.
+"""))
+cells.append(writefile_cell())
 
-md("Imports y semillas fijas. Usamos **PyTorch** en CPU (en Colab ya viene instalado).")
-code(r"""
+cells.append(md(r"""
+Importamos la cueva y las bibliotecas de siempre, y fijamos una semilla. Las convenciones son las de las clases 3 a 5: **+1 al entrar a la salida**, la salida es absorbente y vale 0 (ahí ya no queda nada por cobrar), el primer paso no se descuenta y $\gamma = 0{,}99$. Las partidas duran como mucho 200 pasos, como en el juego.
+"""))
+cells.append(code(r"""
 import numpy as np
 import matplotlib.pyplot as plt
-import torch
-import torch.nn as nn
 from cave_env import CaveEnv, ACTION_NAMES
 
-np.random.seed(0)
-torch.manual_seed(0)
-torch.set_num_threads(1)      # en redes tan chicas, un hilo es más rápido
-plt.rcParams["figure.dpi"] = 90
-""")
+SEMILLA = 0
+np.random.seed(SEMILLA)
+GAMMA = 0.99
+env = CaveEnv(max_steps=200)
+"""))
 
-md(r"""
-### Herramientas
+cells.append(md(r"""
+La celda siguiente define las **herramientas** (la respuesta correcta con el mapa, el agente que aprende y los dibujos). Está plegada: no hace falta leerla, solo ejecutarla.
 
-Funciones largas (Q-learning tabular, DQN, dibujos). **No hace falta leerlas**: en la clase solo las usamos.
-En Colab aparece plegada.
-""")
-code(r'''
-#@title Herramientas (plegable)
+Una aclaración importante: la función que **aprende** (`aprender`) y la que juega una partida (`jugar`) solo usan `env.reset` y `env.step`, como un jugador en la cueva a oscuras. El mapa (`env.P`, `env.R`) lo usan solo `iteracion_de_valor` y `valor_explorando`, que calculan la respuesta correcta para comparar.
+"""))
+cells.append(code(r'''
+# @title Herramientas (no hace falta leer esto)
 # Herramientas: no hace falta leer esto
-import time
+import matplotlib.patheffects as pe
 
-AZUL, NARANJA = "#2a78d6", "#eb6834"
+COLORES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
+plt.rcParams.update({
+    "figure.dpi": 100, "axes.spines.top": False, "axes.spines.right": False,
+    "axes.grid": True, "grid.color": "#e6e6e6", "grid.linewidth": 0.8,
+    "axes.edgecolor": "#888888", "axes.titlesize": 12, "font.size": 10.5,
+    "lines.linewidth": 2, "axes.axisbelow": True,
+})
+COL_SARSA, COL_Q = COLORES[6], COLORES[2]
+NOMBRE = {"sarsa": "SARSA", "q": "Q-learning"}
+COLOR = {"sarsa": COL_SARSA, "q": COL_Q}
 
-def iteracion_de_valor(env, gamma=0.95, tol=1e-8):
-    """V* exacto usando el modelo (clase 3). Sirve de referencia."""
+
+# ---------- la respuesta correcta (esto SÍ usa el mapa) ----------
+def iteracion_de_valor(env, gamma, tol=1e-12):
+    """Clase 4: V(s) <- max_a [R(s,a) + γ Σ P(s'|s,a) V(s')]. Devuelve V* y Q*."""
     V = np.zeros(env.nS)
     while True:
-        Qm = env.R + gamma * env.P @ V
-        V2 = Qm.max(1)
-        if np.abs(V2 - V).max() < tol:
-            return V2, Qm.argmax(1)
-        V = V2
+        V_nuevo = (env.R + gamma * env.P @ V).max(axis=1)
+        if np.max(np.abs(V_nuevo - V)) < tol:
+            return V_nuevo, env.R + gamma * env.P @ V_nuevo
+        V = V_nuevo
 
-def epsilon(paso, eps_ini=1.0, eps_fin=0.05, pasos_decaimiento=4000):
-    return max(eps_fin, eps_ini - (eps_ini - eps_fin) * paso / pasos_decaimiento)
 
-def transiciones_al_azar(env, n=3000, seed=0):
-    """Una lista fija de transiciones (s, a, r, s', terminal) con un agente al azar."""
-    rng = np.random.default_rng(seed); out = []
-    s = env.reset()
-    for _ in range(n):
-        a = int(rng.integers(4)); s2, r, done, info = env.step(a)
-        out.append((s, a, r, s2, info["reached_goal"]))
-        s = env.reset() if done else s2
-    return out
-
-def q_tabla(env, transiciones, alpha=0.5, gamma=0.95):
-    Q = np.zeros((env.nS, 4))
-    for s, a, r, s2, fin in transiciones:
-        y = r + (0.0 if fin else gamma * Q[s2].max())
-        Q[s, a] += alpha * (y - Q[s, a])
-    return Q
-
-def q_red_onehot(env, transiciones, alpha=0.5, gamma=0.95):
-    """Una red lineal sin sesgo (nS -> 4), entrada one-hot, SGD con lr = alpha, pérdida ½(Q - y)²."""
-    red = nn.Linear(env.nS, 4, bias=False).double()
-    nn.init.zeros_(red.weight)
-    opt = torch.optim.SGD(red.parameters(), lr=alpha)
-    X = torch.eye(env.nS, dtype=torch.float64)          # fila s = one-hot de s
-    for s, a, r, s2, fin in transiciones:
-        with torch.no_grad():
-            y = r + (0.0 if fin else gamma * red(X[s2]).max().item())
-        perdida = 0.5 * (red(X[s])[a] - y) ** 2
-        opt.zero_grad(); perdida.backward(); opt.step()
-    with torch.no_grad():
-        return red(X).numpy(), red
-
-def crear_red(n_entrada, oculta=64):
-    return nn.Sequential(nn.Linear(n_entrada, oculta), nn.ReLU(),
-                         nn.Linear(oculta, oculta), nn.ReLU(),
-                         nn.Linear(oculta, 4))
-
-def dqn(env, obs="coords+touch", episodios=150, gamma=0.95, lr=1e-3, lote=64, capacidad=10_000,
-        copiar_cada=50, pasos_decaimiento=4000, usar_replay=True, usar_objetivo=True, calentamiento=500, seed=0):
-    """DQN mínimo. Devuelve la red, y por episodio: retorno, largo; visitas por casilla."""
-    torch.manual_seed(seed); rng = np.random.default_rng(seed)
-    n_in = len(env.observe(kind=obs))
-    red, red_obj = crear_red(n_in), crear_red(n_in)
-    red_obj.load_state_dict(red.state_dict())
-    opt = torch.optim.Adam(red.parameters(), lr=lr)
-    # replay buffer circular
-    O = np.zeros((capacidad, n_in), np.float32); O2 = np.zeros_like(O)
-    A = np.zeros(capacidad, np.int64); R = np.zeros(capacidad, np.float32); T = np.zeros(capacidad, np.float32)
-    n, paso, retornos, largos, eps_hist = 0, 0, [], [], []
-    N = np.zeros(env.nS)
-    for ep in range(episodios):
-        env.reset(); o = env.observe(kind=obs); G = 0.0
-        eps_hist.append(epsilon(paso, pasos_decaimiento=pasos_decaimiento))
-        while True:
-            # actuar con ε-greedy
-            if rng.random() < epsilon(paso, pasos_decaimiento=pasos_decaimiento):
-                a = int(rng.integers(4))
-            else:
-                with torch.no_grad():
-                    a = int(red(torch.from_numpy(o)).argmax())
-            s2, r, done, info = env.step(a); N[s2] += 1; G += r
-            o2 = env.observe(kind=obs)
-            i = n % capacidad
-            O[i], A[i], R[i], O2[i], T[i] = o, a, r, o2, float(info["reached_goal"])
-            n += 1; paso += 1
-            # aprender
-            if (usar_replay and n >= calentamiento) or not usar_replay:
-                idx = rng.integers(min(n, capacidad), size=lote) if usar_replay else np.array([i])
-                ob, ob2 = torch.from_numpy(O[idx]), torch.from_numpy(O2[idx])
-                with torch.no_grad():
-                    red_y = red_obj if usar_objetivo else red
-                    y = torch.from_numpy(R[idx]) + gamma * (1 - torch.from_numpy(T[idx])) * red_y(ob2).max(1).values
-                q_sa = red(ob).gather(1, torch.from_numpy(A[idx])[:, None]).squeeze(1)
-                perdida = nn.functional.smooth_l1_loss(q_sa, y)
-                opt.zero_grad(); perdida.backward(); opt.step()
-                if usar_objetivo and paso % copiar_cada == 0:
-                    red_obj.load_state_dict(red.state_dict())
-            o = o2
-            if done:
-                retornos.append(G); largos.append(env.t); break
-    return dict(red=red, obs=obs, retornos=np.array(retornos), largos=np.array(largos),
-                eps=np.array(eps_hist), N=N, pasos=paso)
-
-def q_de_la_red(env, red, obs):
-    """Evalúa la red en TODAS las casillas: matriz (nS, 4)."""
-    X = torch.from_numpy(np.stack([env.observe(s, kind=obs) for s in range(env.nS)]))
-    with torch.no_grad():
-        return red(X).numpy()
-
-def trayectoria_greedy(env, red, obs):
-    s = env.reset(); camino = [s]
+def valor_explorando(env, gamma, eps, tol=1e-12):
+    """Lo que vale cada flecha si después se sigue jugando ε-greedy (la mejor flecha con prob. 1−ε, el dado con ε),
+    eligiendo siempre lo mejor que se puede elegir así. Es el valor al que llega SARSA con ε fijo."""
+    Q = np.zeros((env.nS, env.nA))
     while True:
-        with torch.no_grad():
-            a = int(red(torch.from_numpy(env.observe(kind=obs))).argmax())
-        s, r, done, info = env.step(a); camino.append(s)
-        if done:
-            return camino, info["reached_goal"]
+        V = (1 - eps) * Q.max(axis=1) + eps * Q.mean(axis=1)
+        Q_nuevo = env.R + gamma * env.P @ V
+        if np.max(np.abs(Q_nuevo - Q)) < tol:
+            return Q_nuevo
+        Q = Q_nuevo
 
-def q_learning_tabular(env, episodios=150, alpha=0.5, gamma=0.95, pasos_decaimiento=4000, seed=0):
-    """Q-learning tabular con el mismo ε decreciente que DQN (para comparar)."""
-    rng = np.random.default_rng(seed); Q = np.zeros((env.nS, 4)); N = np.zeros(env.nS); paso = 0
-    for ep in range(episodios):
+
+def acciones_optimas(Q_estrella):
+    """Máscara [s, a]: True si a es óptima en s (puede haber empates)."""
+    return np.isclose(Q_estrella, Q_estrella.max(axis=1, keepdims=True), rtol=0, atol=1e-9)
+
+
+def frac_optimas(env, Q, opt, casillas=None):
+    """Fracción de casillas (sin la salida) en las que la flecha de mayor Q aprendido es óptima."""
+    ss = [s for s in range(env.nS) if s != env.goal] if casillas is None else list(casillas)
+    flechas = Q.argmax(axis=1)
+    return float(np.mean([opt[s, flechas[s]] for s in ss]))
+
+
+def pasos_de(v, gamma=0.99):
+    """Si el único premio es el +1 al entrar, V = γ^(n−1): un camino de n pasos."""
+    return 1 + np.log(v) / np.log(gamma)
+
+
+# ---------- el agente sin mapa: solo env.reset y env.step ----------
+def inicio_al_azar(env, rng):
+    """Una casilla al azar que no sea la salida."""
+    s = int(rng.integers(env.nS - 1))
+    return s if s < env.goal else s + 1
+
+
+def q_inicial(env, rng):
+    """Q arranca en 0 más un ruido minúsculo (entre 0 y 0,0001): sin ruido, todo empata."""
+    return rng.uniform(0, 1e-4, size=(env.nS, env.nA))
+
+
+def aprender(env, metodo, eps, alfa, n_partidas, semilla, gamma=0.99, inicio="S"):
+    """SARSA (metodo="sarsa") o Q-learning (metodo="q") con ε-greedy, desde S o desde una casilla al azar.
+    En cada paso:  Q(s,a) += α [objetivo − Q(s,a)]  con
+        SARSA:      objetivo = r + γ Q(s', a')      (a' = la acción que de verdad va a tomar)
+        Q-learning: objetivo = r + γ max_a' Q(s', a')
+    Al entrar a la salida, objetivo = r (ahí ya no queda nada por cobrar).
+    Devuelve Q, pasos y salida de cada partida, visitas[partida, casilla] y V(S) = max_a Q(S, a) al final de cada partida."""
+    rng = np.random.default_rng(semilla)
+    Q = q_inicial(env, rng).tolist()              # listas de Python: más rápido que numpy para filas de 4
+    pasos = np.zeros(n_partidas, int); salio = np.zeros(n_partidas, bool)
+    visitas = np.zeros((n_partidas, env.nS), np.int32); VS = np.zeros(n_partidas)
+    B = 8192; dado = rng.random(B); azar = rng.integers(env.nA, size=B); j = [0]
+
+    def elegir(s):                                # ε-greedy
+        k = j[0]
+        if k == B:
+            dado[:] = rng.random(B); azar[:] = rng.integers(env.nA, size=B); k = 0
+        j[0] = k + 1
+        if dado[k] < eps:
+            return int(azar[k])                   # probar: cualquiera de las 4
+        q = Q[s]
+        return q.index(max(q))                    # aprovechar: la de mayor Q
+
+    sarsa = metodo == "sarsa"
+    for k in range(n_partidas):
         s = env.reset()
+        if inicio == "azar":
+            s = inicio_al_azar(env, rng); env.s = s
+        a = elegir(s); vis = visitas[k]; vis[s] += 1
         while True:
-            if rng.random() < epsilon(paso, pasos_decaimiento=pasos_decaimiento):
-                a = int(rng.integers(4))
+            s2, r, fin, info = env.step(a); vis[s2] += 1
+            a2 = elegir(s2)
+            if info["reached_goal"]:
+                objetivo = r
+            elif sarsa:
+                objetivo = r + gamma * Q[s2][a2]
             else:
-                a = int(rng.choice(np.flatnonzero(Q[s] == Q[s].max())))
-            s2, r, done, info = env.step(a); N[s2] += 1; paso += 1
-            y = r + (0.0 if info["reached_goal"] else gamma * Q[s2].max())
-            Q[s, a] += alpha * (y - Q[s, a]); s = s2
-            if done:
+                objetivo = r + gamma * max(Q[s2])
+            Q[s][a] += alfa * (objetivo - Q[s][a])
+            s, a = s2, a2
+            if fin:
                 break
-    return Q, N
+        pasos[k] = env.t; salio[k] = info["reached_goal"]; VS[k] = max(Q[env.start])
+    return {"Q": np.array(Q), "pasos": pasos, "salio": salio, "visitas": visitas, "VS": VS}
 
-def media_movil(x, k=10):
-    return np.convolve(x, np.ones(k) / k, mode="valid")
 
-def mapa_visitas(env, N, ax, titulo):
-    v = np.where(N > 0, np.log10(1 + N), np.nan)
-    env.plot(values=v, ax=ax, title=titulo, cmap="viridis")
-''', hidden=True)
+def _elegir(Q, s, eps, rng):
+    if rng.random() < eps:
+        return int(rng.integers(Q.shape[1])), True
+    return int(Q[s].argmax()), False
 
-# ---------------------------------------------------------------- Puente
-md(r"""
-## Puente — La tabla Q ya es una función
 
-Entrenamos rápido un Q-learning tabular en la cueva de siempre y miramos la tabla **como lo que es**: una matriz de
-(casillas × 4 acciones). A la derecha, el mismo conocimiento dibujado sobre la cueva: $V(s) = \max_a Q(s,a)$ y la
-mejor acción.
-""")
-code(r"""
-GAMMA = 0.95
-env = CaveEnv(step_reward=-0.01, max_steps=100)   # pequeño castigo por paso: apura al agente
-Q_tab, _ = q_learning_tabular(env, episodios=300, gamma=GAMMA)
+def jugar(env, Q, eps, rng, max_pasos=200):
+    """Una partida desde S con ε-greedy sobre Q, SIN aprender. Devuelve la lista de pasos
+    (s, a, r, s', a', a' salió al azar)."""
+    s = env.reset()
+    a, _ = _elegir(Q, s, eps, rng)
+    partida = []
+    for _ in range(max_pasos):
+        s2, r, fin, info = env.step(a)
+        a2, al_azar = _elegir(Q, s2, eps, rng)
+        partida.append((s, a, r, s2, a2, al_azar))
+        s, a = s2, a2
+        if info["reached_goal"]:
+            break
+    return partida
 
-fig, axes = plt.subplots(1, 2, figsize=(14, 5.2), gridspec_kw=dict(width_ratios=[1, 3]))
-im = axes[0].imshow(Q_tab, aspect="auto", cmap="magma")
-axes[0].set_xticks(range(4)); axes[0].set_xticklabels(ACTION_NAMES)
-axes[0].set_ylabel(f"casilla s (0 … {env.nS - 1})"); axes[0].set_title("La tabla Q(s, a)")
-plt.colorbar(im, ax=axes[0], fraction=0.08)
-env.plot(values=Q_tab.max(1), policy=Q_tab.argmax(1), ax=axes[1], title="La misma tabla sobre la cueva: V(s) y política")
-plt.tight_layout();
-""")
 
-md(r"""
-Una tabla es una función que **memoriza** un número por entrada:
+def camino_de(partida):
+    return [partida[0][0]] + [x[3] for x in partida]
 
-$$
-Q:\ (s, a) \longmapsto \text{valor} \qquad\Longrightarrow\qquad Q_\theta:\ \text{observación}(s) \longmapsto \big(Q(s,\uparrow), Q(s,\rightarrow), Q(s,\downarrow), Q(s,\leftarrow)\big)
-$$
 
-Una red neuronal $Q_\theta$ con parámetros $\theta$ es otra forma de representar esa función. La diferencia: la tabla
-tiene un casillero *independiente* por estado; la red **comparte** parámetros entre estados parecidos, así que lo que
-aprende en uno se *generaliza* a otros. Es lo mismo que pasa en visión (una red reconoce un gato que nunca vio) y en
-NLP (los *embeddings* acercan palabras parecidas).
-""")
+# ---------- dibujos de la cueva ----------
+def plot_cave(env, values=None, policy=None, path=None, ax=None, title=None, cmap="magma", clim=None,
+              mark=None, numbers=False, fmt="{:.2f}"):
+    """env.plot + escala de color elegible (calculada sin la salida), flechas con borde, círculos y números opcionales."""
+    ax = env.plot(values=values, policy=policy, path=path, ax=ax, title=title, cmap=cmap)
+    if values is not None:
+        if clim is None:
+            v = np.asarray(values, dtype=float)[np.arange(env.nS) != env.goal]
+            v = v[np.isfinite(v)]
+            clim = (v.min(), v.max()) if v.size else (0, 1)
+            if clim[1] - clim[0] < 1e-12:
+                clim = (clim[1] - 1, clim[1])
+        ax.images[-1].set_clim(*clim)
+    for t in ax.texts:
+        t.set_path_effects([pe.withStroke(linewidth=2.5, foreground="black")])
+    if mark is not None:
+        for m in np.atleast_1d(mark):
+            r, c = env.free[int(m)]
+            ax.plot(c, r, "o", mfc="none", mec="#00e5ff", mew=2.5, ms=15)
+    if numbers and values is not None:
+        for s, (r, c) in enumerate(env.free):
+            if np.isfinite(values[s]) and s != env.goal:
+                ax.text(c, r + 0.3, fmt.format(values[s]), ha="center", va="center", fontsize=7, color="w",
+                        path_effects=[pe.withStroke(linewidth=2, foreground="black")])
+    return ax
 
-# ---------------------------------------------------------------- Paso 1
-md(r"""
-## Paso 1 — Una red con entrada one-hot **es** una tabla
 
-Codificamos el estado como un vector *one-hot* (*one-hot encoding*): todo ceros salvo un 1 en la posición de la
-casilla (`env.observe(kind="onehot")`). Tomamos la red más simple: una capa lineal sin sesgo, $Q_\theta(s) = W\,x_s$.
-Multiplicar por un one-hot **selecciona una columna** de $W$: la columna $s$ son los 4 valores de la casilla $s$.
-O sea, $W$ *es* la tabla traspuesta.
+def plot_agent_view(env, partida, ax, title):
+    """Lo que 've' el agente: solo las paredes que tocó (gris claro) y su recorrido."""
+    tocadas = set()
+    for s, a, r, s2, *_ in partida:
+        if s2 == s:
+            (fr, fc), (dr, dc) = env.free[s], [(-1, 0), (0, 1), (1, 0), (0, -1)][a]
+            tocadas.add((fr + dr, fc + dc))
+    env.plot(ax=ax, show_walls=False, path=camino_de(partida), title=title)
+    for (r, c) in tocadas:
+        ax.add_patch(plt.Rectangle((c - .5, r - .5), 1, 1, color=(0.8, 0.8, 0.8)))
+    return tocadas
 
-Lo comprobamos: le damos **las mismas 3.000 transiciones** a Q-learning tabular ($\alpha = 0.5$) y a la red entrenada
-con descenso por gradiente (*SGD*, tasa de aprendizaje 0.5, pérdida $\tfrac12(Q_\theta(s,a) - y)^2$).
-""")
-code(r"""
-trans = transiciones_al_azar(env, n=3000)
-Q_t = q_tabla(env, trans, alpha=0.5, gamma=GAMMA)
-Q_r, red_lineal = q_red_onehot(env, trans, alpha=0.5, gamma=GAMMA)
 
-print(f"Parámetros de la red: {red_lineal.weight.numel()}  =  casillas × acciones = {env.nS} × 4")
-print(f"Diferencia máxima entre tabla y red: {np.abs(Q_t - Q_r).max():.1e}")
+def plot_casilla(env, s, ax, V=None, Q=None, title=None, radio=2, clim=None):
+    """Zoom alrededor de la casilla s. Con V: el valor de cada casilla y un '?' en cada flecha de s.
+    Con Q: los cuatro valores de las flechas de s (la mejor, en verde)."""
+    r0, c0 = env.free[s]
+    vals = V if V is not None else Q.max(axis=1)
+    plot_cave(env, values=vals, ax=ax, clim=clim, title=title)
+    ax.set_xlim(c0 - radio - .5, c0 + radio + .5); ax.set_ylim(r0 + radio + .5, r0 - radio - .5)
+    sombra = [pe.withStroke(linewidth=2.5, foreground="black")]
+    desp = [(-0.37, 0), (0, 0.37), (0.37, 0), (0, -0.37)]
+    for t in ax.texts:
+        t.set_clip_on(True)
+    if V is not None:
+        for s2, (r, c) in enumerate(env.free):
+            if abs(r - r0) <= radio and abs(c - c0) <= radio and s2 != env.goal:
+                ax.text(c, r, f"{V[s2]:.3f}", ha="center", va="center", fontsize=9, color="w", path_effects=sombra)
+        for (dr, dc) in desp:
+            ax.text(c0 + 1.35 * dc, r0 + 1.35 * dr, "?", ha="center", va="center", fontsize=14, color="#ffd400",
+                    weight="bold", path_effects=sombra)
+    else:
+        best = int(Q[s].argmax())
+        for a, (dr, dc) in enumerate(desp):
+            ax.text(c0 + 0.8 * dc, r0 + dr, f"{ACTION_NAMES[a]} {Q[s, a]:.3f}", ha="center", va="center",
+                    fontsize=9, color="#7CFC00" if a == best else "w", weight="bold" if a == best else None,
+                    path_effects=sombra)
+    ax.plot(c0, r0, "s", mfc="none", mec="#00e5ff", mew=2, ms=38)
 
-fig, axes = plt.subplots(1, 2, figsize=(14, 4.8))
-env.plot(values=Q_t.max(1), policy=Q_t.argmax(1), ax=axes[0], title="Q-learning tabular")
-env.plot(values=Q_r.max(1), policy=Q_r.argmax(1), ax=axes[1], title="Red lineal con entrada one-hot")
-plt.tight_layout();
-""")
 
-md(r"""
-Dos dibujos idénticos, diferencia 0 (como mucho, error de redondeo). La cuenta que lo explica: el gradiente de
-$\tfrac12(Q_\theta(s,a)-y)^2$ respecto de $W_{a,s}$ es $(Q_\theta(s,a)-y)\cdot 1$, y respecto de cualquier otra entrada es 0
-(por el one-hot). Un paso de SGD queda
+def suavizar(x, w=20):
+    x = np.asarray(x, dtype=float)
+    return np.convolve(x, np.ones(w) / w, mode="valid")
 
-$$
-W_{a,s} \leftarrow W_{a,s} + \alpha\,\big(y - W_{a,s}\big)
-$$
 
-que es **exactamente** la regla de Q-learning de la clase 4. **Q-learning tabular es un caso particular de una red.**
+def banda(ax, x, y, color, label, ls="-"):
+    """Promedio sobre semillas y banda de ± 1 desvío."""
+    m, sd = y.mean(0), y.std(0)
+    ax.plot(x, m, color=color, label=label, ls=ls)
+    ax.fill_between(x, m - sd, m + sd, color=color, alpha=0.15, lw=0)
+''', herramientas=True))
 
-Pero el one-hot no generaliza: la casilla 17 no sabe nada de la 18. Para eso necesitamos una entrada más rica y una
-red con capas ocultas.
-""")
+# ======================================================================= 1
+cells.append(md(r"""
+## 1. Por qué $Q$ y no $V$
 
-# ---------------------------------------------------------------- Paso 2
-md(r"""
-## Paso 2 — DQN: posición + bigotes
+En la clase 4, con el mapa, elegir era fácil: para cada flecha se hace la cuenta
 
-Le damos a la red una observación que se parece más a lo que "siente" el jugador en la cueva a oscuras
-(`env.observe(kind="coords+touch")`): **6 números**, la fila y la columna normalizadas, y 4 **bigotes**
-(arriba, derecha, abajo, izquierda) que valen 1 si hay pared pegada.
-""")
-code(r"""
-for s in [env.start, 5, env.goal]:
-    fila, col = env.free[s]
-    o = env.observe(s, kind="coords+touch")
-    bigotes = " ".join(f"{n}:{int(b)}" for n, b in zip(ACTION_NAMES, o[2:]))
-    print(f"casilla ({fila},{col}) -> posición = ({o[0]:.2f}, {o[1]:.2f})   bigotes  {bigotes}")
-""")
+$$Q(s, a) = R(s, a) + \gamma \sum_{s'} P(s' \mid s, a)\, V(s')$$
 
-md(r"""
-Pasar de la tabla a la red no es solo "cambiar la tabla por una red". Si lo hacemos ingenuamente, el aprendizaje es
-inestable. DQN agrega tres ingredientes:
+y se elige la de mayor $Q$. Pero esa cuenta **necesita $P$**: saber adónde lleva cada flecha. Sin mapa, aunque alguien le soplara al agente el $V$ exacto de cada casilla, no sabría qué flecha lo lleva a la casilla que vale más.
 
-1. **Memoria de repetición** (*experience replay*): guardamos las transiciones $(s,a,r,s')$ en un *buffer* y entrenamos
-   con **lotes al azar** de esa memoria. Así los ejemplos no están correlacionados (pasos consecutivos son casi iguales)
-   y cada experiencia se reusa muchas veces.
-2. **Red objetivo** (*target network*): el objetivo $y = r + \gamma \max_{a'} Q_{\bar\theta}(s',a')$ se calcula con una
-   **copia congelada** de la red, que se actualiza cada tantos pasos. Si no, la red persigue un blanco que se mueve con ella.
-3. **ε decreciente**: al principio casi todo al azar (explorar), y ε baja de a poco hasta 0.05 (explotar).
+### Paso 1 — La respuesta correcta (solo para comparar)
 
-La red es un perceptrón multicapa (*MLP*) chico: 6 → 64 → 64 → 4. Recompensa: +1 en la salida y −0.01 por paso
-(una ayuda para que aprenda en pocos segundos de CPU). Entrenamos 150 episodios.
-""")
-code(r"""
-t0 = time.time()
-res = dqn(env, obs="coords+touch", episodios=150, gamma=GAMMA, seed=0)
-print(f"Entrenamiento: {res['pasos']:,} pasos en {time.time() - t0:.1f} s")
+Calculamos $V^*$ y $Q^*$ por iteración de valor, con el mapa, como en la clase 4. El agente nunca ve esto.
+""", objetivos=["O1"]))
+cells.append(code(r"""
+V_estrella, Q_estrella = iteracion_de_valor(env, GAMMA)
+opt = acciones_optimas(Q_estrella)
+ng = np.arange(env.nS) != env.goal
+cruce = env.pos2s[(5, 6)]
 
-V_star, _ = iteracion_de_valor(env, gamma=GAMMA)
-fig, axes = plt.subplots(1, 2, figsize=(14, 4.2))
-ax = axes[0]
-ax.plot(res["largos"], color=AZUL, alpha=0.25, lw=1)
-ax.plot(np.arange(9, len(res["largos"])), media_movil(res["largos"]), color=AZUL, lw=2, label="DQN (media móvil 10)")
-ax.axhline(20, color="gray", ls="--", lw=1); ax.text(len(res["largos"]), 21, "camino más corto", ha="right", color="gray", fontsize=9)
-ax.set_xlabel("episodio"); ax.set_ylabel("pasos hasta salir (100 = no salió)"); ax.set_title("Curva de aprendizaje")
-ax.legend(frameon=False); ax.spines[["top", "right"]].set_visible(False)
-ax = axes[1]
-ax.plot(res["eps"], color=NARANJA, lw=2)
-ax.set_xlabel("episodio"); ax.set_ylabel("ε al inicio del episodio"); ax.set_title("Exploración: ε decreciente")
-ax.set_ylim(0, 1.05); ax.spines[["top", "right"]].set_visible(False)
-plt.tight_layout();
-""")
+print(f"V*(S) = {V_estrella[env.start]:.4f}   (= 0.99^{pasos_de(V_estrella[env.start]) - 1:.0f}: el camino más corto tiene "
+      f"{pasos_de(V_estrella[env.start]):.0f} pasos)")
+print("Q*(S, ·):      " + "   ".join(f"{ACTION_NAMES[a]} {Q_estrella[env.start, a]:.4f}" for a in range(env.nA)))
+print(f"V*(cruce (5, 6)) = {V_estrella[cruce]:.4f}")
+print("Q*(cruce, ·):  " + "   ".join(f"{ACTION_NAMES[a]} {Q_estrella[cruce, a]:.4f}" for a in range(env.nA)))
+"""))
+cells.append(md(r"""
+### Paso 2 — La misma casilla, con $V$ y con $Q$
 
-md(r"""
-Al principio los episodios llegan al tope de 100 pasos (no sale). A medida que ε baja y la red aprende, el largo cae
-hasta cerca del camino más corto (20 pasos). Recordemos que en esta cueva chica un agente al azar sale ~5% de las veces:
-acá la exploración no es el problema (eso fue la clase 5); el desafío es **aprender con una red**.
+A la izquierda, el cruce (5, 6) de las clases 3 a 5 con el $V^*$ de cada casilla vecina: sabemos cuánto vale cada lugar, pero no adónde lleva cada flecha (los signos de pregunta). A la derecha, la misma casilla con sus cuatro $Q^*$: un número por flecha, y elegir es mirar cuál es el mayor.
+"""))
+cells.append(code(r"""
+fig, axs = plt.subplots(1, 2, figsize=(15, 6.6))
+plot_casilla(env, cruce, axs[0], V=V_estrella, title="Con V: cuánto vale cada casilla. ¿Y cada flecha?")
+plot_casilla(env, cruce, axs[1], Q=Q_estrella, title="Con Q: cuánto vale cada flecha")
+plt.tight_layout(); plt.show()
 
-La pérdida que minimiza DQN, para un lote de transiciones de la memoria:
+print("Lo que hace falta para pasar de V a Q en el cruce (esto usa el mapa):")
+for a in range(env.nA):
+    s2 = int(np.argmax(env.P[cruce, a]))
+    destino = str(env.free[s2]) + (" (choca y se queda)" if s2 == cruce else "")
+    print(f"   {ACTION_NAMES[a]}: P dice que va a {destino:24s} R = {env.R[cruce, a]:g}   "
+          f"Q = {env.R[cruce, a]:g} + {GAMMA} · {V_estrella[s2]:.4f} = {Q_estrella[cruce, a]:.4f}")
+"""))
+cells.append(md(r"""
+Con $V$ solo, el agente sabe que alguna casilla vecina vale más que otra, pero para saber qué flecha lo lleva ahí necesita $P$ (y en una cueva resbalosa, como la de la clase 4, ni siquiera alcanza con saber la dirección). Con $Q$ no hace falta: el número ya está pegado a la flecha. Por eso, sin mapa, **se aprende directamente $Q(s, a)$**: 60 casillas × 4 flechas = 240 números.
 
-$$
-\mathcal{L}(\theta) = \Big(\underbrace{r + \gamma \max_{a'} Q_{\bar\theta}(s',a')}_{y\ \text{(red objetivo, congelada)}} - Q_\theta(s,a)\Big)^2
-$$
+Y ahí aparece el problema de hoy: para saber cuánto vale una flecha, hay que **probarla**.
+"""))
 
-Es el error TD de la clase 4, convertido en una pérdida de regresión como las de cualquier red.
-""")
+# ======================================================================= 2
+cells.append(md(r"""
+## 2. Probar a veces: $\varepsilon$-greedy
 
-# ---------------------------------------------------------------- Paso 3
-md(r"""
-## Paso 3 — ¿Qué aprendió la red?
+Si el agente siempre elige la flecha de mayor $Q$ (*greedy*, codicioso), nunca prueba las otras y nunca se entera de si valían más. La receta más simple para probar es **$\varepsilon$-greedy**:
 
-Evaluamos la red en **todas** las casillas y pintamos $V(s) = \max_a Q_\theta(s,a)$ con la política (flechas),
-al lado del $V^*$ exacto que calculamos con el modelo en la clase 3 (iteración de valor).
-Abajo, la trayectoria que sigue la red sin explorar (*greedy*).
-""")
-code(r"""
-Q_red = q_de_la_red(env, res["red"], res["obs"])
-camino, salio = trayectoria_greedy(env, res["red"], res["obs"])
+1. Con probabilidad $\varepsilon$, una flecha **al azar** (cualquiera de las cuatro, incluida la mejor): **probar** (*explore*).
+2. Si no, la de mayor $Q$: **aprovechar** (*exploit*).
 
-fig, axes = plt.subplots(1, 2, figsize=(14, 4.8))
-env.plot(values=Q_red.max(1), policy=Q_red.argmax(1), ax=axes[0], title="DQN: V(s) = max Q de la red, y política")
-env.plot(values=V_star, ax=axes[1], title="Referencia: V* exacto (iteración de valor)")
-plt.tight_layout()
+### Paso 1 — Qué probabilidad tiene cada flecha
 
-ax = env.plot(path=camino, title=f"Trayectoria greedy de la red: {len(camino) - 1} pasos (¿salió? {'sí' if salio else 'no'})");
-""")
+Con los $Q^*$ de S, la mejor flecha es →. Con $\varepsilon$-greedy, la mejor tiene probabilidad $1 - \varepsilon + \varepsilon/4$ y cada una de las otras, $\varepsilon/4$.
+""", objetivos=["O1"]))
+cells.append(code(r"""
+EPS_DEMO = [0, 0.1, 0.5, 1]
+mejor = int(Q_estrella[env.start].argmax())
+fig, ax = plt.subplots(figsize=(9, 3.6))
+ancho = 0.2
+for i, e in enumerate(EPS_DEMO):
+    p = np.full(env.nA, e / env.nA); p[mejor] += 1 - e
+    ax.bar(np.arange(env.nA) + (i - 1.5) * ancho, p, width=ancho, color=COLORES[i], label=f"ε = {e:g}")
+ax.set_xticks(range(env.nA))
+ax.set_xticklabels([ACTION_NAMES[a] + ("  (la mejor)" if a == mejor else "") for a in range(env.nA)])
+ax.set_ylabel("probabilidad de elegirla"); ax.set_title("ε-greedy en S"); ax.legend(frameon=False, ncol=4)
+ax.grid(axis="x", visible=False)
+plt.tight_layout(); plt.show()
+for e in EPS_DEMO:
+    print(f"ε = {e:<4g} la mejor: {1 - e + e / 4:.3f}   cada una de las otras: {e / 4:.3f}")
+"""))
+cells.append(md(r"""
+### Paso 2 — ¿Cuánto probar?
 
-md(r"""
-El mapa de la red se parece al $V^*$ exacto: valores altos cerca de la salida, que bajan con la distancia, y flechas
-que forman un camino. **La red nunca vio el mapa ni el modelo**: solo posiciones, bigotes y recompensas.
-""")
+Ahora el agente juega de verdad, sin mapa, desde S, con Q-learning (la regla de la sección 4; por ahora alcanza con saber que aprende de cada paso). Su $Q$ arranca en 0 en todas partes, más un ruido minúsculo (entre 0 y 0,0001): sin ese ruido las cuatro flechas empatarían, y con el ruido cada casilla tiene una preferencia arbitraria, como una costumbre. Como el único premio es el +1 de la salida, **hasta que no la encuentra una vez, todo sigue valiendo casi 0**.
 
-md(r"""
-### ✍️ Ejercicio
+Probamos siete valores de $\varepsilon$, con 300 partidas de hasta 200 pasos, $\alpha = 0{,}2$ y 8 semillas. Medimos dos cosas: **en qué partida encuentra la salida por primera vez** y **cuántos pasos tarda al final** (promedio de las últimas 50 partidas; 200 = no sale).
+"""))
+cells.append(code(r"""
+ALFA = 0.2
+EPS_BARRIDO = [0, 0.01, 0.05, 0.1, 0.3, 0.5, 1]
+N_SEM = 8
+barrido = {e: [aprender(env, "q", e, ALFA, 300, sem) for sem in range(N_SEM)] for e in EPS_BARRIDO}
 
-Cambiá `obs="coords+touch"` por `obs="coords"` (sin bigotes) y volvé a entrenar. ¿Aprende igual? ¿Dónde se equivoca
-la política? (Pista: con solo la posición, la red tiene que "dibujar" las paredes con su función.)
-""")
-code(r"""
-# TODO: probá obs="coords" y/o otra semilla
-prueba = dqn(env, obs="coords+touch", episodios=150, gamma=GAMMA, seed=1)
-Qp = q_de_la_red(env, prueba["red"], prueba["obs"])
-cam, ok = trayectoria_greedy(env, prueba["red"], prueba["obs"])
-env.plot(values=Qp.max(1), policy=Qp.argmax(1), path=cam, title=f"obs = {prueba['obs']} | ¿salió? {'sí' if ok else 'no'}");
-""")
+primera = {e: np.array([int(np.argmax(r["salio"])) + 1 if r["salio"].any() else -1 for r in barrido[e]]) for e in EPS_BARRIDO}
+finales = {e: np.array([r["pasos"][-50:].mean() for r in barrido[e]]) for e in EPS_BARRIDO}
 
-# ---------------------------------------------------------------- Paso 4
-md(r"""
-## Paso 4 — Generalización: valores donde casi no estuvo
+fig, axs = plt.subplots(1, 2, figsize=(14, 4.2))
+xs = np.arange(len(EPS_BARRIDO))
+jit = np.linspace(-0.2, 0.2, N_SEM)
+for i, e in enumerate(EPS_BARRIDO):
+    f = primera[e]
+    axs[0].plot(i + jit[f > 0], f[f > 0], "o", color=COLORES[0], ms=6)
+    axs[0].plot(i + jit[f < 0], np.full(np.sum(f < 0), 330), "x", color=COLORES[7], ms=7, mew=2)
+    axs[1].plot(i + jit, finales[e], "o", color=COLORES[1], ms=6)
+axs[0].axhline(300, color="#888888", lw=0.8, ls=":")
+axs[0].text(len(EPS_BARRIDO) - 0.6, 312, "× = no la encontró en 300 partidas", ha="right", fontsize=9, color=COLORES[7])
+axs[0].set_ylim(0, 345); axs[0].set_ylabel("partida de la primera salida")
+axs[0].set_title("¿Cuándo descubre la salida? (cada punto, una semilla)")
+axs[1].axhline(20, color="k", ls=":", lw=1); axs[1].text(-0.3, 26, "camino más corto: 20 pasos", fontsize=9)
+axs[1].set_ylim(0, 215); axs[1].set_ylabel("pasos por partida (últimas 50)")
+axs[1].set_title("¿Aprovecha lo aprendido? (cada punto, una semilla)")
+for ax in axs:
+    ax.set_xticks(xs); ax.set_xticklabels([f"{e:g}" for e in EPS_BARRIDO]); ax.set_xlabel("ε"); ax.grid(axis="x", visible=False)
+plt.tight_layout(); plt.show()
 
-Durante el entrenamiento, la política se concentró en el camino a la salida y muchas casillas se visitaron poco.
-Comparamos tres mapas:
+print(f"{'ε':>5s} {'semillas que la encontraron':>28s} {'partida de la 1.ª salida (mediana)':>36s} {'pasos al final (promedio)':>27s}")
+for e in EPS_BARRIDO:
+    f = primera[e]
+    med = f"{np.median(f[f > 0]):.0f}" if np.any(f > 0) else "—"
+    cuantas = f"{np.sum(f > 0)} de {N_SEM}"
+    print(f"{e:>5g} {cuantas:>28s} {med:>36s} {finales[e].mean():>27.1f}")
+print("\npartida de la primera salida, semilla por semilla (−1 = nunca):")
+for e in EPS_BARRIDO:
+    print(f"   ε = {e:<5g} {primera[e].tolist()}")
+"""))
+cells.append(md(r"""
+Los dos extremos fallan, cada uno a su manera:
 
-1. cuántas veces se visitó cada casilla (log; negro = nunca);
-2. $V(s)$ de un **Q-learning tabular** con el mismo presupuesto y el mismo ε;
-3. $V(s)$ de la **red**.
-""")
-code(r"""
-Q_tab2, N_tab = q_learning_tabular(env, episodios=150, gamma=GAMMA)
-pocas = res["N"] < 20
-print(f"Casillas visitadas menos de 20 veces por DQN: {pocas.sum()} de {env.nS}")
-err_red = np.abs(Q_red.max(1) - V_star)[pocas].mean()
-err_tab = np.abs(Q_tab2.max(1) - V_star)[N_tab < 20].mean()
-print(f"Error medio |V - V*| en esas casillas poco visitadas:  tabla = {err_tab:.3f}   red = {err_red:.3f}")
+- **Con $\varepsilon = 0$ no prueba nunca**: sigue sus costumbres, que lo dejan dando vueltas siempre por el mismo lado, y en 7 de las 8 semillas no encuentra la salida en 300 partidas. (En la otra la encuentra recién en la partida 195: el ruido inicial, al irse corrigiendo, a veces le cambia una costumbre y lo hace probar algo sin querer.) Con $\varepsilon = 0{,}01$ tampoco alcanza: 3 de 8 semillas no la encuentran.
+- **Con $\varepsilon = 1$ prueba siempre**: encuentra la salida como el dado, pero como nunca usa lo aprendido, al final sigue tardando casi 200 pasos por partida.
+- En el medio, el agente descubre la salida y después la aprovecha. Entre $\varepsilon = 0{,}05$ y $0{,}5$, cuanto más grande $\varepsilon$, antes la descubre y más pasos gasta en probar al final.
 
-fig, axes = plt.subplots(1, 3, figsize=(20, 4.6))
-mapa_visitas(env, res["N"], axes[0], "Visitas durante el entrenamiento (log10)")
-env.plot(values=Q_tab2.max(1), ax=axes[1], title="V(s): tabla, mismo presupuesto")
-env.plot(values=Q_red.max(1), ax=axes[2], title="V(s): red DQN")
-plt.tight_layout();
-""")
+### Paso 3 — Una partida más, después de aprender
 
-md(r"""
-La tabla solo sabe algo de las casillas que visitó *muchas* veces: en las demás quedó cerca de su valor inicial y el
-mapa se ve "manchado". La red, en cambio, da un valor **razonable en todas**, porque casillas cercanas tienen entradas
-parecidas y comparten parámetros.
+Para ver qué hace cada agente con lo que aprendió, la semilla 0 de tres de ellos juega una partida más desde S, con su mismo $\varepsilon$, sin aprender.
+"""))
+cells.append(code(r"""
+fig, axs = plt.subplots(1, 3, figsize=(18, 4.6))
+for ax, e in zip(axs, [0, 0.1, 1]):
+    p = jugar(env, barrido[e][0]["Q"], e, np.random.default_rng(1))
+    salio = p[-1][3] == env.goal
+    plot_agent_view(env, p, ax, f"ε = {e:g}: {len(p)} pasos, " + ("sale" if salio else "no sale"))
+    print(f"ε = {e:<4g} pasos = {len(p):3d}   ¿salió? {'sí' if salio else 'no'}   casillas distintas = {len(set(camino_de(p)))}   "
+          f"choques = {sum(x[0] == x[3] for x in p)}")
+plt.tight_layout(); plt.show()
+"""))
+cells.append(md(r"""
+Con $\varepsilon = 0$ el agente va y viene por el mismo recorrido de 17 casillas durante los 200 pasos: sin probar, no hay de dónde aprender. Con $\varepsilon = 0{,}1$ va casi derecho a la salida. Con $\varepsilon = 1$ deambula al azar y choca contra las paredes una y otra vez. **Probar cuesta pasos, pero sin probar no se aprende nada.**
+"""))
 
-Una aclaración honesta: en esta cueva la red tiene **más** parámetros que la tabla (~5.000 contra 240). La ventaja no
-está en el tamaño acá, sino en que **la cantidad de parámetros no crece con la cantidad de estados**, y en que lo
-aprendido se transfiere a estados parecidos. Con pixeles, esa es la única opción.
-""")
+# ======================================================================= 3
+cells.append(md(r"""
+## 3. SARSA: aprender de lo que hago
 
-# ---------------------------------------------------------------- Paso 5
-md(r"""
-## Paso 5 — Ablación: DQN sin memoria de repetición
+La idea es la de TD(0) de la clase 5, pero sobre $Q$: después de cada paso, corregir el valor de la flecha que se usó hacia un objetivo que mira un paso adelante. En **SARSA** el objetivo usa **la acción que de verdad va a tomar** en la casilla siguiente, $a'$ (elegida con el mismo $\varepsilon$-greedy, así que a veces es al azar):
 
-¿Hace falta el *replay buffer*? Entrenamos la misma red, mismos pasos, pero aprendiendo **solo de la última transición**
-(como hacía Q-learning tabular), sin memoria.
-""")
-code(r"""
-t0 = time.time()
-res_sin = dqn(env, obs="coords+touch", episodios=150, gamma=GAMMA, seed=0, usar_replay=False)
-print(f"Sin replay: {time.time() - t0:.1f} s")
+$$Q(s,a) \leftarrow Q(s,a) + \alpha\,\big[\,r + \gamma\, Q(s', a') - Q(s,a)\,\big]$$
 
-fig, ax = plt.subplots(figsize=(9, 4))
-for r_, nombre, color in [(res, "DQN completo", AZUL), (res_sin, "sin memoria de repetición", NARANJA)]:
-    ax.plot(np.arange(9, len(r_["largos"])), media_movil(r_["largos"]), lw=2, color=color, label=nombre)
-ax.axhline(20, color="gray", ls="--", lw=1)
-ax.set_xlabel("episodio"); ax.set_ylabel("pasos hasta salir (media móvil 10)")
-ax.set_title("Ablación: el replay buffer"); ax.legend(frameon=False)
-ax.spines[["top", "right"]].set_visible(False);
-""")
+El nombre sale de los cinco datos que usa cada actualización: $(s, a, r, s', a')$, *State–Action–Reward–State–Action*.
 
-md(r"""
-Sin memoria, la red aprende de una transición a la vez, siempre de la zona donde está parada: cada paso de gradiente
-"pisa" lo aprendido en otra parte (*olvido catastrófico*, *catastrophic forgetting*) y no llega a una política que salga.
-Con la tabla esto no pasaba porque cada casillero es independiente: **la generalización tiene un precio**,
-y el replay es parte de cómo se paga.
+### Paso 1 — Un agente a medio aprender
 
-(Si quieren probar sin red objetivo: `usar_objetivo=False`. En esta cueva chica suele funcionar igual; en Atari, sin
-ella el entrenamiento diverge con frecuencia.)
-""")
+Dejamos que SARSA juegue 300 partidas desde S con $\varepsilon = 0{,}2$ y $\alpha = 0{,}2$. Después lo hacemos jugar una partida más, sin aprender, y buscamos un paso en el que **la acción siguiente $a'$ salió al azar** y no es la mejor. Ese paso es el que vamos a actualizar a mano.
+""", objetivos=["O2"]))
+cells.append(code(r"""
+EPS = 0.2
+sarsa300 = aprender(env, "sarsa", EPS, ALFA, 300, semilla=3)
+Q_mano = sarsa300["Q"].copy()
 
-# ---------------------------------------------------------------- Cierre
-md(r"""
-## Cierre — De la cueva a Atari, y de Atari a ChatGPT
+rng = np.random.default_rng(7)
+elegidos = []
+while not elegidos:
+    p = jugar(env, Q_mano, EPS, rng)
+    elegidos = [x for x in p if x[5] and x[4] != Q_mano[x[3]].argmax() and x[2] == 0 and Q_mano[x[3]].max() > 0.3]
+s, a, r, s2, a2, _ = elegidos[0]
+print(f"Partida de {len(p)} pasos. El paso elegido:")
+print(f"   s = {env.free[s]}   a = {ACTION_NAMES[a]}   r = {r:g}   s' = {env.free[s2]}   "
+      f"a' = {ACTION_NAMES[a2]} (salió al azar; la mejor en s' era {ACTION_NAMES[int(Q_mano[s2].argmax())]})")
+print("Q(s, ·)  = " + "   ".join(f"{ACTION_NAMES[b]} {Q_mano[s, b]:.4f}" for b in range(env.nA)))
+print("Q(s', ·) = " + "   ".join(f"{ACTION_NAMES[b]} {Q_mano[s2, b]:.4f}" for b in range(env.nA)))
 
-**DQN en Atari** (Mnih et al., *Nature* 2015): la misma receta de hoy (replay + red objetivo + ε decreciente), con
-otra observación: las **últimas 4 pantallas** reducidas a 84×84 grises, y una **red convolucional** (la de visión) en vez
-de nuestro MLP. Con **los mismos hiperparámetros** jugó 49 juegos distintos, y en más de la mitad superó a un jugador
-humano profesional. En *Montezuma's Revenge* sacó **0 puntos**: el problema de exploración de la clase 5.
+fig, ax = plt.subplots(figsize=(8, 5.6))
+plot_cave(env, values=Q_mano.max(axis=1), policy=Q_mano.argmax(axis=1), mark=[s, s2], clim=(0, V_estrella[ng].max()), ax=ax,
+          title="SARSA después de 300 partidas: max Q y flecha de cada casilla")
+(r0, c0), (r1, c1) = env.free[s], env.free[s2]
+ax.annotate("", xy=(c1, r1), xytext=(c0, r0), arrowprops=dict(arrowstyle="->", color="#ffd400", lw=2.5))
+dr, dc = [(-1, 0), (0, 1), (1, 0), (0, -1)][a2]
+ax.annotate("", xy=(c1 + 0.8 * dc, r1 + 0.8 * dr), xytext=(c1, r1),
+            arrowprops=dict(arrowstyle="->", color="#ff5c5c", lw=2.5, ls="--"))
+plt.tight_layout(); plt.show()
+print("amarillo: el paso (s, a) -> s'.   rojo punteado: a', la acción que tomó después (al azar).")
+"""))
+cells.append(md(r"""
+### Paso 2 — La actualización de SARSA, con números
 
-**Lo que viene después.** DQN aprende $Q$ y deriva la política con un $\arg\max$. Eso funciona con pocas acciones
-discretas. Otra familia aprende **directamente la política** $\pi_\theta(a \mid s)$ empujando hacia arriba la probabilidad
-de las acciones que salieron bien: **gradiente de política** (*policy gradient*). Su versión más usada es **PPO**
-(*Proximal Policy Optimization*, Schulman et al. 2017).
+1. El **objetivo**: el premio que cobró más lo que espera de la acción que de verdad va a tomar, $r + \gamma\,Q(s', a')$.
+2. El **error** $\delta$: objetivo menos lo que creía, $Q(s, a)$.
+3. La **corrección**: $Q(s,a)$ se mueve una fracción $\alpha$ del error.
+"""))
+cells.append(code(r"""
+obj_sarsa = r + GAMMA * Q_mano[s2, a2]
+delta_sarsa = obj_sarsa - Q_mano[s, a]
+nuevo_sarsa = Q_mano[s, a] + ALFA * delta_sarsa
+print(f"Paso: {env.free[s]} --{ACTION_NAMES[a]}--> {env.free[s2]},  r = {r:g},  a' = {ACTION_NAMES[a2]},  α = {ALFA},  γ = {GAMMA}")
+print(f"   1. objetivo SARSA = r + γ Q(s', a') = {r:g} + {GAMMA} · {Q_mano[s2, a2]:.4f} = {obj_sarsa:.4f}")
+print(f"   2. δ = objetivo − Q(s, a) = {obj_sarsa:.4f} − {Q_mano[s, a]:.4f} = {delta_sarsa:+.4f}")
+print(f"   3. Q(s, a) nuevo = Q(s, a) + α δ = {Q_mano[s, a]:.4f} + {ALFA} · ({delta_sarsa:+.4f}) = {nuevo_sarsa:.4f}")
+print(f"   (respuesta correcta, con el mapa: Q*(s, a) = {Q_estrella[s, a]:.4f})")
+"""))
+cells.append(md(r"""
+La acción siguiente salió al azar y vale menos que la mejor de $s'$, así que el objetivo de SARSA queda **bajo** (en este paso, más bajo que lo que ya creía: $\delta$ es negativo y $Q(s, a)$ baja). SARSA le cobra a la flecha $a$ el desvío que el agente va a hacer después. Eso es «aprender de lo que hago»: el valor que aprende SARSA incluye sus propias pruebas.
+"""))
 
-Y acá está el puente: un modelo de lenguaje *es* una política $\pi_\theta(\text{próximo token} \mid \text{texto})$.
-**RLHF** (*Reinforcement Learning from Human Feedback*) la ajusta con PPO usando como recompensa una red entrenada con
-preferencias humanas. Así se pasó de GPT-3 a ChatGPT.
+# ======================================================================= 4
+cells.append(md(r"""
+## 4. Q-learning: aprender de lo mejor que podría hacer
 
+**Q-learning** (Watkins y Dayan, 1992) cambia un solo término del objetivo: en vez de la acción que va a tomar, usa **la mejor** de la casilla siguiente, aunque después no la tome:
+
+$$Q(s,a) \leftarrow Q(s,a) + \alpha\,\big[\,r + \gamma\, \max_{a'} Q(s', a') - Q(s,a)\,\big]$$
+
+### Paso 1 — La misma experiencia, con la otra regla
+
+Mismo paso, misma tabla $Q$, mismos $\alpha$ y $\gamma$. Lo único que cambia es el objetivo.
+""", objetivos=["O2"]))
+cells.append(code(r"""
+mejor2 = int(Q_mano[s2].argmax())
+obj_q = r + GAMMA * Q_mano[s2].max()
+delta_q = obj_q - Q_mano[s, a]
+nuevo_q = Q_mano[s, a] + ALFA * delta_q
+print(f"Paso: {env.free[s]} --{ACTION_NAMES[a]}--> {env.free[s2]},  r = {r:g},  α = {ALFA},  γ = {GAMMA}")
+print(f"   1. objetivo Q-learning = r + γ max Q(s', ·) = {r:g} + {GAMMA} · {Q_mano[s2].max():.4f} "
+      f"(la de {ACTION_NAMES[mejor2]}) = {obj_q:.4f}")
+print(f"   2. δ = objetivo − Q(s, a) = {obj_q:.4f} − {Q_mano[s, a]:.4f} = {delta_q:+.4f}")
+print(f"   3. Q(s, a) nuevo = Q(s, a) + α δ = {Q_mano[s, a]:.4f} + {ALFA} · ({delta_q:+.4f}) = {nuevo_q:.4f}")
+print(f"\nLa misma experiencia:  SARSA deja Q(s, a) = {nuevo_sarsa:.4f}   Q-learning lo deja en {nuevo_q:.4f}   "
+      f"(Q*(s, a) = {Q_estrella[s, a]:.4f})")
+print(f"La diferencia sale del objetivo: Q(s', a' = {ACTION_NAMES[a2]}) = {Q_mano[s2, a2]:.4f}  contra  "
+      f"max Q(s', ·) = {Q_mano[s2].max():.4f}")
+"""))
+cells.append(md(r"""
+Q-learning **no le cobra** a la flecha $a$ el desvío que viene después: aprende cuánto valdría $a$ si de ahí en adelante el agente jugara lo mejor que sabe. Por eso se dice que es ***off-policy***: aprende el valor de una política (la mejor) mientras juega otra (la que explora). SARSA es ***on-policy***: aprende el valor de la misma política con la que juega.
+
+### Paso 2 — Los dos, aprendiendo desde cero
+
+SARSA y Q-learning, 500 partidas desde S, $\varepsilon = 0{,}2$, $\alpha = 0{,}2$, 5 semillas cada uno. A la izquierda, cuántos pasos tarda cada partida; a la derecha, cuánto cree que vale S, $\max_a Q(S, a)$, contra $V^*(S)$.
+"""))
+cells.append(code(r"""
+SEMILLAS = range(5)
+corridas = {m: [aprender(env, m, EPS, ALFA, 500, sem) for sem in SEMILLAS] for m in ["sarsa", "q"]}
+
+fig, axs = plt.subplots(1, 2, figsize=(15, 4))
+for m in corridas:
+    pasos = np.array([suavizar(c["pasos"]) for c in corridas[m]])
+    banda(axs[0], np.arange(pasos.shape[1]) + 20, pasos, COLOR[m], NOMBRE[m])
+    vs = np.array([c["VS"] for c in corridas[m]])
+    banda(axs[1], np.arange(1, vs.shape[1] + 1), vs, COLOR[m], NOMBRE[m])
+axs[0].axhline(20, color="k", ls=":", lw=1); axs[0].set_ylim(0, 205)
+axs[0].set_xlabel("partida"); axs[0].set_ylabel("pasos (media móvil de 20)"); axs[0].set_title("¿Cuánto tarda en salir?")
+axs[1].axhline(V_estrella[env.start], color="k", ls="--", lw=1, label="V*(S) (con mapa)")
+axs[1].set_xlabel("partida"); axs[1].set_ylabel("max Q(S, ·)"); axs[1].set_title("¿Cuánto cree que vale S?")
+for ax in axs:
+    ax.legend(frameon=False, loc="best")
+plt.tight_layout(); plt.show()
+
+for m in corridas:
+    f = [int(np.argmax(c["salio"])) + 1 for c in corridas[m]]
+    vf = np.array([c["VS"][-1] for c in corridas[m]])
+    pf = np.mean([c["pasos"][-100:].mean() for c in corridas[m]])
+    print(f"{NOMBRE[m]:10s} primera salida en las partidas {f}   pasos (últimas 100) = {pf:.1f}   "
+          f"max Q(S) al final = {vf.mean():.4f} ± {vf.std():.4f}   {np.round(vf, 4).tolist()}")
+print(f"V*(S) = {V_estrella[env.start]:.4f}")
+"""))
+cells.append(md(r"""
+Los dos aprenden a salir en un par de cientos de partidas y al final juegan parecido (el $\varepsilon = 0{,}2$ los desvía a los dos por igual). Lo que cambia es **cuánto creen que vale S**: Q-learning se planta cerca de $V^*(S)$ (algunas semillas, en el valor de un camino algo más largo); SARSA queda mucho más abajo y todavía sube despacio, porque le cobra a S todos los desvíos de la exploración, incluidos los que lo llevan a casillas que todavía no aprendió. La sección siguiente mide esa diferencia con cuidado, con muchas más partidas.
+"""))
+
+# ======================================================================= 5
+cells.append(md(r"""
+## 5. SARSA contra Q-learning con varios $\varepsilon$
+
+La predicción, a partir de los objetivos:
+
+- **Q-learning** (*off-policy*) aprende $Q^*$, el valor de jugar perfecto, **sea cual sea $\varepsilon$**: su $\max_a Q(S, a)$ tendría que llegar a $V^*(S) = 0{,}8262$.
+- **SARSA** (*on-policy*) aprende el valor de jugar **explorando con ese $\varepsilon$**: cuanto más explora, más pasos de más y menos vale S. Ese valor también lo podemos calcular con el mapa (`valor_explorando`): es lo que vale cada flecha si después se sigue jugando $\varepsilon$-greedy.
+
+### Paso 1 — Cuatro valores de $\varepsilon$, 5 semillas
+
+Para que todas las casillas reciban visitas y los valores lleguen a asentarse, en esta sección **cada partida empieza en una casilla al azar** (como en la clase 5) y jugamos 20 000 partidas con $\alpha = 0{,}2$. Leemos $\max_a Q(S, a)$ promediado en las últimas 2000 partidas (con $\alpha$ fijo, el valor tiembla un poco). Tarda unos 30 segundos.
+""", objetivos=["O3"]))
+cells.append(code(r"""
+EPS_COMP = [0.1, 0.2, 0.3, 0.5]
+N_COMP = 20_000
+comp = {(m, e): [aprender(env, m, e, ALFA, N_COMP, sem, inicio="azar") for sem in SEMILLAS]
+        for e in EPS_COMP for m in ["sarsa", "q"]}
+VS_fin = {k: np.array([c["VS"][-2000:].mean() for c in v]) for k, v in comp.items()}
+Q_eps = {e: valor_explorando(env, GAMMA, e) for e in EPS_COMP}
+
+eps_fino = np.linspace(0, 0.6, 31)
+ref_fina = [valor_explorando(env, GAMMA, e)[env.start].max() for e in eps_fino]
+
+fig, axs = plt.subplots(1, 2, figsize=(15, 4.4))
+e_ver = 0.3
+for m in ["sarsa", "q"]:
+    for i, c in enumerate(comp[(m, e_ver)]):
+        axs[0].plot(np.arange(1, N_COMP + 1), c["VS"], color=COLOR[m], lw=0.8, alpha=0.6,
+                    label=NOMBRE[m] if i == 0 else None)
+axs[0].axhline(V_estrella[env.start], color="k", ls="--", lw=1, label="V*(S): jugar perfecto")
+axs[0].axhline(Q_eps[e_ver][env.start].max(), color=COL_SARSA, ls=":", lw=1.5, label=f"jugar explorando con ε = {e_ver}")
+axs[0].set_xscale("log"); axs[0].set_ylim(0, 0.9); axs[0].set_xlabel("partidas (escala log)")
+axs[0].set_ylabel("max Q(S, ·)"); axs[0].set_title(f"ε = {e_ver}: 5 semillas de cada método")
+for l_ in axs[0].legend(frameon=False, loc="upper left").get_lines():
+    l_.set_linewidth(2); l_.set_alpha(1)
+
+axs[1].plot(eps_fino, np.full_like(eps_fino, V_estrella[env.start]), "k--", lw=1, label="V*(S) (con mapa)")
+axs[1].plot(eps_fino, ref_fina, ":", color=COL_SARSA, lw=1.5, label="jugar explorando con ε (con mapa)")
+for m, desp in [("sarsa", -0.006), ("q", 0.006)]:
+    for e in EPS_COMP:
+        axs[1].plot(np.full(len(SEMILLAS), e + desp), VS_fin[(m, e)], "o", color=COLOR[m], ms=5, alpha=0.7,
+                    label=NOMBRE[m] + " (una semilla)" if e == EPS_COMP[0] else None)
+axs[1].set_xlim(0, 0.6); axs[1].set_ylim(0.6, 0.85); axs[1].set_xlabel("ε"); axs[1].set_ylabel("max Q(S, ·) al final")
+axs[1].set_title("Qué valor de S aprende cada uno"); axs[1].legend(frameon=False, loc="lower left")
+plt.tight_layout(); plt.show()
+
+print(f"V*(S) = {V_estrella[env.start]:.4f}.  max Q(S, ·), promedio de las últimas 2000 partidas, 5 semillas:")
+print(f"{'ε':>5s} {'Q-learning':>18s} {'SARSA':>18s} {'explorando (mapa)':>18s}")
+for e in EPS_COMP:
+    q_, s_ = VS_fin[("q", e)], VS_fin[("sarsa", e)]
+    print(f"{e:>5g} {q_.mean():>10.4f} ± {q_.std():.4f} {s_.mean():>10.4f} ± {s_.std():.4f} {Q_eps[e][env.start].max():>18.4f}")
+print("\nsemilla por semilla:")
+for e in EPS_COMP:
+    print(f"   ε = {e:<4g} Q-learning {np.round(VS_fin[('q', e)], 4).tolist()}   SARSA {np.round(VS_fin[('sarsa', e)], 4).tolist()}")
+"""))
+cells.append(md(r"""
+Lo que muestran los números:
+
+- **SARSA**, con $\varepsilon$ de 0,2 a 0,5, queda casi sobre la línea punteada: aprende cuánto vale S **jugando como juega**, con sus pruebas incluidas. Cuanto más grande $\varepsilon$, más bajo.
+- **Q-learning** llega a $V^*(S)$ con $\varepsilon$ 0,3 y 0,5, aunque juega explorando: aprende el valor de jugar perfecto. Con $\varepsilon = 0{,}2$, dos semillas quedan clavadas en un valor algo más bajo: aprendieron perfecto el valor de **otro camino**, más largo, y nunca probaron lo suficiente el más corto.
+- Con $\varepsilon = 0{,}1$ los dos quedan por debajo de lo que les corresponde, y parecidos entre sí: con tan poca exploración, 20 000 partidas no alcanzan. La diferencia entre *on-policy* y *off-policy* se ve cuando la exploración alcanza.
+
+### Paso 2 — ¿Qué camino creen que hay?
+
+Si el único premio es el +1, un valor $V$ corresponde a un camino de $n$ pasos con $V = \gamma^{\,n-1}$. Traducimos el valor de S de cada semilla a pasos, y medimos además qué fracción de las flechas aprendidas son óptimas.
+"""))
+cells.append(code(r"""
+for m in ["q", "sarsa"]:
+    print(f"{NOMBRE[m]}:")
+    for e in EPS_COMP:
+        n_pasos = np.round(pasos_de(VS_fin[(m, e)]), 1).tolist()
+        fr = np.mean([frac_optimas(env, c["Q"], opt) for c in comp[(m, e)]])
+        print(f"   ε = {e:<4g} V(S) traducido a pasos: {str(n_pasos):34s} flechas óptimas: {fr:.0%}")
+print(f"\n(camino más corto: {pasos_de(V_estrella[env.start]):.0f} pasos; 'flechas óptimas' = fracción de casillas, sin la salida, "
+      f"en las que la flecha de mayor Q es óptima, promedio de 5 semillas)")
+"""))
+cells.append(md(r"""
+Las semillas de Q-learning que quedaron abajo creen en un camino más largo que el de 20 pasos: su valor es exacto **para ese camino**, pero el más corto sale de S hacia la derecha y casi no lo exploraron. Q-learning promete $Q^*$ solo si **todas** las flechas se siguen probando; con poca exploración, aprende lo mejor de lo que vio.
+
+Los «pasos» de SARSA no son un camino de verdad: su valor promedia los desvíos de la exploración, y por eso equivale a un camino más largo que el que de verdad sigue.
+
+> **Para enseñarlo:** SARSA aprende de lo que de verdad hago; Q-learning, de lo mejor que podría hacer desde ahí.
+
+¿Cuál conviene? Si el agente va a **seguir explorando** (y los desvíos pueden costar caro, por ejemplo cerca de un precipicio), el valor de SARSA es una predicción honesta de lo que va a cobrar. Si la exploración es solo para aprender y después se juega sin ella, el de Q-learning es el que importa.
+"""))
+
+# ======================================================================= 6
+cells.append(md(r"""
+## 6. El mapa de visitas
+
+El agente solo puede aprender de las casillas por las que pasa. Volvemos al juego: **partidas desde S**, Q-learning, $\varepsilon = 0{,}1$, $\alpha = 0{,}2$, 2000 partidas. Contamos cuántas veces pisó cada casilla y lo comparamos con dónde se equivoca: el error de su valor, $|\max_a Q(s,a) - V^*(s)|$, y si la flecha aprendida es óptima.
+
+### Paso 1 — Visitas, error y flechas
+""", objetivos=["O4"]))
+cells.append(code(r"""
+EPS_VIS = 0.1
+vis_corridas = [aprender(env, "q", EPS_VIS, ALFA, 2000, sem) for sem in SEMILLAS]
+c0 = vis_corridas[0]
+visitas = c0["visitas"].sum(axis=0)
+err = np.abs(c0["Q"].max(axis=1) - V_estrella)
+bien = opt[np.arange(env.nS), c0["Q"].argmax(axis=1)]
+
+fig, axs = plt.subplots(1, 3, figsize=(20, 4.8))
+plot_cave(env, values=np.log10(1 + visitas), ax=axs[0], cmap="viridis", title="Visitas en 2000 partidas (log10 de 1 + visitas)")
+plot_cave(env, values=err, ax=axs[1], cmap="magma", clim=(0, 0.9), title="Error |max Q − V*|")
+plot_cave(env, values=np.where(bien, 1.0, 0.0), policy=c0["Q"].argmax(axis=1), ax=axs[2], cmap="RdYlGn", clim=(-0.3, 1.3),
+          title="Flecha aprendida: verde = óptima, rojo = no")
+plt.tight_layout(); plt.show()
+
+print(f"semilla 0: max Q(S) = {c0['Q'][env.start].max():.4f}  (V*(S) = {V_estrella[env.start]:.4f}; "
+      f"equivale a un camino de {pasos_de(c0['Q'][env.start].max()):.0f} pasos)")
+print(f"flecha aprendida en S: {ACTION_NAMES[int(c0['Q'][env.start].argmax())]}   flecha óptima en S: "
+      f"{', '.join(ACTION_NAMES[a_] for a_ in np.flatnonzero(opt[env.start]))}")
+print(f"flechas óptimas: {frac_optimas(env, c0['Q'], opt):.0%} de las casillas   casillas nunca pisadas: {int(np.sum(visitas[ng] == 0))}: "
+      f"{', '.join(str(env.free[s_]) for s_ in np.flatnonzero(ng & (visitas == 0)))}")
+orden = [int(x) for x in np.argsort(np.where(ng, visitas, np.inf))][:int(ng.sum())]
+def fila(s_):
+    return (f"   {str(env.free[s_]):9s} visitas = {visitas[s_]:5d}   max Q = {c0['Q'][s_].max():.4f}   V* = {V_estrella[s_]:.4f}   "
+            f"error = {err[s_]:.4f}   flecha {'óptima' if bien[s_] else 'NO óptima'}")
+print("\nlas 8 casillas menos visitadas:")
+for s_ in orden[:8]:
+    print(fila(s_))
+print("las 5 más visitadas:")
+for s_ in orden[-5:][::-1]:
+    print(fila(s_))
+"""))
+cells.append(md(r"""
+El error es casi 0 solo sobre el camino que usa el agente (las casillas amarillas del primer mapa, pisadas miles de veces). Fuera de ese camino el valor quedó cerca de 0 y el error cerca de 0,9, aunque algunas de esas casillas se pisaron cientos de veces: pasar de vez en cuando, explorando, no alcanza para que el +1 llegue hasta ahí. De las 10 casillas que no pisó nunca, 9 están arriba a la derecha. Casi todas las flechas rojas están fuera del camino, salvo una que importa mucho: **la de S**, que apunta hacia abajo (el camino de 22 pasos) y no a la derecha (el de 20).
+
+### Paso 2 — Visitas contra error, en 5 semillas
+
+Una figura con todas las casillas de las 5 semillas: en el eje horizontal, cuántas veces la pisó; en el vertical, cuánto se equivoca su valor.
+"""))
+cells.append(code(r"""
+V_todas, E_todas, B_todas = [], [], []
+for c in vis_corridas:
+    V_todas.append(c["visitas"].sum(axis=0)[ng])
+    E_todas.append(np.abs(c["Q"].max(axis=1) - V_estrella)[ng])
+    B_todas.append(opt[np.arange(env.nS), c["Q"].argmax(axis=1)][ng])
+V_todas, E_todas, B_todas = map(np.concatenate, (V_todas, E_todas, B_todas))
+
+fig, ax = plt.subplots(figsize=(10, 4.4))
+ax.scatter(1 + V_todas[B_todas], E_todas[B_todas], s=22, color=COL_Q, alpha=0.6, label="flecha óptima")
+ax.scatter(1 + V_todas[~B_todas], E_todas[~B_todas], s=30, color=COLORES[7], marker="x", label="flecha NO óptima")
+ax.set_xscale("log"); ax.set_xlabel("1 + visitas en 2000 partidas (escala log)"); ax.set_ylabel("|max Q − V*|")
+ax.set_title("El agente solo sabe de donde pasa (5 semillas, 59 casillas cada una)"); ax.legend(frameon=False)
+plt.tight_layout(); plt.show()
+
+print(f"{'visitas':>14s} {'casillas':>9s} {'error medio':>12s} {'flechas óptimas':>16s}")
+for lo, hi in [(0, 10), (10, 100), (100, 1000), (1000, None)]:
+    sel = (V_todas >= lo) & (True if hi is None else V_todas < hi)
+    rango = f"{lo} o más" if hi is None else f"{lo}–{hi - 1}"
+    if np.any(sel):
+        print(f"{rango:>14s} {int(sel.sum()):>9d} {E_todas[sel].mean():>12.4f} {B_todas[sel].mean():>16.0%}")
+print(f"\nmax Q(S) de las 5 semillas: {[round(float(c['Q'][env.start].max()), 4) for c in vis_corridas]}   (V*(S) = {V_estrella[env.start]:.4f})")
+print(f"flechas óptimas de las 5 semillas: {[format(frac_optimas(env, c['Q'], opt), '.0%') for c in vis_corridas]}")
+"""))
+cells.append(md(r"""
+Con menos de 10 visitas, el agente no sabe nada (error cerca de 0,9, la mayoría de las flechas equivocadas); con 1000 o más, el error es chico. En el medio hay de todo: casillas que se pisan cientos de veces, pero solo de paso, y no llegan a asentar su valor. Al agente no le molesta mientras no pase por ahí, pero si una de esas casillas está en el camino más corto, nunca se va a enterar de que por ahí se llegaba antes. Tirar una moneda con $\varepsilon = 0{,}1$ no alcanza para llegar a todos lados: **cómo explorar mejor** es el tema de la clase 7.
+"""))
+
+# ======================================================================= Ejercicio
+cells.append(md(r"""
+## ✍️ Ejercicio — Cambien $\varepsilon$ y $\alpha$
+
+Cambien `eps_ej` y `alfa_ej` y ejecuten. La celda corre SARSA y Q-learning desde S, 2000 partidas, 3 semillas, y muestra el valor de S de cada uno contra $V^*(S)$, las flechas óptimas y el mapa de visitas de Q-learning.
+
+Antes de ejecutar, **predigan**: con $\varepsilon = 0{,}5$, ¿cuál de los dos queda más cerca de $V^*(S) = 0{,}8262$? ¿Y con $\varepsilon = 0{,}02$, qué pasa con las casillas sin visitar? Con $\alpha = 0{,}9$, ¿tiembla más el valor de SARSA o el de Q-learning?
+""", objetivos=["O3", "O4"]))
+cells.append(code(r"""
+eps_ej = 0.5     # TODO: probá 0.02, 0.1, 0.5
+alfa_ej = 0.2    # TODO: probá 0.05, 0.9
+
+ej = {m: [aprender(env, m, eps_ej, alfa_ej, 2000, sem) for sem in range(3)] for m in ["sarsa", "q"]}
+fig, axs = plt.subplots(1, 2, figsize=(15, 4.2))
+for m in ej:
+    for i, c in enumerate(ej[m]):
+        axs[0].plot(c["VS"], color=COLOR[m], lw=0.8, alpha=0.7, label=NOMBRE[m] if i == 0 else None)
+axs[0].axhline(V_estrella[env.start], color="k", ls="--", lw=1, label="V*(S)")
+axs[0].set_xlabel("partida"); axs[0].set_ylabel("max Q(S, ·)"); axs[0].legend(frameon=False)
+axs[0].set_title(f"ε = {eps_ej}, α = {alfa_ej}: 3 semillas")
+plot_cave(env, values=np.log10(1 + ej["q"][0]["visitas"].sum(axis=0)), ax=axs[1], cmap="viridis",
+          title="Visitas de Q-learning, semilla 0 (log10)")
+plt.tight_layout(); plt.show()
+for m in ej:
+    vs_ = [round(float(c["VS"][-1]), 4) for c in ej[m]]
+    fr_ = [format(frac_optimas(env, c["Q"], opt), ".0%") for c in ej[m]]
+    nunca_ = [int(np.sum(c["visitas"].sum(0)[ng] == 0)) for c in ej[m]]
+    print(f"{NOMBRE[m]:10s} max Q(S) final = {vs_}   flechas óptimas = {fr_}   casillas nunca pisadas = {nunca_}")
+print(f"V*(S) = {V_estrella[env.start]:.4f}")
+"""))
+cells.append(md(r"""
+**Lo que encontramos** (¿quién queda más cerca de $V^*(S)$? ¿cómo cambian las visitas y las flechas con $\varepsilon$? ¿qué hace $\alpha$?):
+
+-
+"""))
+
+# ======================================================================= Cierre
+cells.append(md(r"""
 ## Preguntas para pensar
 
-1. En el Paso 1 la red one-hot era idéntica a la tabla. ¿Qué cambiarías en la entrada para que dos casillas vecinas
-   "se ayuden"? ¿Por qué eso puede ser malo si hay una pared entre ellas?
-2. La memoria de repetición reusa experiencias viejas, generadas por una política anterior. ¿Por qué Q-learning puede
-   aprender de eso (es *off-policy*) y SARSA no tanto?
-3. Si el agente de la cueva recibiera la imagen del mapa entero, ¿qué arquitectura usarías? ¿Y si recibiera una
-   descripción en texto ("pasillo hacia la derecha, pared arriba")?
+1. En la sección 2, con $\varepsilon = 0$ el agente casi nunca encontró la salida. ¿Qué cambiaría si el $Q$ inicial fuera 1 en todas las flechas en vez de 0? (Pista: ¿qué pasa con el valor de una flecha cada vez que la prueba y no encuentra nada?)
+2. Imaginen un tutor que, para aprender qué ejercicio conviene, a veces le da a un alumno uno al azar. ¿Qué valor les parece más honesto para decidir: el de SARSA o el de Q-learning? ¿Quién paga los desvíos de la exploración?
+3. En la sección 6, las casillas poco visitadas quedaron con valores y flechas equivocados. ¿En qué situación eso sería grave aunque el agente casi nunca pase por ahí?
 
 ## Próxima clase
 
-Clase 7: **redes recurrentes**. Hasta acá la red recibía la casilla, pero el jugador a ciegas no la ve: solo siente
-los choques. Cuando la observación no alcanza para saber dónde estás, la red necesita memoria.
-""")
+El agente solo aprende de donde pasa, y tirar una moneda con probabilidad $\varepsilon$ es una manera bastante torpe de decidir adónde ir. En la clase 7, **explorar**: de los *bandits* (como elegir qué aviso mostrar en una página) a la cueva, con maneras de probar que apuntan adonde todavía no se sabe.
+"""))
 
-nb = nbf.v4.new_notebook()
-nb.cells = cells
-nb.metadata["kernelspec"] = {"name": "python3", "display_name": "Python 3", "language": "python"}
-nb.metadata["language_info"] = {"name": "python"}
-nb.metadata["colab"] = {"provenance": [], "toc_visible": True}
-nbf.write(nb, OUT)
-print("escrito", OUT)
+save(cells, "06-controlar-sin-mapa.ipynb")
