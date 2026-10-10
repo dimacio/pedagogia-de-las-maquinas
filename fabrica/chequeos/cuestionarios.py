@@ -100,7 +100,7 @@ def correr(ctx: Contexto) -> Resultado:
             rub = a.get("rubrica")
             if not isinstance(rub, list) or len(rub) != 3 or not all(txt(x) for x in rub):
                 r.falla(f"{k} actividad.rubrica: tiene que tener 3 criterios de texto")
-    res = f"{len(orden)} clases, {preguntas_total} preguntas"
+    res = f"{len(clases_activas())} clases activas ({len(en_preparacion())} en preparación), {preguntas_total} preguntas"
     if sin_obj_total:
         res += f"; faltan marcas de objetivo en {sin_obj_total} preguntas"
     return r.cerrar(res + f"; {len(r.errores)} problemas")

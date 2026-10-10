@@ -109,6 +109,10 @@ pre.code code { color: var(--ink); }
 .pager a span { font-family: var(--mono); font-size: 12px; color: var(--muted); }
 .pager a b { font-family: var(--body); color: var(--ink); }
 .pager a.next { text-align: right; margin-left: auto; }
+.pager .pronto { display: grid; gap: 2px; max-width: 48%; opacity: .6; }
+.pager .pronto span { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.pager .pronto b { font-family: var(--body); color: var(--muted); font-weight: 400; }
+.pager .pronto.next { text-align: right; margin-left: auto; }
 footer.site { color: var(--muted); font-size: 13px; padding-top: 18px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
