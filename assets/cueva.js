@@ -211,7 +211,7 @@
     { id: "7", archivo: "07-explorar.html", titulo: "Explorar: de los bandits a la cueva", nb: "07-explorar.ipynb", bloque: "Clase 7", unidad: 2 },
     { id: "8", archivo: "08-de-la-tabla-a-la-red.html", titulo: "De la tabla a la red: aproximación y DQN", nb: "08-de-la-tabla-a-la-red.ipynb", bloque: "Clase 8", unidad: 2, pronto: true },
     { id: "9", archivo: "09-redes-recurrentes.html", titulo: "Redes recurrentes: cuando el estado no alcanza", nb: "09-redes-recurrentes.ipynb", bloque: "Clase 9", unidad: 3 },
-    { id: "10", archivo: "10-aprender-de-registros.html", titulo: "Aprender de registros: imitar y RL offline", nb: "10-aprender-de-registros.ipynb", bloque: "Clase 10", unidad: 3, pronto: true },
+    { id: "10", archivo: "10-aprender-de-registros.html", titulo: "Aprender de registros: imitar y RL offline", nb: "10-aprender-de-registros.ipynb", bloque: "Clase 10", unidad: 3 },
     { id: "11", archivo: "11-policy-gradient.html", titulo: "Policy gradient y actor-crítico: reforzar lo que salió bien", nb: "11-policy-gradient.ipynb", bloque: "Clase 11", unidad: 3, pronto: true },
     { id: "12", archivo: "12-aprender-la-recompensa.html", titulo: "Aprender la recompensa: preferencias, RLHF y DPO", nb: "12-aprender-la-recompensa.ipynb", bloque: "Clase 12", unidad: 3, pronto: true },
     { id: "13", archivo: "13-el-lenguaje-como-politica.html", titulo: "El modelo de lenguaje como política: token, temperatura, GRPO", nb: "13-el-lenguaje-como-politica.ipynb", bloque: "Clase 13", unidad: 4, pronto: true },

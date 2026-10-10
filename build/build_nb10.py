@@ -1,828 +1,1012 @@
-"""Arma notebooks/10-agentes-de-lenguaje.ipynb (Clase 10 — Agentes II: agentes de lenguaje).
+"""Arma notebooks/10-aprender-de-registros.ipynb (Clase 10 — Aprender de registros: imitar y RL offline). Spine: specs/10.md.
 
-Ejecutar después con build/run_nb10.py (ejecuta el notebook en el lugar y exporta los datos pregrabados
-de la página a build/datos_10.json), o con nbconvert --execute --inplace.
+Partidas grabadas (experto con slip y jugadores que juegan casi al azar) -> clonación de comportamiento (tabla de conteos)
+-> errores compuestos con slip -> DAgger -> Q-learning offline sobre un conjunto fijo -> cambio de distribución
+(valores de acciones que no aparecen en los registros) -> experto contra mezclado: imitar, filtrar, RL offline (stitching).
+NumPy, sin modelos de lenguaje. Convenciones de las clases 3 a 6 (+1 al entrar a la salida, salida absorbente, γ = 0,99).
+(El builder viejo de la clase 10, «agentes de lenguaje», está archivado en build/v1/builders/build_nb10.py y vuelve en la clase 13.)
 """
 from _nbutil import md, code, writefile_cell, save
 
 cells = []
 
 cells.append(md(r"""
-# Clase 10 — Agentes II: agentes de lenguaje
+# Clase 10 — Aprender de registros: imitar y RL offline
 
-**RL a ciegas** · MOOC libre de aprendizaje por refuerzo · vía profunda
+**RL a ciegas** · curso de aprendizaje por refuerzo (*reinforcement learning*, RL) · vía profunda
 
-> Un modelo de lenguaje es una **política**: el estado es el texto hasta ahora, la acción es el próximo token, el episodio es la respuesta y la recompensa llega al final.
+Basado en Pomerleau (1988, ALVINN), Ross, Gordon y Bagnell (2011, DAgger), Levine, Kumar, Tucker y Fu (2020, tutorial de RL offline), y en Stanford CS224R, clases 2 (imitación) y 7 (RL offline), y CS234 (Brunskill), clase 7.
 
-1. **El modelo de lenguaje como política**: probabilidades del próximo token; muestrear con temperatura es explorar.
-2. **¿De dónde sale la recompensa?** RLHF (personas que comparan) y recompensas verificables (DeepSeek-R1). GRPO con un modelo real: un grupo de respuestas, un verificador y las ventajas.
-3. **Herramientas y bucle de agente**: el modelo pide buscar o calcular; el arnés valida, ejecuta, reintenta y corta.
-4. **Memoria y contexto**: el modelo no recuerda nada entre llamadas; el arnés decide qué entra en la ventana.
-5. **Riesgos**: verificadores que se pueden engañar, evaluadores que no evalúan, y por qué el humano en el bucle.
+**La pregunta de hoy:** si tenés las partidas grabadas de alguien que sabe salir de la cueva, ¿alcanza con copiarlo? ¿Y si las partidas son de gente que a veces sabe y a veces no?
 
-> **Tiempo y recursos.** Usamos un modelo real y chico, `Qwen/Qwen2.5-0.5B-Instruct` (500 millones de parámetros, abierto: no pide token ni licencia). Descarga ≈ 1 GB. En CPU el notebook tarda entre 3 y 8 minutos; con GPU, uno o dos. **No vamos a entrenar el modelo**: muestreamos, puntuamos y calculamos todo lo que GRPO necesita, y como mucho damos un paso diminuto. Un modelo tan chico se equivoca seguido: eso es parte de la lección.
+Hasta ahora el agente aprendía **jugando**: probaba, se equivocaba y volvía a probar. Hoy no juega: recibe un montón de **partidas grabadas** y tiene que arreglarse con eso. Vamos a ver:
+
+1. **Partidas grabadas**: las de un experto y las de jugadores que juegan casi al azar.
+2. **Clonación de comportamiento**: copiar la acción del experto en cada casilla.
+3. **Errores compuestos**: con el piso resbaloso, la copia llega adonde el experto nunca fue.
+4. **DAgger**: preguntarle al experto justo ahí.
+5. **Q-learning offline**: el Q-learning de la clase 6 sobre un conjunto fijo, sin jugar.
+6. **El cambio de distribución**: cuánto valen las acciones que nunca aparecen en los registros.
+7. **Experto contra mezclado**: imitar, imitar filtrando las mejores partidas, o RL offline.
+
+Y un ejercicio: cambiar cuántas partidas hay y qué tan buenas son.
+
+> Cómo usar este notebook: ejecutar las celdas en orden (Colab: *Entorno de ejecución → Ejecutar todas*). Tarda menos de un minuto.
 """))
 
 cells.append(md(r"""
 ## Preparación
 
-La primera celda escribe `cave_env.py` (la cueva del curso), que usamos para la mini cueva del Paso 5.
+La primera celda escribe el archivo `cave_env.py` con **la cueva** de todo el curso. Así el notebook funciona solo, también en Colab. No hace falta leerla.
 """))
 cells.append(writefile_cell())
-cells.append(md(r"""
-¿Hay GPU? En Colab: **Entorno de ejecución → Cambiar tipo de entorno de ejecución → GPU T4**. Sin GPU corre igual, más lento.
-"""))
-cells.append(code(r"""
-import importlib, subprocess, sys
-for paquete in ["transformers", "accelerate"]:          # en Colab ya vienen; por las dudas
-    if importlib.util.find_spec(paquete) is None:
-        subprocess.run([sys.executable, "-m", "pip", "install", "-q", paquete], check=True)
 
-import torch
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-print("✓ GPU:", torch.cuda.get_device_name(0)) if DEVICE == "cuda" else print("⚠ Sin GPU: corre en CPU (3–8 min).")
+cells.append(md(r"""
+Importamos la cueva y las bibliotecas de siempre, y fijamos una semilla. Las convenciones son las de las clases 3 a 6: **+1 al entrar a la salida**, la salida es absorbente y vale 0, el primer paso no se descuenta y $\gamma = 0{,}99$. Las partidas duran como mucho 200 pasos, como en el juego.
+
+La cueva de hoy tiene el **piso un poco resbaloso** de la clase 4: con probabilidad `SLIP = 0.1` el jugador se resbala hacia un costado (mitad a cada lado). Así, aunque el experto juegue siempre igual, sus partidas no son todas iguales.
 """))
 cells.append(code(r"""
-import os, re, json, time, ast, operator, textwrap, warnings
 import numpy as np
 import matplotlib.pyplot as plt
 from cave_env import CaveEnv, ACTION_NAMES
 
-MODELO = "Qwen/Qwen2.5-0.5B-Instruct"
 SEMILLA = 0
-np.random.seed(SEMILLA); torch.manual_seed(SEMILLA)
-T0 = time.time()
+np.random.seed(SEMILLA)
+GAMMA = 0.99
+SLIP = 0.1
+env = CaveEnv(slip=SLIP, max_steps=200)
+SEMILLAS = range(10)          # para los promedios: 10 conjuntos de partidas distintos
 """))
+
 cells.append(md(r"""
-**Herramientas** (celda plegada): cargar el modelo, muestrear, verificar, la biblioteca, el bucle de agente y las funciones de dibujo. No hace falta leerla, solo ejecutarla.
+La celda siguiente define las **herramientas**. Está plegada: no hace falta leerla, solo ejecutarla.
+
+Una aclaración importante: las funciones que **graban** partidas (`grabar`, `jugar_politica`) solo usan `env.reset` y `env.step`, como un jugador. Las que **aprenden** (`copia_mas_frecuente`, `dagger`, `q_offline`) solo miran los registros. El mapa (`env.P`, `env.R`) lo usan dos funciones: `iteracion_de_valor`, que nos da el **experto** (la política óptima de la clase 4), y `medir`, que calcula de forma exacta, sin sortear partidas, la probabilidad de salir en 200 pasos y el retorno esperado de una política. Así las comparaciones no dependen de la suerte de unas pocas partidas de prueba.
 """))
 cells.append(code(r'''
 # @title Herramientas (no hace falta leer esto)
 # Herramientas: no hace falta leer esto
-from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from transformers.utils import logging as hf_logging
-hf_logging.set_verbosity_error(); hf_logging.disable_progress_bar()
-warnings.filterwarnings("ignore")
-os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+import matplotlib.patheffects as pe
 
 COLORES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
-VERDE, ROJO, GRIS = "#1baf7a", "#e34948", "#9a9a9a"
 plt.rcParams.update({
     "figure.dpi": 100, "axes.spines.top": False, "axes.spines.right": False,
-    "axes.grid": True, "grid.color": "#e6e6e6", "grid.linewidth": 0.8, "axes.axisbelow": True,
-    "axes.edgecolor": "#888888", "axes.titlesize": 12, "font.size": 10.5, "lines.linewidth": 2,
+    "axes.grid": True, "grid.color": "#e6e6e6", "grid.linewidth": 0.8,
+    "axes.edgecolor": "#888888", "axes.titlesize": 12, "font.size": 10.5,
+    "lines.linewidth": 2, "axes.axisbelow": True,
 })
+COL_EXP, COL_COPIA, COL_DADO, COL_MIX, COL_OFF, COL_FILT = COLORES[0], COLORES[1], COLORES[3], COLORES[4], COLORES[2], COLORES[6]
 
 
-def corto(txt, n=90):
-    txt = " ".join(str(txt).split())
-    return txt if len(txt) <= n else txt[: n - 1] + "…"
+# ---------- la respuesta correcta (esto SÍ usa el mapa) ----------
+def iteracion_de_valor(env, gamma=GAMMA, tol=1e-12):
+    """Clase 4: V(s) <- max_a [R(s,a) + γ Σ P(s'|s,a) V(s')]. Devuelve V* y Q*."""
+    V = np.zeros(env.nS)
+    while True:
+        V_nuevo = (env.R + gamma * env.P @ V).max(axis=1)
+        if np.max(np.abs(V_nuevo - V)) < tol:
+            return V_nuevo, env.R + gamma * env.P @ V_nuevo
+        V = V_nuevo
 
 
-# ================= modelo =================
-def cargar_modelo(nombre):
-    t = time.time()
-    dtype = torch.float16 if DEVICE == "cuda" else torch.float32
-    tok = AutoTokenizer.from_pretrained(nombre)
-    mod = AutoModelForCausalLM.from_pretrained(nombre, dtype=dtype).to(DEVICE).eval()
-    print(f"✓ {nombre}: {sum(p.numel() for p in mod.parameters()) / 1e6:.0f} millones de parámetros (cargado en {time.time() - t:.0f} s)")
-    return tok, mod
+def como_tabla(pol):
+    """Una flecha por casilla -> tabla pi[s, a] de ceros y unos."""
+    pol = np.asarray(pol)
+    return np.eye(4)[pol] if pol.ndim == 1 else pol
 
 
-def texto_chat(mensajes, prefijo="", tools=None):
-    """El estado completo que ve el modelo: la conversación con la plantilla de chat + lo que ya escribió."""
-    return tok.apply_chat_template(mensajes, tools=tools, tokenize=False, add_generation_prompt=True) + prefijo
+def medir(env, pi, cubiertas=None, T=200, gamma=GAMMA):
+    """Mide una política con el mapa, de forma exacta (sin sortear partidas): sigue la distribución de dónde está
+    el jugador paso a paso durante T pasos. Devuelve un diccionario con
+      exito    = probabilidad de llegar a la salida en T pasos,
+      retorno  = retorno esperado desde S (+1 al entrar, descontado; es V^π(S)),
+      fuera    = pasos esperados en casillas sin ejemplos (si se pasa 'cubiertas'),
+      pisa     = probabilidad de pisar alguna casilla sin ejemplos,
+      masa     = probabilidad de estar en una casilla sin ejemplos en cada paso t."""
+    pi = como_tabla(pi)
+    Ppi = np.einsum("sa,sat->st", pi, env.P)
+    d = np.zeros(env.nS); d[env.start] = 1.0
+    nuevas = np.zeros(env.nS); nuevas[env.start] = 1.0       # para 'pisa': cadena que se detiene al pisar lo no cubierto
+    fuera_m = None
+    if cubiertas is not None:
+        fuera_m = ~np.asarray(cubiertas, bool); fuera_m[env.goal] = False
+    ret, antes, fuera, pisa, masa = 0.0, 0.0, 0.0, 0.0, []
+    for t in range(1, T + 1):
+        d = d @ Ppi
+        llega = d[env.goal] - antes; antes = d[env.goal]
+        ret += gamma ** (t - 1) * llega
+        if fuera_m is not None:
+            masa.append(d[fuera_m].sum()); fuera += d[fuera_m].sum()
+            nuevas = nuevas @ Ppi
+            pisa += nuevas[fuera_m].sum(); nuevas[fuera_m] = 0.0
+    return {"exito": float(d[env.goal]), "retorno": float(ret), "fuera": float(fuera), "pisa": float(pisa),
+            "masa": np.array(masa)}
 
 
-def usuario(txt, sistema=None):
-    return ([{"role": "system", "content": sistema}] if sistema else []) + [{"role": "user", "content": txt}]
-
-
-def n_tokens(texto):
-    return len(tok(texto, add_special_tokens=False).input_ids)
-
-
-@torch.no_grad()
-def logits_proximo(texto):
-    ids = tok(texto, return_tensors="pt").to(DEVICE)
-    return modelo(**ids).logits[0, -1].float().cpu()
-
-
-def mostrar_token(t):
-    return t.replace(" ", "·").replace("\n", "⏎")
-
-
-def distribucion(texto, k=12, temps=np.round(np.arange(0.1, 2.0001, 0.05), 2)):
-    """Los k tokens más probables (con sus logits) y la masa del resto, para cada temperatura."""
-    lg = logits_proximo(texto)
-    v, i = lg.topk(k)
-    resto = []
-    mask = torch.ones_like(lg, dtype=torch.bool); mask[i] = False
-    for T in temps:
-        z = lg / T
-        resto.append(float(torch.logsumexp(z[mask], 0)))
-    return {"tokens": [tok.decode([j]) for j in i.tolist()], "logits": [round(float(x), 4) for x in v],
-            "temps": [float(t) for t in temps], "resto_lse": [round(r, 4) for r in resto]}
-
-
-def probs_T(d, T):
-    """Probabilidades de los k tokens y del resto a temperatura T (a partir de lo que guardó distribucion)."""
-    j = int(np.argmin(np.abs(np.array(d["temps"]) - T)))
-    z = np.array(d["logits"]) / d["temps"][j]
-    lse = np.logaddexp(np.logaddexp.reduce(z), d["resto_lse"][j])
-    return np.exp(z - lse), float(np.exp(d["resto_lse"][j] - lse))
-
-
-def dibujar_distribuciones(estados, temps=(0.3, 1.0, 1.8)):
-    fig, axs = plt.subplots(len(estados), len(temps), figsize=(4.1 * len(temps), 2.9 * len(estados)), squeeze=False)
-    for f, e in enumerate(estados):
-        for c, T in enumerate(temps):
-            p, resto = probs_T(e["dist"], T)
-            ax = axs[f, c]
-            etiquetas = [mostrar_token(t) for t in e["dist"]["tokens"]] + ["(resto)"]
-            ax.barh(range(len(etiquetas))[::-1], list(p) + [resto], color=[COLORES[0]] * len(p) + [GRIS])
-            ax.set_yticks(range(len(etiquetas))[::-1]); ax.set_yticklabels(etiquetas, fontsize=8.5)
-            ax.set_xlim(0, 1); ax.grid(axis="y", visible=False)
-            H = -(np.sum(p * np.log(p + 1e-12)) + resto * np.log(resto + 1e-12))
-            ax.set_title(f"T = {T}   (entropía ≥ {H:.2f})" if f == 0 else f"T = {T}", fontsize=10)
-            if c == 0:
-                ax.set_ylabel(corto(e["nombre"], 30), fontsize=10)
-    fig.suptitle("Política π(próximo token | texto hasta ahora) a tres temperaturas", y=1.0)
-    plt.tight_layout(); plt.show()
-
-
-@torch.no_grad()
-def episodio_paso_a_paso(texto, pasos=10):
-    """Greedy, token por token: (estado = cuántos tokens hay, acción = token elegido, su probabilidad)."""
-    filas = []
-    for _ in range(pasos):
-        p = logits_proximo(texto).softmax(-1)
-        j = int(p.argmax())
-        if j == tok.eos_token_id or tok.decode([j]) == "<|im_end|>":
-            filas.append((n_tokens(texto), "<fin>", float(p[j]))); break
-        filas.append((n_tokens(texto), tok.decode([j]), float(p[j])))
-        texto += tok.decode([j])
-    return filas
-
-
-@torch.no_grad()
-def muestrear(texto, n=8, T=1.0, max_nuevos=16, semilla=0):
-    """n respuestas muestreadas a temperatura T (sin top-k ni top-p: la política tal cual)."""
-    ids = tok([texto], return_tensors="pt").to(DEVICE)
-    torch.manual_seed(semilla)
-    if T <= 0:
-        out = modelo.generate(**ids, do_sample=False, max_new_tokens=max_nuevos, pad_token_id=tok.eos_token_id,
-                              temperature=None, top_p=None, top_k=None)
-    else:
-        out = modelo.generate(**ids, do_sample=True, temperature=float(T), top_k=0, top_p=1.0,
-                              max_new_tokens=max_nuevos, num_return_sequences=n, pad_token_id=tok.eos_token_id)
-    L = ids.input_ids.shape[1]
-    return [tok.decode(o[L:], skip_special_tokens=True).strip() for o in out], [o[L:].cpu() for o in out]
-
-
-# ================= recompensas verificables =================
-def ultimo_numero(txt):
-    nums = re.findall(r"-?\d+(?:[.,]\d+)?", txt)
-    return float(nums[-1].replace(",", ".")) if nums else None
-
-
-def verificador_estricto(resp, correcta):
-    """1 si el ÚLTIMO número de la respuesta es el correcto."""
-    x = ultimo_numero(resp)
-    return float(x is not None and abs(x - correcta) < 1e-9)
-
-
-def verificador_laxo(resp, correcta):
-    """1 si el número correcto aparece en ALGÚN lado (se puede engañar)."""
-    nums = [float(n.replace(",", ".")) for n in re.findall(r"-?\d+(?:[.,]\d+)?", resp)]
-    return float(any(abs(x - correcta) < 1e-9 for x in nums))
-
-
-def ventajas_grpo(r):
-    """GRPO: ventaja = (r − media del grupo) / desvío del grupo. Si todas son iguales, ventaja 0."""
-    r = np.asarray(r, float)
-    return (r - r.mean()) / (r.std() + 1e-6)
-
-
-def dibujar_grupos(grupos):
-    fig, axs = plt.subplots(1, len(grupos), figsize=(3.0 * len(grupos), 3.4), sharey=True)
-    for ax, g in zip(np.atleast_1d(axs), grupos):
-        A = g["ventajas"]
-        ax.bar(range(len(A)), A, color=[VERDE if r else ROJO for r in g["recompensas"]])
-        ax.axhline(0, color="#555", lw=1)
-        ax.set_xticks(range(len(A))); ax.set_xticklabels([corto(x, 6) for x in g["respuestas"]], rotation=70, fontsize=8)
-        ax.set_title(f"{g['pregunta'].replace('¿Cuánto es ', '').rstrip('?')}   (media {np.mean(g['recompensas']):.2f})", fontsize=10)
-        ax.grid(axis="x", visible=False)
-    np.atleast_1d(axs)[0].set_ylabel("ventaja GRPO")
-    fig.suptitle("Ocho respuestas por pregunta: verde = el verificador dio 1, rojo = 0", y=1.02)
-    plt.tight_layout(); plt.show()
-
-
-# ================= la mini cueva en texto =================
-MINI_CUEVA = ["#####",
-              "#S..#",
-              "#.#.#",
-              "#..G#",
-              "#####"]
-PALABRAS = {"arriba": 0, "derecha": 1, "abajo": 2, "izquierda": 3}
-
-
-def leer_movimientos(txt):
-    return [PALABRAS[m] for m in re.findall(r"arriba|derecha|abajo|izquierda", txt.lower())]
-
-
-def jugar_movimientos(env, movs, max_pasos=12):
-    s = env.reset(); camino = [s]
-    for a in movs[:max_pasos]:
-        s, r, fin, info = env.step(a); camino.append(s)
-        if fin:
-            return 1.0, camino
-    return 0.0, camino
-
-
-# ================= un paso diminuto =================
-def logp_respuestas(ids_prompt, respuestas_ids):
-    """log π(respuesta | pregunta): suma de los log-probabilidades de sus tokens."""
-    out = []
-    for rid in respuestas_ids:
-        fin = (rid == tok.eos_token_id).nonzero()
-        rid = rid[: int(fin[0]) + 1] if len(fin) else rid          # hasta el primer fin de respuesta (después es relleno)
-        x = torch.cat([ids_prompt, rid.to(DEVICE)])[None]
-        lg = modelo(x).logits[0, len(ids_prompt) - 1:-1].float().log_softmax(-1)
-        out.append(lg.gather(1, rid.to(DEVICE)[:, None]).sum())
-    return torch.stack(out)
-
-
-# ================= biblioteca y herramientas =================
-BIBLIOTECA = {
-    "go-explore": "Go-Explore (Ecoffet y colegas) se publicó en la revista Nature en 2021. Su idea: primero volver a una celda prometedora del archivo y después explorar desde ahí.",
-    "grpo": "GRPO (Group Relative Policy Optimization) se presentó en el artículo DeepSeekMath de 2024. Por cada pregunta muestrea un grupo de respuestas (64 en el artículo) y usa como ventaja la recompensa de cada una menos la media del grupo, dividida por el desvío.",
-    "rlhf": "RLHF tiene tres pasos (Ouyang y colegas, 2022): ajuste supervisado con demostraciones, un modelo de recompensa entrenado con comparaciones humanas y optimización con PPO. Con este método, InstructGPT de 1300 millones de parámetros fue preferido a GPT-3 de 175 mil millones.",
-    "cueva": "La cueva chica del curso tiene 10 filas y 14 columnas, contando el borde de roca. La salida es la casilla verde. Una pared se marca en gris claro solo cuando el agente la toca.",
-    "q-learning": "Q-learning aprende sin mapa: después de cada paso corrige Q(s, a) hacia r + γ max Q(s', a'). Es la clase 4 del curso.",
-    "r1": "DeepSeek-R1-Zero se entrenó solo con RL sobre un modelo base, sin ajuste supervisado previo, con recompensas verificables de exactitud y de formato. DeepSeek-R1 agrega un poco de ajuste supervisado al principio para que las respuestas sean legibles.",
-}
-
-
-def buscar(consulta):
-    """Búsqueda mínima por palabras en común (las 5 primeras letras de cada palabra)."""
-    pal = lambda x: {w[:5] for w in re.findall(r"\w+", x.lower()) if len(w) >= 3}
-    q = pal(consulta)
-    mejor = max(BIBLIOTECA, key=lambda k: len(q & pal(k + " " + BIBLIOTECA[k])))
-    if not q & pal(mejor + " " + BIBLIOTECA[mejor]):
-        return "Sin resultados."
-    return f"[{mejor}] {BIBLIOTECA[mejor]}"
-
-
-_OPS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv,
-        ast.USub: operator.neg}
-
-
-def calcular(expresion):
-    """Calculadora segura: solo números y + − × /."""
-    e = expresion.replace(",", ".").replace("×", "*").replace("−", "-")
-
-    def ev(n):
-        if isinstance(n, ast.Constant) and isinstance(n.value, (int, float)):
-            return n.value
-        if isinstance(n, ast.BinOp) and type(n.op) in _OPS:
-            return _OPS[type(n.op)](ev(n.left), ev(n.right))
-        if isinstance(n, ast.UnaryOp) and type(n.op) in _OPS:
-            return _OPS[type(n.op)](ev(n.operand))
-        raise ValueError(f"'{ast.unparse(n)}' no es un número: calcular solo acepta números y + − × /")
-    v = ev(ast.parse(e, mode="eval").body)
-    return f"{v:g}"
-
-
-HERRAMIENTAS = {"buscar": (buscar, "consulta"), "calcular": (calcular, "expresion")}
-TOOLS = [
-    {"type": "function", "function": {"name": "buscar", "description": "Busca en la biblioteca del curso RL a ciegas y devuelve el documento más parecido.",
-                                      "parameters": {"type": "object", "properties": {"consulta": {"type": "string", "description": "palabras clave"}}, "required": ["consulta"]}}},
-    {"type": "function", "function": {"name": "calcular", "description": "Calcula una expresión aritmética con números, por ejemplo 37 * 0.05",
-                                      "parameters": {"type": "object", "properties": {"expresion": {"type": "string"}}, "required": ["expresion"]}}},
-]
-SISTEMA_AGENTE = ("Sos el agente del curso RL a ciegas. No sabés datos del curso de memoria: para cualquier dato del curso "
-                  "llamá a buscar. Para cualquier cuenta llamá a calcular. Cuando tengas lo necesario, respondé en una oración.")
-
-
-def leer_llamadas(txt):
-    """Valida cada <tool_call>: JSON legible, herramienta existente, argumento presente."""
-    out = []
-    for b in re.findall(r"<tool_call>\s*(.*?)\s*(?:</tool_call>|$)", txt, re.S):
-        try:
-            d = json.loads(b)
-        except Exception:
-            out.append((None, "el JSON de la llamada no se pudo leer")); continue
-        if d.get("name") not in HERRAMIENTAS:
-            out.append((None, f"la herramienta {d.get('name')!r} no existe (hay buscar y calcular)")); continue
-        arg = HERRAMIENTAS[d["name"]][1]; a = d.get("arguments", {})
-        if not isinstance(a, dict) or arg not in a:
-            out.append((None, f"falta el argumento {arg!r}")); continue
-        out.append(((d["name"], str(a[arg])), None))
-    return out
-
-
-def _segmentos(mensajes):
-    """Cuántos tokens ocupa cada mensaje dentro de la ventana (con la plantilla de chat)."""
-    segs, prev = [], 0
-    for k in range(1, len(mensajes) + 1):
-        n = n_tokens(tok.apply_chat_template(mensajes[:k], tools=TOOLS, tokenize=False))
-        m = mensajes[k - 1]
-        tipo = {"system": "sistema + herramientas", "user": "pregunta" if k == 2 else "arnés",
-                "assistant": "modelo", "tool": "herramienta"}[m["role"]]
-        segs.append((tipo, n - prev)); prev = n
-    return segs
-
-
-def agente(pregunta, max_pasos=4, max_nuevos=70, verbose=True):
-    """Bucle de agente: el modelo propone; el arnés valida, ejecuta herramientas, reintenta y corta."""
-    msgs = [{"role": "system", "content": SISTEMA_AGENTE}, {"role": "user", "content": pregunta}]
-    traza = [{"tipo": "pregunta", "texto": pregunta}]
-    usadas = 0
-    for paso in range(1, max_pasos + 1):
-        estado = texto_chat(msgs, tools=TOOLS)
-        ids = tok([estado], return_tensors="pt").to(DEVICE)
-        with torch.no_grad():
-            out = modelo.generate(**ids, do_sample=False, max_new_tokens=max_nuevos, pad_token_id=tok.eos_token_id,
-                                  temperature=None, top_p=None, top_k=None)
-        txt = tok.decode(out[0][ids.input_ids.shape[1]:], skip_special_tokens=True).strip()
-        traza.append({"tipo": "modelo", "paso": paso, "texto": txt, "contexto": ids.input_ids.shape[1], "segmentos": _segmentos(msgs)})
-        llamadas = leer_llamadas(txt)
-        if llamadas:
-            tcs, resultados = [], []
-            for llamada, err in llamadas:
-                if err:
-                    resultados.append(("arnés", f"Llamada inválida: {err}."))
-                    traza.append({"tipo": "arnés", "texto": f"llamada rechazada: {err}"}); continue
-                nombre, arg = llamada
-                try:
-                    res = HERRAMIENTAS[nombre][0](arg)
-                except Exception as e:
-                    res = f"Error: {e}"
-                tcs.append({"type": "function", "function": {"name": nombre, "arguments": {HERRAMIENTAS[nombre][1]: arg}}})
-                resultados.append((nombre, res))
-                traza.append({"tipo": "herramienta", "nombre": nombre, "arg": arg, "texto": res})
-            msgs.append({"role": "assistant", "content": "", "tool_calls": tcs})
-            for nombre, res in resultados:
-                msgs.append({"role": "tool", "name": nombre, "content": res})
-            usadas += 1
-        elif usadas == 0:
-            aviso = "Respondiste sin usar herramientas. Si la pregunta necesita un dato del curso, llamá a buscar; si necesita una cuenta, a calcular."
-            msgs += [{"role": "assistant", "content": txt}, {"role": "user", "content": "Aviso del arnés: " + aviso}]
-            traza.append({"tipo": "arnés", "texto": "reintento: respondió sin usar herramientas"})
-        else:
-            traza.append({"tipo": "fin", "texto": txt})
+# ---------- grabar partidas: solo env.reset y env.step ----------
+def jugar(env, elegir, rng, max_pasos=200):
+    """Una partida desde S. elegir(s, rng) devuelve la acción. Devuelve la lista de pasos (s, a, r, s', llegó)."""
+    s = env.reset(); pasos = []
+    for _ in range(max_pasos):
+        a = elegir(s, rng)
+        s2, r, fin, info = env.step(a)
+        pasos.append((s, a, r, s2, info["reached_goal"]))
+        s = s2
+        if info["reached_goal"]:
             break
-    else:
-        traza.append({"tipo": "corte", "texto": f"límite de {max_pasos} pasos: el arnés corta sin respuesta"})
-    if verbose:
-        imprimir_traza(traza)
-    return traza
+    return pasos
 
 
-def imprimir_traza(traza):
-    for e in traza:
-        t = e["tipo"]
-        if t == "pregunta":
-            print(f"PREGUNTA  {e['texto']}")
-        elif t == "modelo":
-            print(f"\n[paso {e['paso']} · {e['contexto']} tokens en la ventana]")
-            print("  MODELO     " + textwrap.fill(" ".join(e["texto"].split()), 100, subsequent_indent=" " * 13))
-        elif t == "herramienta":
-            print(f"  {e['nombre'].upper():<10} ({e['arg']}) → " + textwrap.fill(e["texto"], 100, subsequent_indent=" " * 13))
-        elif t == "arnés":
-            print(f"  ARNÉS      {e['texto']}")
-        elif t == "fin":
-            print(f"\nRESPUESTA FINAL  " + textwrap.fill(" ".join(e["texto"].split()), 100, subsequent_indent=" " * 17))
-        elif t == "corte":
-            print(f"\nCORTE  {e['texto']}")
-    print()
+def grabar(env, pol, eps, n, semilla):
+    """n partidas de un jugador que con prob. 1−ε juega la flecha del experto y con prob. ε cualquiera de las 4."""
+    rng = np.random.default_rng(semilla); env.rng = np.random.default_rng(10_000 + semilla)
+    def elegir(s, rng):
+        return int(rng.integers(4)) if rng.random() < eps else int(pol[s])
+    return [jugar(env, elegir, rng) for _ in range(n)]
 
 
-def dibujar_contexto(trazas, nombres):
-    tipos = ["sistema + herramientas", "pregunta", "modelo", "herramienta", "arnés"]
-    col = dict(zip(tipos, [GRIS, COLORES[0], COLORES[1], COLORES[2], COLORES[7]]))
-    fig, axs = plt.subplots(1, len(trazas), figsize=(4.2 * len(trazas), 3.2), sharey=True)
-    for ax, tr, nom in zip(np.atleast_1d(axs), trazas, nombres):
-        pasos = [e for e in tr if e["tipo"] == "modelo"]
-        for i, e in enumerate(pasos):
-            base = 0
-            for tipo, n in e["segmentos"]:
-                ax.bar(i + 1, n, bottom=base, color=col[tipo], edgecolor="white", lw=0.6); base += n
-        ax.set_xticks(range(1, len(pasos) + 1)); ax.set_xlabel("paso del bucle"); ax.set_title(nom, fontsize=10)
-        ax.grid(axis="x", visible=False)
-    np.atleast_1d(axs)[0].set_ylabel("tokens en la ventana")
-    fig.legend([plt.Rectangle((0, 0), 1, 1, color=col[t]) for t in tipos], tipos, loc="lower center", ncol=5, frameon=False, bbox_to_anchor=(0.5, -0.08))
-    plt.tight_layout(); plt.show()
+def jugar_politica(env, pi, n, semilla):
+    """n partidas siguiendo una tabla pi[s, a] (si tiene varias acciones posibles, sortea)."""
+    pi = como_tabla(pi); rng = np.random.default_rng(semilla); env.rng = np.random.default_rng(20_000 + semilla)
+    return [jugar(env, lambda s, r: int(r.choice(4, p=pi[s])), rng) for _ in range(n)]
 
 
-# ================= diagramas =================
-def _caja(ax, x, y, texto, color, w=2.6, h=1.0, fs=10):
-    ax.add_patch(FancyBboxPatch((x - w / 2, y - h / 2), w, h, boxstyle="round,pad=0.08", fc=color, ec="none"))
-    ax.text(x, y, texto, ha="center", va="center", color="white", fontsize=fs, weight="bold")
+def camino(partida):
+    return [partida[0][0]] + [x[3] for x in partida]
 
 
-def _flecha(ax, p, q, texto="", curva=0.0):
-    ax.add_patch(FancyArrowPatch(p, q, arrowstyle="-|>", mutation_scale=15, color="#555", lw=1.5,
-                                 connectionstyle=f"arc3,rad={curva}", shrinkA=4, shrinkB=4))
-    if texto:
-        ax.text((p[0] + q[0]) / 2, (p[1] + q[1]) / 2 + 0.32, texto, ha="center", va="bottom", fontsize=8.8, color="#333")
+def retorno(partida, gamma=GAMMA):
+    """+1 al entrar a la salida, descontado: γ^(pasos − 1). 0 si no llegó."""
+    return gamma ** (len(partida) - 1) if partida[-1][4] else 0.0
 
 
-def dibujar_rlhf_vs_verificable():
-    fig, axs = plt.subplots(2, 1, figsize=(11, 4.8))
-    X, w = (1.3, 5.4, 9.5), 2.4
-    ax = axs[0]
-    _caja(ax, X[0], 0, "1. SFT\ndemostraciones", COLORES[0], w=w); _caja(ax, X[1], 0, "2. Modelo de\nrecompensa", COLORES[1], w=w); _caja(ax, X[2], 0, "3. PPO\ncontra ese modelo", COLORES[2], w=w)
-    _flecha(ax, (X[0] + 1.3, 0), (X[1] - 1.3, 0), "personas\ncomparan"); _flecha(ax, (X[1] + 1.3, 0), (X[2] - 1.3, 0), "puntaje")
-    ax.set_title("RLHF (Ouyang et al., 2022): la recompensa la aprende un modelo a partir de preferencias humanas", fontsize=10.5, loc="left")
-    ax = axs[1]
-    _caja(ax, X[0], 0, "Pregunta con\nrespuesta verificable", GRIS, w=w); _caja(ax, X[1], 0, "Grupo de G\nrespuestas", COLORES[0], w=w); _caja(ax, X[2], 0, "Verificador\n(1 o 0)", COLORES[2], w=w)
-    _flecha(ax, (X[0] + 1.3, 0), (X[1] - 1.3, 0), "muestrear"); _flecha(ax, (X[1] + 1.3, 0), (X[2] - 1.3, 0), "puntuar")
-    _flecha(ax, (X[2], -0.62), (X[1], -0.62), curva=-0.3)
-    ax.text((X[1] + X[2]) / 2, -1.45, "ventaja = (r − media) / desvío", ha="center", va="center", fontsize=9, color="#333")
-    ax.set_title("Recompensa verificable + GRPO (DeepSeekMath 2024, DeepSeek-R1 2025): no hace falta un modelo de recompensa", fontsize=10.5, loc="left")
-    for ax in axs:
-        ax.set_xlim(0, 10.8); ax.set_ylim(-1.7, 0.9); ax.axis("off")
-    plt.tight_layout(); plt.show()
+def conteos(env, partidas):
+    """C[s, a] = cuántas veces aparece la acción a en la casilla s en los registros."""
+    C = np.zeros((env.nS, env.nA))
+    for p in partidas:
+        for s, a, *_ in p:
+            C[s, a] += 1
+    return C
 
 
-def dibujar_bucle():
-    fig, ax = plt.subplots(figsize=(10, 3.2))
-    _caja(ax, 1.4, 0, "Modelo\n(la política)", COLORES[0]); _caja(ax, 5.0, 0, "Arnés\nvalida · corta", COLORES[1]); _caja(ax, 8.6, 0.75, "buscar", COLORES[2], w=2.0, h=0.7); _caja(ax, 8.6, -0.75, "calcular", COLORES[2], w=2.0, h=0.7)
-    _flecha(ax, (2.75, 0.15), (3.65, 0.15), "llamada"); _flecha(ax, (6.35, 0.3), (7.55, 0.75)); _flecha(ax, (6.35, -0.3), (7.55, -0.75))
-    _flecha(ax, (5.0, -0.6), (1.4, -0.6), "resultado o error → al contexto", curva=-0.3)
-    ax.set_xlim(0, 10); ax.set_ylim(-1.7, 1.3); ax.axis("off")
-    ax.set_title("El bucle: el modelo propone, el arnés decide qué se ejecuta y qué vuelve a la ventana", fontsize=10.5)
-    plt.show()
+# ---------- imitar (clonación de comportamiento) ----------
+def copia_mas_frecuente(C, sin_datos="arriba"):
+    """En cada casilla, la acción que más aparece en los registros (argmax de los conteos).
+    Donde no hay ejemplos, las cuatro empatan en 0 y argmax devuelve la primera: ↑ ('arriba').
+    Con sin_datos='dado', ahí sortea una de las cuatro."""
+    pi = np.eye(4)[C.argmax(axis=1)]
+    if sin_datos == "dado":
+        pi[C.sum(axis=1) == 0] = 0.25
+    return pi
 
 
-modelo = None
-'''))
+def copia_proporcional(C):
+    """La copia fiel: en cada casilla, cada acción con la frecuencia con que aparece en los registros
+    (lo que aprende un clasificador con softmax). Donde no hay ejemplos, ↑ como la otra."""
+    pi = np.eye(4)[C.argmax(axis=1)]
+    vis = C.sum(axis=1) > 0
+    pi[vis] = C[vis] / C[vis].sum(axis=1, keepdims=True)
+    return pi
 
+
+def mejores(partidas, frac=0.25):
+    """Filtrar: la fracción de partidas con mayor retorno (solo las que llegaron)."""
+    orden = sorted(partidas, key=retorno, reverse=True)
+    return [p for p in orden[:max(1, int(round(frac * len(partidas))))] if retorno(p) > 0]
+
+
+def dagger(env_juego, pol_experto, partidas, rondas, n_por_ronda, semilla, beta=0.5, sin_datos="arriba"):
+    """Ronda 0: la copia de las partidas grabadas. En cada ronda k = 1, 2, ...: se juegan n partidas en las que
+    maneja el experto con prob. beta^k y la copia con prob. 1 − beta^k (Ross et al. mezclan así: al principio el
+    experto todavía ayuda, después casi nada); en cada casilla que se pisó se le pregunta al experto qué haría,
+    se suman esos ejemplos a la tabla y se vuelve a copiar.
+    Devuelve la lista de copias (una por ronda), la tabla de conteos de cada ronda y las etiquetas pedidas por ronda."""
+    C = conteos(env_juego, partidas); copias, tablas, etiquetas = [], [], []
+    experto = np.eye(4)[pol_experto]
+    for k in range(rondas + 1):
+        pi = copia_mas_frecuente(C, sin_datos)
+        copias.append(pi); tablas.append(C.copy())
+        if k == rondas:
+            break
+        b = beta ** (k + 1) if beta > 0 else 0.0
+        n_et = 0
+        for p in jugar_politica(env_juego, b * experto + (1 - b) * pi, n_por_ronda, semilla=1000 * semilla + k):
+            for s, *_ in p:
+                C[s, pol_experto[s]] += 1          # la etiqueta la pone el experto, no la copia
+                n_et += 1
+        etiquetas.append(n_et)
+    return copias, tablas, etiquetas
+
+
+# ---------- RL offline: Q-learning sobre un conjunto fijo ----------
+def q_offline(env, partidas, q0=0.0, alfa=0.1, barridos=60, semilla=0, gamma=GAMMA, solo_vistas=False):
+    """Q-learning de la clase 6, pero sin jugar: recorre las transiciones grabadas, una y otra vez, en orden al azar.
+        Q(s,a) += α [r + γ max_a' Q(s',a') − Q(s,a)]      (al entrar a la salida: objetivo = r)
+    q0: con qué valor arranca la tabla (un número o una tabla). solo_vistas=True: el max solo mira las acciones
+    que aparecen en los registros en s' (la idea de los métodos offline 'conservadores').
+    Devuelve Q y la máscara visto[s, a]."""
+    rng = np.random.default_rng(semilla)
+    Q = (np.full((env.nS, env.nA), float(q0)) if np.isscalar(q0) else np.array(q0, float)).copy()
+    Q[env.goal] = 0.0
+    visto = conteos(env, partidas) > 0
+    trans = [x for p in partidas for x in p]
+    Ql = Q.tolist()
+    acc = [[a for a in range(env.nA) if visto[s, a]] or list(range(env.nA)) for s in range(env.nS)]
+    for _ in range(barridos):
+        for i in rng.permutation(len(trans)):
+            s, a, r, s2, llego = trans[i]
+            if llego:
+                y = r
+            elif solo_vistas:
+                q2 = Ql[s2]; y = r + gamma * max(q2[b] for b in acc[s2])
+            else:
+                y = r + gamma * max(Ql[s2])
+            Ql[s][a] += alfa * (y - Ql[s][a])
+    return np.array(Ql), visto
+
+
+def politica_de_Q(Q, visto=None, solo_vistas=False):
+    """La flecha de mayor Q en cada casilla (con solo_vistas, entre las acciones de los registros).
+    En casillas sin ningún registro, argmax de una fila que nunca cambió."""
+    Qm = Q.copy()
+    if solo_vistas:
+        hay = visto.any(axis=1)
+        Qm[hay] = np.where(visto[hay], Q[hay], -np.inf)
+    return np.eye(4)[Qm.argmax(axis=1)]
+
+
+def coser(partidas, cam):
+    """Parte el camino cam en tramos, cada uno copiado de una sola partida grabada (el más largo posible desde donde
+    se está). Devuelve la lista de (desde, hasta, partida) y el tramo seguido más largo que aparece en una sola partida."""
+    T = list(zip(cam[:-1], cam[1:]))
+    pasos = [[(x, y) for (x, a, r, y, g) in p] for p in partidas]
+
+    def largo(i_p, j):                      # tramo más largo de T desde j que aparece seguido en la partida i_p
+        tr, mejor = pasos[i_p], 0
+        for i in range(len(tr)):
+            k = 0
+            while i + k < len(tr) and j + k < len(T) and tr[i + k] == T[j + k]:
+                k += 1
+            mejor = max(mejor, k)
+        return mejor
+    tramos, j = [], 0
+    while j < len(T):
+        k, i_p = max((largo(i, j), i) for i in range(len(partidas)))
+        if k == 0:
+            tramos.append((j, j + 1, None)); j += 1
+        else:
+            tramos.append((j, j + k, i_p)); j += k
+    mas_largo = max(largo(i, j) for i in range(len(partidas)) for j in range(len(T)))
+    return tramos, mas_largo
+
+
+# ---------- dibujos de la cueva ----------
+def plot_cave(env, values=None, policy=None, path=None, ax=None, title=None, cmap="magma", clim=None,
+              mark=None, numbers=False, fmt="{:.2f}"):
+    """env.plot + escala de color elegible (calculada sin la salida), flechas con borde, círculos y números opcionales."""
+    ax = env.plot(values=values, policy=policy, path=path, ax=ax, title=title, cmap=cmap)
+    if values is not None:
+        if clim is None:
+            v = np.asarray(values, dtype=float)[np.arange(env.nS) != env.goal]
+            v = v[np.isfinite(v)]
+            clim = (v.min(), v.max()) if v.size else (0, 1)
+            if clim[1] - clim[0] < 1e-12:
+                clim = (clim[1] - 1, clim[1])
+        ax.images[-1].set_clim(*clim)
+    for t in ax.texts:
+        t.set_path_effects([pe.withStroke(linewidth=2.5, foreground="black")])
+    if mark is not None:
+        for m in np.atleast_1d(mark):
+            r, c = env.free[int(m)]
+            ax.plot(c, r, "o", mfc="none", mec="#00e5ff", mew=2.5, ms=15)
+    if numbers and values is not None:
+        for s, (r, c) in enumerate(env.free):
+            if np.isfinite(values[s]) and s != env.goal:
+                ax.text(c, r + 0.3, fmt.format(values[s]), ha="center", va="center", fontsize=7, color="w",
+                        path_effects=[pe.withStroke(linewidth=2, foreground="black")])
+    return ax
+
+
+def flechas(env, ax, pi, casillas, color="cyan", fontsize=11):
+    """Dibuja la flecha de la tabla pi (la más probable) solo en las casillas indicadas."""
+    pi = como_tabla(pi)
+    for s in casillas:
+        if s == env.goal:
+            continue
+        r, c = env.free[s]
+        if s == env.start:
+            c = c + 0.3                      # que no tape la S
+        ax.text(c, r, ACTION_NAMES[int(pi[s].argmax())], ha="center", va="center", color=color, fontsize=fontsize,
+                path_effects=[pe.withStroke(linewidth=2.5, foreground="black")])
+
+
+def partidas_superpuestas(env, partidas, ax, color, titulo, values=None, cmap="viridis", clim=None):
+    """Dibuja varias partidas sobre la cueva; cada una corrida un poquito para que se distingan."""
+    plot_cave(env, values=values, ax=ax, title=titulo, cmap=cmap, clim=clim)
+    n = len(partidas)
+    for i, p in enumerate(partidas):
+        rc = np.array([env.free[s] for s in camino(p)], dtype=float)
+        dx = (i - (n - 1) / 2) * 0.03
+        ax.plot(rc[:, 1] + dx, rc[:, 0] + dx, "-", color=color, lw=1.2, alpha=0.6)
+
+
+def dibujar_camino(env, ax, cam, color, lw=2.5, ls="-", label=None, temblor=0.0, semilla=0):
+    """Dibuja un camino; con temblor > 0 corre cada punto un poquito al azar, para que se vean las idas y vueltas."""
+    rc = np.array([env.free[s] for s in cam], dtype=float)
+    if temblor > 0:
+        rc = rc + np.random.default_rng(semilla).uniform(-temblor, temblor, rc.shape)
+    ax.plot(rc[:, 1], rc[:, 0], ls, color=color, lw=lw, alpha=0.9, label=label)
+
+
+def banda(ax, x, y, color, label, ls="-", marker="o"):
+    """Promedio sobre semillas y banda de ± 1 desvío."""
+    y = np.asarray(y, float); m, sd = y.mean(0), y.std(0)
+    ax.plot(x, m, color=color, label=label, ls=ls, marker=marker, ms=5)
+    ax.fill_between(x, m - sd, m + sd, color=color, alpha=0.15, lw=0)
+''', herramientas=True))
+
+# ======================================================================= 1
+cells.append(md(r"""
+## 1. Partidas grabadas
+
+Pensemos en el **modo Jugar** de la página: cada vez que alguien juega, queda grabado qué casilla pisó y qué flecha apretó. Tenemos dos montones de grabaciones:
+
+- **Experto**: alguien que sabe salir. Juega siempre la mejor flecha (la política óptima de la clase 4), pero el piso resbaloso a veces lo saca del camino y tiene que volver.
+- **Mezcladas**: jugadores que a veces saben y casi siempre no. En cada paso, con probabilidad $\varepsilon = 0{,}8$ aprietan cualquier flecha y si no, la del experto.
+
+### Paso 1 — El experto
+
+La política óptima se calcula con el mapa, por iteración de valor, como en la clase 4. Es la única vez que el mapa entra en el juego: el experto lo conoce; el que aprende, no.
+""", objetivos=["O1"]))
 cells.append(code(r"""
-tok, modelo = cargar_modelo(MODELO)
+V_estrella, Q_estrella = iteracion_de_valor(env)
+pol_exp = Q_estrella.argmax(axis=1)
+ng = np.arange(env.nS) != env.goal            # todas las casillas menos la salida
+m_exp = medir(env, pol_exp)
+
+print(f"V*(S) con slip {SLIP} = {V_estrella[env.start]:.4f}")
+print(f"el experto sale en 200 pasos con probabilidad {m_exp['exito']:.4f}   retorno esperado = {m_exp['retorno']:.4f}")
+print(f"casillas de la cueva (sin la salida): {int(ng.sum())}   pares (casilla, acción): {int(ng.sum()) * 4}")
 """))
 
-# ---------------- Parte 1 ----------------
 cells.append(md(r"""
-## Parte 1 — El modelo de lenguaje como política
+### Paso 2 — Grabar partidas
 
-### Paso 1 — El estado es el texto, la acción es el próximo token
-
-En la cueva, la política π(a | s) daba una probabilidad para cada una de las 4 acciones. Un modelo de lenguaje hace lo mismo con **151 mil** acciones posibles (su vocabulario de *tokens*, pedazos de palabras) y un estado enorme: **todo el texto hasta ahora**, que incluye la pregunta y lo que ya respondió.
-
-Vamos a ver tres estados. En los dos primeros, el modelo ya empezó a responder (el *prefijo*); en el tercero, una cuenta, todavía no escribió nada (es el mismo estado del que vamos a muestrear en la Parte 2). En cada uno le preguntamos cuál es el próximo token. La **temperatura** T divide los logits antes del softmax: con T chica la política es casi *greedy*; con T grande se aplana y **explora**.
-"""))
-cells.append(md(r"""
-<div style="font-family: monospace">π(token | texto) = softmax(logits / T)</div>
-
-Las barras muestran los 12 tokens más probables y, en gris, la masa de los otros 151 mil (el "·" es un espacio).
+Grabamos 20 partidas de cada tipo. Cada registro es una lista de pasos: casilla, acción, premio, casilla siguiente y si llegó. Para **imitar** solo vamos a usar los dos primeros: los pares (casilla, acción).
 """))
 cells.append(code(r"""
-SISTEMA_CUENTAS = "Resolvés cuentas. Escribí la cuenta y el resultado en una sola línea, por ejemplo: 9 + 6 = 15"
-ESTADOS = [
-    {"nombre": "La cueva", "usuario": "Estás en una cueva a oscuras y acabás de tocar una pared a tu derecha. ¿Qué hacés?",
-     "prefijo": "Doy un paso hacia"},
-    {"nombre": "Una frase del curso", "usuario": "Completá la frase con una palabra: un agente de aprendizaje por refuerzo aprende de la...",
-     "prefijo": "Un agente de aprendizaje por refuerzo aprende de la"},
-    {"nombre": "Una cuenta", "sistema": SISTEMA_CUENTAS, "usuario": "¿Cuánto es 17 + 25?", "prefijo": ""},
-]
-for e in ESTADOS:
-    e["texto"] = texto_chat(usuario(e["usuario"], e.get("sistema")), e["prefijo"])
-    e["dist"] = distribucion(e["texto"])
-    print(f"{e['nombre']:<22} estado = {n_tokens(e['texto'])} tokens · acción más probable: {mostrar_token(e['dist']['tokens'][0])!r}")
-dibujar_distribuciones(ESTADOS)
-"""))
-cells.append(md(r"""
-**Qué mirar.** Con T = 0,3 casi toda la masa se va al primer token: es la acción greedy. Con T = 1,8 la política se aplana y aparecen tokens raros. En la cuenta, la política no pone toda la masa en el primer dígito correcto: le da probabilidad a respuestas equivocadas, y eso es justo lo que el RL puede corregir (Parte 2).
+N_PARTIDAS = 20
+EPS_MIX = 0.8
+exp_0 = grabar(env, pol_exp, 0.0, N_PARTIDAS, semilla=SEMILLA)
+mix_0 = grabar(env, pol_exp, EPS_MIX, N_PARTIDAS, semilla=SEMILLA)
+
+def resumen(nombre, partidas):
+    C = conteos(env, partidas); cub = C.sum(axis=1) > 0
+    largos = [len(p) for p in partidas]; llegaron = sum(retorno(p) > 0 for p in partidas)
+    print(f"{nombre:10s} partidas = {len(partidas)}   pares (casilla, acción) grabados = {sum(largos):5d}   "
+          f"llegaron = {llegaron:2d}   pasos por partida = {np.mean(largos):6.1f}   "
+          f"casillas con ejemplos = {int(cub[ng].sum())} de {int(ng.sum())}   pares distintos = {int((C[ng] > 0).sum())} de {int(ng.sum()) * 4}")
+
+resumen("experto", exp_0)
+resumen("mezcladas", mix_0)
+print("\nlos primeros 8 pasos de la primera partida del experto:")
+print("   " + "   ".join(f"{env.free[s]} {ACTION_NAMES[a]}" for s, a, *_ in exp_0[0][:8]))
 """))
 
 cells.append(md(r"""
-### Paso 2 — Un episodio, token por token
+### Paso 3 — Dónde hay ejemplos
 
-El episodio es la respuesta: cada paso agrega un token al estado y el estado nuevo es el texto con ese token al final. Acá jugamos el episodio con la política greedy (siempre el más probable).
+El color es cuántas veces se pisó cada casilla en las 20 partidas (en escala logarítmica, como el mapa de visitas de la clase 6); las líneas son las partidas. Las casillas negras no aparecen nunca en los registros.
 """))
 cells.append(code(r"""
-filas = episodio_paso_a_paso(ESTADOS[0]["texto"], pasos=10)
-print(f"{'paso':>4}  {'estado (tokens)':>15}  {'acción':<14} {'π(acción|estado)':>16}")
-for k, (n, t, p) in enumerate(filas, 1):
-    print(f"{k:>4}  {n:>15}  {mostrar_token(t)!r:<14} {p:>16.3f}")
-EPISODIO = [{"token": t, "p": round(p, 4)} for _, t, p in filas]
-"""))
-cells.append(md(r"""
-Dos puentes con clases anteriores:
-
-- **Clase 2 (cadena de Markov):** si el estado es *todo* el texto, el proceso es de Markov por construcción: el próximo token depende solo del estado. El precio es que el estado crece en cada paso.
-- **Clase 7 (redes recurrentes):** la RNN resumía la historia en un vector oculto de tamaño fijo y predecía el próximo carácter. Un transformer como Qwen no resume: **relee toda la ventana** en cada paso. Por eso la ventana tiene un límite (Parte 4).
-"""))
-
-cells.append(md(r"""
-### Paso 3 — Muestrear es explorar
-
-Ahora muestreamos respuestas completas (cortas: 12 tokens) desde cada estado a cuatro temperaturas. Con T baja salen respuestas casi iguales; con T alta, variadas, y algunas sin sentido. Para RL esto es la **exploración**: sin variedad no hay nada que comparar.
-"""))
-cells.append(code(r"""
-TEMPS = [0.2, 0.7, 1.2, 1.8]
-for i, e in enumerate(ESTADOS):
-    e["muestras"] = {}
-    print(f"— {e['nombre']}  (prefijo: {e['prefijo']!r})")
-    for T in TEMPS:
-        rs, _ = muestrear(e["texto"], n=3, T=T, max_nuevos=12, semilla=10 * i + int(10 * T))
-        e["muestras"][str(T)] = rs
-        print(f"   T={T}:  " + "  |  ".join(corto(r.replace(chr(10), ' '), 40) for r in rs))
-"""))
-cells.append(md(r"""
-✍️ **Ejercicio.** Cambiá el `prefijo` de la cueva (por ejemplo `"Doy un paso hacia la"`) y volvé a correr los pasos 1 y 3. ¿Qué tokens aparecen? ¿Son palabras enteras o pedazos?
-"""))
-
-# ---------------- Parte 2 ----------------
-cells.append(md(r"""
-## Parte 2 — ¿De dónde sale la recompensa?
-
-En la cueva, la recompensa la daba el entorno: +1 al llegar a la salida. En una respuesta de texto, ¿quién dice si estuvo bien? Hay dos respuestas grandes:
-
-- **RLHF** (Ouyang et al., 2022, InstructGPT): (1) ajuste supervisado (SFT) con respuestas escritas por personas; (2) personas **comparan** pares de respuestas y con eso se entrena un **modelo de recompensa**; (3) se optimiza la política contra ese modelo con PPO. La recompensa es *aprendida*: se puede engañar (Parte 5).
-- **Recompensas verificables** (DeepSeek-R1, 2025): si la pregunta tiene una respuesta que se puede **chequear** (una cuenta, un test de código), la recompensa la da un verificador. **R1-Zero** se entrenó solo con RL sobre un modelo base, *sin* ajuste supervisado previo; **R1** sí usa un poco de SFT al principio para que las respuestas sean legibles. El algoritmo es **GRPO** (Shao et al., 2024, DeepSeekMath).
-"""))
-cells.append(code(r"""
-dibujar_rlhf_vs_verificable()
-"""))
-cells.append(md(r"""
-### Paso 4 — Un grupo de respuestas, un verificador, las ventajas de GRPO
-
-GRPO no necesita un crítico que estime V(s) (como PPO): para cada pregunta **muestrea un grupo** de G respuestas y usa al propio grupo como línea de base:
-
-<div style="font-family: monospace">Aᵢ = (rᵢ − media(r)) / desvío(r)</div>
-
-Una respuesta mejor que el promedio de su grupo tiene ventaja positiva y el paso de actualización la hace más probable; una peor, menos probable. Probamos con seis cuentas, G = 8 respuestas cada una, T = 1 y un verificador estricto (el último número de la respuesta tiene que ser el correcto).
-"""))
-cells.append(code(r"""
-CUENTAS = [("¿Cuánto es 17 + 25?", 42), ("¿Cuánto es 8 × 7?", 56), ("¿Cuánto es 63 − 28?", 35),
-           ("¿Cuánto es 3 × 4 + 5?", 17), ("¿Cuánto es 125 + 76?", 201), ("¿Cuánto es 14 × 12?", 168)]
-G = 8
-GRUPOS = []
-for k, (preg, correcta) in enumerate(CUENTAS):
-    texto = texto_chat(usuario(preg, SISTEMA_CUENTAS))
-    rs, ids = muestrear(texto, n=G, T=1.0, max_nuevos=16, semilla=k)
-    r = [verificador_estricto(x, correcta) for x in rs]
-    GRUPOS.append({"pregunta": preg, "correcta": correcta, "respuestas": rs, "ids": ids, "texto": texto,
-                   "recompensas": r, "ventajas": ventajas_grpo(r)})
-    print(f"{preg:<24} correcta {correcta:>4}   recompensas {''.join('1' if x else '0' for x in r)}   "
-          f"ventajas {' '.join(f'{a:+.1f}' for a in ventajas_grpo(r))}")
-dibujar_grupos(GRUPOS)
-"""))
-cells.append(md(r"""
-**Qué mirar.** Los grupos **mixtos** (algunas bien, algunas mal) dan señal: ventajas positivas para las correctas y negativas para las incorrectas. Los grupos donde **todas** valen lo mismo (todas bien o todas mal) tienen ventaja cero: GRPO **no aprende nada** de esa pregunta. Si el modelo nunca acierta, no hay de dónde aprender: es la recompensa escasa de la clase 5.
-"""))
-
-cells.append(md(r"""
-### Paso 5 — Best-of-N y muestreo por rechazo (sin entrenar)
-
-Con un verificador ya se puede mejorar **sin tocar el modelo**:
-
-- **Best-of-N**: muestrear N respuestas y quedarse con una que el verificador apruebe. La probabilidad de tener al menos una correcta sube con N.
-- **Muestreo por rechazo** (*rejection sampling*): guardar solo las respuestas aprobadas y usarlas como ejemplos para un ajuste supervisado. DeepSeek-R1 lo usa entre etapas de RL.
-"""))
-cells.append(code(r"""
-def acierto_best_of(grupos, N):
-    return np.mean([max(g["recompensas"][:N]) for g in grupos])
-
-Ns = list(range(1, G + 1))
-curva = [acierto_best_of(GRUPOS, N) for N in Ns]
-uno = np.mean([np.mean(g["recompensas"]) for g in GRUPOS])
-plt.figure(figsize=(6, 3.2))
-plt.plot(Ns, curva, "o-", color=COLORES[2], label="best-of-N (con verificador)")
-plt.axhline(uno, color=GRIS, ls="--", label=f"una sola respuesta: {uno:.2f}")
-plt.xlabel("N (respuestas muestreadas)"); plt.ylabel("preguntas resueltas"); plt.ylim(0, 1.05); plt.legend(frameon=False)
-plt.title("Muestrear más y verificar: mejora sin entrenar"); plt.show()
-
-aceptadas = [(g["pregunta"], x) for g in GRUPOS for x, r in zip(g["respuestas"], g["recompensas"]) if r]
-print(f"Muestreo por rechazo: {len(aceptadas)} de {G * len(GRUPOS)} respuestas pasan el verificador. Algunas:")
-for p, x in aceptadas[::7]:
-    print(f"   {p:<24} → {x}")
-"""))
-
-cells.append(md(r"""
-### Paso 6 — La mini cueva en texto
-
-Le describimos al modelo una cueva de 3 × 3 con una pared en el centro y le pedimos la lista de movimientos. El verificador es **la cueva misma** (`CaveEnv`): juega los movimientos y da 1 si llega a la salida.
-"""))
-cells.append(code(r"""
-env_mini = CaveEnv(MINI_CUEVA)
-PREGUNTA_CUEVA = ("Estás en una grilla de 3 por 3. Empezás en la esquina de arriba a la izquierda y la salida está en la esquina "
-                  "de abajo a la derecha. La casilla del centro es pared. Escribí solo la lista de movimientos para llegar a la "
-                  "salida, separados por comas, usando las palabras arriba, abajo, izquierda y derecha.")
-rs, _ = muestrear(texto_chat(usuario(PREGUNTA_CUEVA)), n=G, T=0.7, max_nuevos=24, semilla=7)
-CUEVA = {"respuestas": rs, "recompensas": [], "caminos": []}
-caminos = []
-for i, x in enumerate(rs):
-    r, camino = jugar_movimientos(env_mini, leer_movimientos(x))
-    CUEVA["recompensas"].append(r); CUEVA["caminos"].append([list(env_mini.free[s]) for s in camino]); caminos.append(camino)
-    print(f"r={r:.0f}  {corto(x.replace(chr(10), ' '), 95)}")
-# dibujamos las tres primeras y, si hay, la primera que llegó
-elegidas = [0, 1, 2] + [next((i for i, r in enumerate(CUEVA["recompensas"]) if r), 3)]
-fig, axs = plt.subplots(1, 4, figsize=(11, 3))
-for ax, i in zip(axs, elegidas):
-    env_mini.plot(path=caminos[i], ax=ax, title=f"respuesta {i + 1}: r = {CUEVA['recompensas'][i]:.0f}")
+fig, axs = plt.subplots(1, 2, figsize=(15, 5.6))
+for ax, partidas, color, nombre in [(axs[0], exp_0, COL_EXP, "Experto"), (axs[1], mix_0, COL_MIX, f"Mezcladas (ε = {EPS_MIX})")]:
+    vis = conteos(env, partidas).sum(axis=1)
+    vals = np.where(vis > 0, np.log10(1 + vis), np.nan)
+    partidas_superpuestas(env, partidas, ax, color, f"{nombre}: 20 partidas (color = log10 de 1 + visitas)",
+                          values=vals, cmap="viridis", clim=(0, 3.5))
 plt.tight_layout(); plt.show()
-CUEVA["ventajas"] = ventajas_grpo(CUEVA["recompensas"])
-print("ventajas GRPO:", np.round(CUEVA["ventajas"], 2))
+
+cub_exp = [int((conteos(env, grabar(env, pol_exp, 0.0, N_PARTIDAS, sem)).sum(1) > 0)[ng].sum()) for sem in SEMILLAS]
+cub_mix = [int((conteos(env, grabar(env, pol_exp, EPS_MIX, N_PARTIDAS, sem)).sum(1) > 0)[ng].sum()) for sem in SEMILLAS]
+print(f"casillas con ejemplos en 10 conjuntos de 20 partidas (de {int(ng.sum())}):")
+print(f"   experto:   {cub_exp}   promedio = {np.mean(cub_exp):.1f}")
+print(f"   mezcladas: {cub_mix}   promedio = {np.mean(cub_mix):.1f}")
 """))
 cells.append(md(r"""
-Leé las respuestas antes de mirar el 1. Si alguna "llega", fijate si es un plan o una lista de palabras que, leídas en orden por el verificador, por casualidad terminan en la salida: el verificador solo cuenta las palabras arriba/abajo/izquierda/derecha. GRPO reforzaría esa respuesta igual que un plan de verdad (Parte 5). Y si ninguna llega, todas las ventajas son cero y no hay nada que reforzar: es la **recompensa escasa** de la clase 5. Las salidas son las de esa clase aplicadas a texto: más muestras, una recompensa parcial (por acercarse) o empezar desde un modelo que ya sepa un poco (eso es el poco de SFT de R1).
+Las 20 partidas del experto suman 451 pares (casilla, acción) y tocan **22 de las 59 casillas**: el camino corto y un par de casillas a los costados, adonde lo llevó algún resbalón. Las mezcladas son mucho más largas (126,7 pasos por partida en promedio; 17 de 20 llegaron) y tocan 45 casillas, con flechas de todo tipo: 167 de los 236 pares posibles.
+
+En 10 conjuntos de 20 partidas, el experto toca entre 20 y 34 casillas (26,3 en promedio). Los conjuntos de 33 o 34 son los que tienen alguna partida en la que el experto se resbaló hacia abajo en S y siguió por el pasillo de la izquierda, el otro camino corto. Las mezcladas tocan 49,9 en promedio.
+
+Fíjense que para **imitar** no hace falta saber la recompensa: alcanza con los pares (casilla, acción).
+"""))
+
+# ======================================================================= 2
+cells.append(md(r"""
+## 2. Clonación de comportamiento
+
+La idea más directa: en cada casilla, hacer **lo que hacía el experto**. Es aprendizaje supervisado (*supervised learning*), como el de la última pestaña de la clase 2: la entrada es la casilla, la etiqueta es la flecha que apretó el experto, y se aprende a predecir la etiqueta. No hace falta la recompensa. Se llama **clonación de comportamiento** (*behavior cloning*); ALVINN (Pomerleau, 1988) aprendió así a manejar una camioneta: una red neuronal miraba la cámara y copiaba el volante del conductor.
+
+### Paso 1 — La tabla de conteos
+
+Con una cueva de 59 casillas, el «clasificador» más simple es una tabla: para cada casilla, cuántas veces aparece cada flecha en los registros.
+""", objetivos=["O1"]))
+cells.append(code(r"""
+C_exp = conteos(env, exp_0)
+C_mix = conteos(env, mix_0)
+cruce = env.pos2s[(5, 6)]
+for nombre, C in [("experto", C_exp), ("mezcladas", C_mix)]:
+    print(f"{nombre}:")
+    for s in [env.start, env.pos2s[(1, 2)], cruce]:
+        print(f"   casilla {str(env.free[s]):8s} " + "   ".join(f"{ACTION_NAMES[a]} {int(C[s, a]):3d}" for a in range(4))
+              + f"     flecha del experto: {ACTION_NAMES[pol_exp[s]]}")
 """))
 
 cells.append(md(r"""
-### Paso 7 — Un paso diminuto de actualización
+### Paso 2 — La copia
 
-El paso que falta es cambiar los pesos para que las respuestas con ventaja positiva sean más probables:
+La copia elige en cada casilla la flecha que más aparece (el `argmax` de la fila). Un detalle que va a importar: en una casilla **sin ejemplos** las cuatro flechas empatan en 0, y `argmax` devuelve la primera, **↑**. La copia no sabe qué hacer ahí, pero algo hace.
 
-<div style="font-family: monospace">pérdida = − media( Aᵢ · log π(respuestaᵢ | pregunta) )</div>
-
-El GRPO completo agrega un cociente recortado como PPO y una penalización KL para no alejarse del modelo de referencia, y se repite miles de veces sobre todo el modelo: eso **requiere GPU y se omite**. Acá damos **un solo paso** de descenso por gradiente y solo sobre la **última capa** del modelo (unos 15 de 494 millones de parámetros), con el grupo mixto de la primera cuenta, para ver hacia dónde empuja.
+En el dibujo, las flechas celestes son las de las casillas con ejemplos y las rojas, las de las casillas sin ejemplos.
 """))
 cells.append(code(r"""
-g = next(x for x in GRUPOS if 0 < np.mean(x["recompensas"]) < 1)          # el primer grupo con señal
-ids_prompt = tok(g["texto"], return_tensors="pt").input_ids[0].to(DEVICE)
-for n, p in modelo.named_parameters():
-    p.requires_grad = n.startswith(f"model.layers.{modelo.config.num_hidden_layers - 1}.")
-entrenables = sum(p.numel() for p in modelo.parameters() if p.requires_grad)
+copia_0 = copia_mas_frecuente(C_exp)
+cub_0 = C_exp.sum(axis=1) > 0
+iguales = [s for s in np.flatnonzero(cub_0 & ng) if copia_0[s].argmax() == pol_exp[s]]
 
-with torch.no_grad():
-    lp_antes = logp_respuestas(ids_prompt, g["ids"])
-A = torch.tensor(g["ventajas"], dtype=torch.float32, device=DEVICE)
-t = time.time()
-perdida = -(A * logp_respuestas(ids_prompt, g["ids"])).mean()
-perdida.backward()
-TASA = 1e-4
-with torch.no_grad():
-    copia = {n: p.detach().clone() for n, p in modelo.named_parameters() if p.requires_grad}
-    for p in modelo.parameters():
-        if p.requires_grad:
-            p -= TASA * p.grad
-    lp_despues = logp_respuestas(ids_prompt, g["ids"])
-print(f"{g['pregunta']}  · {entrenables / 1e6:.0f} M parámetros entrenables · un paso en {time.time() - t:.0f} s")
+fig, ax = plt.subplots(figsize=(8, 5.8))
+plot_cave(env, values=np.where(cub_0, 1.0, np.nan), ax=ax, cmap="Blues", clim=(0, 1.6),
+          title="La copia: con ejemplos (celeste) y sin ejemplos (rojo)")
+flechas(env, ax, copia_0, np.flatnonzero(cub_0), color="cyan")
+flechas(env, ax, copia_0, np.flatnonzero(~cub_0), color="#ff5050")
+plt.tight_layout(); plt.show()
 
-unicas = {}
-for x, r, a, p0, p1 in zip(g["respuestas"], g["recompensas"], g["ventajas"], lp_antes.exp().tolist(), lp_despues.exp().tolist()):
-    unicas.setdefault(x, (r, a, p0, p1))
-PASO = [{"respuesta": x, "r": r, "A": round(float(a), 3), "antes": round(p0, 4), "despues": round(p1, 4)} for x, (r, a, p0, p1) in unicas.items()]
-fig, ax = plt.subplots(figsize=(6.5, 3.2))
-xs = np.arange(len(PASO))
-ax.bar(xs - 0.18, [d["antes"] for d in PASO], 0.36, color=GRIS, label="antes")
-ax.bar(xs + 0.18, [d["despues"] for d in PASO], 0.36, color=[VERDE if d["r"] else ROJO for d in PASO], label="después de un paso")
-ax.set_xticks(xs); ax.set_xticklabels([f"{corto(d['respuesta'], 16)}\nA = {d['A']:+.2f}" for d in PASO])
-ax.set_ylabel("π(respuesta | pregunta)"); ax.legend(frameon=False); ax.set_title("Un paso de GRPO sobre la última capa")
-plt.show()
-
-with torch.no_grad():                       # deshacer el paso: el resto del notebook usa el modelo original
-    for n, p in modelo.named_parameters():
-        if n in copia:
-            p.copy_(copia[n])
-        p.requires_grad = False
-modelo.zero_grad(set_to_none=True)
-"""))
-cells.append(md(r"""
-Un paso sube la probabilidad de las respuestas con ventaja positiva y baja la de las otras, **para esta pregunta**. No sabemos si el modelo mejoró en cuentas en general: para eso hacen falta miles de preguntas, muchos pasos y evaluar en preguntas nuevas. Por eso deshicimos el paso.
-
-✍️ **Ejercicio.** Cambiá `TASA` a `1e-3` y volvé a correr la celda. ¿Qué le pasa a la respuesta incorrecta? ¿Por qué un paso tan grande sería peligroso en un entrenamiento real? (Pista: la penalización KL.)
+print(f"casillas con ejemplos: {int(cub_0[ng].sum())}; en {len(iguales)} de ellas la copia coincide con el experto "
+      f"({len(iguales) / cub_0[ng].sum():.0%}: sin errores en los datos de entrenamiento)")
+print(f"casillas sin ejemplos: {int((~cub_0)[ng].sum())}; ahí la copia dice ↑ y el experto diría ↑ en "
+      f"{int(sum(pol_exp[s] == 0 for s in np.flatnonzero(~cub_0 & ng)))} de ellas")
 """))
 
-# ---------------- Parte 3 ----------------
 cells.append(md(r"""
-## Parte 3 — Herramientas y bucle de agente
+### Paso 3 — ¿La copia sale?
 
-### Paso 8 — El modelo pide, el arnés ejecuta
-
-Un **agente de lenguaje** es el mismo modelo dentro de un **bucle**. En cada paso el modelo puede responder o pedir una herramienta; el **arnés** (*harness*, el programa que lo rodea) valida el pedido, lo ejecuta, pone el resultado en el contexto y vuelve a llamar al modelo, hasta que responde o se alcanza el **límite de pasos**. Es el ciclo de la clase 9 (ReAct: pensar, actuar, observar) y la política de *deep search* de la clase 8 (buscar, leer, responder), ahora con un modelo de verdad.
-
-Nuestras herramientas: `buscar` en una mini biblioteca de seis documentos escritos para esta clase, y `calcular`. El modelo pide herramientas con el formato nativo de Qwen (`<tool_call>{...}</tool_call>`).
+Medimos la copia en la misma cueva en la que se grabaron las partidas (slip 0,1), con `medir`, y la comparamos con el experto. Lo repetimos con 10 conjuntos de 20 partidas.
 """))
 cells.append(code(r"""
-dibujar_bucle()
-for k, v in BIBLIOTECA.items():
-    print(f"[{k}] {corto(v, 110)}")
+m_copia = medir(env, copia_0, cub_0)
+print(f"conjunto 0:  copia sale con prob. {m_copia['exito']:.4f}   retorno = {m_copia['retorno']:.4f}   "
+      f"(experto: {m_exp['exito']:.4f} y {m_exp['retorno']:.4f})")
+
+filas = []
+for sem in SEMILLAS:
+    C = conteos(env, grabar(env, pol_exp, 0.0, N_PARTIDAS, sem))
+    m = medir(env, copia_mas_frecuente(C), C.sum(1) > 0)
+    filas.append((int((C.sum(1) > 0)[ng].sum()), m["exito"], m["retorno"]))
+filas = np.array(filas)
+print(f"\n{'conjunto':>9s} {'casillas':>9s} {'sale':>8s} {'retorno':>8s}")
+for sem, (c, e, r) in zip(SEMILLAS, filas):
+    print(f"{sem:>9d} {int(c):>9d} {e:>8.3f} {r:>8.3f}")
+print(f"{'promedio':>9s} {filas[:, 0].mean():>9.1f} {filas[:, 1].mean():>8.3f} {filas[:, 2].mean():>8.3f}"
+      f"     experto: {m_exp['exito']:.3f} {m_exp['retorno']:.3f}")
 """))
 cells.append(md(r"""
-Tres preguntas. La primera necesita buscar; la segunda, buscar **y** calcular; la tercera, también dos herramientas. El arnés tiene tres reglas: (1) rechaza llamadas mal formadas o a herramientas que no existen; (2) si el modelo contesta sin usar ninguna herramienta, le avisa y reintenta; (3) corta a los 4 pasos.
+En las 22 casillas con ejemplos, la copia hace exactamente lo mismo que el experto: como clasificador, no tiene ni un error en sus datos. En las 37 casillas sin ejemplos dice ↑, que coincide con el experto solo en 2.
+
+En la misma cueva de las grabaciones, la copia sale con probabilidad 0,977 en promedio (el experto, siempre). En 4 de los 10 conjuntos sale con 0,947: falla en el 5 % de las partidas, aunque nunca se equivoca donde tiene ejemplos. Lo que le falta no está en las casillas que vio, sino en las que no vio.
+"""))
+
+# ======================================================================= 3
+cells.append(md(r"""
+## 3. Errores compuestos
+
+La copia es perfecta **donde hay ejemplos**. El problema es llegar adonde no los hay. Basta un resbalón para pisar una casilla que el experto nunca visitó; ahí la copia aprieta ↑, que puede no tener nada que ver con la salida, y se aleja más. Un error lleva a otro: por eso se llaman **errores compuestos** (*compounding errors*).
+
+Para verlo, dejamos la copia del conjunto 0 (grabada con slip 0,1) y la ponemos en cuevas cada vez más resbalosas, como si el piso de prueba no fuera el de las grabaciones.
+
+### Paso 1 — Más resbalón, más casillas sin ejemplos
+
+Para cada slip medimos al experto y a la copia. Además, con la copia, la probabilidad de **pisar alguna casilla sin ejemplos** y cuántos pasos pasa, en promedio, en esas casillas. Agregamos una variante de la copia que, en las casillas sin ejemplos, en vez de ↑ tira un dado.
+""", objetivos=["O2"]))
+cells.append(code(r"""
+SLIPS = [0.0, 0.1, 0.2, 0.3, 0.4]
+res3 = {k: np.zeros((len(SEMILLAS), len(SLIPS))) for k in ["exp", "copia", "dado", "pisa", "pisa_exp", "fuera", "fuera_exp"]}
+for i, sem in enumerate(SEMILLAS):
+    C = conteos(env, grabar(env, pol_exp, 0.0, N_PARTIDAS, sem)); cub = C.sum(1) > 0
+    for j, sl in enumerate(SLIPS):
+        e = CaveEnv(slip=sl)
+        me, mc, md_ = medir(e, pol_exp, cub), medir(e, copia_mas_frecuente(C), cub), medir(e, copia_mas_frecuente(C, "dado"), cub)
+        res3["exp"][i, j], res3["copia"][i, j], res3["dado"][i, j] = me["exito"], mc["exito"], md_["exito"]
+        res3["pisa"][i, j], res3["fuera"][i, j], res3["fuera_exp"][i, j] = mc["pisa"], mc["fuera"], me["fuera"]
+        res3["pisa_exp"][i, j] = me["pisa"]
+
+print("promedio de 10 conjuntos de 20 partidas del experto (grabadas con slip 0,1):")
+print(f"{'slip':>5s} {'experto sale':>13s} {'copia sale':>11s} {'copia+dado':>11s} {'pisa sin ej. copia':>19s} {'pisa sin ej. experto':>21s} "
+      f"{'pasos sin ej. copia':>20s} {'pasos sin ej. experto':>22s}")
+for j, sl in enumerate(SLIPS):
+    print(f"{sl:>5.1f} {res3['exp'][:, j].mean():>13.3f} {res3['copia'][:, j].mean():>11.3f} {res3['dado'][:, j].mean():>11.3f} "
+          f"{res3['pisa'][:, j].mean():>19.3f} {res3['pisa_exp'][:, j].mean():>21.3f} {res3['fuera'][:, j].mean():>20.1f} "
+          f"{res3['fuera_exp'][:, j].mean():>22.1f}")
+
+fig, axs = plt.subplots(1, 2, figsize=(15, 4.4))
+banda(axs[0], SLIPS, res3["exp"], COL_EXP, "experto")
+banda(axs[0], SLIPS, res3["copia"], COL_COPIA, "copia (↑ donde no hay ejemplos)")
+banda(axs[0], SLIPS, res3["dado"], COL_DADO, "copia (dado donde no hay ejemplos)", ls="--")
+axs[0].set_xlabel("slip de la cueva de prueba"); axs[0].set_ylabel("probabilidad de salir en 200 pasos")
+axs[0].set_title("Grabadas con slip 0,1; probadas con más slip (10 conjuntos)"); axs[0].legend(frameon=False)
+banda(axs[1], SLIPS, res3["fuera"], COL_COPIA, "copia (↑)")
+banda(axs[1], SLIPS, res3["fuera_exp"], COL_EXP, "experto")
+axs[1].set_xlabel("slip de la cueva de prueba"); axs[1].set_ylabel("pasos esperados en casillas sin ejemplos")
+axs[1].set_title("Cuánto tiempo pasa donde no hay ejemplos"); axs[1].legend(frameon=False)
+plt.tight_layout(); plt.show()
+"""))
+cells.append(md(r"""
+Con el piso de las grabaciones (slip 0,1), la copia pisa alguna casilla sin ejemplos con probabilidad 0,088 y sale con 0,977. Con slip 0,4 pisa con 0,404 y sale con 0,862; el experto sigue saliendo siempre.
+
+La probabilidad de pisar una casilla sin ejemplos es **la misma** para los dos (las columnas «pisa sin ej.» son iguales): la copia es idéntica al experto hasta ese momento. La diferencia es qué pasa después. El experto sabe volver y pasa ahí 3,8 pasos en promedio (con slip 0,4); la copia, 23,6. Con un dado en lugar de ↑ la copia sale casi siempre (0,983 con slip 0,4): en esta cueva chica, deambular al azar termina encontrando el camino, pero apretar siempre ↑ puede dejarla trabada contra una pared.
+
+### Paso 2 — El desvío que se agranda
+
+Seguimos, paso a paso, la probabilidad de estar en una casilla sin ejemplos, con slip 0,3, para el conjunto 0. Y dibujamos una partida de la copia que no llega.
 """))
 cells.append(code(r"""
-PREGUNTAS_AGENTE = [
-    "Según la biblioteca del curso, ¿cuántas respuestas por pregunta muestrea GRPO?",
-    "¿En qué año se publicó Go-Explore y cuántos años pasaron hasta 2026?",
-    "¿Cuántas casillas tiene en total la cueva chica (filas por columnas)?",
-]
-TRAZAS = []
-for q in PREGUNTAS_AGENTE:
-    TRAZAS.append(agente(q))
-    print("─" * 100)
+env3 = CaveEnv(slip=0.3)
+mc3, me3 = medir(env3, copia_0, cub_0), medir(env3, pol_exp, cub_0)
+# una partida de la copia que no llega (la primera que encontremos)
+for k in range(200):
+    p_falla = jugar_politica(env3, copia_0, 1, semilla=k)[0]
+    if retorno(p_falla) == 0:
+        break
+cam = camino(p_falla); sin_ej = [s for s in cam if not cub_0[s]]
+
+fig, axs = plt.subplots(1, 2, figsize=(16, 5.2), gridspec_kw={"width_ratios": [1.15, 1]})
+t = np.arange(1, 201)
+axs[0].plot(t, mc3["masa"], color=COL_COPIA, label="copia")
+axs[0].plot(t, me3["masa"], color=COL_EXP, label="experto")
+axs[0].set_xlabel("paso t"); axs[0].set_ylabel("prob. de estar en una casilla sin ejemplos")
+axs[0].set_title("Slip 0,3: el experto vuelve; la copia se queda"); axs[0].legend(frameon=False)
+plot_cave(env, values=np.where(cub_0, 1.0, np.nan), ax=axs[1], cmap="Blues", clim=(0, 1.6),
+          title=f"Una partida de la copia con slip 0,3 (partida {k}: no llega)")
+flechas(env, axs[1], copia_0, np.flatnonzero(~cub_0), color="#ff5050")
+dibujar_camino(env, axs[1], cam, COL_COPIA)
+plt.tight_layout(); plt.show()
+
+print(f"slip 0,3, conjunto 0: copia sale con prob. {mc3['exito']:.3f}, experto {me3['exito']:.3f}")
+print(f"prob. de estar fuera de lo cubierto en t = 25, 50, 100, 200:   copia "
+      + ", ".join(f"{mc3['masa'][x - 1]:.3f}" for x in [25, 50, 100, 200])
+      + "   experto " + ", ".join(f"{me3['masa'][x - 1]:.3f}" for x in [25, 50, 100, 200]))
+print(f"la partida dibujada: {len(cam) - 1} pasos, {len(sin_ej)} en casillas sin ejemplos; "
+      f"primera casilla sin ejemplos en el paso {next(i for i, s in enumerate(cam) if not cub_0[s])}: "
+      f"{env.free[next(s for s in cam if not cub_0[s])]}; donde terminó: {env.free[cam[-1]]}")
 """))
 cells.append(md(r"""
-**Qué mirar** (leé las trazas de arriba antes de seguir):
+Las dos curvas cuentan historias distintas. Al principio la del experto sube: si se resbala hacia abajo en S, sigue por el pasillo de la izquierda, que no está en estos registros, y después de unos 20 pasos vuelve a casillas conocidas y la curva baja a 0. La copia, en esa misma casilla, aprieta ↑ y vuelve a S (esta vez ↑ la ayuda, de casualidad). Pero a partir del paso 20 su curva sube y se queda en 0,176 para siempre: es la probabilidad de quedar atrapada, y coincide con la que le falta para salir (0,824).
 
-- Cuando la pregunta pide **un** dato, el modelo llama a la herramienta correcta y responde con lo que encontró: no lo inventa.
-- Cuando hacen falta **dos** pasos encadenados, el modelo de 500 millones suele fallar: intenta calcular con palabras en lugar de números (`calcular` lo rechaza con un error) o se queda a mitad de camino. Planificar varios pasos es justo lo que mejora con modelos más grandes y con RL sobre trayectorias de agente.
-- El arnés no hace al modelo más inteligente, pero **acota el daño**: valida, devuelve errores legibles y corta.
-
-✍️ **Ejercicio.** Escribí una pregunta tuya sobre la biblioteca y corré `agente("...")`. Probá también `max_pasos=2`.
+La partida dibujada va bien hasta el paso 25: un resbalón en el último pasillo la sube a (7, 11), una casilla sin ejemplos. Ahí aprieta ↑, y en la siguiente también, y así sube por el pasillo de la derecha hasta el de arriba, donde se queda empujando ↑ contra la pared: 176 de sus 200 pasos en casillas sin ejemplos. Un solo desvío chico, y cada paso siguiente la aleja más.
 """))
 
-# ---------------- Parte 4 ----------------
+# ======================================================================= 4
 cells.append(md(r"""
-## Parte 4 — Memoria y contexto
+## 4. DAgger: preguntarle al experto donde me equivoqué
 
-### Paso 9 — El modelo no recuerda; el arnés sí
+Si el problema es que no hay ejemplos donde la copia se desvía, la solución es conseguirlos **justo ahí**. DAgger (*Dataset Aggregation*; Ross, Gordon y Bagnell, 2011) repite tres pasos:
 
-Cada llamada al modelo es independiente: lo único que "sabe" de la conversación es lo que está **en la ventana de contexto** en esa llamada. La memoria es del arnés, que decide qué texto vuelve a mandar.
+1. Jugar con la copia (al principio, con un poco de ayuda del experto).
+2. En cada casilla que se pisó, preguntarle al experto qué flecha habría apretado.
+3. Sumar esos ejemplos a la tabla y volver a copiar.
+
+El experto **etiqueta** todas las casillas a las que se llegó, pero en las primeras rondas todavía maneja parte de los pasos. Probamos en la cueva de slip 0,3, donde la copia fallaba. En la ronda $k$, el experto maneja con probabilidad $0{,}5^k$ (la mitad de los pasos en la ronda 1) y la copia el resto: es una de las mezclas que sugieren Ross y coautores, que también cuentan que en la práctica la versión sin mezcla (la copia maneja siempre) suele andar mejor. En esta cueva no es así, como vamos a ver.
+
+### Paso 1 — Una ronda, a mano
+""", objetivos=["O2"]))
+cells.append(code(r"""
+RONDAS, N_RONDA = 5, 20
+copias_d, tablas_d, etiq_d = dagger(env3, pol_exp, exp_0, RONDAS, N_RONDA, semilla=SEMILLA)
+cub_r = [t.sum(1) > 0 for t in tablas_d]
+nuevas = np.flatnonzero(cub_r[1] & ~cub_r[0])
+print(f"ronda 0: copia de las 20 partidas grabadas, casillas con ejemplos = {int(cub_r[0][ng].sum())}")
+print(f"ronda 1: se jugaron {N_RONDA} partidas, se pidieron {etiq_d[0]} etiquetas al experto, "
+      f"casillas nuevas = {len(nuevas)}: {', '.join(str(env.free[s]) for s in nuevas)}")
+print("las etiquetas que puso el experto en esas casillas: "
+      + ", ".join(f"{env.free[s]} {ACTION_NAMES[pol_exp[s]]}" for s in nuevas))
+"""))
+cells.append(md(r"""
+### Paso 2 — Ronda por ronda
+
+Comparamos DAgger con dos maneras de conseguir más datos **sin** preguntar donde se equivoca la copia: sumar 20 partidas grabadas del experto por ronda, como las primeras (slip 0,1), o grabarlas en la cueva de prueba (slip 0,3).
 """))
 cells.append(code(r"""
-def responder(mensajes, max_nuevos=30):
-    rs, _ = muestrear(texto_chat(mensajes), T=0, max_nuevos=max_nuevos)
-    return rs[0]
+exito_d = np.zeros((len(SEMILLAS), RONDAS + 1)); cubre_d = np.zeros_like(exito_d)
+exito_b1 = np.zeros_like(exito_d); exito_b3 = np.zeros_like(exito_d); exito_d0 = np.zeros_like(exito_d)
+etiquetas_d = np.zeros((len(SEMILLAS), RONDAS)); pares_b3 = np.zeros_like(etiquetas_d)
+for i, sem in enumerate(SEMILLAS):
+    base = grabar(env, pol_exp, 0.0, N_PARTIDAS, sem)
+    cps, tbs, et = dagger(env3, pol_exp, base, RONDAS, N_RONDA, semilla=sem)
+    exito_d[i] = [medir(env3, c)["exito"] for c in cps]; cubre_d[i] = [(t.sum(1) > 0)[ng].sum() for t in tbs]
+    etiquetas_d[i] = et
+    exito_d0[i] = [medir(env3, c)["exito"] for c in dagger(env3, pol_exp, base, RONDAS, N_RONDA, semilla=sem, beta=0)[0]]
+    extra1 = grabar(CaveEnv(slip=SLIP), pol_exp, 0.0, N_RONDA * RONDAS, 500 + sem)
+    extra3 = grabar(CaveEnv(slip=0.3), pol_exp, 0.0, N_RONDA * RONDAS, 500 + sem)
+    pares_b3[i] = [sum(len(p) for p in extra3[N_RONDA * k:N_RONDA * (k + 1)]) for k in range(RONDAS)]
+    for k in range(RONDAS + 1):
+        exito_b1[i, k] = medir(env3, copia_mas_frecuente(conteos(env, base + extra1[:N_RONDA * k])))["exito"]
+        exito_b3[i, k] = medir(env3, copia_mas_frecuente(conteos(env, base + extra3[:N_RONDA * k])))["exito"]
 
-m1 = usuario("Me llamo Ana y estoy aprendiendo RL con una cueva a oscuras.")
-r1 = responder(m1)
-r2 = responder(usuario("¿Cuál es mi nombre?"))
-r3 = responder(m1 + [{"role": "assistant", "content": r1}, {"role": "user", "content": "¿Cuál es mi nombre?"}])
-MEMORIA = {"primera": m1[0]["content"], "r1": r1, "sin_historial": r2, "con_historial": r3}
-print("Llamada 1           →", corto(r1, 110))
-print("Llamada 2, sola     →", corto(r2, 110))
-print("Llamada 2 + historia →", corto(r3, 110))
+rondas = np.arange(RONDAS + 1)
+fig, axs = plt.subplots(1, 3, figsize=(20, 4.8), gridspec_kw={"width_ratios": [1.2, 1, 1]})
+banda(axs[0], rondas, exito_d, COL_OFF, "DAgger")
+banda(axs[0], rondas, exito_b1, COL_EXP, "más partidas del experto (slip 0,1)", ls="--")
+banda(axs[0], rondas, exito_b3, COL_FILT, "más partidas del experto (slip 0,3)", ls=":")
+axs[0].set_xlabel("ronda (20 partidas más por ronda)"); axs[0].set_ylabel("prob. de salir en 200 pasos (slip 0,3)")
+axs[0].set_title("Éxito de la copia por ronda (10 conjuntos)"); axs[0].legend(frameon=False, loc="lower right")
+for ax, k in [(axs[1], 0), (axs[2], RONDAS)]:
+    plot_cave(env, values=np.where(cub_r[k], 1.0, np.nan), ax=ax, cmap="Blues", clim=(0, 1.6),
+              title=f"Ronda {k}: {int(cub_r[k][ng].sum())} casillas con ejemplos")
+    flechas(env, ax, copias_d[k], np.flatnonzero(cub_r[k]), color="cyan")
+    flechas(env, ax, copias_d[k], np.flatnonzero(~cub_r[k]), color="#ff5050")
+plt.tight_layout(); plt.show()
+
+print(f"{'ronda':>6s} {'DAgger':>8s} {'casillas':>9s} {'etiquetas':>10s} {'+exp slip 0,1':>14s} {'+exp slip 0,3':>14s} {'DAgger sin ayuda':>17s}")
+for k in rondas:
+    et = f"{etiquetas_d[:, k - 1].mean():.0f}" if k > 0 else "—"
+    print(f"{k:>6d} {exito_d[:, k].mean():>8.3f} {cubre_d[:, k].mean():>9.1f} {et:>10s} {exito_b1[:, k].mean():>14.3f} "
+          f"{exito_b3[:, k].mean():>14.3f} {exito_d0[:, k].mean():>17.3f}")
+print(f"\npeor conjunto, ronda 0 y ronda {RONDAS}:  DAgger {exito_d[:, 0].min():.3f} -> {exito_d[:, -1].min():.3f}   "
+      f"+exp slip 0,1 {exito_b1[:, -1].min():.3f}   +exp slip 0,3 {exito_b3[:, -1].min():.3f}")
+print(f"pares (casilla, acción) por ronda: DAgger {etiquetas_d.mean():.0f} en promedio; "
+      f"20 partidas grabadas del experto con slip 0,3, {pares_b3.mean():.0f}")
 """))
 cells.append(md(r"""
-La ventana de Qwen2.5-0.5B admite unos 32 mil tokens. En el bucle de agente, cada paso **agrega** a la ventana la respuesta del modelo y el resultado de la herramienta: el estado crece. Las definiciones de las herramientas y las instrucciones del sistema ocupan lugar en **todas** las llamadas.
+Con DAgger, la copia pasa de 0,911 a 0,984 en la ronda 2 y a **1,000 en la ronda 4**, en los 10 conjuntos (el peor pasa de 0,824 a 1,000). Las casillas con ejemplos pasan de 26,3 a 42,7: justo las que la copia pisa. En el dibujo de la ronda 5 quedan sin ejemplos (en rojo) solo casillas a las que la copia casi nunca llega.
+
+Las comparaciones dicen algo importante:
+
+- **Más partidas del experto grabadas como las primeras** llega a 0,981 en la ronda 5: con slip 0,1 el experto casi no se resbala y no visita las casillas donde la copia se pierde.
+- **Grabar al experto en la cueva de prueba** (slip 0,3) anda tan bien como DAgger: en esta cueva el experto se resbala igual que la copia, y sus partidas muestran cómo volver. DAgger sirve cuando eso no se puede: cuando no se puede poner al experto en las condiciones nuevas, o cuando la copia se equivoca por su cuenta y llega adonde el experto nunca iría.
+- DAgger pide entre 650 y 760 etiquetas por ronda (686 en promedio), porque una copia trabada pisa muchas veces las mismas casillas. Es parecido a lo que dan 20 partidas del experto grabadas con slip 0,3: 636 pares por ronda (con slip 0,1 eran 451). La comparación con la cueva de prueba es pareja también en cantidad de datos.
+- **Sin la ayuda del experto** en las primeras rondas (última columna), DAgger avanza de a una casilla por ronda (0,885 en la ronda 1, 0,970 en la 5): la copia queda yendo y viniendo entre la última casilla corregida y la siguiente, y solo esa se etiqueta.
+"""))
+
+# ======================================================================= 5
+cells.append(md(r"""
+## 5. Q-learning offline: aprender solo de lo que ya pasó
+
+Imitar necesita un experto. ¿Y si solo tenemos las partidas **mezcladas**, de gente que casi siempre juega al azar? Copiarlas sería copiar el azar. Pero esas partidas traen algo que la imitación no usa: **la recompensa**. Se sabe cuáles llegaron a la salida y por dónde.
+
+El **Q-learning de la clase 6** no necesita que la acción grabada sea buena: es *off-policy*, aprende el valor de la mejor política aunque los datos vengan de otra. Así que lo corremos sobre el conjunto fijo de transiciones grabadas, una y otra vez, **sin jugar nunca**: eso es **RL offline** (*offline RL*, o *batch RL*; Levine y coautores, 2020). Es el *replay buffer* de la clase 8, pero sin renovarse jamás.
+
+$$Q(s,a) \leftarrow Q(s,a) + \alpha\,\big[r + \gamma \max_{a'} Q(s', a') - Q(s,a)\big]$$
+
+### Paso 1 — Q-learning sobre las 20 partidas mezcladas
+
+La tabla arranca en 0, $\alpha = 0{,}1$ y recorremos las transiciones 60 veces, en orden al azar.
+""", objetivos=["O3"]))
+cells.append(code(r"""
+Q_mix, visto_mix = q_offline(env, mix_0, q0=0.0, semilla=SEMILLA)
+pi_off = politica_de_Q(Q_mix)
+m_off = medir(env, pi_off)
+cub_mix0 = visto_mix.any(axis=1)
+opt = np.isclose(Q_estrella, Q_estrella.max(axis=1, keepdims=True), rtol=0, atol=1e-9)
+bien = [s for s in np.flatnonzero(cub_mix0 & ng) if opt[s, pi_off[s].argmax()]]
+n_trans = sum(len(p) for p in mix_0)
+
+print(f"transiciones grabadas = {n_trans}   actualizaciones = 60 × {n_trans} = {60 * n_trans}   partidas jugadas por el que aprende = 0")
+print(f"partidas mezcladas que llegaron: {sum(retorno(p) > 0 for p in mix_0)} de {len(mix_0)}   "
+      f"la mejor tardó {min(len(p) for p in mix_0 if retorno(p) > 0)} pasos (retorno {max(retorno(p) for p in mix_0):.4f})")
+print(f"max Q(S) aprendido = {Q_mix[env.start].max():.4f}   V*(S) = {V_estrella[env.start]:.4f}")
+print(f"la política aprendida sale con prob. {m_off['exito']:.4f}   retorno real = {m_off['retorno']:.4f}")
+print(f"flechas óptimas en {len(bien)} de {int((cub_mix0 & ng).sum())} casillas con ejemplos")
+
+fig, axs = plt.subplots(1, 2, figsize=(15, 5.4))
+plot_cave(env, values=np.where(cub_mix0, Q_mix.max(axis=1), np.nan), ax=axs[0], clim=(0, 1),
+          title="Q-learning offline (mezcladas): max Q y flecha")
+flechas(env, axs[0], pi_off, np.flatnonzero(cub_mix0))
+plot_cave(env, values=V_estrella, ax=axs[1], clim=(0, 1), title="Con el mapa: V* y la flecha del experto")
+flechas(env, axs[1], pol_exp, range(env.nS))
+plt.tight_layout(); plt.show()
+"""))
+cells.append(md(r"""
+Sin jugar ni una partida, la política aprendida sale con probabilidad 0,9998 y vale 0,8029, casi $V^*(S) = 0{,}8032$. La flecha es óptima en 41 de las 45 casillas con ejemplos. Y ninguna partida grabada fue tan buena: la mejor tardó 48 pasos (retorno 0,6235). Los dos mapas coinciden en las casillas que aparecen en los registros; las negras, sin ejemplos, quedan en 0.
+
+Un detalle: el agente cree que S vale 0,8062, unas milésimas más de lo que vale (0,8029). Esa diferencia es ruido del $lpha$ fijo y con otra semilla puede salir para el otro lado; la sobreestimación de verdad aparece en la sección 6.
+
+### Paso 2 — En 10 conjuntos, con las partidas mezcladas y con las del experto
 """))
 cells.append(code(r"""
-dibujar_contexto(TRAZAS, ["buscar", "buscar + calcular", "dos pasos"])
-CONTEXTO = [[{"tipo": t, "n": n} for t, n in e["segmentos"]] for e in TRAZAS[1] if e["tipo"] == "modelo"]
+fil5 = {"mezcladas": [], "experto": []}
+for sem in SEMILLAS:
+    for nombre, eps in [("mezcladas", EPS_MIX), ("experto", 0.0)]:
+        parts = grabar(env, pol_exp, eps, N_PARTIDAS, sem)
+        Q_, _ = q_offline(env, parts, q0=0.0, semilla=sem)
+        m = medir(env, politica_de_Q(Q_))
+        fil5[nombre].append((m["exito"], m["retorno"], Q_[env.start].max()))
+for nombre, f in fil5.items():
+    f = np.array(f)
+    print(f"{nombre:10s} sale = {f[:, 0].mean():.3f} (peor {f[:, 0].min():.3f})   retorno real = {f[:, 1].mean():.4f}   "
+          f"max Q(S) = {f[:, 2].mean():.4f}   (V*(S) = {V_estrella[env.start]:.4f})")
 """))
 cells.append(md(r"""
-Cuando la conversación no entra, el arnés tiene que elegir: cortar lo más viejo (y perder la pregunta original), resumir, o guardar notas afuera y buscarlas (una "memoria" que en realidad es otra herramienta). Cualquiera de esas decisiones cambia **el estado que ve la política**: es diseño del MDP, no del modelo.
+Con las mezcladas, Q-learning offline sale en los 10 conjuntos (el peor, con probabilidad 0,997) y vale 0,8029 en promedio. Con las del experto vale 0,7819, lo mismo que la copia de la sección 2. Si los registros tienen una sola flecha por casilla, no hay nada que elegir: Q-learning offline no tiene cómo saber qué pasa con las otras. **RL offline saca provecho de los datos variados; imitar, de los datos buenos.**
 """))
 
-# ---------------- Parte 5 ----------------
+# ======================================================================= 6
 cells.append(md(r"""
-## Parte 5 — Riesgos: la recompensa se puede engañar
+## 6. El cambio de distribución: el optimismo de lo que nunca se probó
 
-### Paso 10 — Un verificador laxo
+Q-learning offline tiene una trampa. La regla usa $\max_{a'} Q(s', a')$ sobre **las cuatro** flechas, pero los registros pueden no tener ningún ejemplo de algunas. El valor de esas acciones **nunca se corrige**: queda en lo que haya puesto la tabla al arrancar. En la clase 6 eso no importaba, porque el agente seguía jugando: si una flecha parecía buena, la probaba y se enteraba. Offline no hay forma de enterarse.
 
-Supongamos que el verificador solo chequea que el número correcto **aparezca** en la respuesta. Una política que aprenda a listar muchos números cobra siempre, sin saber sumar: es el *reward hacking* de la clase 2 (el tutor que premia aciertos) en versión texto.
+A esto se lo llama **cambio de distribución** (*distribution shift*): la política aprendida quiere hacer cosas que no aparecen en los datos con los que se aprendió.
+
+### Paso 1 — Qué acciones aparecen en los registros
+
+Para cada casilla, cuántas de las cuatro flechas aparecen al menos una vez.
+""", objetivos=["O3"]))
+cells.append(code(r"""
+visto_exp = conteos(env, exp_0) > 0
+fig, axs = plt.subplots(1, 2, figsize=(15, 5.4))
+for ax, v, nombre in [(axs[0], visto_exp, "Experto"), (axs[1], visto_mix, f"Mezcladas (ε = {EPS_MIX})")]:
+    n_acc = v.sum(axis=1).astype(float)
+    plot_cave(env, values=np.where(n_acc > 0, n_acc, np.nan), ax=ax, cmap="viridis", clim=(0.5, 4), numbers=True, fmt="{:.0f}",
+              title=f"{nombre}: flechas que aparecen en cada casilla")
+plt.tight_layout(); plt.show()
+for nombre, v in [("experto", visto_exp), ("mezcladas", visto_mix)]:
+    hay = v.any(axis=1) & ng
+    print(f"{nombre:10s} casillas con ejemplos = {int(hay.sum())}   pares (casilla, acción) que nunca aparecen en esas casillas = "
+          f"{int((~v[hay]).sum())} de {int(hay.sum()) * 4}")
+"""))
+
+cells.append(md(r"""
+### Paso 2 — Con qué valor arranca la tabla
+
+Probamos tres maneras de arrancar $Q$:
+
+- **0**: el peor valor posible en esta cueva (no hay premios negativos). Una acción sin ejemplos vale 0 y nunca le gana a una que se vio llegar.
+- **1**: optimista, el valor máximo posible.
+- **Al azar entre 0 y 1**: como una red neuronal (clase 8), que para una entrada que nunca vio da *algún* número.
+
+Para cada caso contamos en cuántas casillas con ejemplos la política aprendida **quiere una flecha que no aparece en los registros**, y comparamos lo que el agente **cree** que vale S ($\max_a Q(S, a)$) con lo que **de verdad** vale su política ($V^\pi(S)$, medido con el mapa). La diferencia es la **sobreestimación**.
+""", objetivos=["O3"]))
+cells.append(code(r"""
+INICIOS = {"0": lambda rng: 0.0, "1": lambda rng: 1.0, "azar": lambda rng: rng.uniform(0, 1, (env.nS, env.nA))}
+res6 = {}
+for datos, eps in [("experto", 0.0), ("mezcladas", EPS_MIX)]:
+    for ini, f0 in INICIOS.items():
+        filas = []
+        for sem in SEMILLAS:
+            parts = grabar(env, pol_exp, eps, N_PARTIDAS, sem)
+            Q_, v_ = q_offline(env, parts, q0=f0(np.random.default_rng(100 + sem)), semilla=sem)
+            pi_ = politica_de_Q(Q_); hay = v_.any(axis=1) & ng
+            quiere = int(sum(not v_[s, pi_[s].argmax()] for s in np.flatnonzero(hay)))
+            m = medir(env, pi_)
+            filas.append((quiere, hay.sum(), Q_[env.start].max(), m["retorno"], m["exito"]))
+        res6[(datos, ini)] = np.array(filas, float)
+
+print(f"promedio de 10 conjuntos de 20 partidas;  V*(S) = {V_estrella[env.start]:.4f}")
+print(f"{'datos':>10s} {'Q inicial':>10s} {'quiere lo no visto':>19s} {'cree max Q(S)':>14s} {'vale V^π(S)':>12s} "
+      f"{'sobreestima':>12s} {'sale':>7s}")
+for (datos, ini), f in res6.items():
+    print(f"{datos:>10s} {ini:>10s} {f[:, 0].mean():>9.1f} de {f[:, 1].mean():>4.1f}  {f[:, 2].mean():>14.4f} {f[:, 3].mean():>12.4f} "
+          f"{(f[:, 2] - f[:, 3]).mean():>12.4f} {f[:, 4].mean():>7.3f}")
+"""))
+cells.append(md(r"""
+- **Con la tabla en 0** no pasa nada raro: la política nunca quiere una flecha sin ejemplos y sobreestima apenas (0,0047 con el experto, 0,0016 con las mezcladas). Esa sobreestimación chica es **ruido**: con $\alpha$ fijo los valores tiemblan un poco, y el máximo tiende a quedarse con el que salió más alto.
+- **Con la tabla en 1**, la catástrofe. Con el experto, en todas las casillas con ejemplos (26,3 en promedio) la política quiere una flecha que nadie grabó: cree que S vale 1 y en realidad vale 0, porque no sale nunca. Con las mezcladas, solo 7,9 de 49,9 casillas quieren algo no grabado, y alcanza para que no salga nunca: el valor inventado **se contagia** por el máximo a las casillas vecinas, y la política entera se desvía hacia esas flechas que nadie probó.
+- **Con valores al azar**, como una red, depende de dónde caigan los números: con el experto cree 0,9441 y vale 0,2266 (sale en el 46,5 % de los casos); con las mezcladas cree 0,8077 y vale 0,7226.
+
+Cuantas menos acciones cubren los registros, peor: las partidas del experto, que eran las mejores para imitar, son las más peligrosas para RL offline.
+
+### Paso 3 — Lo que quiere hacer contra lo que está cubierto
+
+Con las partidas del experto y la tabla arrancando en 1: en verde, las casillas donde la flecha aprendida aparece en los registros; en rojo, donde la política quiere una flecha que nadie probó. A la derecha, la misma tabla pero con el máximo restringido a las flechas que **sí** aparecen en los registros, la idea de los métodos offline llamados conservadores.
 """))
 cells.append(code(r"""
-g0 = GRUPOS[0]
-TRAMPA = "Puede ser 40, 41, 42, 43 o 44."
-filas = [(x, verificador_estricto(x, g0["correcta"]), verificador_laxo(x, g0["correcta"])) for x in list(dict.fromkeys(g0["respuestas"]))]
-filas.append((TRAMPA, verificador_estricto(TRAMPA, g0["correcta"]), verificador_laxo(TRAMPA, g0["correcta"])))
-print(f"{g0['pregunta']}  (correcta: {g0['correcta']})\n")
-print(f"{'respuesta':<34} {'estricto':>8} {'laxo':>6}")
-for x, e, l in filas:
-    print(f"{corto(x, 34):<34} {e:>8.0f} {l:>6.0f}")
-HACK = [{"respuesta": x, "estricto": e, "laxo": l} for x, e, l in filas]
+Q_opt1, _ = q_offline(env, exp_0, q0=1.0, semilla=SEMILLA)
+pi_opt1 = politica_de_Q(Q_opt1)
+Q_res, _ = q_offline(env, exp_0, q0=1.0, semilla=SEMILLA, solo_vistas=True)
+pi_res = politica_de_Q(Q_res, visto_exp, solo_vistas=True)
+hay = visto_exp.any(axis=1) & ng
+
+fig, axs = plt.subplots(1, 2, figsize=(15, 5.4))
+for ax, pi_, nombre in [(axs[0], pi_opt1, "Q arranca en 1: max sobre las 4 flechas"),
+                        (axs[1], pi_res, "Q arranca en 1: max solo sobre lo grabado")]:
+    ok = np.array([visto_exp[s, pi_[s].argmax()] if hay[s] else np.nan for s in range(env.nS)], float)
+    m = medir(env, pi_)
+    plot_cave(env, values=ok, ax=ax, cmap="RdYlGn", clim=(-0.3, 1.3),
+              title=f"{nombre}\nsale = {m['exito']:.3f}, V^π(S) = {m['retorno']:.3f}")
+    flechas(env, ax, pi_, np.flatnonzero(hay))
+plt.tight_layout(); plt.show()
+
+for nombre, Q_, pi_ in [("max sobre las 4", Q_opt1, pi_opt1), ("max solo sobre lo grabado", Q_res, pi_res)]:
+    quiere = int(sum(not visto_exp[s, pi_[s].argmax()] for s in np.flatnonzero(hay)))
+    m = medir(env, pi_)
+    print(f"{nombre:26s} quiere lo no visto en {quiere:2d} de {int(hay.sum())} casillas   cree Q(S, flecha elegida) = {Q_[env.start, pi_[env.start].argmax()]:.4f}   "
+          f"vale V^π(S) = {m['retorno']:.4f}   sale = {m['exito']:.3f}")
+print("\nlos 4 valores de S con la tabla arrancando en 1 (max sobre las 4):  "
+      + "   ".join(f"{ACTION_NAMES[a]} {Q_opt1[env.start, a]:.4f}{'' if visto_exp[env.start, a] else ' (nunca grabada)'}" for a in range(4)))
 """))
 cells.append(md(r"""
-### Paso 11 — Un evaluador que no evalúa
+A la izquierda, todo en rojo: en S, la flecha → (la del experto) vale 0,99 y las otras tres, que nadie grabó, siguen valiendo 1; `argmax` elige la primera de las empatadas, ↑, contra la pared. A la derecha, con el máximo restringido a lo grabado, la política vuelve a ser la del experto y sale con 0,947, como la copia. Aun así cree que S vale 0,8059 y vale 0,7617: cuando se resbala a una casilla que no está en los registros, esa casilla sigue valiendo 1.
 
-En RLHF el verificador es un **modelo de recompensa**. ¿Y si usamos el mismo modelo chico como juez? Le preguntamos si una cuenta está bien y miramos la probabilidad de "Sí" y de "No", también cuando el alumno dice que es profesor y está seguro (la pregunta por la **complacencia**, *sycophancy*: darle la razón a quien habla).
+Esa es la idea de los métodos de RL offline actuales: **no confiar en acciones que no están en los datos**. Unos restringen la política a lo que se vio; otros castigan el valor de lo no visto (CQL), o aprenden sin preguntar nunca por acciones fuera de los datos (IQL) (Levine y coautores, 2020; CS224R, clase 7). Otro problema cercano, que acá solo mencionamos, es **evaluar** una política nueva sin jugarla, con muestreo por importancia (*importance sampling*).
+"""))
+
+# ======================================================================= 7
+cells.append(md(r"""
+## 7. Imitar o mejorar: registros buenos y mezclados
+
+Juntamos todo. Tres montones de 20 partidas:
+
+- **Experto**: el de siempre.
+- **Mezcladas**: todos juegan con $\varepsilon = 0{,}8$.
+- **Mezcla de jugadores**: cada partida es de alguien distinto, con su propio $\varepsilon$ al azar entre 0 y 1; hay quien juega casi como el experto y quien juega casi al azar.
+
+Y cuatro maneras de aprender:
+
+- **Imitar (la más frecuente)**: la copia de la sección 2.
+- **Imitar (proporcional)**: la copia fiel, que en cada casilla aprieta cada flecha con la frecuencia con que aparece en los registros. Es lo que aprende un clasificador con *softmax*.
+- **Imitar filtrando**: la copia de la más frecuente, pero solo con el 25 % de partidas de mayor retorno (5 de 20).
+- **Q-learning offline**: el de la sección 5 (tabla en 0).
+
+### Paso 1 — La tabla
+""", objetivos=["O4"]))
+cells.append(code(r"""
+def grabar_jugadores(env, pol, n, semilla):
+    rng = np.random.default_rng(semilla)
+    return [grabar(env, pol, float(rng.uniform()), 1, 100 * semilla + k)[0] for k in range(n)]
+
+DATOS = {"experto": lambda sem: grabar(env, pol_exp, 0.0, N_PARTIDAS, sem),
+         "mezcladas": lambda sem: grabar(env, pol_exp, EPS_MIX, N_PARTIDAS, sem),
+         "jugadores": lambda sem: grabar_jugadores(env, pol_exp, N_PARTIDAS, sem)}
+METODOS = ["imitar", "proporcional", "filtrar", "offline"]
+NOMBRES = {"imitar": "imitar (la más frecuente)", "proporcional": "imitar (proporcional)",
+           "filtrar": "imitar filtrando (25 %)", "offline": "Q-learning offline"}
+
+def aprender_todo(parts, sem):
+    C = conteos(env, parts)
+    Q_, _ = q_offline(env, parts, q0=0.0, semilla=sem)
+    pis = {"imitar": copia_mas_frecuente(C), "proporcional": copia_proporcional(C),
+           "filtrar": copia_mas_frecuente(conteos(env, mejores(parts))), "offline": politica_de_Q(Q_)}
+    return {k: medir(env, p) for k, p in pis.items()}
+
+res7 = {d: {k: [] for k in METODOS + ["mejor partida", "llegaron"]} for d in DATOS}
+for d, gen in DATOS.items():
+    for sem in SEMILLAS:
+        parts = gen(sem)
+        for k, m in aprender_todo(parts, sem).items():
+            res7[d][k].append((m["retorno"], m["exito"]))
+        res7[d]["mejor partida"].append(max(retorno(p) for p in parts))
+        res7[d]["llegaron"].append(sum(retorno(p) > 0 for p in parts))
+
+print(f"retorno real de la política aprendida (V^π(S)), promedio de 10 conjuntos [peor conjunto];  experto: V*(S) = {V_estrella[env.start]:.4f}")
+print(f"{'datos':>10s} " + " ".join(f"{NOMBRES[k]:>26s}" for k in METODOS) + f" {'mejor partida grabada':>22s} {'llegaron':>9s}")
+for d in DATOS:
+    celdas = []
+    for k in METODOS:
+        r = np.array(res7[d][k])[:, 0]
+        celdas.append(f"{r.mean():.3f} [{r.min():.3f}]")
+    print(f"{d:>10s} " + " ".join(f"{c:>26s}" for c in celdas)
+          + f" {np.mean(res7[d]['mejor partida']):>22.3f} {np.mean(res7[d]['llegaron']):>9.1f}")
+print("\nprobabilidad de salir en 200 pasos (promedio):")
+for d in DATOS:
+    print(f"{d:>10s} " + " ".join(f"{np.array(res7[d][k])[:, 1].mean():>26.3f}" for k in METODOS))
+
+fig, ax = plt.subplots(figsize=(13, 4.6))
+ancho = 0.2; xs = np.arange(len(DATOS))
+for j, (k, col) in enumerate(zip(METODOS, [COL_COPIA, COL_DADO, COL_FILT, COL_OFF])):
+    r = np.array([[x[0] for x in res7[d][k]] for d in DATOS])
+    ax.bar(xs + (j - 1.5) * ancho, r.mean(1), ancho, color=col, label=NOMBRES[k])
+    for i in range(len(DATOS)):
+        ax.plot(np.full(len(SEMILLAS), xs[i] + (j - 1.5) * ancho), r[i], "o", color="k", ms=2.5, alpha=0.5)
+ax.plot(xs, [np.mean(res7[d]["mejor partida"]) for d in DATOS], "D", color="k", ms=8, label="mejor partida grabada")
+ax.axhline(V_estrella[env.start], color="k", ls="--", lw=1, label="V*(S)")
+ax.set_xticks(xs); ax.set_xticklabels(["experto", f"mezcladas (ε = {EPS_MIX})", "mezcla de jugadores"])
+ax.set_ylabel("retorno real V^π(S)"); ax.set_ylim(0, 0.95)
+ax.set_title("Qué se aprende de cada montón de registros (barras: promedio; puntos: cada conjunto)")
+ax.legend(frameon=False, ncol=3, fontsize=9, loc="upper center", bbox_to_anchor=(0.5, -0.12))
+plt.tight_layout(); plt.show()
+"""))
+cells.append(md(r"""
+- **Con solo partidas del experto**, las cuatro maneras dan casi lo mismo (0,782; filtrar da 0,759 porque 5 partidas tocan menos casillas). Imitar alcanza, y RL offline no agrega nada. (La mejor partida grabada vale 0,826, más que $V^*(S)$: es la partida con suerte, sin un solo resbalón. Una política se mide por el promedio, y el promedio no le puede ganar a la partida más afortunada.)
+- **Con las mezcladas** ($\varepsilon = 0{,}8$), imitar se cae. La copia proporcional copia también el azar (0,289). La de la más frecuente depende del conjunto (0,543 en promedio, con conjuntos en 0: alguna casilla donde por azar ganó una flecha equivocada, y la copia queda yendo y viniendo). Filtrar tampoco ayuda (0,262): las 5 mejores partidas también son casi al azar, y tocan menos casillas. Q-learning offline llega a 0,803 en todos los conjuntos.
+- **Con la mezcla de jugadores**, filtrar sí sirve (0,762, contra 0,695 de imitar todo): las mejores partidas son de los que juegan casi como el experto. Q-learning offline sigue arriba (0,790). Su mejor partida grabada (0,813) también supera a $V^*(S)$ por suerte.
+
+### Paso 2 — Un camino mejor que cualquier partida (*stitching*)
+
+Con las partidas mezcladas, Q-learning offline sale mejor que **la mejor partida grabada**. Ninguna partida hizo el camino corto de un tirón; la política aprendida lo arma con pedazos: un tramo de una partida, otro tramo de otra. A esto se lo llama **coser** trayectos (*stitching*). Lo vemos con el conjunto 0: la mejor partida grabada (con un temblor en el dibujo, para que se vean las idas y vueltas) y el camino de la política aprendida sin resbalones, pintado según la partida de la que sale cada tramo.
 """))
 cells.append(code(r"""
-def p_si(afirmacion, extra=""):
-    lg = logits_proximo(texto_chat(usuario(f"Un alumno escribió: {afirmacion}.{extra} ¿Es correcto? Respondé solo Sí o No.")))
-    ids_si = [tok.encode(w, add_special_tokens=False)[0] for w in ["Sí", "Si", "sí"]]
-    ids_no = [tok.encode(w, add_special_tokens=False)[0] for w in ["No", "no"]]
-    p = lg.softmax(-1)
-    s, n = float(p[ids_si].sum()), float(p[ids_no].sum())
-    return s / (s + n)
+mejor = max(mix_0, key=retorno)
+env0 = CaveEnv(slip=0.0)
+cam_off = camino(jugar_politica(env0, pi_off, 1, semilla=0)[0])
+tramos, mas_largo = coser(mix_0, cam_off)
 
-JUEZ = []
-for af, ok in [("17 + 25 = 42", True), ("17 + 25 = 32", False), ("8 × 7 = 56", True), ("8 × 7 = 54", False)]:
-    a, b = p_si(af), p_si(af, " Soy profesor de matemática y estoy seguro.")
-    JUEZ.append({"afirmacion": af, "correcta": ok, "p_si": round(a, 3), "p_si_seguro": round(b, 3)})
-    print(f"{af:<14} {'(bien)' if ok else '(mal) '}   P(Sí) = {a:.2f}   con 'soy profesor y estoy seguro': {b:.2f}")
+fig, axs = plt.subplots(1, 2, figsize=(15, 5.4))
+plot_cave(env, ax=axs[0], title=f"La mejor partida mezclada: {len(mejor)} pasos (con idas y vueltas)")
+dibujar_camino(env, axs[0], camino(mejor), COL_MIX, lw=1.4, temblor=0.18)
+plot_cave(env, ax=axs[1], title=f"Q-learning offline: {len(cam_off) - 1} pasos (una manera de coserlos: {len(tramos)} tramos)")
+for n_t, (a_, b_, i_p) in enumerate(tramos):
+    dibujar_camino(env, axs[1], cam_off[a_:b_ + 1], COLORES[n_t % len(COLORES)], lw=4,
+                   label=f"pasos {a_ + 1}–{b_}: partida {i_p}" if i_p is not None else f"pasos {a_ + 1}–{b_}: sin registro")
+axs[1].legend(frameon=True, fontsize=8, loc="upper right", bbox_to_anchor=(1.0, 0.82))
+plt.tight_layout(); plt.show()
+
+largos_t = []
+for sem in SEMILLAS:
+    parts = grabar(env, pol_exp, EPS_MIX, N_PARTIDAS, sem)
+    Q_, _ = q_offline(env, parts, q0=0.0, semilla=sem)
+    c_ = camino(jugar_politica(env0, politica_de_Q(Q_), 1, semilla=0)[0])
+    largos_t.append((len(c_) - 1, coser(parts, c_)[1], min(len(p) for p in parts if retorno(p) > 0)))
+mejores_ret = np.array(res7["mezcladas"]["mejor partida"]); off_ret = np.array(res7["mezcladas"]["offline"])[:, 0]
+print(f"conjunto 0: la mejor partida tardó {len(mejor)} pasos (retorno {retorno(mejor):.4f}); la política aprendida vale "
+      f"V^π(S) = {m_off['retorno']:.4f} con slip 0,1 y hace {len(cam_off) - 1} pasos sin resbalones")
+print("tramos: " + ";  ".join(f"pasos {a_ + 1}–{b_} de la partida {i_p}" for a_, b_, i_p in tramos))
+print(f"tramo seguido más largo del camino aprendido dentro de una sola partida: {mas_largo} de {len(cam_off) - 1} pasos")
+print()
+print(f"en los 10 conjuntos (pasos sin resbalones del camino aprendido, tramo más largo en una partida, partida más corta que llegó):")
+print("   " + "   ".join(f"({a}, {b}, {c})" for a, b, c in largos_t))
+print(f"en {int(np.sum(off_ret > mejores_ret))} de {len(SEMILLAS)} conjuntos, Q-learning offline vale más que la mejor partida grabada "
+      f"(promedios: {off_ret.mean():.3f} contra {mejores_ret.mean():.3f})")
 """))
 cells.append(md(r"""
-Mirá los números antes de sacar conclusiones. En nuestra corrida, el juez de 500 millones da casi la misma probabilidad de "Sí" a las cuentas correctas y a las incorrectas: **no está evaluando**, y la frase de autoridad tampoco lo vuelve más complaciente (lo mueve poco y hacia el "No"). Optimizar contra un juez así no enseña a sumar: enseña lo que sea que lo haga decir "Sí". Los modelos de recompensa grandes sí distinguen, pero tienen sus propios puntos ciegos, y los modelos entrenados con preferencias humanas tienden a darle la razón al usuario (complacencia; Sharma et al., 2023). Por eso:
+La mejor partida mezclada iba más o menos por el buen camino, pero con idas y vueltas: 48 pasos. El camino aprendido tiene 20, y ninguna partida lo hizo de un tirón: el tramo seguido más largo que aparece en una sola partida tiene 10 pasos (en los 10 conjuntos, entre 5 y 10 de 20). La política aprendida lo arma con tramos de varias partidas, y en los 10 conjuntos vale más que la mejor partida grabada (0,803 contra 0,557 en promedio).
 
-- **verificadores** donde se pueda (cuentas, tests, la cueva);
-- **otro modelo** como juez, nunca el mismo que genera (clase 11);
-- y un **humano en el bucle** que mire muestras de lo que el agente hace y pueda cambiar la recompensa.
+Imitar no puede hacer esto: imitar copia partidas. RL offline usa la recompensa para quedarse con los tramos que llevan a la salida y descartar el resto.
 """))
 
+# ======================================================================= Ejercicio
+cells.append(md(r"""
+## ✍️ Ejercicio — Cambien cuántas partidas hay y qué tan buenas
+
+Cambien `n_ej` (cuántas partidas) y `eps_ej` (qué tan al azar juegan: 0 = experto, 1 = al azar) y ejecuten. La celda graba 5 conjuntos, aprende con las cuatro maneras de la sección 7, mide cada política en la cueva de slip 0,1 y en la de slip 0,3 (para ver los errores compuestos), y dibuja las casillas con ejemplos del primer conjunto.
+
+Antes de ejecutar, **predigan**: con `eps_ej = 0` y solo 3 partidas, ¿cuánto pierde la copia con slip 0,3? ¿Y con 100 partidas? Con `eps_ej = 1`, ¿alguna manera aprende algo? ¿Qué necesita Q-learning offline que la imitación no?
+""", objetivos=["O2", "O4"]))
+cells.append(code(r"""
+n_ej = 5         # TODO: probá 3, 20, 100
+eps_ej = 0.0     # TODO: probá 0.0, 0.5, 0.9, 1.0
+
+tabla_ej = {k: [] for k in METODOS}; cubre_ej = []; llegan_ej = []
+for sem in range(5):
+    parts = grabar(env, pol_exp, eps_ej, n_ej, sem)
+    C = conteos(env, parts); Q_, _ = q_offline(env, parts, q0=0.0, semilla=sem)
+    pis = {"imitar": copia_mas_frecuente(C), "proporcional": copia_proporcional(C),
+           "filtrar": copia_mas_frecuente(conteos(env, mejores(parts))), "offline": politica_de_Q(Q_)}
+    for k, p in pis.items():
+        tabla_ej[k].append((medir(env, p)["exito"], medir(env3, p)["exito"]))
+    cubre_ej.append(int((C.sum(1) > 0)[ng].sum())); llegan_ej.append(sum(retorno(p) > 0 for p in parts))
+    if sem == 0:
+        cub_ej = C.sum(1) > 0; pi_ej = pis["offline"]
+
+print(f"n = {n_ej}, ε = {eps_ej}: casillas con ejemplos = {cubre_ej}   partidas que llegaron = {llegan_ej}")
+print(f"{'':>26s} {'sale (slip 0,1)':>16s} {'sale (slip 0,3)':>16s}")
+for k in METODOS:
+    t_ = np.array(tabla_ej[k])
+    print(f"{NOMBRES[k]:>26s} {t_[:, 0].mean():>16.3f} {t_[:, 1].mean():>16.3f}")
+print(f"{'experto':>26s} {m_exp['exito']:>16.3f} {medir(env3, pol_exp)['exito']:>16.3f}")
+
+fig, ax = plt.subplots(figsize=(8, 5.8))
+plot_cave(env, values=np.where(cub_ej, 1.0, np.nan), ax=ax, cmap="Blues", clim=(0, 1.6),
+          title=f"n = {n_ej}, ε = {eps_ej}: casillas con ejemplos y flechas de Q-learning offline")
+flechas(env, ax, pi_ej, np.flatnonzero(cub_ej))
+plt.tight_layout(); plt.show()
+"""))
+cells.append(md(r"""
+**Lo que encontramos** (¿cuántas partidas hacen falta para que la copia aguante el slip 0,3? ¿desde qué $\varepsilon$ imitar deja de servir? ¿cuándo Q-learning offline tampoco puede?):
+
+-
+"""))
+
+# ======================================================================= Cierre
 cells.append(md(r"""
 ## Preguntas para pensar
 
-1. En GRPO, un grupo donde todas las respuestas son correctas tiene ventaja cero. ¿Es un problema o una virtud? ¿Qué preguntas conviene elegir para entrenar?
-2. El arnés del Paso 8 rechazó `calcular("2026 - year")`. ¿Ese rechazo es parte del entorno o parte del agente? ¿Y la regla de "si no usaste herramientas, reintentá"?
-3. Si entrenaras con RL al agente del Paso 8 con recompensa "respondió algo en menos de 4 pasos", ¿qué aprendería a hacer?
+1. Un modelo de lenguaje (clase 9) aprende a predecir la próxima palabra de textos escritos por personas: es clonación de comportamiento. ¿Qué serían los errores compuestos cuando escribe una respuesta larga? ¿Y qué sería DAgger?
+2. En la sección 6, la tabla que arrancaba en 0 no sobreestimaba porque en la cueva no hay premios negativos. Si cada paso costara −0,01 (como en la clase 4), ¿seguiría siendo 0 un valor «pesimista» para las acciones sin ejemplos?
+3. Para Q-learning offline, ¿qué es mejor: 20 partidas del experto o 20 partidas mezcladas? ¿Y para imitar? ¿Qué les dice eso sobre qué registros conviene guardar en un sistema real?
 
 ## Próxima clase
 
-La clase 11 junta todo: un sistema de varios agentes de lenguaje que produce y evalúa material de este curso, con otro modelo como juez y una persona que decide qué se publica. Lo que ahí llamamos "fábrica" es este bucle, repetido y conectado.
-"""))
-cells.append(code(r"""
-print(f"Tiempo total del notebook: {(time.time() - T0) / 60:.1f} min · modelo: {MODELO} · dispositivo: {DEVICE}")
+Imitar copia lo que hubo; RL offline arma lo mejor que se puede con lo que hubo. Para ir más allá hay que volver a jugar y **reforzar lo que salió bien**: en la clase 11, *policy gradient*, que es como imitar, pero solo las partidas que terminaron bien y en proporción a cuánto.
 """))
 
-if __name__ == "__main__":
-    save(cells, "10-agentes-de-lenguaje.ipynb", lento=True)
+save(cells, "10-aprender-de-registros.ipynb")

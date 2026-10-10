@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aprender de registros · RL a ciegas</title>
+<meta name="description" content="Clase 10: aprender de partidas grabadas sin jugar. Clonación de comportamiento, errores compuestos, DAgger, RL offline, el cambio de distribución y cuándo conviene imitar o mejorar, en la cueva a ciegas.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .lz { min-width: 0; }
+  .seg { flex-wrap: wrap; }
+  .seg button { min-width: 0; }
+  .cap { font-size: 13px; color: var(--muted); }
+  .cap b { color: var(--ink); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+  .chips span { display: inline-flex; align-items: center; gap: 6px; }
+  .chips i { width: 14px; height: 10px; display: inline-block; border-radius: 2px; }
+  /* las fórmulas largas se parten en un punto elegido (los espacios duros no cortan) */
+  .eq.parte { white-space: normal; }
+  .eq .nw { white-space: nowrap; margin-right: 1.2em; }
+  /* tablas de cifras del notebook */
+  .tabla.nb table { font-size: 13px; }
+  .tabla.nb tr.sel td { color: var(--lamp); }
+  .tabla.nb tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--lamp); }
+  @media (max-width: 560px) { .tabla.nb table { font-size: 12px; } .tabla.nb th, .tabla.nb td { padding: 6px 5px; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase 10</div>
+    <h1>Aprender de <span class="g">registros</span></h1>
+    <p class="thesis">Con partidas grabadas se puede copiar al que sabe hasta que un desvío lleva adonde él nunca estuvo, o usar la recompensa para armar un camino mejor que cualquier partida.</p>
+  </section>
+
+  <!-- B1: partidas grabadas -->
+  <section class="bloque" id="b-partidas" data-objetivos="O1">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué partidas mirar" id="segRec">
+        <button aria-pressed="true" data-d="exp">Experto (ε = 0)</button>
+        <button aria-pressed="false" data-d="mix">Mezcladas (ε = 0,8)</button>
+      </div>
+      <div class="lz"><canvas id="cvRec" aria-label="La cueva con 20 partidas grabadas dibujadas encima y, en celeste, cuántas veces se pisó cada casilla; las casillas negras no aparecen en los registros"></canvas></div>
+      <div class="legend"><span>0 visitas</span><span class="bar" id="legRec"></span><span id="legRecHi"></span></div>
+      <div class="row"><button class="btn primary" id="recOtra">Otra grabación</button></div>
+      <div class="hud" id="hudRec"></div>
+      <p class="cap">20 partidas desde S en la cueva con slip 0,1, simuladas en el navegador con otra semilla que el notebook. Las casillas negras no aparecen nunca en los registros.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 1</div>
+      <h2>Partidas grabadas</h2>
+      <p>Hoy el agente no juega ni busca premios, sino que recibe partidas que grabaron otros, como las que deja el modo Jugar del juego. La cueva tiene el piso un poco resbaloso de la clase 4 (slip 0,1) y el experto juega siempre la flecha óptima (ε = 0), que vale V*(S) = 0,8032. En las partidas mezcladas, en cambio, cada paso es una flecha cualquiera con probabilidad ε = 0,8. En el conjunto 0 del notebook, las 20 partidas del experto suman 451 pares (casilla, acción) y tocan 22 de las 59 casillas, mientras que las 20 mezcladas suman 2534 pares y tocan 45.</p>
+      <div class="eq">registro = (s₀, a₀), (s₁, a₁), (s₂, a₂), …</div>
+      <p class="nota pregunta">Para copiar al experto, ¿hace falta saber cuánto paga la salida?</p>
+    </div>
+  </section>
+
+  <!-- B2: imitar es aprender supervisado -->
+  <section class="bloque" id="b-copia" data-objetivos="O1">
+    <div class="stage">
+      <div class="lz"><canvas id="cvCopia" aria-label="La copia: en celeste las casillas con ejemplos del experto y su flecha; en las casillas sin ejemplos, una flecha roja hacia arriba. La casilla elegida tiene borde ámbar"></canvas></div>
+      <div class="chips"><span><i style="background:rgba(94,200,216,.35)"></i>con ejemplos</span><span style="color:var(--ember)">↑ rojo: sin ejemplos</span></div>
+      <div class="row"><button class="btn primary" id="copiaOtra">Otra grabación</button></div>
+      <div class="hud" id="hudCopia"></div>
+      <p class="cap">La copia de 20 partidas del experto simuladas en el navegador. Tocá una casilla para ver cuántas veces aparece cada flecha en los registros.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 2</div>
+      <h2>Imitar es aprender supervisado</h2>
+      <p>La <b>clonación de comportamiento</b> (<i>behavior cloning</i>) aprende en cada casilla la flecha que más apretó el experto, sin mirar la recompensa. Es <b>aprendizaje supervisado</b> (<i>supervised learning</i>), como en la última pestaña de la clase 2, con la casilla como entrada y la flecha del experto como etiqueta. ALVINN (Pomerleau, 1988) aprendió así a manejar una camioneta, con una red que miraba la cámara y copiaba el volante del conductor. En el conjunto 0 del notebook, la copia coincide con el experto en sus 22 casillas con ejemplos y en las otras 37, donde las cuatro flechas empatan en 0, queda en ↑.</p>
+      <div class="eq">π(s) = argmaxₐ N(s,a)</div>
+      <p class="nota pregunta">Tocá una casilla negra. Si la copia nunca vio esa casilla, ¿por qué igual aprieta una flecha?</p>
+    </div>
+  </section>
+
+  <!-- B3: errores compuestos -->
+  <section class="bloque" id="b-errores" data-objetivos="O2">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Slip de la cueva de prueba" id="segSlip">
+        <button aria-pressed="false" data-s="0.1">slip 0,1</button>
+        <button aria-pressed="false" data-s="0.2">0,2</button>
+        <button aria-pressed="true" data-s="0.3">0,3</button>
+        <button aria-pressed="false" data-s="0.4">0,4</button>
+      </div>
+      <div class="lz"><canvas id="cvErr" aria-label="Una partida de la copia en una cueva más resbalosa: la línea ámbar sale de las casillas con ejemplos y sigue las flechas rojas hacia arriba"></canvas></div>
+      <div class="row"><button class="btn primary" id="errOtra">Otra partida</button></div>
+      <div class="hud" id="hudErr"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>slip (notebook)</th><th>experto sale</th><th>copia sale</th><th>copia con dado</th><th>pasos sin ejemplos: copia / experto</th></tr></thead>
+          <tbody id="tbErr">
+            <tr data-s="0.1"><td>0,1</td><td class="num">1,000</td><td class="num">0,977</td><td class="num">0,998</td><td class="num">4,6 / 0,5</td></tr>
+            <tr data-s="0.2"><td>0,2</td><td class="num">1,000</td><td class="num">0,948</td><td class="num">0,995</td><td class="num">9,8 / 1,2</td></tr>
+            <tr data-s="0.3"><td>0,3</td><td class="num">1,000</td><td class="num">0,911</td><td class="num">0,990</td><td class="num">16,1 / 2,2</td></tr>
+            <tr data-s="0.4"><td>0,4</td><td class="num">1,000</td><td class="num">0,862</td><td class="num">0,983</td><td class="num">23,6 / 3,8</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">La copia aprendió de partidas grabadas con slip 0,1 y se prueba en cuevas más resbalosas. La partida y las probabilidades del renglón de arriba son simuladas en el navegador (las probabilidades, exactas para esta copia). La tabla es la del notebook, con el promedio de 10 conjuntos de 20 partidas.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 3</div>
+      <h2>Errores compuestos</h2>
+      <p>Un resbalón lleva a la copia a una casilla que el experto nunca visitó, donde aprieta ↑ y se aleja más, de modo que un error trae el siguiente (<b>errores compuestos</b>, <i>compounding errors</i>). En el notebook, con partidas del experto grabadas con slip 0,1, la copia sale con probabilidad 0,977 con slip 0,1, 0,948 con 0,2, 0,911 con 0,3 y 0,862 con 0,4, mientras que el experto sale siempre (1,000). Con slip 0,3, la copia pasa en promedio 16,1 pasos en casillas sin ejemplos contra 2,2 del experto, que sabe volver. En esta cueva el efecto es moderado y depende de la flecha ↑, porque con un dado en las casillas sin ejemplos la copia sale con 0,990 (slip 0,3) y 0,983 (slip 0,4).</p>
+      <p class="nota pregunta">Con slip 0,3, la copia y el experto pisan alguna casilla sin ejemplos con la misma probabilidad, 0,289. ¿Por qué terminan tan distinto?</p>
+    </div>
+  </section>
+
+  <!-- B4: DAgger -->
+  <section class="bloque" id="b-dagger" data-objetivos="O2">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Ronda de DAgger" id="segRonda">
+        <button aria-pressed="false" data-r="0">ronda 0</button>
+        <button aria-pressed="true" data-r="1">1</button>
+        <button aria-pressed="false" data-r="2">2</button>
+        <button aria-pressed="false" data-r="3">3</button>
+        <button aria-pressed="false" data-r="4">4</button>
+        <button aria-pressed="false" data-r="5">5</button>
+      </div>
+      <div class="lz"><canvas id="cvDag" aria-label="Las casillas con ejemplos en cada ronda de DAgger; las que el experto etiquetó en esta ronda tienen borde ámbar; en rojo, las flechas de las casillas que todavía no tienen ejemplos"></canvas></div>
+      <div class="chips"><span><i style="background:rgba(94,200,216,.35)"></i>con ejemplos</span><span><i style="background:transparent;box-shadow:inset 0 0 0 2px var(--lamp)"></i>etiquetada en esta ronda</span><span style="color:var(--ember)">↑ rojo: sin ejemplos</span></div>
+      <div class="hud" id="hudDag"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>ronda (notebook)</th><th>DAgger sale</th><th>etiquetas</th><th>+ experto con slip 0,3</th></tr></thead>
+          <tbody id="tbDag">
+            <tr data-r="0"><td>0</td><td class="num">0,911</td><td class="num">—</td><td class="num">0,911</td></tr>
+            <tr data-r="1"><td>1</td><td class="num">0,918</td><td class="num">668</td><td class="num">0,984</td></tr>
+            <tr data-r="2"><td>2</td><td class="num">0,984</td><td class="num">762</td><td class="num">0,988</td></tr>
+            <tr data-r="3"><td>3</td><td class="num">0,997</td><td class="num">694</td><td class="num">0,997</td></tr>
+            <tr data-r="4"><td>4</td><td class="num">1,000</td><td class="num">654</td><td class="num">1,000</td></tr>
+            <tr data-r="5"><td>5</td><td class="num">1,000</td><td class="num">650</td><td class="num">1,000</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">DAgger en la cueva de slip 0,3, simulado en el navegador: 20 partidas por ronda, y en la ronda k el experto maneja con probabilidad 0,5<sup>k</sup>, una de las mezclas que sugieren Ross y coautores. La tabla es la del notebook, promedio de 10 conjuntos. La última columna suma 20 partidas del experto por ronda, grabadas con slip 0,3.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 4</div>
+      <h2>DAgger: preguntarle al experto donde me equivoqué</h2>
+      <p><b>DAgger</b> (<i>Dataset Aggregation</i>; Ross, Gordon y Bagnell, 2011) juega con la copia, le pregunta al experto qué flecha habría apretado en cada casilla que se pisó, suma esos ejemplos y vuelve a copiar. En el notebook, con slip 0,3, la copia pasa de salir con probabilidad 0,911 a 1,000 en la ronda 4. En las primeras rondas el experto todavía maneja parte de los pasos (la mitad en la ronda 1), y sin esa ayuda, en esta cueva, DAgger avanza de a una casilla por ronda (0,885 en la ronda 1, 0,970 en la 5). No le gana a sumar partidas del experto grabadas con slip 0,3, que también llegan a 1,000 en la ronda 4 con una cantidad parecida de etiquetas (636 pares por ronda contra 650 a 760).</p>
+      <div class="eq parte"><span class="nw">D&nbsp;←&nbsp;D&nbsp;∪&nbsp;{(s,&nbsp;π*(s))}</span> <span class="nw">para&nbsp;cada&nbsp;s&nbsp;que&nbsp;pisó&nbsp;la&nbsp;copia</span></div>
+      <p class="nota pregunta">Si no se pudiera poner al experto en la cueva resbalosa, ¿cuál de las dos maneras de conseguir ejemplos quedaría?</p>
+    </div>
+  </section>
+
+  <!-- B5: RL offline -->
+  <section class="bloque" id="b-offline" data-objetivos="O3">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué mapa mirar" id="segOff">
+        <button aria-pressed="true" data-v="off">Aprendido offline</button>
+        <button aria-pressed="false" data-v="mapa">Con el mapa (V* y experto)</button>
+      </div>
+      <div class="lz"><canvas id="cvOff" aria-label="El valor max Q de cada casilla aprendido sin jugar sobre las partidas mezcladas, con su flecha; las casillas negras no aparecen en los registros"></canvas></div>
+      <div class="legend"><span>0</span><span class="bar" id="legOff"></span><span>1</span></div>
+      <div class="row"><button class="btn primary" id="offAprender">Aprender de nuevo (60 pasadas)</button></div>
+      <div class="hud" id="hudOff"></div>
+      <p class="cap">Q-learning sobre 20 partidas mezcladas (ε = 0,8) simuladas en el navegador, con la tabla en 0, α = 0,1 y 60 pasadas por las transiciones en orden al azar, como en el notebook. Lo que vale la política se calcula con el mapa.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 5</div>
+      <h2>RL offline: aprender solo de lo que ya pasó</h2>
+      <p>Imitar necesita un experto, pero las partidas mezcladas traen algo que la copia no usa, la recompensa de las que llegaron a la salida. El Q-learning de la clase 6 es <i>off-policy</i> y por eso puede recorrer un conjunto fijo de transiciones grabadas, una y otra vez, sin jugar nunca, lo que se llama <b>RL offline</b> (<i>offline RL</i>). En el notebook, sobre las 20 partidas mezcladas, hace 152 040 actualizaciones sin jugar ninguna partida y su política vale 0,8029, casi el V*(S) de 0,8032. El agente cree que S vale 0,8062: unas milésimas que son ruido y en la simulación pueden salir para cualquier lado; la sobreestimación de verdad viene en el paso siguiente.</p>
+      <div class="eq parte"><span class="nw">Q(s,a)&nbsp;←&nbsp;Q(s,a)</span> <span class="nw">+&nbsp;α&nbsp;[r&nbsp;+&nbsp;γ&nbsp;maxₐ′&nbsp;Q(s′,a′)&nbsp;−&nbsp;Q(s,a)]</span></div>
+      <p class="nota pregunta">En el conjunto 0 ninguna partida mezclada llegó en menos de 48 pasos. ¿De dónde saca RL offline un camino mejor?</p>
+    </div>
+  </section>
+
+  <!-- B6: el cambio de distribución -->
+  <section class="bloque" id="b-cambio" data-objetivos="O3">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué partidas" id="segDatos">
+        <button aria-pressed="true" data-d="exp">Partidas del experto</button>
+        <button aria-pressed="false" data-d="mix">Mezcladas</button>
+      </div>
+      <div class="seg" role="group" aria-label="Con qué valor arranca la tabla Q" id="segQ0">
+        <button aria-pressed="false" data-q="0">Q arranca en 0</button>
+        <button aria-pressed="true" data-q="1">Q arranca en 1</button>
+      </div>
+      <div class="lz"><canvas id="cvCambio" aria-label="En verde, las casillas donde la flecha aprendida aparece en los registros; en rojo, donde la política quiere una flecha que nadie grabó"></canvas></div>
+      <div class="chips"><span><i style="background:rgba(61,220,132,.35)"></i>quiere una flecha grabada</span><span><i style="background:rgba(224,100,90,.5)"></i>quiere una flecha que nadie grabó</span></div>
+      <div class="hud" id="hudCambio"></div>
+      <p class="cap">Q-learning offline sobre 20 partidas simuladas en el navegador, como en el paso 5. «Cree» es max Q(S); «vale» es V<sup>π</sup>(S) de la política aprendida, calculado con el mapa.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 6</div>
+      <h2>El cambio de distribución</h2>
+      <p>La regla de Q-learning toma el máximo sobre las cuatro flechas, pero las que nunca aparecen en los registros nunca se corrigen y quedan con el valor con que arrancó la tabla. En la clase 6 el agente las habría probado, pero offline no hay forma de enterarse, así que la política aprendida puede querer justo acciones que no están en los datos, el <b>cambio de distribución</b> (<i>distribution shift</i>). En el conjunto 0 del notebook nunca aparecen 66 de los 88 pares (casilla, acción) de las casillas del experto, contra 13 de 180 en las mezcladas. Con la tabla en 1 y las partidas del experto, la política quiere una flecha no grabada en todas sus casillas, cree que S vale 1,0 y vale 0,0 (con la tabla al azar, como arrancaría una red, cree 0,9441 y vale 0,2266 en promedio de 10 conjuntos).</p>
+      <div class="eq">sobreestimación = maxₐ Q(S,a) − V<sup>π</sup>(S)</div>
+      <p class="nota pregunta">Con la tabla en 0, ¿por qué una flecha que nadie grabó nunca le gana a una que se vio llegar a la salida?</p>
+    </div>
+  </section>
+
+  <!-- B7: imitar o mejorar -->
+  <section class="bloque" id="b-comparar" data-objetivos="O4">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué camino mirar" id="segCoser">
+        <button aria-pressed="true" data-v="off">Camino de RL offline</button>
+        <button aria-pressed="false" data-v="mejor">Mejor partida grabada</button>
+      </div>
+      <div class="lz"><canvas id="cvCoser" aria-label="El camino de la política aprendida offline, pintado según la partida grabada de la que sale cada tramo, o la mejor partida mezclada con sus idas y vueltas"></canvas></div>
+      <div class="hud" id="hudCoser"></div>
+      <div class="lz"><canvas id="cvBarras" aria-label="Barras con lo que vale la política aprendida al imitar, imitar filtrando y con RL offline, para partidas del experto, mezcladas y una mezcla de jugadores; un rombo marca la mejor partida grabada y la línea punteada V*(S)"></canvas></div>
+      <div class="chips"><span><i style="background:var(--ember)"></i>imitar</span><span><i style="background:var(--sonar)"></i>imitar filtrando</span><span><i style="background:var(--exit)"></i>RL offline</span><span>◆ mejor partida grabada</span><span>guiones: V*(S) = 0,8032</span></div>
+      <p class="cap">Arriba, simulado en el navegador con 20 partidas mezcladas: el camino sin resbalones de la política aprendida, cortado en tramos que aparecen seguidos en una misma partida. Abajo, el notebook: lo que vale cada política (V<sup>π</sup>(S)), promedio de 10 conjuntos de 20 partidas. Filtrar es imitar solo las 5 partidas de mayor retorno. Con partidas del experto, la mejor partida grabada (0,826) supera a V* solo por suerte, porque no tuvo ni un resbalón, y lo mismo pasa con la mejor partida de la mezcla de jugadores (0,813). Los métodos offline actuales, como CQL o IQL, desconfían de las acciones que no están en los datos (Levine et al., 2020; CS224R).</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 7</div>
+      <h2>Imitar o mejorar</h2>
+      <p>Con solo partidas del experto, RL offline no agrega nada, porque vale 0,782 igual que imitar. Con las mezcladas (ε = 0,8), imitar cae a 0,543 y filtrar las mejores partidas a 0,262, mientras que RL offline llega a 0,803, más que la mejor partida grabada (0,557). Filtrar sí sirve con una mezcla de jugadores de distinto ε (0,762 contra 0,695 de imitar), aunque RL offline sigue arriba con 0,790. RL offline le gana a la mejor partida grabada en 10 de 10 conjuntos porque cose tramos de varias partidas (<i>stitching</i>), como el camino de 20 pasos del conjunto 0, armado con 4 tramos de partidas distintas.</p>
+      <p class="nota pregunta">Si tuvieras que guardar registros para aprender después, ¿preferirías solo partidas buenas o partidas variadas? ¿Depende del método?</p>
+    </div>
+  </section>
+
+  <!-- B8: Para enseñarlo -->
+  <section class="bloque full" id="b-ensenar" data-objetivos="O1 O2">
+    <div class="texto prose">
+      <div class="paso">Para enseñarlo</div>
+      <h2>Cómo contar esta clase en una oración</h2>
+      <p>"Copiar al que sabe funciona mientras estés donde él estuvo; cuando te desviás, necesitás que alguien te diga qué hacer ahí."</p>
+      <p class="nota pregunta">Pregunta para hacerle a quien te escucha: si aprendiste a manejar mirando a quien te enseñaba, ¿qué hacés la primera vez que el auto patina en una curva que esa persona nunca tomó?</p>
+      <p><b>Ejercicio de 5 minutos:</b> dibujen en el pizarrón un pasillo de cinco casillas con la salida al final y una fila de casillas debajo. Una persona hace de experta y camina derecho hasta la salida mientras la clase anota en una tabla su flecha en cada casilla. Después otra persona juega solo con esa tabla y tira una moneda en cada paso. Si sale cara, se resbala a la fila de abajo. Cuando llega a una casilla sin flecha en la tabla, la clase le pregunta a la experta qué haría ahí, la anota y vuelve a empezar, como en DAgger.</p>
+      <p class="small muted">Adelanto: imitar copia lo que hubo. Para hacerlo mejor que el experto hay que reforzar lo que salió bien. Viene la clase 11, <i>policy gradient</i>.</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(async () => {
+  // cada figura se arma en su propia tarea, para no trabar el navegador al cargar
+  const tarea = f => new Promise(r => setTimeout(() => r(f()), 0));
+  Cueva.pagina("10", { lecturas: [
+    { texto: "Pomerleau (1988), ALVINN: An Autonomous Land Vehicle in a Neural Network, NIPS 1, 305–313", url: "https://proceedings.neurips.cc/paper/1988/hash/812b4ba287f5ee0bc9d43bbf5bbe87fb-Abstract.html" },
+    { texto: "Ross, Gordon y Bagnell (2011), A Reduction of Imitation Learning and Structured Prediction to No-Regret Online Learning (DAgger), AISTATS", url: "https://arxiv.org/abs/1011.0686" },
+    { texto: "Levine, Kumar, Tucker y Fu (2020), Offline Reinforcement Learning: Tutorial, Review, and Perspectives on Open Problems", url: "https://arxiv.org/abs/2005.01643" },
+    { texto: "Stanford CS224R, clases 2 (imitation learning) y 7 (offline RL); CS234 (Brunskill), clase 7 (imitación y DAgger)", url: "https://cs224r.stanford.edu/" }
+  ] });
+
+  const env = Cueva.makeEnv(Cueva.MAPS.chica), n = env.nS, GOAL = env.goal, START = env.start;
+  const COL = Cueva.COL(), MONO = COL.mono || "monospace", AR = Cueva.ARROW;
+  const PARED = "#2c3346", GAMMA = 0.99, MAXP = 200, SLIP = 0.1, EPS_MIX = 0.8, NPART = 20;
+  const CUB = "rgba(94,200,216,.28)", SIN = "rgba(255,255,255,.035)";
+  const reducir = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = id => document.getElementById(id);
+  const coma = s => String(s).replace(".", ",").replace("-", "−");
+  const fmt = (x, d = 3) => coma(x.toFixed(d));
+  const rc = s => `(${env.free[s][0]},${env.free[s][1]})`;
+  const nom = s => s === START ? "S" : rc(s);
+  const marcar = (sel, attr, v) => document.querySelectorAll(sel).forEach(b => b.setAttribute("aria-pressed", b.dataset[attr] === v));
+  const casillaDe = (T, e) => { const [r, c] = T.celdaEn(e); return env.idx[r + "," + c]; };
+  const NOMETA = Array.from({ length: n }, (_, s) => s).filter(s => s !== GOAL);
+  const argmax = q => { let b = 0; for (let a = 1; a < 4; a++) if (q[a] > q[b]) b = a; return b; };   // la primera si empatan, como en el notebook
+  const maxQ = q => Math.max(q[0], q[1], q[2], q[3]);
+
+  // ---------- el mapa: solo para el experto y para medir políticas (el que aprende no lo usa) ----------
+  const NXT = Array.from({ length: n }, (_, s) => [0, 1, 2, 3].map(a => s === GOAL ? GOAL : env.move(s, a)[0]));
+  const { V: VS } = Cueva.iteracionValor(env, { gamma: GAMMA, slip: SLIP, iters: 4000 });
+  const POL = Cueva.politicaGreedy(env, VS, { gamma: GAMMA, slip: SLIP });   // el experto (clase 4)
+  const PS = {}; const trans = slip => PS[slip] || (PS[slip] = Cueva.transiciones(env, slip));
+  const unaFlecha = pol => pol.map(a => [0, 1, 2, 3].map(b => (b === a ? 1 : 0)));
+  // medir: como en el notebook, sigue la distribución de dónde está el jugador durante 200 pasos (sin sortear)
+  function medir(pi, slip, cub = null) {
+    const P = trans(slip); let d = new Float64Array(n); d[START] = 1;
+    let antes = 0, ret = 0, fuera = 0;
+    for (let t = 1; t <= MAXP; t++) {
+      const nd = new Float64Array(n);
+      for (let s = 0; s < n; s++) {
+        if (!d[s]) continue;
+        if (s === GOAL) { nd[GOAL] += d[s]; continue; }
+        for (let a = 0; a < 4; a++) { const pa = pi[s][a]; if (!pa) continue; for (const [s2, p] of P[s][a]) nd[s2] += d[s] * pa * p; }
+      }
+      d = nd; ret += Math.pow(GAMMA, t - 1) * (d[GOAL] - antes); antes = d[GOAL];
+      if (cub) for (const s of NOMETA) if (!cub[s]) fuera += d[s];
+    }
+    return { exito: d[GOAL], retorno: ret, fuera };
+  }
+
+  // ---------- grabar partidas: solo pasos de juego, con el piso resbaloso ----------
+  const paso = (s, a, slip, u) => { if (slip > 0 && u() < slip) a = (a + (u() < 0.5 ? 1 : 3)) % 4; return NXT[s][a]; };
+  function grabar(eps, nP, semilla, slip = SLIP) {
+    const u = Cueva.rng(semilla), partidas = [];
+    for (let k = 0; k < nP; k++) {
+      const p = []; let s = START;
+      for (let t = 0; t < MAXP; t++) {
+        const a = u() < eps ? Math.floor(u() * 4) : POL[s], s2 = paso(s, a, slip, u), llego = s2 === GOAL;
+        p.push([s, a, llego ? 1 : 0, s2, llego]); s = s2; if (llego) break;
+      }
+      partidas.push(p);
+    }
+    return partidas;
+  }
+  const retorno = p => (p[p.length - 1][4] ? Math.pow(GAMMA, p.length - 1) : 0);
+  const caminoDe = p => [p[0][0], ...p.map(x => x[3])];
+  function conteos(partidas) { const C = Array.from({ length: n }, () => [0, 0, 0, 0]); for (const p of partidas) for (const [s, a] of p) C[s][a]++; return C; }
+  const cubiertas = C => C.map(f => f[0] + f[1] + f[2] + f[3] > 0);
+  // la copia: la flecha que más aparece; sin ejemplos, las cuatro empatan en 0 y gana la primera, ↑
+  const copia = C => unaFlecha(C.map(argmax));
+
+  // ---------- DAgger en la cueva de prueba ----------
+  function dagger(base, rondas, nR, semilla, slip) {
+    // devuelve, por ronda: la copia, sus casillas con ejemplos, las etiquetas pedidas para llegar ahí y las casillas nuevas
+    const C = conteos(base), out = [];
+    let et = 0, nuevas = [];
+    for (let k = 0; k <= rondas; k++) {
+      const pol = C.map(argmax), antes = cubiertas(C);
+      out.push({ pol, cub: antes, etiquetas: et, nuevas });
+      if (k === rondas) break;
+      const b = Math.pow(0.5, k + 1), u = Cueva.rng(semilla + 97 * (k + 1)); et = 0;
+      for (let g = 0; g < nR; g++) {
+        let s = START;
+        for (let t = 0; t < MAXP && s !== GOAL; t++) {
+          const a = u() < b ? POL[s] : pol[s];   // maneja el experto con prob. b; si no, la copia
+          C[s][POL[s]]++; et++;                  // la etiqueta la pone el experto, no la copia
+          s = paso(s, a, slip, u);
+        }
+      }
+      const desp = cubiertas(C); nuevas = NOMETA.filter(s => desp[s] && !antes[s]);
+    }
+    return out;
+  }
+
+  // ---------- RL offline: Q-learning sobre un conjunto fijo, sin jugar ----------
+  function qOffline(partidas, q0, semilla, { alfa = 0.1, barridos = 60, foto = null } = {}) {
+    const u = Cueva.rng(semilla), Q = Array.from({ length: n }, (_, s) => s === GOAL ? [0, 0, 0, 0] : [q0, q0, q0, q0]);
+    const T = partidas.flat(), idx = T.map((_, i) => i);
+    for (let b = 0; b < barridos; b++) {
+      for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(u() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+      for (const i of idx) { const [s, a, r, s2, llego] = T[i]; const y = llego ? r : r + GAMMA * maxQ(Q[s2]); Q[s][a] += alfa * (y - Q[s][a]); }
+      if (foto) foto(b, Q);
+    }
+    return { Q, visto: conteos(partidas).map(f => f.map(x => x > 0)), nT: T.length };
+  }
+  const politicaQ = Q => Q.map(argmax);
+  // el camino sin resbalones de una política
+  function caminoPol(pol) { const c = [START]; let s = START; for (let t = 0; t < MAXP && s !== GOAL; t++) { s = NXT[s][pol[s]]; c.push(s); } return c; }
+  // coser: parte el camino en tramos, cada uno seguido dentro de una sola partida (el más largo desde donde se está)
+  function coser(partidas, cam) {
+    const T = cam.slice(0, -1).map((s, i) => [s, cam[i + 1]]), pasos = partidas.map(p => p.map(x => [x[0], x[3]]));
+    const largo = (ip, j) => { const tr = pasos[ip]; let mejor = 0; for (let i = 0; i < tr.length; i++) { let k = 0; while (i + k < tr.length && j + k < T.length && tr[i + k][0] === T[j + k][0] && tr[i + k][1] === T[j + k][1]) k++; mejor = Math.max(mejor, k); } return mejor; };
+    const tramos = []; let j = 0;
+    while (j < T.length) {
+      let k = 0, ip = -1; for (let i = 0; i < partidas.length; i++) { const l = largo(i, j); if (l >= k) { k = l; ip = i; } }
+      if (k === 0) { tramos.push([j, j + 1, null]); j++; } else { tramos.push([j, j + k, ip]); j += k; }
+    }
+    return tramos;
+  }
+
+  // ---------- utilidades de dibujo ----------
+  function rotulo(T, s, txt, color = COL.ink, escala = .34) {
+    const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s];
+    ctx.font = `600 ${Math.max(8, Math.round(cell * escala))}px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.85)"; ctx.strokeText(txt, c * cell + cell / 2, r * cell + cell / 2 + 1);
+    ctx.fillStyle = color; ctx.fillText(txt, c * cell + cell / 2, r * cell + cell / 2 + 1);
+  }
+  function borde(T, s, color, ancho = 2, inset = 1.5) {
+    const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s];
+    ctx.strokeStyle = color; ctx.lineWidth = ancho; ctx.strokeRect(c * cell + inset, r * cell + inset, cell - 2 * inset, cell - 2 * inset);
+  }
+  function calor(T, V, lo, hi, rampa = "valor", mascara = null) {
+    for (const s of NOMETA) { if (mascara && !mascara[s]) continue; const [r, c] = env.free[s]; T.casilla(r, c, Cueva.rampa(rampa, (V[s] - lo) / ((hi - lo) || 1))); }
+  }
+  // una línea por el centro de las casillas, corrida un poco (para que se distingan varias partidas)
+  function linea(T, cam, color, ancho, dx = 0, dy = 0) {
+    if (cam.length < 2) return; const ctx = T.ctx, cell = T.cell;
+    ctx.strokeStyle = color; ctx.lineWidth = ancho; ctx.lineJoin = "round"; ctx.lineCap = "round"; ctx.beginPath();
+    cam.forEach((s, i) => { const [r, c] = env.free[s]; const x = c * cell + cell / 2 + dx, y = r * cell + cell / 2 + dy; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+  }
+  // la copia sobre la cueva: casillas con ejemplos en celeste y su flecha; sin ejemplos, ↑ rojo
+  function dibujarCopia(T, pol, cub) {
+    T.fondo("#000").paredes(PARED);
+    for (const s of NOMETA) { const [r, c] = env.free[s]; T.casilla(r, c, cub[s] ? CUB : SIN); }
+    T.salida();
+    for (const s of NOMETA) T.texto(s, AR[pol[s]], cub[s] ? COL.ink : COL.ember, .5);
+  }
+
+  // conjuntos simulados que comparten los pasos 2 a 6 (otra semilla que el notebook)
+  const EXP = grabar(0, NPART, 5), MIX = grabar(EPS_MIX, NPART, 8);
+
+  // =====================================================================
+  // B1. Partidas grabadas
+  // =====================================================================
+  const b1 = await tarea(() => {
+    const T = Cueva.tablero($("cvRec"), env, { maxCell: 40 }), hud = $("hudRec");
+    $("legRec").style.background = Cueva.gradienteCSS("visitas");
+    let datos = "exp", semilla = 5, P = null;
+    const grabarAhora = () => { P = grabar(datos === "exp" ? 0 : EPS_MIX, NPART, datos === "exp" ? semilla : semilla + 3); };
+    function dibujar() {
+      const C = conteos(P), vis = C.map(f => f[0] + f[1] + f[2] + f[3]), cub = vis.map(v => v > 0);
+      const L = vis.map(v => Math.log10(1 + v)), hi = Math.max(...NOMETA.map(s => L[s]));
+      $("legRecHi").textContent = `${Math.max(...NOMETA.map(s => vis[s]))} (log)`;
+      T.fondo("#000").paredes(PARED); calor(T, L, 0, hi, "visitas", cub); T.salida();
+      const col = datos === "exp" ? "rgba(242,179,90,.55)" : "rgba(242,179,90,.28)", k = T.cell * .03;
+      P.forEach((p, i) => linea(T, caminoDe(p), col, 1.4, (i - 9.5) * k, (i - 9.5) * k));
+      rotulo(T, START, "S", COL.ink, .4);
+      const pares = P.reduce((t, p) => t + p.length, 0), llegaron = P.filter(p => retorno(p) > 0).length;
+      const distintos = NOMETA.reduce((t, s) => t + C[s].filter(x => x > 0).length, 0);
+      hud.innerHTML = `<span>simulado: pares (casilla, acción) <b>${pares}</b></span><span>casillas con ejemplos <b>${NOMETA.filter(s => cub[s]).length} de ${NOMETA.length}</b></span>` +
+        `<span>pares distintos <b>${distintos} de ${NOMETA.length * 4}</b></span><span>llegaron <b>${llegaron} de ${NPART}</b></span>`;
+    }
+    document.querySelectorAll("#segRec button").forEach(b => b.onclick = () => { datos = b.dataset.d; marcar("#segRec button", "d", datos); grabarAhora(); dibujar(); });
+    $("recOtra").onclick = () => { semilla += 2; grabarAhora(); dibujar(); };
+    grabarAhora(); dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B2. La copia
+  // =====================================================================
+  const b2 = await tarea(() => {
+    const T = Cueva.tablero($("cvCopia"), env, { maxCell: 40 }), hud = $("hudCopia");
+    let semilla = 5, C, pol, cub, sel = START;
+    const aprender = () => { C = conteos(grabar(0, NPART, semilla)); pol = C.map(argmax); cub = cubiertas(C); };
+    function dibujar() {
+      dibujarCopia(T, pol, cub); borde(T, sel, COL.lamp, 2.5); if (sel !== START) rotulo(T, START, "S", COL.lamp, .3);
+      const conCub = NOMETA.filter(s => cub[s]), iguales = conCub.filter(s => pol[s] === POL[s]).length;
+      hud.innerHTML = `<span>simulado: la copia coincide con el experto en <b>${iguales} de ${conCub.length}</b> casillas con ejemplos</span><span>sin ejemplos <b>${NOMETA.length - conCub.length}</b>, todas en ↑</span>` +
+        `<span>casilla <b>${nom(sel)}</b>: ${[0, 1, 2, 3].map(a => `${AR[a]} <b>${C[sel][a]}</b>`).join(" ")} → copia <b>${AR[pol[sel]]}</b>, experto <b>${AR[POL[sel]]}</b></span>`;
+    }
+    $("cvCopia").addEventListener("pointerdown", e => { const s = casillaDe(T, e); if (s !== undefined && s !== GOAL) { sel = s; dibujar(); } });
+    $("copiaOtra").onclick = () => { semilla += 2; aprender(); dibujar(); };
+    aprender(); dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B3. Errores compuestos
+  // =====================================================================
+  const CE = conteos(EXP), POL_C = CE.map(argmax), CUB_C = cubiertas(CE), PI_C = unaFlecha(POL_C);
+  const PI_EXP = unaFlecha(POL);
+  const b3 = await tarea(() => {
+    const T = Cueva.tablero($("cvErr"), env, { maxCell: 40 }), hud = $("hudErr");
+    let slip = "0.3", k = 0, cam = [START], prog = 1, raf = 0;
+    // una partida de la copia: la primera que no llega a partir de la semilla k (si ninguna falla, la última probada)
+    function partida() {
+      for (let i = 0; i < 300; i++, k++) {
+        const u = Cueva.rng(5000 + k), c = [START]; let s = START;
+        for (let t = 0; t < MAXP && s !== GOAL; t++) { s = paso(s, POL_C[s], +slip, u); c.push(s); }
+        cam = c; if (s !== GOAL) return;
+      }
+    }
+    function dibujar() {
+      dibujarCopia(T, POL_C, CUB_C);
+      const m = Math.max(1, Math.round((cam.length - 1) * prog)), parte = cam.slice(0, m + 1);
+      linea(T, parte, "rgba(242,179,90,.8)", Math.max(2, T.cell * .1));
+      T.sprite(parte[parte.length - 1], 2, m % 2); rotulo(T, START, "S", COL.ink, .4);
+      const mc = medir(PI_C, +slip, CUB_C), me = medir(PI_EXP, +slip, CUB_C);
+      const sinEj = cam.filter(s => s !== GOAL && !CUB_C[s]).length, llego = cam[cam.length - 1] === GOAL;
+      hud.innerHTML = `<span>simulado, slip ${coma(slip)}: copia sale <b>${fmt(mc.exito)}</b>, experto <b>${fmt(me.exito)}</b></span>` +
+        `<span>pasos sin ejemplos: copia <b>${fmt(mc.fuera, 1)}</b>, experto <b>${fmt(me.fuera, 1)}</b></span>` +
+        `<span>esta partida: <b>${cam.length - 1}</b> pasos${llego ? "" : " sin salir"}, <b>${sinEj}</b> en casillas sin ejemplos</span>`;
+      document.querySelectorAll("#tbErr tr").forEach(tr => tr.classList.toggle("sel", tr.dataset.s === slip));
+    }
+    function animar() {
+      cancelAnimationFrame(raf);
+      if (reducir) { prog = 1; dibujar(); return; }
+      prog = 0; const t0 = performance.now(), dur = Math.min(2600, 300 + cam.length * 12);
+      const f = now => { prog = Math.min(1, (now - t0) / dur); dibujar(); if (prog < 1) raf = requestAnimationFrame(f); };
+      raf = requestAnimationFrame(f);
+    }
+    document.querySelectorAll("#segSlip button").forEach(b => b.onclick = () => { slip = b.dataset.s; marcar("#segSlip button", "s", slip); partida(); animar(); });
+    $("errOtra").onclick = () => { k++; partida(); animar(); };
+    partida(); dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B4. DAgger
+  // =====================================================================
+  const b4 = await tarea(() => {
+    const T = Cueva.tablero($("cvDag"), env, { maxCell: 40 }), hud = $("hudDag");
+    const R = dagger(EXP, 5, NPART, 3, 0.3), exito = R.map(x => medir(unaFlecha(x.pol), 0.3).exito);
+    let ronda = "1";
+    function dibujar() {
+      const x = R[+ronda];
+      dibujarCopia(T, x.pol, x.cub);
+      for (const s of x.nuevas) borde(T, s, COL.lamp, 2.5);
+      rotulo(T, START, "S", COL.lamp, .3);
+      hud.innerHTML = `<span>simulado, slip 0,3, ronda ${ronda}: la copia sale <b>${fmt(exito[+ronda])}</b></span>` +
+        `<span>casillas con ejemplos <b>${NOMETA.filter(s => x.cub[s]).length}</b></span>` +
+        (+ronda ? `<span>etiquetas pedidas <b>${x.etiquetas}</b>, casillas nuevas <b>${x.nuevas.length}</b></span>` : `<span>ronda 0: solo las 20 partidas grabadas</span>`) +
+        `<span>por ronda: ${exito.map(v => fmt(v)).join(" → ")}</span>`;
+      document.querySelectorAll("#tbDag tr").forEach(tr => tr.classList.toggle("sel", tr.dataset.r === ronda));
+    }
+    document.querySelectorAll("#segRonda button").forEach(b => b.onclick = () => { ronda = b.dataset.r; marcar("#segRonda button", "r", ronda); dibujar(); });
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B5. RL offline sobre las mezcladas
+  // =====================================================================
+  const b5 = await tarea(() => {
+    const T = Cueva.tablero($("cvOff"), env, { maxCell: 40 }), hud = $("hudOff");
+    $("legOff").style.background = Cueva.gradienteCSS("valor");
+    let vista = "off", semilla = 1, R, fotos, pasada = 59, raf = 0, medida;
+    function aprender() {
+      fotos = [];
+      R = qOffline(MIX, 0, semilla, { foto: (b, Q) => fotos.push(Q.map(maxQ)) });
+      medida = medir(unaFlecha(politicaQ(R.Q)), SLIP);
+    }
+    const cub = () => R.visto.map(f => f.some(Boolean));
+    function dibujar() {
+      T.fondo("#000").paredes(PARED);
+      if (vista === "off") {
+        const c = cub(), V = fotos[pasada], pol = politicaQ(R.Q);
+        for (const s of NOMETA) { const [r, cc] = env.free[s]; T.casilla(r, cc, SIN); }
+        calor(T, V, 0, 1, "valor", c); T.salida();
+        if (pasada === 59) for (const s of NOMETA) if (c[s]) T.texto(s, AR[pol[s]], V[s] > .62 ? "#0b0d12" : COL.ink, .5);
+      } else {
+        calor(T, VS, 0, 1, "valor"); T.salida();
+        for (const s of NOMETA) T.texto(s, AR[POL[s]], VS[s] > .62 ? "#0b0d12" : COL.ink, .5);
+      }
+      rotulo(T, START, "S", COL.sonar, .3);
+      hud.innerHTML = `<span>simulado: pasada <b>${pasada + 1} de 60</b>, actualizaciones <b>${((pasada + 1) * R.nT).toLocaleString("es-AR").replace(/\./g, " ")}</b>, partidas jugadas <b>0</b></span>` +
+        `<span>cree max Q(S) <b>${fmt(fotos[pasada][START], 4)}</b></span><span>vale <b>${fmt(medida.retorno, 4)}</b> (V*(S) = ${fmt(VS[START], 4)})</span>`;
+    }
+    function animar() {
+      cancelAnimationFrame(raf);
+      if (reducir) { pasada = 59; dibujar(); return; }
+      const t0 = performance.now(), dur = 2400;
+      const f = now => { pasada = Math.min(59, Math.floor(60 * (now - t0) / dur)); dibujar(); if (pasada < 59) raf = requestAnimationFrame(f); };
+      raf = requestAnimationFrame(f);
+    }
+    document.querySelectorAll("#segOff button").forEach(b => b.onclick = () => { vista = b.dataset.v; marcar("#segOff button", "v", vista); cancelAnimationFrame(raf); pasada = 59; dibujar(); });
+    $("offAprender").onclick = () => { semilla++; aprender(); vista = "off"; marcar("#segOff button", "v", vista); animar(); };
+    aprender(); dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B6. El cambio de distribución
+  // =====================================================================
+  const b6 = await tarea(() => {
+    const T = Cueva.tablero($("cvCambio"), env, { maxCell: 40 }), hud = $("hudCambio"), cache = {};
+    let datos = "exp", q0 = "1";
+    function calcular() {
+      const k = datos + q0; if (cache[k]) return cache[k];
+      const R = qOffline(datos === "exp" ? EXP : MIX, +q0, 11), pol = politicaQ(R.Q), hay = R.visto.map(f => f.some(Boolean));
+      return (cache[k] = { R, pol, hay, m: medir(unaFlecha(pol), SLIP) });
+    }
+    function dibujar() {
+      const { R, pol, hay, m } = calcular();
+      T.fondo("#000").paredes(PARED);
+      for (const s of NOMETA) { const [r, c] = env.free[s]; T.casilla(r, c, !hay[s] ? SIN : R.visto[s][pol[s]] ? "rgba(61,220,132,.3)" : "rgba(224,100,90,.5)"); }
+      T.salida();
+      for (const s of NOMETA) if (hay[s]) T.texto(s, AR[pol[s]], COL.ink, .5);
+      rotulo(T, START, "S", COL.lamp, .3);
+      const conEj = NOMETA.filter(s => hay[s]), quiere = conEj.filter(s => !R.visto[s][pol[s]]).length;
+      const faltan = conEj.reduce((t, s) => t + R.visto[s].filter(v => !v).length, 0);
+      hud.innerHTML = `<span>simulado: quiere una flecha que nadie grabó en <b>${quiere} de ${conEj.length}</b> casillas</span>` +
+        `<span>pares nunca grabados <b>${faltan} de ${conEj.length * 4}</b></span>` +
+        `<span>cree <b>${fmt(maxQ(R.Q[START]), 4)}</b>, vale <b>${fmt(m.retorno, 4)}</b>, sale <b>${fmt(m.exito)}</b></span>`;
+    }
+    document.querySelectorAll("#segDatos button").forEach(b => b.onclick = () => { datos = b.dataset.d; marcar("#segDatos button", "d", datos); dibujar(); });
+    document.querySelectorAll("#segQ0 button").forEach(b => b.onclick = () => { q0 = b.dataset.q; marcar("#segQ0 button", "q", q0); dibujar(); });
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B7. Coser tramos y la tabla del notebook
+  // =====================================================================
+  const NB_TABLA = [   // celda 44 del notebook: V^π(S), promedio de 10 conjuntos
+    { d: ["experto", ""], imitar: 0.782, filtrar: 0.759, offline: 0.782, mejor: 0.826 },
+    { d: ["mezcladas", "ε = 0,8"], imitar: 0.543, filtrar: 0.262, offline: 0.803, mejor: 0.557 },
+    { d: ["mezcla de", "jugadores"], imitar: 0.695, filtrar: 0.762, offline: 0.790, mejor: 0.813 }
+  ];
+  const TRAMOS = [COL.lamp, COL.sonar, COL.exit, COL.ember, "#c58cf2", "#f2e35a", "#8fd16a", "#f29bc0"];
+  const b7 = await tarea(() => {
+    const T = Cueva.tablero($("cvCoser"), env, { maxCell: 40 }), hud = $("hudCoser"), cvb = $("cvBarras");
+    const R = qOffline(MIX, 0, 1), pol = politicaQ(R.Q), cam = caminoPol(pol), tramos = coser(MIX, cam);
+    const mejor = MIX.reduce((a, p) => (retorno(p) > retorno(a) ? p : a), MIX[0]), camM = caminoDe(mejor);
+    const vale = medir(unaFlecha(pol), SLIP).retorno;
+    let vista = "off";
+    function dibujar() {
+      T.fondo("#000").paredes(PARED); T.salida();
+      if (vista === "off") {
+        tramos.forEach(([a, b, ip], i) => linea(T, cam.slice(a, b + 1), ip === null ? COL.muted : TRAMOS[i % TRAMOS.length], Math.max(3, T.cell * .16)));
+        hud.innerHTML = `<span>simulado: camino de <b>${cam.length - 1}</b> pasos sin resbalones, cosido con <b>${tramos.length}</b> tramos</span>` +
+          `<span>${tramos.map(([a, b, ip], i) => `<b style="color:${ip === null ? COL.muted : TRAMOS[i % TRAMOS.length]}">${b === a + 1 ? "paso " + b : `pasos ${a + 1}–${b}`}</b> ${ip === null ? "sin registro" : "de la partida " + ip}`).join(", ")}</span>` +
+          `<span>la política vale <b>${fmt(vale)}</b></span>`;
+      } else {
+        const u = Cueva.rng(3), j = T.cell * .18;
+        const ctx = T.ctx, cell = T.cell; ctx.strokeStyle = "rgba(242,155,192,.85)"; ctx.lineWidth = 1.4; ctx.lineJoin = "round"; ctx.beginPath();
+        camM.forEach((s, i) => { const [r, c] = env.free[s]; const x = c * cell + cell / 2 + (u() * 2 - 1) * j, y = r * cell + cell / 2 + (u() * 2 - 1) * j; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+        hud.innerHTML = `<span>simulado: la mejor partida mezclada tardó <b>${mejor.length}</b> pasos, con idas y vueltas (retorno <b>${fmt(retorno(mejor))}</b>)</span>`;
+      }
+      rotulo(T, START, "S", COL.ink, .4);
+      barras();
+    }
+    function barras() {
+      const { w, h, ctx } = Cueva.lienzo(cvb, 220)();
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      const m = { l: 38, r: 8, t: 14, b: 40 }, Y = v => h - m.b - v / 0.9 * (h - m.t - m.b);
+      ctx.font = `11px ${MONO}`; ctx.fillStyle = COL.muted; ctx.strokeStyle = "rgba(141,147,163,.18)"; ctx.lineWidth = 1;
+      for (const t of [0, .2, .4, .6, .8]) { const y = Math.round(Y(t)) + .5; ctx.beginPath(); ctx.moveTo(m.l, y); ctx.lineTo(w - m.r, y); ctx.stroke(); ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(coma(t.toFixed(1)), m.l - 5, y); }
+      const gw = (w - m.l - m.r) / 3, bw = Math.min(34, gw / 4.2);
+      NB_TABLA.forEach((g, i) => {
+        const x0 = m.l + i * gw + gw / 2 - 1.5 * bw;
+        [["imitar", COL.ember], ["filtrar", COL.sonar], ["offline", COL.exit]].forEach(([k, c], j) => {
+          ctx.fillStyle = c; ctx.fillRect(x0 + j * bw + 1, Y(g[k]), bw - 2, Y(0) - Y(g[k]));
+        });
+        const xm = m.l + i * gw + gw / 2, ym = Y(g.mejor); ctx.fillStyle = COL.ink; ctx.beginPath(); ctx.moveTo(xm, ym - 6); ctx.lineTo(xm + 6, ym); ctx.lineTo(xm, ym + 6); ctx.lineTo(xm - 6, ym); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = COL.muted; ctx.textAlign = "center"; ctx.textBaseline = "top";
+        ctx.fillText(g.d[0], xm, h - m.b + 6); ctx.fillText(g.d[1], xm, h - m.b + 20);
+      });
+      ctx.setLineDash([6, 4]); ctx.strokeStyle = COL.ink; ctx.beginPath(); ctx.moveTo(m.l, Y(VS[START]) + .5); ctx.lineTo(w - m.r, Y(VS[START]) + .5); ctx.stroke(); ctx.setLineDash([]);
+    }
+    document.querySelectorAll("#segCoser button").forEach(b => b.onclick = () => { vista = b.dataset.v; marcar("#segCoser button", "v", vista); dibujar(); });
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  Cueva.alCargarSprites(() => b3.dibujar());
+  let tRes = 0;
+  addEventListener("resize", () => { clearTimeout(tRes); tRes = setTimeout(() => { for (const f of [b1, b2, b3, b4, b5, b6, b7]) f.dibujar(); }, 120); });
+})();
+</script>
+</body>
+</html>

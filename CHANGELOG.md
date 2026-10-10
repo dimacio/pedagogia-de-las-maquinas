@@ -27,6 +27,7 @@ Formato: una sección por versión (SemVer sobre el curso, ver `fabrica/CONVENCI
 - Clase 6 (nueva): por qué Q y no V sin mapa, ε-greedy, SARSA, Q-learning, on-policy contra off-policy, mapa de visitas.
 - Clase 7 (nueva): bandits, regret, UCB, optimismo y conteos, Go-Explore, acciones pegajosas (Machado et al., 2018).
 - Clase 9: redes recurrentes desde la v1 7 sin la cadena de Markov (bigotes, n-gramas, red con un lazo, agente con memoria, puente al modelo de lenguaje); recuadro de falsas memorias.
+- Clase 10 (nueva): clonación de comportamiento, errores compuestos, DAgger, RL offline, cambio de distribución, imitar o mejorar.
 
 ### Aviso
 - El progreso de los cuestionarios guardado en el navegador vuelve a cero (los ids cambian de significado).

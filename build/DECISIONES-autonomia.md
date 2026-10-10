@@ -24,3 +24,4 @@ Formato: `fecha · clase · decisión — por qué — qué cuesta si está mal`
 - 2026-10-10 · 7 · La carrera de exploradores usa la cueva grande de la v1 (13×25) porque en la cueva de siempre ε-greedy llega; el conteo solo falla en una tabla y se presenta como lección (spine ajustado) — honestidad sobre el resultado — si se prefiere la cueva de siempre, hay que rehacer la sección.
 - 2026-10-10 · 9 · Clase 9 producida en un worktree y mergeada antes que la 8 (la 8 tarda por su notebook con torch); el orden de entradas en modulos.js y CHANGELOG se acomoda al mergear la 8 — ahorra tiempo — ninguno funcional.
 - 2026-10-10 · 9 · Diferido: el olvido medido con el gradiente quedó en B5 (spine: B3); B5 junta escala, olvido y atención — sugerencia del revisor, no bloquea — revisar en la pasada de alumno cero.
+- 2026-10-10 · 10 · Spine de la clase 10 escrito por el orquestador (PLAN §3 + CS224R 02 y 07 + CS234 L7); issue #5 asignado a la clase 15 — ver arriba — ninguno.
