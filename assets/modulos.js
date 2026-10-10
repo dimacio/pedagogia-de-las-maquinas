@@ -893,12 +893,12 @@ window.MODULOS = {
       },
       {
         objetivo: "O2",
-        pregunta: "La copia aprendió de partidas grabadas con slip 0,1 y en sus 22 casillas con ejemplos hace lo mismo que el experto. Con slip 0,3 sale con 0,911 contra 1,000 del experto, y pasa en promedio 16,1 pasos en casillas sin ejemplos contra 2,2. ¿Qué explica la diferencia?",
+        pregunta: "La copia aprendió de partidas grabadas con slip 0,1 y en sus casillas con ejemplos hace lo mismo que el experto. En promedio de 10 conjuntos, con slip 0,3 sale con 0,911 contra 1,000 del experto, y pasa 16,1 pasos en casillas sin ejemplos contra 2,2. ¿Qué explica la diferencia?",
         opciones: [
-          { texto: "Como clasificador se equivoca en algunas casillas con ejemplos, y esos errores chicos se van sumando a lo largo de la partida.", explicacion: "No: en las 22 casillas con ejemplos no tiene ni un error. El problema no está en los datos, sino afuera de ellos." },
+          { texto: "Como clasificador se equivoca en algunas casillas con ejemplos, y esos errores chicos se van sumando a lo largo de la partida.", explicacion: "No: en sus casillas con ejemplos no tiene ni un error (22 de 22 en el conjunto 0). El problema no está en los datos, sino afuera de ellos." },
           { texto: "Con slip 0,3 la copia se resbala más seguido que el experto, así que pisa casillas sin ejemplos muchas más veces.", explicacion: "No: los dos pisan alguna casilla sin ejemplos con la misma probabilidad, 0,289. Hasta ese momento la copia es idéntica al experto; lo que cambia es qué hace después." },
           { texto: "Es efecto del slip y no de la copia: en una cueva tan resbalosa cualquier política sale menos, también el experto.", explicacion: "No: el experto sale siempre (1,000) con slip 0,1, 0,2, 0,3 y 0,4, porque sabe volver desde donde se resbala." },
-          { texto: "Un resbalón la lleva adonde el experto nunca estuvo; en esas 37 casillas sin ejemplos aprieta ↑ y se aleja más.", explicacion: "Correcto. Un error trae el siguiente: errores compuestos. El efecto depende de ↑: si en esas casillas tirara un dado, saldría con 0,990." }
+          { texto: "Un resbalón la lleva adonde el experto nunca estuvo; en esas casillas sin ejemplos aprieta ↑ y se aleja más.", explicacion: "Correcto. Un error trae el siguiente: errores compuestos. El efecto depende de ↑: si en esas casillas tirara un dado, saldría con 0,990." }
         ],
         correcta: 3
       },
@@ -906,7 +906,7 @@ window.MODULOS = {
         objetivo: "O2",
         pregunta: "Con slip 0,3, DAgger lleva a la copia de 0,911 a 1,000 en la ronda 4. ¿Qué hace en cada ronda?",
         opciones: [
-          { texto: "Juega con la copia, le pide al experto la flecha de cada casilla que pisó, suma esos pares y vuelve a copiar.", explicacion: "Correcto. El experto no juega, solo etiqueta donde la copia se desvió. En esta cueva, sumar partidas del experto grabadas con slip 0,3 llega igual a 1,000 en la ronda 4 y pide menos etiquetas (unas 450 por ronda contra 650 a 760)." },
+          { texto: "Juega con la copia, le pide al experto la flecha de cada casilla que pisó, suma esos pares y vuelve a copiar.", explicacion: "Correcto. El experto etiqueta cada casilla que se pisó y en las primeras rondas todavía maneja parte de los pasos (la mitad en la ronda 1). En esta cueva, sumar partidas del experto grabadas con slip 0,3 llega igual a 1,000 en la ronda 4 con una cantidad parecida de etiquetas (636 pares por ronda contra 650 a 760)." },
           { texto: "Graba más partidas enteras del experto en la cueva de slip 0,1 y las suma a los registros de la ronda anterior.", explicacion: "No: eso llega a 0,981 en la ronda 5. Con slip 0,1 el experto casi no se resbala y no visita las casillas donde la copia se pierde." },
           { texto: "Le da recompensa a la copia en las casillas sin ejemplos para que aprenda con Q-learning a volver al camino.", explicacion: "No: DAgger no usa la recompensa. Sigue siendo imitación, con más etiquetas del experto justo en las casillas a las que llega la copia." },
           { texto: "Cambia el ↑ de las casillas sin ejemplos por un dado, y así la copia termina encontrando la salida por azar.", explicacion: "No: esa es la variante del dado, que con slip 0,3 sale con 0,990. DAgger llega a 1,000 porque esas casillas pasan a tener la flecha del experto." }

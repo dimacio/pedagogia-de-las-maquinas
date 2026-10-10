@@ -595,7 +595,7 @@ Si el problema es que no hay ejemplos donde la copia se desvía, la solución es
 2. En cada casilla que se pisó, preguntarle al experto qué flecha habría apretado.
 3. Sumar esos ejemplos a la tabla y volver a copiar.
 
-El experto no juega esas partidas: solo **etiqueta** las casillas a las que llegó la copia. Probamos en la cueva de slip 0,3, donde la copia fallaba. En la ronda $k$, el experto maneja con probabilidad $0{,}5^k$ (la mezcla que proponen Ross y coautores) y la copia el resto.
+El experto **etiqueta** todas las casillas a las que se llegó, pero en las primeras rondas todavía maneja parte de los pasos. Probamos en la cueva de slip 0,3, donde la copia fallaba. En la ronda $k$, el experto maneja con probabilidad $0{,}5^k$ (la mitad de los pasos en la ronda 1) y la copia el resto: es una de las mezclas que sugieren Ross y coautores, que también cuentan que en la práctica la versión sin mezcla (la copia maneja siempre) suele andar mejor. En esta cueva no es así, como vamos a ver.
 
 ### Paso 1 — Una ronda, a mano
 """, objetivos=["O2"]))
@@ -618,7 +618,7 @@ Comparamos DAgger con dos maneras de conseguir más datos **sin** preguntar dond
 cells.append(code(r"""
 exito_d = np.zeros((len(SEMILLAS), RONDAS + 1)); cubre_d = np.zeros_like(exito_d)
 exito_b1 = np.zeros_like(exito_d); exito_b3 = np.zeros_like(exito_d); exito_d0 = np.zeros_like(exito_d)
-etiquetas_d = np.zeros((len(SEMILLAS), RONDAS))
+etiquetas_d = np.zeros((len(SEMILLAS), RONDAS)); pares_b3 = np.zeros_like(etiquetas_d)
 for i, sem in enumerate(SEMILLAS):
     base = grabar(env, pol_exp, 0.0, N_PARTIDAS, sem)
     cps, tbs, et = dagger(env3, pol_exp, base, RONDAS, N_RONDA, semilla=sem)
@@ -627,6 +627,7 @@ for i, sem in enumerate(SEMILLAS):
     exito_d0[i] = [medir(env3, c)["exito"] for c in dagger(env3, pol_exp, base, RONDAS, N_RONDA, semilla=sem, beta=0)[0]]
     extra1 = grabar(CaveEnv(slip=SLIP), pol_exp, 0.0, N_RONDA * RONDAS, 500 + sem)
     extra3 = grabar(CaveEnv(slip=0.3), pol_exp, 0.0, N_RONDA * RONDAS, 500 + sem)
+    pares_b3[i] = [sum(len(p) for p in extra3[N_RONDA * k:N_RONDA * (k + 1)]) for k in range(RONDAS)]
     for k in range(RONDAS + 1):
         exito_b1[i, k] = medir(env3, copia_mas_frecuente(conteos(env, base + extra1[:N_RONDA * k])))["exito"]
         exito_b3[i, k] = medir(env3, copia_mas_frecuente(conteos(env, base + extra3[:N_RONDA * k])))["exito"]
@@ -652,6 +653,8 @@ for k in rondas:
           f"{exito_b3[:, k].mean():>14.3f} {exito_d0[:, k].mean():>17.3f}")
 print(f"\npeor conjunto, ronda 0 y ronda {RONDAS}:  DAgger {exito_d[:, 0].min():.3f} -> {exito_d[:, -1].min():.3f}   "
       f"+exp slip 0,1 {exito_b1[:, -1].min():.3f}   +exp slip 0,3 {exito_b3[:, -1].min():.3f}")
+print(f"pares (casilla, acción) por ronda: DAgger {etiquetas_d.mean():.0f} en promedio; "
+      f"20 partidas grabadas del experto con slip 0,3, {pares_b3.mean():.0f}")
 """))
 cells.append(md(r"""
 Con DAgger, la copia pasa de 0,911 a 0,984 en la ronda 2 y a **1,000 en la ronda 4**, en los 10 conjuntos (el peor pasa de 0,824 a 1,000). Las casillas con ejemplos pasan de 26,3 a 42,7: justo las que la copia pisa. En el dibujo de la ronda 5 quedan sin ejemplos (en rojo) solo casillas a las que la copia casi nunca llega.
@@ -660,8 +663,8 @@ Las comparaciones dicen algo importante:
 
 - **Más partidas del experto grabadas como las primeras** llega a 0,981 en la ronda 5: con slip 0,1 el experto casi no se resbala y no visita las casillas donde la copia se pierde.
 - **Grabar al experto en la cueva de prueba** (slip 0,3) anda tan bien como DAgger: en esta cueva el experto se resbala igual que la copia, y sus partidas muestran cómo volver. DAgger sirve cuando eso no se puede: cuando no se puede poner al experto en las condiciones nuevas, o cuando la copia se equivoca por su cuenta y llega adonde el experto nunca iría.
-- DAgger pide más etiquetas: entre 650 y 760 por ronda, contra unas 450 en 20 partidas del experto, porque una copia trabada pisa muchas veces las mismas casillas.
-- **Sin la ayuda del experto** en las primeras rondas (última columna), DAgger avanza de a una casilla por ronda: la copia queda yendo y viniendo entre la última casilla corregida y la siguiente, y solo esa se etiqueta.
+- DAgger pide entre 650 y 760 etiquetas por ronda (686 en promedio), porque una copia trabada pisa muchas veces las mismas casillas. Es parecido a lo que dan 20 partidas del experto grabadas con slip 0,3: 636 pares por ronda (con slip 0,1 eran 451). La comparación con la cueva de prueba es pareja también en cantidad de datos.
+- **Sin la ayuda del experto** en las primeras rondas (última columna), DAgger avanza de a una casilla por ronda (0,885 en la ronda 1, 0,970 en la 5): la copia queda yendo y viniendo entre la última casilla corregida y la siguiente, y solo esa se etiqueta.
 """))
 
 # ======================================================================= 5
@@ -705,7 +708,7 @@ plt.tight_layout(); plt.show()
 cells.append(md(r"""
 Sin jugar ni una partida, la política aprendida sale con probabilidad 0,9998 y vale 0,8029, casi $V^*(S) = 0{,}8032$. La flecha es óptima en 41 de las 45 casillas con ejemplos. Y ninguna partida grabada fue tan buena: la mejor tardó 48 pasos (retorno 0,6235). Los dos mapas coinciden en las casillas que aparecen en los registros; las negras, sin ejemplos, quedan en 0.
 
-Un detalle: el agente cree que S vale 0,8062, un poco más de lo que vale. Vamos a volver sobre eso en la sección 6.
+Un detalle: el agente cree que S vale 0,8062, unas milésimas más de lo que vale (0,8029). Esa diferencia es ruido del $lpha$ fijo y con otra semilla puede salir para el otro lado; la sobreestimación de verdad aparece en la sección 6.
 
 ### Paso 2 — En 10 conjuntos, con las partidas mezcladas y con las del experto
 """))
@@ -905,7 +908,7 @@ plt.tight_layout(); plt.show()
 cells.append(md(r"""
 - **Con solo partidas del experto**, las cuatro maneras dan casi lo mismo (0,782; filtrar da 0,759 porque 5 partidas tocan menos casillas). Imitar alcanza, y RL offline no agrega nada. (La mejor partida grabada vale 0,826, más que $V^*(S)$: es la partida con suerte, sin un solo resbalón. Una política se mide por el promedio, y el promedio no le puede ganar a la partida más afortunada.)
 - **Con las mezcladas** ($\varepsilon = 0{,}8$), imitar se cae. La copia proporcional copia también el azar (0,289). La de la más frecuente depende del conjunto (0,543 en promedio, con conjuntos en 0: alguna casilla donde por azar ganó una flecha equivocada, y la copia queda yendo y viniendo). Filtrar tampoco ayuda (0,262): las 5 mejores partidas también son casi al azar, y tocan menos casillas. Q-learning offline llega a 0,803 en todos los conjuntos.
-- **Con la mezcla de jugadores**, filtrar sí sirve (0,762, contra 0,695 de imitar todo): las mejores partidas son de los que juegan casi como el experto. Q-learning offline sigue arriba (0,790).
+- **Con la mezcla de jugadores**, filtrar sí sirve (0,762, contra 0,695 de imitar todo): las mejores partidas son de los que juegan casi como el experto. Q-learning offline sigue arriba (0,790). Su mejor partida grabada (0,813) también supera a $V^*(S)$ por suerte.
 
 ### Paso 2 — Un camino mejor que cualquier partida (*stitching*)
 
