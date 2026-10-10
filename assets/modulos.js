@@ -945,5 +945,83 @@ window.MODULOS = {
         "Se explica por qué mirar más veces lo de siempre no alcanza: las situaciones nuevas aparecen cuando uno se desvía, no cuando copia bien."
       ]
     }
+  },
+
+  "11": {
+    objetivos: [
+      "Describir una política estocástica con preferencias por casilla (softmax) y explicar por qué se puede optimizar directamente.",
+      "Explicar REINFORCE como hacer más probable lo que dio buen retorno (imitar lo que salió bien) y aplicar una actualización a mano.",
+      "Explicar por qué una línea de base reduce la varianza sin sesgar y cómo un crítico V da la ventaja con la que aprende el actor.",
+      "Explicar la idea de PPO como no alejarse demasiado de la política anterior, sin derivarla."
+    ],
+    tiempo: { pagina: 35, notebook: 75 },
+    previos: ["10", "5"],
+    requisitos: ["De la clase 10, imitar: aprender una política copiando las acciones de partidas grabadas.", "De la clase 5, el retorno G, el valor V y el error δ = r + γV(s′) − V(s) de TD."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "La casilla S guarda las preferencias θ(S) = (−1; 1; 0,5; −1) en el orden ↑ → ↓ ←, y softmax las vuelve probabilidades. ¿Qué política queda en S y por qué sirve para optimizarla directamente?",
+        opciones: [
+          { texto: "Determinista: siempre →, porque tiene la preferencia más alta; las demás flechas quedan con probabilidad 0 y no se juegan.", explicacion: "No: eso sería tomar el máximo. Softmax le da algo a cada flecha: → es la más probable, pero ↓ sigue con 0,3231 y ↑ y ← con 0,0721." },
+          { texto: "Proporcional a θ: → con 1/1,5 y ↓ con 0,5/1,5, mientras que ↑ y ← quedan en cero porque sus preferencias son negativas.", explicacion: "No: softmax no divide las preferencias por su suma, usa e^θ. Por eso una preferencia negativa da una probabilidad chica pero positiva, 0,0721." },
+          { texto: "→ con 0,5327, ↓ con 0,3231 y ↑ o ← con 0,0721; un cambio chico de θ da un cambio chico de π, así que se puede mejorar de a poco.", explicacion: "Correcto. π(a|s) = e^θ(s,a) / Σ e^θ(s,b). Como π depende suavemente de θ, el gradiente de política la mejora sin pasar por Q." },
+          { texto: "Las cuatro con 1/4, porque softmax normaliza las preferencias y en cada casilla deja siempre el dado, sean cuales sean las θ de esa casilla.", explicacion: "No: el dado aparece solo cuando las cuatro preferencias son iguales (por ejemplo, todas en 0). Sumarles lo mismo a las cuatro no cambia nada; cambiarlas por separado, sí." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O2",
+        pregunta: "La primera partida del dado que salió tardó 161 pasos: desde S cobró G = 0,99¹⁶⁰ = 0,2003. En S había tomado ↓ con π = 0,25 en las cuatro flechas. Con REINFORCE y α = 1, ¿cómo se mueve θ(S) en el orden ↑ → ↓ ←?",
+        opciones: [
+          { texto: "(−0,0501; −0,0501; +0,1502; −0,0501): sube ↓, la tomada, y bajan las otras; con una partida que no salió, G = 0 y θ no se movería.", explicacion: "Correcto. ∇ log π vale 1 − 0,25 para la acción tomada y −0,25 para las otras, por G = 0,2003. π queda en (0,2369; 0,2369; 0,2894; 0,2369)." },
+          { texto: "(0; 0; +0,2003; 0): a ↓ se le suma el retorno entero y las otras tres flechas no se tocan, porque no se jugaron en S.", explicacion: "No: ∇ log π también toca las flechas no jugadas. A ↓ se le suma (1 − 0,25) · G = 0,1502 y a cada una de las otras se le resta 0,25 · G = 0,0501." },
+          { texto: "(+0,0501; +0,0501; −0,1502; +0,0501): baja ↓, porque tardar 161 pasos es una partida mala y REINFORCE castiga lo que la alargó.", explicacion: "No: sin línea de base, todo G positivo empuja para arriba la acción tomada. Una partida que salió rápido empujaría más, pero esta también empuja ↓ hacia arriba." },
+          { texto: "No se mueve: REINFORCE actualiza θ solo cuando G supera el retorno de una partida perfecta, y 0,2003 está lejos de ese valor.", explicacion: "No: no hay umbral. El empuje es proporcional a G; con 0,2003 es chico pero no nulo. Solo con G = 0, una partida que no salió, θ queda igual." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O3",
+        pregunta: "Restar una línea de base b(s), el retorno promedio desde cada casilla, baja la varianza del gradiente de una partida de 23,06 a 4,20. Con α = 3 llega a V(S) = 0,75 en 485 partidas contra 430 sin ella. ¿Para qué sirve, entonces?",
+        opciones: [
+          { texto: "Para aprender más rápido siempre: con menos varianza cada actualización vale más, y en cualquier α llega antes a 0,75.", explicacion: "No: con α = 3 no aprende antes (485 contra 430 partidas). La ventaja aparece al usar pasos más grandes, no con el mismo α." },
+          { texto: "Para cambiar hacia dónde apunta el gradiente: deja de empujar las acciones de las partidas buenas y empuja las de las malas.", explicacion: "No: en promedio el gradiente apunta igual, por eso no sesga. Lo que cambia es que sube solo lo que salió mejor que lo esperado y baja lo que salió peor." },
+          { texto: "Para reemplazar el retorno: con b(s) el agente ya no necesita esperar el final de la partida y aprende en cada paso.", explicacion: "No: eso es lo que aporta el crítico del actor-crítico. Con línea de base, REINFORCE sigue esperando G al final de la partida." },
+          { texto: "Para admitir pasos más grandes: con α = 10, sin ella se traban 7 de 8 semillas y con ella aprende en 150 partidas.", explicacion: "Correcto. Sube solo lo que salió mejor que lo esperado, sin cambiar la dirección promedio, y termina en 0,811 ± 0,007." }
+        ],
+        correcta: 3
+      },
+      {
+        objetivo: "O3",
+        pregunta: "En el actor-crítico, el crítico aprende V con TD(0) y el actor usa A = r + γV(s′) − V(s). Aprende en 145 partidas y termina en 0,8210 ± 0,0072, cerca de V*(S) = 0,8262. ¿Qué aporta el crítico?",
+        opciones: [
+          { texto: "El valor verdadero de cada casilla: el actor-crítico arranca con V* de la clase 4 y por eso termina tan cerca de 0,8262.", explicacion: "No: el crítico aprende V con TD mientras juega, sin el mapa. Queda a menos de 0,05 del valor verdadero del actor en solo el 39 % de las casillas." },
+          { texto: "Una ventaja en cada paso, el mismo δ de la clase 5, sin esperar el G del final; acierta sobre el camino del actor y no fuera.", explicacion: "Correcto. El δ dice cuánto mejor o peor salió el paso de lo esperado. Aprende a la par de REINFORCE con línea de base (150) y termina más cerca de V*." },
+          { texto: "Una segunda política que elige las acciones junto con el actor, de modo que el agente juega con dos votos en cada casilla.", explicacion: "No: el crítico no elige acciones. Solo juzga: su V da el δ con el que el actor, las preferencias θ, ajusta sus probabilidades." },
+          { texto: "Un valor preciso en todas las casillas de la cueva, y por eso el actor puede mejorar también donde nunca pasa.", explicacion: "No: el crítico acierta donde juega el actor. Fuera del camino casi no tiene datos, y en el notebook queda cerca del valor verdadero en solo el 39 % de las casillas." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O4",
+        pregunta: "Desde una política con V(S) = 0,2178 se reusa un lote de 10 partidas en 50 pasadas de gradiente. Sin recorte V(S) cae a 0,0047; con el recorte de PPO (ε = 0,2) sube a 0,3263. Con una sola pasada, las dos dan 0,2628. ¿Qué hace el recorte?",
+        opciones: [
+          { texto: "Achica α en cada pasada, así que las 50 pasadas con recorte equivalen a una sola pasada larga con un paso más chico.", explicacion: "No: el recorte no toca α. Si fuera un paso más chico, también cambiaría el resultado de la primera pasada, y con una sola pasada da lo mismo con o sin él." },
+          { texto: "Descarta las partidas malas del lote antes de reusarlo, de modo que las 50 pasadas solo empujan acciones con buen retorno.", explicacion: "No: el lote queda entero. Lo que se limita es cuánto puede cambiar la probabilidad de cada acción respecto de la política que jugó." },
+          { texto: "Saca el empuje de una acción cuando π_nueva/π_vieja ya salió de [1 − ε, 1 + ε]; en la primera pasada la razón vale 1 y no actúa.", explicacion: "Correcto. Evita alejarse demasiado de la política que jugó el lote. En un lote del notebook la razón mediana queda en 1,043 con recorte contra 0,070 sin él." },
+          { texto: "Garantiza que ninguna razón salga de la banda [0,8; 1,2], porque cada probabilidad nueva se fuerza a quedar dentro de ese rango.", explicacion: "No: no es un candado perfecto y algunas razones se escapan de la banda. El recorte solo saca el empuje de esas acciones, no fija sus probabilidades." }
+        ],
+        correcta: 2
+      }
+    ],
+    actividad: {
+      titulo: "Reforzar lo que salió bien",
+      consigna: "Elegí un hábito propio que quieras mejorar: estudiar, entrenar, cocinar, ordenar la semana. Contá qué hiciste las últimas veces y cómo te fue, y explicá cómo «reforzarías lo que salió bien» como REINFORCE: qué harías más seguido después de un buen día. Agregale una línea de base: ¿con qué resultado esperado comparás cada día, y por qué un día apenas normal no debería reforzar todo lo que hiciste, rodeos incluidos? Usá la pregunta de «Para enseñarlo»: ¿merece el mismo festejo un 7 de quien siempre saca 9 que el de quien siempre saca 4? Después pensá en un paso demasiado grande: después de un solo día excelente, cambiás toda tu rutina para copiarlo. Contá qué podría salir mal y cómo pondrías un límite a cuánto cambiar de una vez, como el recorte de PPO. Cerralo con la oración de «Para enseñarlo»: policy gradient es reforzar lo que salió bien, comparado con lo que esperabas. Publicalo en Discussions; otra persona te devuelve con la rúbrica.",
+      rubrica: [
+        "Se nombra un hábito concreto y se dice qué se haría más seguido después de un resultado bueno, en proporción a qué tan bueno fue.",
+        "Hay una línea de base explícita (el resultado esperado) y se explica por qué reforzar solo lo que salió mejor que eso evita premiar un día normal o un rodeo.",
+        "Se describe qué podría salir mal con un cambio demasiado grande después de un solo resultado y se propone un límite concreto a cuánto cambiar de una vez, relacionado con el recorte de PPO."
+      ]
+    }
   }
 };
