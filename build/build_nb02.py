@@ -1,4 +1,4 @@
-"""Arma notebooks/02-que-es-rl.ipynb (Clase 2 — ¿Qué es RL?)."""
+"""Arma notebooks/02-que-es-rl.ipynb (Clase 2 — ¿Qué es RL?). Spine: specs/2.md."""
 from _nbutil import md, code, writefile_cell, save
 
 cells = []
@@ -6,17 +6,18 @@ cells = []
 cells.append(md(r"""
 # Clase 2 — ¿Qué es el aprendizaje por refuerzo?
 
-**RL a ciegas** · mini curso de aprendizaje por refuerzo (*reinforcement learning*, RL) · vía profunda
+**RL a ciegas** · curso de aprendizaje por refuerzo (*reinforcement learning*, RL) · vía profunda
 
-Basado en Stanford CS234 (Brunskill), clase 1, y en Sutton & Barto, cap. 1 y 3.
+Basado en Stanford CS234 (Brunskill), clase 1; Stanford CS224R, clase 1; y Sutton & Barto, cap. 1 y 3.
 
 En esta clase vamos a ver:
 
-1. **El ciclo agente–entorno**: alguien decide, el mundo responde.
-2. **Un agente aleatorio en la cueva a oscuras**: qué ve, qué descubre y cuánto tarda en salir.
-3. **Historia vs. estado** y el **supuesto de Markov**: ¿qué tiene que recordar el agente?
-4. **Aula invertida: el tutor de IA como proceso de decisión**. Ustedes diseñan el problema… y descubren una trampa.
-5. Dónde aparece RL hoy.
+1. **Dónde aparece RL hoy y qué tiene de distinto**: el problema sin respuesta correcta.
+2. **El ciclo agente–entorno**: alguien decide, el mundo responde.
+3. **La política**: la regla que elige. Un agente al azar contra uno con flechas.
+4. **Qué se maximiza**: la suma de recompensas, con un agente aleatorio en la cueva a oscuras.
+5. **Historia vs. estado** y el **supuesto de Markov**: ¿qué tiene que recordar el agente?
+6. **Aula invertida: el tutor de IA como proceso de decisión**. Ustedes diseñan el problema… y descubren una trampa.
 
 > Cómo usar este notebook: ejecutar las celdas en orden (Colab: *Entorno de ejecución → Ejecutar todas*). Tarda menos de un minuto.
 """))
@@ -29,7 +30,7 @@ La primera celda escribe el archivo `cave_env.py` con **la cueva** que usamos en
 cells.append(writefile_cell())
 
 cells.append(md(r"""
-Ahora importamos la cueva y las bibliotecas de siempre (`numpy` para números, `matplotlib` para gráficos). Fijamos una semilla para que todos veamos los mismos resultados.
+Ahora importamos la cueva y las bibliotecas de siempre (`numpy` para números, `matplotlib` para gráficos). Fijamos una semilla para que todos veamos los mismos resultados y le ponemos nombre a las cuatro acciones.
 """))
 cells.append(code(r"""
 import numpy as np
@@ -38,6 +39,7 @@ from cave_env import CaveEnv, ACTION_NAMES
 
 SEMILLA = 0
 np.random.seed(SEMILLA)
+ARRIBA, DERECHA, ABAJO, IZQUIERDA = 0, 1, 2, 3
 print("Acciones:", ACTION_NAMES)
 """))
 
@@ -58,7 +60,31 @@ plt.rcParams.update({
 })
 
 
-# ---------- 1. ciclo agente-entorno ----------
+# ---------- flechas calculadas con el mapa (la clase 4 explica cómo) ----------
+def flechas_con_mapa(env, gamma=0.95, tol=1e-10):
+    """Iteración de valor sobre env.P y env.R. Devuelve una flecha (acción) por casilla."""
+    V = np.zeros(env.nS)
+    while True:
+        Q = env.R + gamma * env.P @ V
+        V_nuevo = Q.max(axis=1)
+        if np.max(np.abs(V_nuevo - V)) < tol:
+            break
+        V = V_nuevo
+    return Q.argmax(axis=1)
+
+
+# ---------- 1. supervisado contra RL ----------
+def supervisado_vs_rl(env, politica):
+    fig, axs = plt.subplots(1, 2, figsize=(13, 4.6))
+    env.plot(policy=politica, ax=axs[0],
+             title="Aprendizaje supervisado: la respuesta correcta en cada casilla")
+    env.plot(show_walls=False, ax=axs[1], title="RL: a oscuras, y solo un número al llegar")
+    gr, gc = env.free[env.goal]
+    axs[1].text(gc, gr, "+1", ha="center", va="center", color="k", fontsize=11, weight="bold")
+    plt.tight_layout(); plt.show()
+
+
+# ---------- 2. ciclo agente-entorno ----------
 def dibujar_ciclo():
     fig, ax = plt.subplots(figsize=(8, 3.6))
     ax.set_xlim(0, 10); ax.set_ylim(0, 5); ax.axis("off")
@@ -76,15 +102,73 @@ def dibujar_ciclo():
     plt.show()
 
 
-# ---------- 2. agente aleatorio ----------
+def ciclo_en_la_cueva(env, acciones):
+    """Juega las acciones dadas e imprime cada vuelta del ciclo."""
+    s = env.reset()
+    print(f"{'t':>2}  {'acción':>6}  {'observación (casilla fila, col)':>32}  {'¿chocó?':>8}  {'recompensa':>10}")
+    for t, a in enumerate(acciones, start=1):
+        s, r, done, info = env.step(a)
+        print(f"{t:>2}  {ACTION_NAMES[a]:>6}  {str(env.free[s]):>32}  {'sí' if info['bump'] else 'no':>8}  {r:>10}")
+        if done:
+            break
+
+
+# ---------- 3 y 4. episodios ----------
 def correr_episodio(env, rng, politica=None):
-    """Juega un episodio. Devuelve (camino de estados, retorno, ¿llegó?)."""
+    """Juega un episodio. politica: None (al azar) o un arreglo con una acción por casilla.
+    Devuelve (camino de estados, retorno, ¿llegó?)."""
     s = env.reset(); camino = [s]; G = 0.0; done = False; info = {"reached_goal": False}
     while not done:
-        a = rng.integers(env.nA) if politica is None else politica(s)
+        a = rng.integers(env.nA) if politica is None else int(politica[s])
         s, r, done, info = env.step(a)
         camino.append(s); G += r
     return camino, G, info["reached_goal"]
+
+
+def recompensas_de_un_episodio(env, rng, politica=None):
+    s = env.reset(); rs = []; done = False
+    while not done:
+        a = rng.integers(env.nA) if politica is None else int(politica[s])
+        s, r, done, info = env.step(a); rs.append(r)
+    return np.array(rs), info["reached_goal"]
+
+
+def dos_politicas(politica, limite=200, seed=0):
+    env = CaveEnv(max_steps=limite)
+    cam_azar, _, ok_azar = correr_episodio(env, np.random.default_rng(seed))
+    cam_flechas, _, ok_flechas = correr_episodio(env, np.random.default_rng(seed), politica)
+    fig, axs = plt.subplots(1, 2, figsize=(13, 4.6))
+    env.plot(path=cam_azar, ax=axs[0],
+             title=f"Al azar: {len(cam_azar) - 1} pasos, ¿salió? {'sí' if ok_azar else 'no'}")
+    env.plot(policy=politica, path=cam_flechas, ax=axs[1],
+             title=f"Flechas fijas: {len(cam_flechas) - 1} pasos, ¿salió? {'sí' if ok_flechas else 'no'}")
+    plt.tight_layout(); plt.show()
+    return len(cam_flechas) - 1
+
+
+def pasos_hasta_salir(n_episodios=300, seed=0, politica=None):
+    """Sin límite de pasos: ¿cuántos pasos tarda en encontrar la salida?"""
+    env = CaveEnv(max_steps=10**6); rng = np.random.default_rng(seed); pasos = []
+    for _ in range(n_episodios):
+        camino, _, _ = correr_episodio(env, rng, politica)
+        pasos.append(len(camino) - 1)
+    return np.array(pasos)
+
+
+def comparar_dos_politicas(pasos_azar, pasos_flechas, limite=200):
+    nombres = ["al azar", "flechas fijas"]
+    exito = [np.mean(p <= limite) * 100 for p in (pasos_azar, pasos_flechas)]
+    medianas = [np.median(p) for p in (pasos_azar, pasos_flechas)]
+    fig, axs = plt.subplots(1, 2, figsize=(11, 3.8))
+    for ax, vals, tit, fmt in [(axs[0], exito, f"% de episodios que salen en {limite} pasos", "%.1f%%"),
+                               (axs[1], medianas, "Mediana de pasos hasta salir (sin límite)", "%.0f")]:
+        bars = ax.bar(nombres, vals, color=[COLORES[1], COLORES[0]], width=0.55)
+        ax.bar_label(bars, fmt=fmt, padding=3)
+        ax.set_title(tit); ax.grid(axis="x", visible=False); ax.set_ylim(0, max(vals) * 1.2)
+    plt.tight_layout(); plt.show()
+    print(f"{'política':15s} {'éxito en ' + str(limite):>12s} {'mediana de pasos':>17s}")
+    for n, e, m in zip(nombres, exito, medianas):
+        print(f"{n:15s} {e:11.1f}% {m:17.0f}")
 
 
 def pintar_paredes_tocadas(env, camino, ax=None, title=None):
@@ -104,13 +188,18 @@ def tres_vistas(env, camino):
     plt.tight_layout(); plt.show()
 
 
-def pasos_hasta_salir(n_episodios=300, seed=0):
-    """Agente aleatorio sin límite de pasos: ¿cuántos pasos tarda en encontrar la salida?"""
-    env = CaveEnv(max_steps=10**6); rng = np.random.default_rng(seed); pasos = []
-    for _ in range(n_episodios):
-        camino, _, _ = correr_episodio(env, rng)
-        pasos.append(len(camino) - 1)
-    return np.array(pasos)
+def dibujar_recompensas(rs_azar, rs_flechas):
+    fig, axs = plt.subplots(2, 1, figsize=(11, 4.6))
+    for ax, rs, nombre, col in [(axs[0], rs_azar, "al azar", COLORES[1]), (axs[1], rs_flechas, "flechas fijas", COLORES[0])]:
+        t = np.arange(1, len(rs) + 1)
+        ax.vlines(t, 0, rs, color=col, lw=2)
+        ax.plot(t, rs, "o", ms=2.5, color=col)
+        ax.set_xlim(0, len(rs_azar) + 1); ax.set_ylim(-0.1, 1.3); ax.set_yticks([0, 1])
+        ax.set_ylabel("$r_t$")
+        ax.set_title(f"Política {nombre}: {int(np.sum(rs == 0))} recompensas 0 y un +1 en el paso {len(rs)}",
+                     fontsize=11)
+    axs[1].set_xlabel("paso t")
+    plt.tight_layout(); plt.show()
 
 
 def histograma_pasos(pasos, limite=200):
@@ -129,7 +218,7 @@ def histograma_pasos(pasos, limite=200):
     return exito
 
 
-# ---------- 3. historia vs estado ----------
+# ---------- 5. historia vs estado ----------
 def camino_de_acciones(env, acciones):
     s = env.reset(); camino = [s]
     for a in acciones:
@@ -155,22 +244,7 @@ def firma_paredes(env, s):
     return tuple(env.observe(s, kind="coords+touch")[2:].astype(int))
 
 
-def mapa_aliasing(env, s_ref):
-    firmas = [firma_paredes(env, s) for s in range(env.nS)]
-    cuantas = np.array([firmas.count(f) for f in firmas], dtype=float)
-    iguales = np.array([1.0 if f == firmas[s_ref] else 0.0 for f in firmas])
-    fig, axs = plt.subplots(1, 2, figsize=(14, 4.6))
-    env.plot(values=cuantas, ax=axs[0], cmap="viridis",
-             title="¿Con cuántas casillas comparte lo que siente?")
-    env.plot(values=iguales, ax=axs[1], cmap="Blues",
-             title="Casillas que 'se sienten' igual a la marcada")
-    r, c = env.free[s_ref]
-    axs[1].plot(c, r, "o", ms=16, mfc="none", mec=COLORES[1], mew=3)
-    plt.tight_layout(); plt.show()
-    return len(set(firmas)), int(iguales.sum())
-
-
-# ---------- 4. tutor de IA ----------
+# ---------- 6. tutor de IA ----------
 HAB_INICIAL = {"suma": 0.10, "resta": 0.05}   # prob. de acertar al principio
 VELOCIDAD = {"suma": 0.12, "resta": 0.04}     # cuánto aprende por cada problema practicado
 
@@ -229,10 +303,47 @@ def comparar_politicas_tutor(recompensa=recompensa_original, titulo_r="recompens
 
 # ---------------------------------------------------------------- 1
 cells.append(md(r"""
-## 1. El ciclo agente–entorno
+## 1. Dónde aparece RL hoy y qué tiene de distinto
+
+Dos ejemplos conocidos, con su fuente:
+
+- **Juegos.** AlphaGo aprendió a jugar al Go combinando redes neuronales, búsqueda en el árbol de jugadas y aprendizaje por refuerzo jugando contra sí mismo; le ganó 5 a 0 al campeón europeo Fan Hui (Silver et al., 2016).
+- **Asistentes conversacionales.** Los modelos de lenguaje se ajustan con *RL a partir de retroalimentación humana* (*RL from human feedback*, RLHF): personas comparan respuestas, con esas comparaciones se entrena un modelo de recompensa y el modelo de lenguaje se optimiza con RL para obtener más recompensa. En el trabajo de InstructGPT, las personas prefirieron las respuestas de un modelo así ajustado de 1300 millones de parámetros a las de GPT-3, más de cien veces más grande (Ouyang et al., 2022).
+
+¿Qué tienen en común estos problemas con salir de una cueva a oscuras? Que **nadie da la respuesta correcta**.
+
+### Paso 1 — Lo que recibe el que aprende
+
+A la izquierda, lo que tendría un problema de **aprendizaje supervisado** (*supervised learning*): para cada casilla, alguien nos dice la flecha correcta (como una etiqueta en un conjunto de datos). A la derecha, lo que tiene el agente de RL: la cueva a oscuras y un **+1** cuando llega a la salida. Nada más.
+
+(Las flechas de la izquierda las calculamos nosotros mirando el mapa; en la clase 4 vamos a ver cómo.)
+""", objetivos=["O2"]))
+cells.append(code(r"""
+env = CaveEnv(max_steps=200)
+politica_flechas = flechas_con_mapa(env)
+supervisado_vs_rl(env, politica_flechas)
+"""))
+cells.append(md(r"""
+En el aprendizaje supervisado, cada error se corrige en el momento: "acá era ↓, no →". En RL el agente solo recibe un número, a veces mucho después, y tiene que deducir por su cuenta qué hizo bien. Lo que hace difícil a RL se resume en cuatro ingredientes (CS234, clase 1):
+
+| Ingrediente | ¿Qué significa en la cueva? |
+|---|---|
+| **Optimización** (*optimization*) | queremos salir, y rápido |
+| **Consecuencias demoradas** (*delayed consequences*) | el +1 llega recién al final: un paso a la izquierda ahora puede ser lo que permite salir 30 pasos después |
+| **Exploración** (*exploration*) | no vemos el mapa: solo sabemos qué hay detrás de una pared si chocamos con ella |
+| **Generalización** (*generalization*) | ¿lo aprendido en esta cueva sirve en otra? |
+
+En el Go y en los asistentes pasa lo mismo: nadie sabe cuál era "la jugada correcta" o "la respuesta correcta" en cada paso; solo se sabe, al final, si se ganó o qué respuesta prefirió una persona.
+
+**Tres parientes de RL** que vamos a cruzar en el curso: el **RL basado en modelo** (*model-based RL*), donde el agente conoce o aprende cómo funciona el mundo —en la cueva, el mapa $P(s' \mid s, a)$— y planifica con él (clase 4); el **aprendizaje por imitación** (*imitation learning*), donde en vez de recompensa hay demostraciones de un experto (clase 10); y **RLHF**, donde la recompensa no se escribe a mano sino que se aprende de comparaciones hechas por personas (clase 12).
+"""))
+
+# ---------------------------------------------------------------- 2
+cells.append(md(r"""
+## 2. El ciclo agente–entorno
 
 Primero la figura, después las palabras.
-"""))
+""", objetivos=["O1"]))
 cells.append(code("dibujar_ciclo()"))
 cells.append(md(r"""
 En cada instante $t$:
@@ -240,55 +351,117 @@ En cada instante $t$:
 - el **agente** (*agent*) elige una **acción** $a_t$;
 - el **mundo** o **entorno** (*environment*) cambia y le devuelve una **observación** $o_t$ y una **recompensa** $r_t$ (un número: bueno si es alto).
 
+### Paso 1 — El ciclo en la cueva, vuelta por vuelta
+
+En la cueva: el agente es quien camina; el entorno es la cueva; las acciones son ↑ → ↓ ←; la observación es la casilla donde quedó (y si chocó con una pared); la recompensa es **+1 al llegar a la salida y 0 en cualquier otro paso**. Juguemos seis acciones elegidas a mano y miremos cada vuelta del ciclo.
+"""))
+cells.append(code(r"""
+ciclo_en_la_cueva(env, [DERECHA, DERECHA, DERECHA, DERECHA, ABAJO, ABAJO])
+"""))
+cells.append(md(r"""
+La cuarta acción (→) choca: la casilla no cambia y el agente se entera de que ahí hay una pared. En las seis vueltas la recompensa fue 0: nada le dice si va bien o mal.
+"""))
+
+# ---------------------------------------------------------------- 3
+cells.append(md(r"""
+## 3. La política: la regla que elige
+
+¿Quién elige la acción? Una **política** (*policy*): una regla que, para cada estado, dice qué hacer.
+
+$$a = \pi(s)$$
+
+La política es **lo que el agente aprende**. Vamos a comparar dos políticas en la misma cueva:
+
+- **al azar**: en cada paso tira un dado de cuatro caras;
+- **flechas fijas**: en cada casilla hay una flecha y el agente siempre la sigue (son las flechas de la sección 1).
+
+### Paso 1 — Dos políticas, un episodio cada una (límite: 200 pasos)
+""", objetivos=["O1"]))
+cells.append(code(r"""
+pasos_flechas = dos_politicas(politica_flechas, limite=200, seed=SEMILLA)
+print(f"Con las flechas, el agente sale en {pasos_flechas} pasos.")
+"""))
+cells.append(md(r"""
+El agente al azar va y vuelve por los mismos pasillos y no sale; el de las flechas va derecho a la salida. Los dos viven en la misma cueva, con las mismas acciones y la misma recompensa: **lo único que cambia es la política**.
+
+### Paso 2 — Muchos episodios: ¿cuánto mejor es una buena política?
+
+Un solo episodio puede ser suerte. Jugamos **300 episodios** con cada política, sin límite de pasos, y medimos cuántos pasos tarda cada una en salir. Después contamos qué porcentaje sale dentro de los 200 pasos del juego.
+"""))
+cells.append(code(r"""
+pasos_azar = pasos_hasta_salir(n_episodios=300, seed=SEMILLA)
+pasos_flechas_300 = pasos_hasta_salir(n_episodios=300, seed=SEMILLA, politica=politica_flechas)
+comparar_dos_politicas(pasos_azar, pasos_flechas_300, limite=200)
+"""))
+cells.append(md(r"""
+Las flechas salen siempre y por el camino más corto (la cueva no tiene azar: la misma flecha da siempre el mismo paso). El azar, en cambio, casi nunca sale en 200 pasos y su mediana está muy por encima del límite. Aprender, en RL, es ir de la política de la izquierda a la de la derecha **usando solo la recompensa**.
+"""))
+cells.append(md(r"""
+### ✍️ Ejercicio — Rompan una flecha
+
+Una política es una regla fija: si una flecha está mal, el agente repite el error para siempre. Cambien la flecha de **una** casilla y miren qué pasa. Por ejemplo, la casilla `(1, 2)` (a la derecha de `S`) apuntando a la izquierda (`IZQUIERDA`). Prueben también otras casillas del camino.
+"""))
+cells.append(code(r"""
+# TODO: cambiar la casilla (fila, columna) y la flecha, y volver a ejecutar
+casilla = (1, 2)
+nueva_flecha = IZQUIERDA
+
+mi_politica = politica_flechas.copy()
+mi_politica[env.pos2s[casilla]] = nueva_flecha
+camino_ej, _, llego_ej = correr_episodio(env, np.random.default_rng(SEMILLA), mi_politica)
+env.plot(policy=mi_politica, path=camino_ej,
+         title=f"Flecha cambiada en {casilla}: {len(camino_ej) - 1} pasos, ¿salió? {'sí' if llego_ej else 'no'}")
+plt.show()
+"""))
+
+# ---------------------------------------------------------------- 4
+cells.append(md(r"""
+## 4. Qué se maximiza: un agente aleatorio en la cueva
+
 El objetivo del agente no es la recompensa de *este* paso sino la suma de todas las que vienen:
 
 $$\text{maximizar}\quad \mathbb{E}\left[\, r_1 + r_2 + r_3 + \dots \right]$$
 
-Lo que hace difícil a RL (y lo distingue del aprendizaje supervisado) se resume en cuatro palabras de CS234:
-
-| | ¿Qué significa en la cueva? |
-|---|---|
-| **Optimización** | queremos salir, y rápido |
-| **Demora en las consecuencias** (*delayed consequences*) | un paso a la izquierda ahora puede ser lo que permite salir 30 pasos después |
-| **Exploración** (*exploration*) | solo sabemos qué hay detrás de una pared si chocamos con ella |
-| **Generalización** (*generalization*) | ¿lo aprendido en esta cueva sirve en otra? |
-
-Nadie le dice al agente cuál era la acción correcta: solo recibe un número, a veces mucho después.
-"""))
-
-# ---------------------------------------------------------------- 2
-cells.append(md(r"""
-## 2. Un agente aleatorio en la cueva
-
-**La cueva**: una grilla a oscuras. El agente no ve el mapa; solo se entera de que hay una pared cuando choca. La salida es el cuadrado verde. Recompensa: **+1 al llegar a la salida, 0 en cualquier otro paso**. El juego se corta a los 200 pasos.
+En la cueva esa suma vale 1 si sale y 0 si no. Volvamos al agente más tonto posible, el que elige **al azar**, y miremos qué recibe.
 
 ### Paso 1 — Un episodio a ciegas
 
-El agente más tonto posible: elige **al azar** entre ↑ → ↓ ←. Vamos a mirar el mismo episodio de tres maneras: lo que ve el agente (nada), lo que descubrió (las paredes que tocó, en gris claro, como en el juego) y el mapa real.
-"""))
+El mismo episodio de tres maneras: lo que ve el agente (nada), lo que descubrió (las paredes que tocó, en gris claro, como en el juego) y el mapa real. El juego se corta a los 200 pasos.
+""", objetivos=["O2"]))
 cells.append(code(r"""
-env = CaveEnv(max_steps=200)
 rng = np.random.default_rng(SEMILLA)
-
 camino, retorno, llego = correr_episodio(env, rng)
 print(f"Pasos: {len(camino) - 1}  |  ¿llegó a la salida? {llego}  |  recompensa total: {retorno}")
 tres_vistas(env, camino)
 """))
 cells.append(md(r"""
-El camino (azul) va y vuelve por los mismos pasillos (las líneas se superponen) y no se aleja mucho del inicio `S`: en 200 pasos no llega. Recompensa total: **0**. Notar que el agente *no recibió ninguna pista* de que iba mal: con recompensa 0 en cada paso, perderse y acercarse se ven igual. A esto se le llama **recompensa escasa** (*sparse reward*) y es el tema de la clase 5.
+En 200 pasos no llega. Recompensa total: **0**. Notar que el agente *no recibió ninguna pista* de que iba mal: con recompensa 0 en cada paso, perderse y acercarse se ven igual.
 
-### Paso 2 — Muchos episodios: ¿cuánto tarda en salir?
+### Paso 2 — Una partida real, número por número
 
-Ahora le sacamos el límite de pasos y jugamos **300 episodios** para medir cuántos pasos necesita el azar para encontrar la salida.
+Ahora dejamos jugar al azar sin límite hasta que salga, y anotamos la recompensa de cada paso. Abajo, para comparar, la partida de las flechas fijas.
 """))
 cells.append(code(r"""
-pasos = pasos_hasta_salir(n_episodios=300, seed=SEMILLA)
-exito = histograma_pasos(pasos, limite=200)
+env_sin_limite = CaveEnv(max_steps=10**6)
+rs_azar, _ = recompensas_de_un_episodio(env_sin_limite, np.random.default_rng(SEMILLA))
+rs_flechas, _ = recompensas_de_un_episodio(env_sin_limite, np.random.default_rng(SEMILLA), politica_flechas)
+print("Al azar:   ", " ".join(f"{r:.0f}" for r in rs_azar[:12]), "...", " ".join(f"{r:.0f}" for r in rs_azar[-3:]))
+print(f"            {int(np.sum(rs_azar == 0))} ceros y un +1 en el paso {len(rs_azar)}  →  suma = {rs_azar.sum():.0f}")
+print(f"Flechas:    {int(np.sum(rs_flechas == 0))} ceros y un +1 en el paso {len(rs_flechas)}  →  suma = {rs_flechas.sum():.0f}")
+dibujar_recompensas(rs_azar, rs_flechas)
 """))
 cells.append(md(r"""
-Con 200 pasos, el azar sale en muy pocos episodios (cerca del 4%). La mediana está en más de mil pasos: la salida está a apenas ~20 pasos de distancia, pero sin memoria ni mapa el agente camina en círculos.
+Las dos partidas suman exactamente lo mismo: **1**. La suma de recompensas no distingue una salida rápida de una lentísima (eso lo arregla el descuento de la clase 3). Y en la partida del azar, ¿cuál de todos esos pasos fue el bueno? Ningún número lo dice: el +1 llega al final y hay que repartir el mérito entre todo lo anterior. A esto se le llama **recompensa escasa** (*sparse reward*) y **demorada**; es el tema de la clase 7.
 
-Ese porcentaje es justamente lo que un algoritmo de RL tiene que mejorar **usando solo la recompensa**.
+### Paso 3 — Muchos episodios: ¿cuánto tarda el azar en salir?
+
+Los mismos 300 episodios al azar de la sección 3, ahora como histograma.
+"""))
+cells.append(code(r"""
+exito = histograma_pasos(pasos_azar, limite=200)
+"""))
+cells.append(md(r"""
+Con 200 pasos, el azar sale en muy pocos episodios y la mediana está muy por encima del límite, aunque las flechas muestran que la salida está a pocos pasos. Ese porcentaje es lo que un algoritmo de RL tiene que mejorar **usando solo la recompensa**: casi nunca ve un +1 del cual aprender.
 """))
 cells.append(md(r"""
 ### ✍️ Ejercicio
@@ -300,66 +473,62 @@ cells.append(code(r"""
 limite = 200
 SEMILLA_EJ = 1
 
-print(f"Con {limite} pasos, el azar sale en el {np.mean(pasos <= limite) * 100:.1f}% de los episodios")
+print(f"Con {limite} pasos, el azar sale en el {np.mean(pasos_azar <= limite) * 100:.1f}% de los episodios")
 env_ej = CaveEnv(max_steps=limite)
 camino_ej, _, llego_ej = correr_episodio(env_ej, np.random.default_rng(SEMILLA_EJ))
 pintar_paredes_tocadas(env_ej, camino_ej, title=f"¿Llegó? {llego_ej} — paredes tocadas: {len(env_ej.touched)}")
 plt.show()
 """))
 
-# ---------------------------------------------------------------- 3
+# ---------------------------------------------------------------- 5
 cells.append(md(r"""
-## 3. Historia vs. estado: ¿qué tiene que recordar el agente?
+## 5. Historia vs. estado: ¿qué tiene que recordar el agente?
 
 Todo lo que el agente vivió hasta ahora es su **historia** (*history*):
 
 $$h_t = (a_1, o_1, r_1,\; a_2, o_2, r_2,\; \dots,\; a_t, o_t, r_t)$$
 
-Guardar toda la historia es caro. Queremos un resumen, el **estado** (*state*) $s_t = f(h_t)$, que alcance para decidir.
+La historia crece en cada paso. Guardarla entera es caro: queremos un resumen, el **estado** (*state*) $s_t = f(h_t)$, que alcance para decidir. La política de la sección 3 usaba como estado la casilla. ¿Alcanza?
 
 ### Paso 1 — Dos historias, una misma casilla
 
 Dos recorridos distintos desde `S` que terminan en la misma casilla. Pregunta: ¿el futuro depende de *cómo* llegó?
-"""))
+""", objetivos=["O3"]))
 cells.append(code(r"""
-ARRIBA, DERECHA, ABAJO, IZQUIERDA = 0, 1, 2, 3
 historia_A = [DERECHA] * 3 + [ABAJO] * 2 + [IZQUIERDA]
 historia_B = [ABAJO] * 6 + [DERECHA] * 5 + [ARRIBA] * 2 + [IZQUIERDA] * 3 + [ARRIBA] * 2
 
 fin_A, fin_B = dos_historias(env, historia_A, historia_B)
 print("¿Terminan en el mismo estado?", fin_A == fin_B)
+print("Flecha de la política en esa casilla:", ACTION_NAMES[politica_flechas[fin_A]])
 """))
 cells.append(md(r"""
-No: en la cueva, lo que pase después depende solo de **dónde estoy** y **qué hago ahora**, no del camino. La **posición alcanza** como estado. Eso es el **supuesto de Markov** (*Markov assumption*):
+No importa el camino: en la cueva, lo que pase después depende solo de **dónde estoy** y **qué hago ahora**. Por eso la política de flechas puede tener una sola flecha por casilla. La **posición alcanza** como estado. Eso es el **supuesto de Markov** (*Markov assumption*):
 
 $$p(s_{t+1} \mid s_t, a_t) = p(s_{t+1} \mid h_t, a_t)$$
 
 "El futuro es independiente del pasado, dado el presente."
 
-### Paso 2 — ¿Y si el agente solo sintiera paredes?
+### Adelanto de la clase 9 — ¿Y si el agente solo sintiera paredes?
 
-Supongamos que el agente **no sabe su posición** y solo tiene 4 "bigotes" que le dicen si hay pared arriba, a la derecha, abajo o a la izquierda. ¿Esa observación alcanza como estado? Contemos cuántas casillas "se sienten" igual.
+Supongamos que el agente no sabe su posición y solo tiene cuatro "bigotes" que le dicen si hay pared arriba, a la derecha, abajo o a la izquierda. Contemos cuántas sensaciones distintas hay.
 """))
 cells.append(code(r"""
-casilla_marcada = env.pos2s[(5, 5)]   # una casilla de un pasillo horizontal
-n_firmas, n_iguales = mapa_aliasing(env, casilla_marcada)
-print(f"Hay {env.nS} casillas pero solo {n_firmas} sensaciones distintas.")
-print(f"La casilla marcada se siente igual que otras {n_iguales - 1} casillas.")
+firmas = [firma_paredes(env, s) for s in range(env.nS)]
+print(f"Hay {env.nS} casillas pero solo {len(set(firmas))} sensaciones distintas.")
 """))
 cells.append(md(r"""
-Muchas casillas son indistinguibles por tacto (a esto se lo llama *perceptual aliasing*): un pasillo horizontal se siente igual en cualquier lugar de la cueva, pero en unos conviene ir a la derecha y en otros a la izquierda. Con solo los bigotes, **la observación no es Markov**: para decidir bien el agente necesita recordar parte de la historia (por dónde vino, qué paredes ya tocó).
+Muchas casillas se sienten igual y en algunas conviene ir a un lado y en otras al otro: con solo los bigotes, **la observación no es Markov** y el agente necesita recordar parte de la historia. Ese es el tema de la clase 9 (redes recurrentes: cuando el estado no alcanza).
 
 | El agente percibe… | ¿Es Markov? |
 |---|---|
 | su posición (casilla) | **sí**: la posición alcanza |
 | solo las 4 paredes vecinas | **no**: necesita memoria |
-
-En la clase 6 (Deep RL) vamos a volver a esto: una red puede recibir coordenadas, bigotes o las dos cosas.
 """))
 
-# ---------------------------------------------------------------- 4
+# ---------------------------------------------------------------- 6
 cells.append(md(r"""
-## 4. Aula invertida: el tutor de IA como proceso de decisión
+## 6. Aula invertida: el tutor de IA como proceso de decisión
 
 *(Ejercicio de Emma Brunskill, CS234, clase 1.)* Ahora **ustedes** son quienes diseñan el problema.
 
@@ -367,7 +536,7 @@ cells.append(md(r"""
 
 **En grupos, 5 minutos, antes de seguir leyendo:**
 
-1. ¿Cuál es el **estado**? ¿Cuál es la **acción**? ¿Cuál es la **recompensa**?
+1. ¿Quién es el **agente** y quién el **entorno**? ¿Cuál es el **estado**, la **acción** y la **recompensa**?
 2. ¿Qué representa la **dinámica** (cómo cambia el estado)?
 3. Si el tutor maximiza la recompensa esperada, **¿qué política va a aprender?**
 
@@ -377,16 +546,18 @@ cells.append(md(r"""
 
 ### Para discutir después
 
+- **Agente**: el tutor. **Entorno**: el alumno.
 - **Acción**: dar un problema de suma o de resta.
 - **Estado**: lo que el tutor sabe del alumno (por ejemplo, su historial de aciertos y errores, o un nivel estimado en suma y en resta).
 - **Recompensa**: +1 / −1 según acierte.
 - **Dinámica**: cómo cambia el nivel del alumno al practicar.
-- **La respuesta incómoda**: la política óptima es **dar solo sumas**. Las sumas se aprenden rápido, se aciertan, y suman puntos. Las restas cuestan y restan puntos. El tutor "gana" sin enseñar a restar. Esto se llama **trampa de la recompensa** (*reward hacking*): el agente optimiza exactamente lo que le pedimos, no lo que queríamos.
+- **Política**: la regla con la que el tutor elige el próximo problema.
+- **La respuesta incómoda**: la política óptima es **dar solo sumas**. Las sumas se aprenden rápido, se aciertan, y suman puntos. Las restas cuestan y restan puntos. El tutor "gana" sin enseñar a restar. Esto se llama **trampa de la recompensa** (*reward hacking*): el agente optimiza exactamente lo que le pedimos, no lo que queríamos (Amodei et al., 2016).
 
 ### Paso 1 — Simulemos al alumno
 
 Un modelo mínimo: el alumno acierta con una probabilidad (su "habilidad"). Cada vez que practica un tipo de problema, esa habilidad sube: rápido en suma, lento en resta. Comparamos tres políticas fijas del tutor durante 60 problemas, promediando 300 alumnos simulados.
-"""))
+""", objetivos=["O1", "O4"]))
 cells.append(code(r"""
 print("Habilidad inicial:", HAB_INICIAL, "| velocidad de aprendizaje:", VELOCIDAD)
 comparar_politicas_tutor()
@@ -395,12 +566,14 @@ cells.append(md(r"""
 **El desalineamiento, en una figura**: el gráfico del medio y el de la derecha ordenan las políticas al revés.
 
 - "Solo sumas" gana en recompensa… y deja al alumno sin saber restar.
-- "Alternar" y "mayormente restas" pierden puntos (el alumno se equivoca mucho al principio), pero al final el alumno sabe las dos cosas.
+- "Alternar" y "mayormente restas" suman muchos menos puntos (al principio el alumno se equivoca mucho y la recompensa acumulada baja), pero al final el alumno sabe las dos cosas.
 
 Un algoritmo de RL bien hecho, con esta recompensa, *encontraría* "solo sumas". El problema no está en el algoritmo sino en **cómo definimos la recompensa**. Diseñar la recompensa es parte del trabajo (y en muchos problemas reales, la parte más difícil).
 """))
+
+# ---------------------------------------------------------------- ejercicio
 cells.append(md(r"""
-### ✍️ Ejercicio — Ustedes son el docente: rediseñen la recompensa
+## ✍️ Ejercicio — Ustedes son el docente: rediseñen la recompensa
 
 La función `mi_recompensa` recibe si el alumno acertó, el tipo de problema y su habilidad **antes** y **después** de practicar (diccionarios con `"suma"` y `"resta"`). Ahora devuelve lo mismo que la original (+1/−1).
 
@@ -410,8 +583,8 @@ Cámbienla para que **la política que más recompensa obtiene sea también la q
 - no castigar los errores;
 - premiar la **mejora**: `hab_despues[tipo] - hab_antes[tipo]`.
 
-Después discutan: ¿esa información la tendría un tutor real? (En la clase 8 retomamos su diseño y lo resolvemos con RL.)
-"""))
+Después discutan: ¿esa información la tendría un tutor real? ¿Cómo podría el tutor **engañar** a la recompensa nueva? (En la clase 4 escribimos el tutor como MDP; en la 12 vemos cómo aprender la recompensa a partir de preferencias de personas, como en RLHF.)
+""", objetivos=["O4"]))
 cells.append(code(r"""
 def mi_recompensa(acierto, tipo, hab_antes, hab_despues):
     # TODO: cambiar esta línea por la recompensa que diseñe el grupo
@@ -420,28 +593,16 @@ def mi_recompensa(acierto, tipo, hab_antes, hab_despues):
 comparar_politicas_tutor(recompensa=mi_recompensa, titulo_r="recompensa del grupo")
 """))
 
-# ---------------------------------------------------------------- 5
-cells.append(md(r"""
-## 5. Dónde aparece RL hoy
-
-- **ChatGPT y los asistentes conversacionales**: se ajustan con *RL from human feedback* (RLHF): personas comparan respuestas y el modelo aprende a producir las preferidas. Es, probablemente, el ejemplo de RL más usado del mundo.
-- **Modelos que razonan (DeepSeek-R1, 2025)**: aprendieron a "pensar paso a paso" con RL, usando como recompensa si la respuesta final de un problema de matemática o de código era correcta.
-- **Juegos (AlphaGo, 2016)**: venció al campeón mundial de Go combinando redes neuronales, búsqueda y aprendizaje por refuerzo jugando contra sí mismo.
-- **Robótica**: robots que aprenden a caminar o manipular objetos, muchas veces primero en simulación.
-
-**Tres parientes de RL** que vamos a cruzar en el curso. En el **aprendizaje por imitación** (*imitation learning*) el agente no recibe recompensa sino demostraciones de un experto, y aprende a copiarlas (como un residente que mira al cirujano). En el **RL basado en modelo** (*model-based RL*) el agente aprende o conoce cómo funciona el mundo —en la cueva: el mapa, $P(s' \mid s, a)$— y planifica con ese modelo (clase 3). Y en el **RL a partir de retroalimentación humana** (*RL from human feedback*, RLHF) la recompensa no se escribe a mano: se aprende de comparaciones hechas por personas (clase 8).
-"""))
-
 cells.append(md(r"""
 ## Preguntas para pensar
 
 1. En la cueva, la recompensa es +1 solo al salir. Si en cambio diéramos −0.01 por cada paso, ¿qué cambiaría en lo que el agente "quiere"? ¿Podría aparecer otra trampa de la recompensa?
-2. Un agente que solo siente las paredes vecinas, ¿qué debería recordar para que su "estado" vuelva a ser Markov?
+2. Elijan otro problema (un videojuego, un termostato, un recomendador de videos): ¿cuál es el agente, el entorno, la acción, la observación, la recompensa y la política? ¿Su observación cumple el supuesto de Markov?
 3. En el tutor, el nivel real del alumno no se observa: solo sus aciertos. ¿Cómo estimarían el estado a partir de la historia?
 
 ## Próxima clase
 
-¿Y si el agente **conociera el mapa**? En la clase 3 vamos a calcular el valor de cada casilla con la ecuación de Bellman: la información viaja hacia atrás desde la salida, parecido a cómo *backpropagation* lleva el error hacia atrás en una red neuronal.
+La casilla alcanza para decidir: el futuro depende solo del presente. En la clase 3 armamos con eso la **cadena de Markov** de la cueva y le damos un número a **cuánto pesa el futuro** (el descuento $\gamma$), parecido a una tasa de interés que hace valer menos una recompensa lejana.
 """))
 
 save(cells, "02-que-es-rl.ipynb")

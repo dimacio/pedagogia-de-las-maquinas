@@ -11,7 +11,7 @@ API mínima (estilo Gymnasium, sin dependencias):
     s, r, done, info = env.step(a)  # a en {0:arriba, 1:derecha, 2:abajo, 3:izquierda}
     info["bump"]                    # True si chocó con una pared
 
-Para la clase 3 (con modelo): env.P[s, a, s'] y env.R[s, a].
+Para la clase 4 (planificar con mapa): env.P[s, a, s'] y env.R[s, a].
 """
 import numpy as np
 
