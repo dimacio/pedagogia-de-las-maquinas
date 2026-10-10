@@ -74,7 +74,7 @@
     <div class="texto">
       <div class="paso">Paso 1 · solo bigotes</div>
       <h2 id="t2">Cuando la observación no es el estado</h2>
-      <p>En el modo difícil del juego no ves la casilla y solo sentís las cuatro paredes vecinas con los <b>bigotes</b>. Como adelantó la clase 2, las 60 casillas de la cueva chica dan apenas 12 lecturas distintas, así que casillas que se sienten igual piden flechas distintas. Cuando la observación no alcanza para saber el estado, el problema es un <b>proceso de decisión de Markov parcialmente observable</b> (<i>partially observable MDP</i>, POMDP). El conjunto de casillas compatibles con todo el camino se llama <b>estado de creencia</b> (<i>belief state</i>) y en el recorrido del notebook baja de 15 a 7, 2, 2 y 1.</p>
+      <p>En el modo difícil del juego no ves la casilla y solo sentís las cuatro paredes vecinas con los <b>bigotes</b>. Como adelantó la clase 2, las 60 casillas de la cueva chica dan apenas 12 lecturas distintas, así que casillas que se sienten igual piden flechas distintas. Cuando la observación no alcanza para saber el estado, el problema es un <b>proceso de decisión de Markov parcialmente observable</b> (<i>partially observable MDP</i>, POMDP). En su versión más simple, sin azar, el conjunto de casillas compatibles con todo el camino se llama <b>estado de creencia</b> (<i>belief state</i>) y en el recorrido del notebook baja de 15 a 7, 2, 2 y 1.</p>
       <div class="eq parte"><span class="nw">bₜ₊₁ = { mover(s, aₜ) : s ∈ bₜ }</span> <span class="nw">∩ { s′ : bigotes(s′) = oₜ₊₁ }</span></div>
       <p class="nota pregunta">¿Cuántos pasos te lleva quedarte con una sola casilla? ¿Te conviene caminar por un pasillo largo o buscar esquinas?</p>
     </div>
@@ -159,7 +159,7 @@
       <div class="eq parte"><span class="nw">hₜ = GRU(hₜ₋₁,</span> <span class="nw">[bigotesₜ, aₜ₋₁])</span></div>
       <div class="aviso mide">
         <h3>Esto hoy se mide</h3>
-        <p>En un experimento de laboratorio con 200 personas que vieron un video, un entrevistador con un modelo de lenguaje que hacía preguntas engañosas aumentó los recuerdos falsos de los testigos (Chan, Pataranutaporn et al., 2024). Es un preprint, y las preguntas eran engañosas a propósito, así que no muestra que cualquier charla con una IA altere la memoria. Lo que sí muestra es que una memoria se puede contaminar, sea el estado de una red o el recuerdo de una persona.</p>
+        <p>En un experimento de laboratorio con 200 personas que vieron un video, un entrevistador con un modelo de lenguaje que hacía preguntas engañosas aumentó los recuerdos falsos de los testigos (Chan, Pataranutaporn et al., 2024). Es un preprint, y las preguntas eran engañosas a propósito, así que no muestra que cualquier charla con una IA altere la memoria. Lo que sí muestra es que el recuerdo de una persona se puede contaminar, como el estado de una red.</p>
       </div>
       <p class="nota pregunta">La última acción ya es memoria de un paso. ¿Por qué no alcanza en la cueva grande? Mirá dónde se traba la red común.</p>
     </div>

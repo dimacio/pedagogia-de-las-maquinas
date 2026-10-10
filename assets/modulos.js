@@ -806,10 +806,10 @@ window.MODULOS = {
         objetivo: "O1",
         pregunta: "En el modo difícil solo sentís las cuatro paredes vecinas con los bigotes. En la cueva chica, las 60 casillas dan apenas 12 lecturas distintas. ¿Por qué eso rompe el supuesto de Markov con el que veníamos trabajando?",
         opciones: [
-          { texto: "Porque los bigotes a veces fallan: una misma casilla puede dar lecturas distintas y el agente no se puede fiar de lo que siente.", explicacion: "No: los bigotes no fallan, cada casilla da siempre la misma lectura. El problema es al revés: muchas casillas distintas dan la misma lectura." },
-          { texto: "Porque 12 lecturas son pocas para aprender: jugando más partidas, el agente terminaría sabiendo qué hacer con cada una.", explicacion: "No: más partidas no ayudan. Con la misma lectura, un agente sin memoria hace siempre lo mismo, y en unos pasillos conviene subir y en otros bajar." },
+          { texto: "Los bigotes a veces fallan: una misma casilla puede dar lecturas distintas y el agente no se puede fiar de lo que siente.", explicacion: "No: los bigotes no fallan, cada casilla da siempre la misma lectura. El problema es al revés: muchas casillas distintas dan la misma lectura." },
+          { texto: "Doce lecturas son pocas para aprender: jugando más partidas, el agente terminaría sabiendo qué hacer con cada una.", explicacion: "No: más partidas no ayudan. Con la misma lectura, un agente sin memoria hace siempre lo mismo, y en unos pasillos conviene subir y en otros bajar." },
           { texto: "Casillas que se sienten igual piden flechas distintas: la lectura de ahora no alcanza para decidir y hace falta un resumen del camino.", explicacion: "Correcto. La observación no es el estado: es un POMDP. Con la historia, en el recorrido del notebook las casillas posibles bajan de 15 a 7, 2, 2 y 1." },
-          { texto: "Porque la cueva cambia mientras el agente camina, y la casilla en la que está ya no alcanza para prever adónde lo lleva cada acción.", explicacion: "No: la cueva y sus reglas no cambian. Si el agente supiera su casilla, Markov seguiría valiendo; lo que falla es que solo ve una pista de ella." }
+          { texto: "La cueva cambia mientras el agente camina, y la casilla en la que está ya no alcanza para prever adónde lo lleva cada acción.", explicacion: "No: la cueva y sus reglas no cambian. Si el agente supiera su casilla, Markov seguiría valiendo; lo que falla es que solo ve una pista de ella." }
         ],
         correcta: 2
       },
@@ -831,7 +831,7 @@ window.MODULOS = {
           { texto: "Una copia de las últimas 32 letras, una por número: por eso la primera de 42 letras ya salió del estado y pesa casi cero.", explicacion: "No: los números del estado no tienen letras asignadas (leer la dimensión 17 no dice nada), y la primera letra sigue pesando, solo que muy poco." },
           { texto: "El texto entero sin pérdida: como las tablas W son las mismas en todos los pasos, ninguna letra se borra y todas pesan igual en la predicción.", explicacion: "No: que la regla no cambie no quiere decir que se conserve todo. El estado tiene tamaño fijo y el efecto de cada letra se achica paso a paso." },
           { texto: "Solo la próxima letra ya elegida: hₜ es la salida de la red, y lo que leyó antes se descarta en cuanto hace la predicción.", explicacion: "No: la predicción sale de hₜ con otra tabla (W_hy) y un softmax, y hₜ pasa al paso siguiente: ese es el lazo." },
-          { texto: "Un resumen de tamaño fijo de lo leído, que cada letra actualiza; lo viejo se va borrando: es el gradiente que se desvanece.", explicacion: "Correcto. La letra de hace 10 pasos todavía pesa 1,4 · 10⁻¹; la primera de 42, casi nada. Por eso la GRU agrega una perilla que decide cuánto conservar del estado viejo." }
+          { texto: "Un resumen de tamaño fijo de lo leído, que cada letra actualiza; lo viejo pesa cada vez menos, como mide el gradiente.", explicacion: "Correcto. La letra de hace 10 pasos todavía pesa 1,4 · 10⁻¹; la primera de 42, casi nada. Por eso la GRU agrega una perilla que decide cuánto conservar del estado viejo." }
         ],
         correcta: 3
       },
