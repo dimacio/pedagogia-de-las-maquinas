@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Planificar con mapa · RL a ciegas</title>
+<meta name="description" content="Clase 4: la cueva como proceso de decisión de Markov, la política fija que vuelve a ser una cadena, el valor de cada acción, la mejora de la política, la iteración de política y de valor, el piso resbaloso, el costo por paso y el robot de reciclaje.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .lz { min-width: 0; }
+  .seg { flex-wrap: wrap; }
+  .seg button { min-width: 0; }
+  .cap { font-size: 13px; color: var(--muted); }
+  .cap b { color: var(--ink); }
+  .btn[aria-pressed="true"] { border-color: var(--lamp); color: var(--lamp); }
+  .btn.sug { border-color: var(--lamp); box-shadow: inset 0 0 0 1px var(--lamp); }
+  .duo { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+  .duo > div { min-width: 0; display: grid; gap: 6px; align-content: start; }
+  .duo h3 { font-family: var(--mono); font-size: 12.5px; font-weight: 400; color: var(--muted); }
+  .duo h3 b { color: var(--ink); font-weight: 600; }
+  .ctls { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  /* la cuenta de Q en una casilla */
+  .cuenta { font-family: var(--mono); font-size: 13px; line-height: 1.6; background: var(--rock); border: 1px solid var(--rock-2); border-radius: 3px;
+    padding: 8px 10px; overflow-x: auto; white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .cuenta b { color: var(--ink); font-weight: 600; }
+  .cuenta .v { color: var(--lamp); }
+  .tabla td.op { color: var(--exit); font-weight: 700; }
+  .tabla td.mejor { box-shadow: inset 0 0 0 2px var(--exit); }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase 4</div>
+    <h1>Planificar con <span class="g">mapa</span></h1>
+    <p class="thesis">Con el mapa entero de la cueva a la vista, la mejor flecha de cada casilla se calcula sin jugar ni una vez.</p>
+  </section>
+
+  <!-- B1: el MDP -->
+  <section class="bloque" id="b-mdp" data-objetivos="O1">
+    <div class="stage">
+      <div class="lz"><canvas id="cvMdp" aria-label="La cueva con una casilla elegida y los destinos de sus cuatro acciones; al tocar otra casilla se ven los suyos"></canvas></div>
+      <div class="hud" id="hudMdp"></div>
+      <p class="cap">Tocá una casilla. Cada acción lleva a una sola casilla con probabilidad 1; si hay pared, el caminante choca y se queda (raya roja).</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 1</div>
+      <h2>Ahora el caminante elige</h2>
+      <p>Ahora el caminante deja el dado y elige en cada casilla una de cuatro acciones. Una cadena con recompensa y acciones es un <b>proceso de decisión de Markov</b> (<i>Markov decision process</i>, MDP). Para cada acción, el <b>modelo de transición</b> (<i>transition model</i>) P(s′|s,a) dice adónde va a parar el caminante desde s. La recompensa R(s,a) es la de la clase 3, +1 en el paso que entra a la salida, con γ = 0,99.</p>
+      <div class="eq">MDP = (S, A, P, R, γ)</div>
+      <p class="nota pregunta">Desde S, ¿cuántas de las cuatro acciones dejan al caminante donde está? Contalas antes de tocar.</p>
+    </div>
+  </section>
+
+  <!-- B2: política fija = MRP -->
+  <section class="bloque" id="b-mrp" data-objetivos="O1">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Política fija" id="segPol">
+        <button aria-pressed="true" data-p="dado">El dado (al azar)</button>
+        <button aria-pressed="false" data-p="arriba">Todas ↑</button>
+      </div>
+      <div class="lz"><canvas id="cvMrp" aria-label="Mapa de calor del valor de la política fija y la fila de P a la pi de la casilla tocada"></canvas></div>
+      <div class="legend"><span id="legMlo"></span><span class="bar" id="legM"></span><span id="legMhi"></span></div>
+      <div class="hud" id="hudMrp"></div>
+      <p class="cap">Valores calculados en el navegador resolviendo la ecuación de Bellman de la clase 3 con P<sup>π</sup> (γ = 0,99), como en el notebook. Tocá una casilla para ver su fila de P<sup>π</sup>.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 2</div>
+      <h2>Con la política fija, vuelve a ser una cadena</h2>
+      <p>Una <b>política</b> (<i>policy</i>) π(a|s), como en la clase 2, dice con qué probabilidad se elige cada acción en cada casilla. Con la política fija, cada casilla vuelve a tener una sola distribución de destinos, el promedio de las cuatro tablas pesado por π. Un MDP con la política fija es entonces un proceso de recompensa de Markov (MRP) como el de la clase 3. Con la política al azar se recupera el caminante del dado, con V(S) = 0,0136 y V(cruce) = 0,0771.</p>
+      <div class="eq">P<sup>π</sup>(s′|s) = Σₐ π(a|s) P(s′|s,a)</div>
+      <p class="nota pregunta">Con «todas ↑» todo vale 0. ¿Por qué ninguna casilla cobra nunca nada?</p>
+    </div>
+  </section>
+
+  <!-- B3: Q -->
+  <section class="bloque" id="b-q" data-objetivos="O2">
+    <div class="stage">
+      <div class="lz"><canvas id="cvQ" aria-label="Mapa de calor del valor de la política al azar en escala logarítmica, con la casilla elegida y sus cuatro destinos"></canvas></div>
+      <div class="lz"><canvas id="cvQb" aria-label="Barras con el valor de cada una de las cuatro acciones en la casilla elegida y una línea punteada con el valor de la casilla"></canvas></div>
+      <div class="cuenta" id="cuentaQ" aria-live="polite"></div>
+      <p class="cap">Calculado en el navegador con los valores del dado (γ = 0,99). En verde, la mejor acción. Tocá una casilla.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 3</div>
+      <h2>Cuánto vale cada acción</h2>
+      <p>El <b>valor de una acción</b> (<i>action value</i>) Q<sup>π</sup>(s,a) responde a la pregunta «¿y si acá hago esto y después sigo como venía?». Es el premio de ese paso más γ por el valor, con la política vieja, de la casilla adonde lleva la acción. En el cruce (5,6), con los valores del dado, ↑ vale 0,0763, → vale 0,1070, ↓ vale 0,0623 y ← vale 0,0627. Como el dado elige las cuatro con la misma probabilidad, su promedio da justo V(cruce) = 0,0771.</p>
+      <div class="eq">Q<sup>π</sup>(s,a) = R(s,a) + γ Σₛ′ P(s′|s,a) V<sup>π</sup>(s′)</div>
+      <p class="nota pregunta">En S, ↑ y ← valen exactamente lo mismo. ¿Por qué?</p>
+    </div>
+  </section>
+
+  <!-- B4: mejora -->
+  <section class="bloque" id="b-mejora" data-objetivos="O2">
+    <div class="stage">
+      <div class="duo">
+        <div><h3>antes: <b>el dado</b> (log V)</h3><div class="lz"><canvas id="cvAntes" aria-label="Valor de la política al azar en escala logarítmica"></canvas></div></div>
+        <div><h3>después de <b>una mejora</b></h3><div class="lz"><canvas id="cvDespues" aria-label="Valor de la política mejorada, sus flechas y el camino desde S"></canvas></div></div>
+      </div>
+      <div class="hud" id="hudMejora"></div>
+      <p class="cap">Calculado en el navegador como en el notebook: Q del dado, la flecha de la mayor Q en cada casilla y la política nueva evaluada de nuevo. Tocá una casilla para comparar su valor antes y después.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 4</div>
+      <h2>Mejorar: quedarse con la mejor acción</h2>
+      <p>La <b>mejora de la política</b> (<i>policy improvement</i>) pone en cada casilla la flecha de la acción con mayor Q<sup>π</sup>. La política nueva nunca es peor que la vieja, porque su valor no baja en ninguna casilla. Una sola mejora desde el dado lleva V(S) de 0,0136 a 0,8262 y hace subir el valor de las 59 casillas. Ese 0,8262 es 0,99¹⁹, lo que vale ir derecho a la salida en 20 pasos.</p>
+      <div class="eq">π′(s) = argmaxₐ Q<sup>π</sup>(s,a)</div>
+      <p class="nota pregunta">Si una sola mejora ya lleva de S a la salida en 20 pasos, ¿hace falta seguir? ¿Cómo lo sabrías?</p>
+    </div>
+  </section>
+
+  <!-- B5: iteración de política -->
+  <section class="bloque" id="b-pi" data-objetivos="O3">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Política inicial" id="segPI">
+        <button aria-pressed="true" data-i="dado">Empezar con el dado</button>
+        <button aria-pressed="false" data-i="arriba">Empezar con todas ↑</button>
+      </div>
+      <div class="lz"><canvas id="cvPI" aria-label="Iteración de política: el valor de la política actual, sus flechas y las casillas que cambiaron en la última mejora"></canvas></div>
+      <div class="legend"><span>V = 0</span><span class="bar" id="legPI"></span><span>1</span></div>
+      <div class="row">
+        <button class="btn" id="piEval">1. Evaluar</button>
+        <button class="btn" id="piMejorar">2. Mejorar</button>
+        <button class="btn" id="piFin">Hasta el final</button>
+        <button class="btn" id="piReset">Reiniciar</button>
+      </div>
+      <div class="hud" id="hudPI"></div>
+      <p class="cap" id="capPI"></p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 5</div>
+      <h2>Iteración de política: evaluar, mejorar, repetir</h2>
+      <p>La <b>iteración de política</b> (<i>policy iteration</i>) alterna dos pasos hasta que ninguna flecha cambia. Primero evalúa la política actual de un saque, con la ecuación de Bellman del paso 2. Después la mejora casilla por casilla con su Q. Desde el dado alcanzan 4 vueltas, contando la última que solo confirma, pero desde «todas ↑» hacen falta 21.</p>
+      <div class="eq">π₀ → V<sup>π₀</sup> → π₁ → V<sup>π₁</sup> → … → π*</div>
+      <p class="nota pregunta">Empezá con «todas ↑» y avanzá de a una vuelta. ¿Por qué las flechas se acomodan desde la salida hacia atrás, un tramo por vuelta?</p>
+    </div>
+  </section>
+
+  <!-- B6: iteración de valor -->
+  <section class="bloque" id="b-vi" data-objetivos="O3">
+    <div class="stage">
+      <div class="lz"><canvas id="cvVI" aria-label="Iteración de valor en la vuelta k: mapa de calor del valor y las flechas de la mejor acción en cada casilla"></canvas></div>
+      <div class="legend"><span>V = 0</span><span class="bar" id="legVI"></span><span>1</span></div>
+      <div class="ctl">
+        <label for="slVI"><span>Vuelta <i>k</i></span> <output id="outVI"></output></label>
+        <input type="range" id="slVI" min="0" max="22" step="1" value="10">
+      </div>
+      <div class="row"><button class="btn primary" id="viPlay">Animar</button><button class="btn" id="viMas">+1 vuelta</button><button class="btn" id="viCero">Volver a V = 0</button></div>
+      <div class="hud" id="hudVI"></div>
+      <p class="cap">Calculado en el navegador con la misma regla y la misma tolerancia que el notebook (γ = 0,99). En gris, las casillas a las que todavía no llegó valor, donde las cuatro acciones empatan y la flecha queda en ↑.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 6</div>
+      <h2>Iteración de valor: el máximo en cada vuelta</h2>
+      <p>La <b>iteración de valor</b> (<i>value iteration</i>) repite la cuenta de la clase 3 con un solo cambio, quedarse con la mejor acción en vez de promediarlas. No hay política que evaluar, porque las flechas salen solas de la acción que da el máximo. El valor se derrama desde la salida y converge en 22 vueltas, con todas las flechas óptimas desde la vuelta 19. Cada vuelta es un solo barrido, más barato que evaluar una política entera, y llega al mismo V*(S) = 0,8262 que la iteración de política.</p>
+      <div class="eq">V(s) ← maxₐ [ R(s,a) + γ Σₛ′ P(s′|s,a) V(s′) ]</div>
+      <p class="nota pregunta">S está a 20 pasos de la salida. ¿Por qué hacen falta 22 vueltas para terminar?</p>
+    </div>
+  </section>
+
+  <!-- B7: slip, costo y γ -->
+  <section class="bloque" id="b-perillas" data-objetivos="O4">
+    <div class="stage">
+      <div class="lz"><canvas id="cvPer" aria-label="Valor óptimo, flechas de la política óptima y trayecto desde S para los valores elegidos de gamma, costo por paso y slip"></canvas></div>
+      <div class="ctls">
+        <div class="ctl"><label for="slG"><span>γ</span> <output id="outG"></output></label><input type="range" id="slG" min="0.5" max="1" step="0.01" value="0.99"></div>
+        <div class="ctl"><label for="slCosto"><span>costo por paso</span> <output id="outCosto"></output></label><input type="range" id="slCosto" min="0" max="0.1" step="0.01" value="0"></div>
+        <div class="ctl"><label for="slSlip"><span>slip</span> <output id="outSlip"></output></label><input type="range" id="slSlip" min="0" max="0.6" step="0.05" value="0.2"></div>
+      </div>
+      <div class="row">
+        <button class="btn" data-pre="0.99,0,0">piso normal</button><button class="btn" data-pre="0.99,0,0.2">slip 0,2</button><button class="btn" data-pre="1,0,0">γ = 1 sin costo</button><button class="btn" data-pre="1,0.01,0">γ = 1, costo 0,01</button><button class="btn" data-pre="0.99,0.01,0">γ = 0,99, costo 0,01</button>
+      </div>
+      <div class="hud" id="hudPer"></div>
+      <div class="duo">
+        <div><h3>12 partidas, <b>piso normal</b></h3><div class="lz"><canvas id="cvP0" aria-label="Doce partidas superpuestas con piso normal: una sola línea"></canvas></div></div>
+        <div><h3>12 partidas, <b>slip = 0,2</b></h3><div class="lz"><canvas id="cvP1" aria-label="Doce partidas superpuestas con piso resbaloso: cada una distinta"></canvas></div></div>
+      </div>
+      <div class="row"><button class="btn primary" id="otras">Otras 12 partidas</button></div>
+      <div class="hud" id="hudPart"></div>
+      <p class="cap">Todo calculado en el navegador. Las partidas están simuladas en el navegador con otra semilla que el notebook, cada una con la política óptima de su cueva.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 7</div>
+      <h2>Piso resbaloso, costo por paso y γ</h2>
+      <p>Con un piso resbaloso (<i>slip</i>) de 0,2, el caminante se desvía a un costado una de cada cinco veces, así que V*(S) baja de 0,8262 a 0,7742 sin que cambie ninguna flecha, porque en esta cueva no hay pozos y resbalar solo hace perder tiempo. Sin slip, las 12 partidas del notebook tardan 20 pasos, pero con slip cada una es distinta y tardan entre 21 y 29, por eso V es un retorno esperado. Con γ = 1 y sin costo todas las casillas valen 1 y el caminante no llega en 60 pasos, mientras que un costo de 0,01 por paso devuelve el apuro, con V*(S) = 0,81. Con γ = 0,99 y el mismo costo, las dos cosas apuran y V*(S) baja a 0,6523.</p>
+      <div class="eq">rₜ = +1 si el paso entra a la salida, −costo si no</div>
+      <p class="nota pregunta">Si hubiera un pozo al costado del pasillo, ¿la flecha óptima con slip seguiría siendo la misma?</p>
+    </div>
+  </section>
+
+  <!-- B8: robot de reciclaje -->
+  <section class="bloque" id="b-robot" data-objetivos="O4">
+    <div class="stage">
+      <div class="lz"><canvas id="cvRobot" aria-label="Robot de reciclaje: diagrama de los dos estados de batería con la acción óptima de cada uno en verde, y mapa de la acción óptima con batería baja según beta y la recompensa por esperar"></canvas></div>
+      <div class="ctl">
+        <label for="slA"><span>α: con batería alta, prob. de seguir alta al buscar</span> <output id="outA"></output></label>
+        <input type="range" id="slA" min="0" max="1" step="0.01" value="0.8">
+      </div>
+      <div class="ctl">
+        <label for="slB"><span>β: con batería baja, prob. de no agotarse al buscar</span> <output id="outB"></output></label>
+        <input type="range" id="slB" min="0" max="1" step="0.01" value="0.4">
+      </div>
+      <div class="ctl">
+        <label for="slW"><span>r_espera: recompensa por esperar</span> <output id="outW"></output></label>
+        <input type="range" id="slW" min="0" max="2.5" step="0.05" value="1">
+      </div>
+      <div class="tabla">
+        <table>
+          <thead><tr><th>batería</th><th>elige</th><th>V*</th><th>Q buscar</th><th>Q esperar</th><th>Q recargar</th></tr></thead>
+          <tbody id="tbRobot"></tbody>
+        </table>
+      </div>
+      <div class="hud" id="hudRobot"></div>
+      <p class="cap">Iteración de valor de dos estados en el navegador, como en el notebook (buscar rinde 2, rescate −3, γ = 0,9). Tocá el mapa para mover β y r_espera.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 8</div>
+      <h2>El mismo molde fuera de la cueva: el robot de reciclaje</h2>
+      <p>El robot de reciclaje de Sutton y Barto (ejemplo 3.3) es un MDP de dos estados, batería alta o baja, con tres acciones, buscar latas, esperar o recargar. Buscar rinde 2 y esperar rinde 1, pero con batería baja buscar puede agotar al robot, que cuesta un rescate de −3. Con α = 0,8, β = 0,4 y γ = 0,9, conviene buscar con batería alta y recargar con batería baja, donde recargar vale 15,25, esperar 14,73 y buscar 13,64. Con α = 0,8, buscar con batería baja conviene recién cuando β supera 0,863.</p>
+      <div class="eq">Q(baja, buscar) = β(2 + γV(baja)) + (1−β)(−3 + γV(alta))</div>
+      <p class="nota pregunta">El tutor de la clase 2 también se puede plantear como un MDP. ¿Cuáles serían sus estados, sus acciones y su recompensa?</p>
+    </div>
+  </section>
+
+  <!-- B9: Para enseñarlo -->
+  <section class="bloque full" id="b-ensenar" data-objetivos="O2 O3">
+    <div class="texto prose">
+      <div class="paso">Para enseñarlo</div>
+      <h2>Cómo contar esta clase en una oración</h2>
+      <p>"Con el mapa a la vista, planificar es preguntar en cada casilla qué pasaría con cada acción, quedarse con la mejor y repetir hasta que nada cambie."</p>
+      <p class="nota pregunta">Pregunta para hacerle a quien te escucha: si en una casilla dos acciones llevan a lugares que valen lo mismo, ¿importa cuál elegís?</p>
+      <p><b>Ejercicio de 5 minutos:</b> dibujen en el pizarrón un pasillo de cuatro casillas con la salida en una punta, donde en cada casilla se puede ir a la izquierda o a la derecha. Escriban V = 0 en todas y, vuelta por vuelta, reemplacen cada casilla por la mejor de sus dos acciones, con +1 si entra a la salida y 0,9 por lo que valía su destino en la vuelta anterior.</p>
+      <p class="small muted">Adelanto: todo lo de hoy pidió conocer el mapa, P y R, así que en la clase 5 vamos a ver cómo evaluar sin mapa, jugando.</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(async () => {
+  // cada figura se arma en su propia tarea, para no trabar el navegador al cargar
+  const tarea = f => new Promise(r => setTimeout(() => r(f()), 0));
+  Cueva.pagina("4", { lecturas: [
+    { texto: "Sutton y Barto (2018), Reinforcement Learning: An Introduction, 2.ª ed., cap. 3 (3.1 MDP, ejemplo 3.3 el robot de reciclaje, 3.6 optimalidad) y cap. 4 (4.1–4.4 evaluación, mejora e iteración de política, iteración de valor)", url: "http://incompleteideas.net/book/the-book-2nd.html" },
+    { texto: "Stanford CS234 (Brunskill), clase 2: decisiones secuenciales con un modelo del mundo (MDP, Q, mejora de política, iteración de política y de valor)", url: "https://web.stanford.edu/class/cs234/" }
+  ] });
+
+  const env = Cueva.makeEnv(Cueva.MAPS.chica), n = env.nS, GOAL = env.goal, START = env.start;
+  const COL = Cueva.COL(), MONO = COL.mono || "monospace", AR = Cueva.ARROW;
+  const PARED = "#2c3346", GAMMA = 0.99;
+  const reducir = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = id => document.getElementById(id);
+  const coma = s => String(s).replace(".", ",").replace("-", "−");
+  const fmt = (x, d = 3) => coma(x.toFixed(d));
+  const rc = s => `(${env.free[s][0]},${env.free[s][1]})`;
+  const nom = s => s === START ? "S" : s === GOAL ? "salida" : rc(s);
+  const marcar = (sel, attr, v) => document.querySelectorAll(sel).forEach(b => b.setAttribute("aria-pressed", b.dataset[attr] === v));
+  const casillaDe = (T, e) => { const [r, c] = T.celdaEn(e); return env.idx[r + "," + c]; };
+  const CRUCE = env.idx["5,6"];
+
+  // ---------- el MDP de la cueva (piso normal): NXT[s][a] = destino; la salida es absorbente ----------
+  const NXT = Array.from({ length: n }, (_, s) => [0, 1, 2, 3].map(a => s === GOAL ? GOAL : env.move(s, a)[0]));
+  const RSA = (s, a) => (s !== GOAL && NXT[s][a] === GOAL ? 1 : 0);
+  const DADO = Array.from({ length: n }, () => [.25, .25, .25, .25]);
+  const probs = (pi, s) => Array.isArray(pi[s]) ? pi[s] : [0, 1, 2, 3].map(a => (a === pi[s] ? 1 : 0));
+
+  // P^π y R^π de una política (tabla π[s][a] o una flecha por casilla)
+  function cadena(pi) {
+    const filas = [], R = new Float64Array(n);
+    for (let s = 0; s < n; s++) {
+      if (s === GOAL) { filas.push([[GOAL, 1]]); continue; }
+      const m = new Map(), p = probs(pi, s);
+      for (let a = 0; a < 4; a++) if (p[a]) { m.set(NXT[s][a], (m.get(NXT[s][a]) || 0) + p[a]); R[s] += p[a] * RSA(s, a); }
+      filas.push([...m.entries()]);
+    }
+    return { filas, R };
+  }
+  // V^π = (I − γP^π)⁻¹ R^π por eliminación gaussiana (como np.linalg.solve en el notebook)
+  function evaluar(pi, gamma = GAMMA) {
+    const { filas, R } = cadena(pi);
+    const A = Array.from({ length: n }, (_, i) => { const f = new Float64Array(n + 1); f[i] = 1; for (const [j, p] of filas[i]) f[j] -= gamma * p; f[n] = R[i]; return f; });
+    for (let c = 0; c < n; c++) {
+      let piv = c; for (let i = c + 1; i < n; i++) if (Math.abs(A[i][c]) > Math.abs(A[piv][c])) piv = i;
+      [A[c], A[piv]] = [A[piv], A[c]];
+      for (let i = 0; i < n; i++) if (i !== c && A[i][c] !== 0) { const f = A[i][c] / A[c][c]; for (let j = c; j <= n; j++) A[i][j] -= f * A[c][j]; }
+    }
+    return Float64Array.from({ length: n }, (_, i) => { const v = A[i][n] / A[i][i]; return Math.abs(v) < 1e-15 ? 0 : v; });
+  }
+  const valoresQ = V => Array.from({ length: n }, (_, s) => [0, 1, 2, 3].map(a => RSA(s, a) + GAMMA * V[NXT[s][a]]));
+  // en cada casilla, la flecha de mayor Q; si la vieja empata con la mejor, se queda (como mejorar del notebook)
+  function mejorar(Q, vieja = null) {
+    return Q.map((q, s) => {
+      let b = 0; for (let a = 1; a < 4; a++) if (q[a] > q[b]) b = a;
+      if (vieja && Math.abs(q[vieja[s]] - q[b]) <= 1e-12) return vieja[s];
+      return b;
+    });
+  }
+
+  const V_DADO = evaluar(DADO), Q_DADO = valoresQ(V_DADO);
+  // iteración de valor desde V = 0 hasta que el cambio máximo sea < 1e-10 (como iteracion_de_valor del notebook)
+  const HVI = [new Float64Array(n)];
+  for (let k = 0; k < 10000; k++) {
+    const Vk = HVI[HVI.length - 1], NV = new Float64Array(n); let d = 0;
+    for (let s = 0; s < n; s++) { NV[s] = Math.max(...[0, 1, 2, 3].map(a => RSA(s, a) + GAMMA * Vk[NXT[s][a]])); d = Math.max(d, Math.abs(NV[s] - Vk[s])); }
+    HVI.push(NV); if (d < 1e-10) break;
+  }
+  const KVI = HVI.length - 1, VSTAR = HVI[KVI], QSTAR = valoresQ(VSTAR);
+  const OPT = QSTAR.map(q => { const m = Math.max(...q); return q.map(x => Math.abs(x - m) <= 1e-9); });   // acciones óptimas (con empates)
+  const POLSTAR = mejorar(QSTAR);
+  const fracOpt = pol => pol.reduce((t, a, s) => t + (s !== GOAL && OPT[s][a] ? 1 : 0), 0);
+
+  // ---------- utilidades de dibujo ----------
+  function rotulo(T, s, txt, color = COL.ink, escala = .34) {
+    if (!txt) return;
+    const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s];
+    ctx.font = `600 ${Math.max(8, Math.round(cell * escala))}px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.85)"; ctx.strokeText(txt, c * cell + cell / 2, r * cell + cell / 2 + 1);
+    ctx.fillStyle = color; ctx.fillText(txt, c * cell + cell / 2, r * cell + cell / 2 + 1);
+  }
+  function borde(T, s, color, ancho = 2, inset = 1.5) {
+    const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s];
+    ctx.strokeStyle = color; ctx.lineWidth = ancho; ctx.strokeRect(c * cell + inset, r * cell + inset, cell - 2 * inset, cell - 2 * inset);
+  }
+  // mapa de calor lineal entre lo y hi; V = 0 queda negro
+  function calor(T, V, lo = 0, hi = 1) {
+    for (let s = 0; s < n; s++) if (s !== GOAL && V[s] !== 0) { const [r, c] = env.free[s]; T.casilla(r, c, Cueva.rampa("valor", (V[s] - lo) / ((hi - lo) || 1))); }
+  }
+  // flechas que se leen sobre el mapa de calor: oscuras sobre casillas claras, claras sobre oscuras
+  function flechas(T, pol, V, { lo = 0, hi = 1, gris = null, alfa = .9 } = {}) {
+    for (let s = 0; s < n; s++) {
+      if (s === GOAL) continue;
+      if (gris && gris(s)) { T.texto(s, AR[pol[s]], "rgba(141,147,163,.45)", .5); continue; }
+      const claro = (V[s] - lo) / ((hi - lo) || 1) > .55;
+      T.texto(s, AR[pol[s]], claro ? `rgba(11,13,18,${alfa})` : `rgba(232,230,223,${alfa})`, .5);
+    }
+  }
+  // el dado: una crucecita en cada casilla
+  function cruces(T) {
+    const ctx = T.ctx, cell = T.cell; ctx.strokeStyle = "rgba(232,230,223,.55)"; ctx.lineWidth = 1.2;
+    for (let s = 0; s < n; s++) if (s !== GOAL) { const [r, c] = env.free[s], x = c * cell + cell / 2, y = r * cell + cell / 2, d = cell * .2;
+      ctx.beginPath(); ctx.moveTo(x - d, y); ctx.lineTo(x + d, y); ctx.moveTo(x, y - d); ctx.lineTo(x, y + d); ctx.stroke(); }
+  }
+  function flecha(ctx, x1, y1, x2, y2, color, ancho) {
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = ancho; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    const ang = Math.atan2(y2 - y1, x2 - x1), L = Math.max(6, ancho * 3);
+    ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(x2 - L * Math.cos(ang - .45), y2 - L * Math.sin(ang - .45)); ctx.lineTo(x2 - L * Math.cos(ang + .45), y2 - L * Math.sin(ang + .45)); ctx.closePath(); ctx.fill();
+  }
+  // las cuatro acciones de una casilla: flecha a su destino o raya roja contra la pared
+  function acciones(T, s, color = COL.lamp) {
+    if (s === GOAL) return;
+    const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s], x = c * cell + cell / 2, y = r * cell + cell / 2;
+    for (let a = 0; a < 4; a++) {
+      const [dr, dc] = Cueva.DR[a];
+      if (NXT[s][a] === s) {
+        const px = x + dc * cell * .5, py = y + dr * cell * .5;
+        ctx.strokeStyle = COL.ember; ctx.lineWidth = Math.max(2.5, cell * .12); ctx.lineCap = "round"; ctx.beginPath();
+        if (dr) { ctx.moveTo(px - cell * .32, py); ctx.lineTo(px + cell * .32, py); } else { ctx.moveTo(px, py - cell * .32); ctx.lineTo(px, py + cell * .32); }
+        ctx.stroke();
+      } else flecha(ctx, x + dc * cell * .18, y + dr * cell * .18, x + dc * cell * .85, y + dr * cell * .85, color, Math.max(2, cell * .07));
+    }
+  }
+
+  // =====================================================================
+  // B1. Una casilla, cuatro destinos
+  // =====================================================================
+  const mdp = await tarea(() => {
+    const cv = $("cvMdp"), hud = $("hudMdp"), T = Cueva.tablero(cv, env, { maxCell: 40 });
+    let sel = CRUCE;
+    function dibujar() {
+      T.fondo("#000").paredes(PARED).salida();
+      rotulo(T, GOAL, "+1", "#0b0d12", .36);
+      for (let a = 0; a < 4; a++) { const s2 = NXT[sel][a]; if (s2 !== sel) borde(T, s2, "rgba(242,179,90,.6)", 1.5, 2); }
+      borde(T, sel, COL.lamp, 2.5);
+      acciones(T, sel);
+      if (sel !== START) rotulo(T, START, "S", COL.ink, .38);
+      hud.innerHTML = sel === GOAL
+        ? `<span>la salida: la partida <b>terminó</b></span>`
+        : `<span>casilla <b>${nom(sel)}</b></span>` + [0, 1, 2, 3].map(a => { const s2 = NXT[sel][a];
+            return `<span>${AR[a]}: ${s2 === sel ? "<b>choca y se queda</b>" : `va a <b>${nom(s2)}</b>`}${RSA(sel, a) ? ` · R = <b>+1</b>` : ""}</span>`; }).join("");
+    }
+    cv.addEventListener("pointerdown", e => { const s = casillaDe(T, e); if (s !== undefined) { sel = s; dibujar(); } });
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B2. Con la política fija: P^π y V^π
+  // =====================================================================
+  const mrp = await tarea(() => {
+    const cv = $("cvMrp"), hud = $("hudMrp"), T = Cueva.tablero(cv, env, { maxCell: 40 });
+    const ARRIBA = new Array(n).fill(0), V_ARRIBA = evaluar(ARRIBA);
+    const L = Array.from(V_DADO, v => v > 0 ? Math.log10(v) : -Infinity);
+    const vals = L.filter((_, s) => s !== GOAL), LO = Math.min(...vals), HI = Math.max(...vals);
+    $("legM").style.background = Cueva.gradienteCSS("valor");
+    let modo = "dado", sel = START;
+    function dibujar() {
+      const pi = modo === "dado" ? DADO : ARRIBA, V = modo === "dado" ? V_DADO : V_ARRIBA, { filas } = cadena(pi);
+      T.fondo("#000").paredes(PARED);
+      if (modo === "dado") { T.valores(L, { lo: LO, hi: HI }); $("legMlo").textContent = fmt(10 ** LO, 4); $("legMhi").textContent = `${fmt(10 ** HI, 3)} (escala log)`; }
+      else { flechas(T, ARRIBA, V); $("legMlo").textContent = "V = 0 en todas"; $("legMhi").textContent = ""; }
+      T.salida();
+      for (const [j] of filas[sel]) if (j !== sel) borde(T, j, COL.sonar, 2, 2);
+      borde(T, sel, COL.lamp, 2.5);
+      if (T.cell >= 30) for (const [j, p] of filas[sel]) rotulo(T, j, fmt(p, 2), j === sel ? COL.lamp : COL.ink, .3);
+      if (!filas[sel].some(([j]) => j === START) && sel !== START) rotulo(T, START, "S", COL.ink, .38);
+      const fila = filas[sel].map(([j, p]) => `${nom(j)} <b>${fmt(p, 2)}</b>`).join(" · ");
+      hud.innerHTML = `<span>V<sup>π</sup>(S) <b>${fmt(V[START], 4)}</b></span><span>V<sup>π</sup>(cruce) <b>${fmt(V[CRUCE], 4)}</b></span>` +
+        (sel !== START && sel !== CRUCE ? `<span>V<sup>π</sup>${sel === GOAL ? "(salida)" : rc(sel)} <b>${fmt(V[sel], 4)}</b></span>` : "") + `<span>fila de P<sup>π</sup> de ${nom(sel)}: ${fila}</span>`;
+    }
+    document.querySelectorAll("#segPol button").forEach(b => b.onclick = () => { modo = b.dataset.p; marcar("#segPol button", "p", modo); dibujar(); });
+    cv.addEventListener("pointerdown", e => { const s = casillaDe(T, e); if (s !== undefined) { sel = s; dibujar(); } });
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B3. Q^π(s,a) de las cuatro acciones con los valores del dado
+  // =====================================================================
+  const qq = await tarea(() => {
+    const cv = $("cvQ"), cvb = $("cvQb"), cuenta = $("cuentaQ"), T = Cueva.tablero(cv, env, { maxCell: 40 });
+    const L = Array.from(V_DADO, v => v > 0 ? Math.log10(v) : -Infinity);
+    const vals = L.filter((_, s) => s !== GOAL), LO = Math.min(...vals), HI = Math.max(...vals);
+    let sel = CRUCE;
+    function dibujar() {
+      T.fondo("#000").paredes(PARED).valores(L, { lo: LO, hi: HI }).salida();
+      borde(T, sel, COL.lamp, 2.5); acciones(T, sel, COL.sonar);
+      if (sel !== START) rotulo(T, START, "S", COL.ink, .38);
+      const q = Q_DADO[sel], v = V_DADO[sel];
+      let best = 0; for (let a = 1; a < 4; a++) if (q[a] > q[best]) best = a;
+      // barras
+      const { w, h, ctx } = Cueva.lienzo(cvb, 170)();
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      const m = { l: 12, r: 12, t: 26, b: 24 }, top = Math.max(...q, 1e-9) * 1.25, bw = (w - m.l - m.r) / 4;
+      const Y = x => h - m.b - x / top * (h - m.t - m.b);
+      ctx.font = `11px ${MONO}`; ctx.textBaseline = "top"; ctx.textAlign = "left"; ctx.fillStyle = COL.muted;
+      ctx.fillText(w < 480 ? `Q(s, a) en ${nom(sel)} · punteada: V` : `Q(s, a) en ${nom(sel)} con los valores del dado · punteada: V = promedio`, m.l, 4);
+      for (let a = 0; a < 4; a++) {
+        const x = m.l + a * bw + bw * .2, ww = bw * .6;
+        ctx.fillStyle = a === best && sel !== GOAL ? COL.exit : COL.sonar; ctx.globalAlpha = a === best ? 1 : .7;
+        ctx.fillRect(x, Y(q[a]), ww, Y(0) - Y(q[a])); ctx.globalAlpha = 1;
+        ctx.fillStyle = COL.ink; ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(fmt(q[a], 4), x + ww / 2, Y(q[a]) - 3);
+        ctx.textBaseline = "top"; ctx.font = `600 13px ${MONO}`; ctx.fillText(AR[a], x + ww / 2, h - m.b + 5); ctx.font = `11px ${MONO}`;
+      }
+      if (sel !== GOAL) {
+        ctx.setLineDash([5, 4]); ctx.strokeStyle = COL.lamp; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(m.l, Y(v) + .5); ctx.lineTo(w - m.r, Y(v) + .5); ctx.stroke(); ctx.setLineDash([]);
+              }
+      if (sel === GOAL) { cuenta.innerHTML = `<b>Q(salida, a) = 0</b> para las cuatro: la partida terminó.`; return; }
+      cuenta.innerHTML = `s = <b>${nom(sel)}</b><br>` + [0, 1, 2, 3].map(a => { const s2 = NXT[sel][a];
+        return `Q(s, ${AR[a]}) = ${RSA(sel, a)} + 0,99 · <span class="v">V${s2 === START ? "(S)" : s2 === GOAL ? "(salida)" : rc(s2)}</span> = ${RSA(sel, a)} + 0,99 · <span class="v">${fmt(V_DADO[s2], 4)}</span> = <b>${fmt(q[a], 4)}</b>${s2 === sel ? " (choca)" : ""}`; }).join("<br>") +
+        `<br>promedio de las cuatro = <b>${fmt(q.reduce((x, y) => x + y) / 4, 4)}</b> = V<sup>π</sup>${sel === START ? "(S)" : rc(sel)}`;
+    }
+    cv.addEventListener("pointerdown", e => { const s = casillaDe(T, e); if (s !== undefined) { sel = s; dibujar(); } });
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B4. Una mejora desde el dado
+  // =====================================================================
+  const mejora = await tarea(() => {
+    const T0 = Cueva.tablero($("cvAntes"), env, { maxCell: 30 }), T1 = Cueva.tablero($("cvDespues"), env, { maxCell: 30 }), hud = $("hudMejora");
+    const POL1 = mejorar(Q_DADO), V1 = evaluar(POL1), path = Cueva.camino(env, POL1);
+    const sube = V1.reduce((t, v, s) => t + (s !== GOAL && v > V_DADO[s] + 1e-12 ? 1 : 0), 0);
+    const baja = V1.reduce((t, v, s) => t + (s !== GOAL && v < V_DADO[s] - 1e-12 ? 1 : 0), 0);
+    const L = Array.from(V_DADO, v => v > 0 ? Math.log10(v) : -Infinity);
+    const vals = L.filter((_, s) => s !== GOAL), LO = Math.min(...vals), HI = Math.max(...vals);
+    let sel = START;
+    function dibujar() {
+      T0.fondo("#000").paredes(PARED).valores(L, { lo: LO, hi: HI }).salida(); cruces(T0); borde(T0, sel, COL.sonar, 2);
+      T1.fondo("#000").paredes(PARED); calor(T1, V1); T1.salida();
+      T1.trayecto(path, "rgba(61,220,132,.8)", .1); flechas(T1, POL1, V1); borde(T1, sel, COL.sonar, 2);
+      hud.innerHTML = `<span>V(S): <b>${fmt(V_DADO[START], 4)}</b> → <b>${fmt(V1[START], 4)}</b></span><span>casillas donde sube <b>${sube}</b>/${n - 1}, donde baja <b>${baja}</b></span>` +
+        `<span>desde S llega en <b>${path.length - 1}</b> pasos</span>` + (sel !== START ? `<span>V${rc(sel)}: <b>${fmt(V_DADO[sel], 4)}</b> → <b>${fmt(V1[sel], 4)}</b></span>` : "");
+    }
+    for (const T of [T0, T1]) T.ctx.canvas.addEventListener("pointerdown", e => { const s = casillaDe(T, e); if (s !== undefined) { sel = s; dibujar(); } });
+    dibujar();
+    return { dibujar: () => { T0.medir(); T1.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B5. Iteración de política, vuelta por vuelta
+  // =====================================================================
+  const pit = await tarea(() => {
+    const cv = $("cvPI"), hud = $("hudPI"), cap = $("capPI"), bE = $("piEval"), bM = $("piMejorar");
+    $("legPI").style.background = Cueva.gradienteCSS("valor");
+    const T = Cueva.tablero(cv, env, { maxCell: 40 });
+    let inicio = "dado", pol, V, evaluada, vueltas, cambiadas, estable, msg, historia;
+    function reset() {
+      pol = inicio === "dado" ? DADO : new Array(n).fill(0);
+      V = evaluar(pol); evaluada = true; vueltas = 0; cambiadas = new Set(); estable = false; historia = [];
+      msg = inicio === "dado" ? "Vuelta 1: el dado ya está evaluado (V(S) = 0,0136). Ahora toca <b>mejorar</b>."
+        : "Vuelta 1: «todas ↑» ya está evaluada y todo vale 0, porque ninguna flecha ↑ entra a la salida. Ahora toca <b>mejorar</b>.";
+    }
+    function paso1() {
+      if (estable) return;
+      if (evaluada) { msg = "Esta política ya está evaluada: ahora toca <b>mejorar</b>."; return; }
+      V = evaluar(pol); evaluada = true;
+      msg = `Vuelta ${vueltas + 1}: política evaluada, V(S) = ${fmt(V[START], 4)}. Ahora toca <b>mejorar</b>.`;
+    }
+    function paso2() {
+      if (estable) return;
+      if (!evaluada) { msg = "Primero hay que <b>evaluar</b> la política nueva: la mejora usa su V."; return; }
+      const vieja = Array.isArray(pol[0]) ? null : pol, nueva = mejorar(valoresQ(V), vieja);
+      cambiadas = new Set(); for (let s = 0; s < n; s++) if (s !== GOAL && (!vieja || nueva[s] !== vieja[s])) cambiadas.add(s);
+      vueltas++; historia.push(vieja ? cambiadas.size : "todas");
+      if (vieja && cambiadas.size === 0) { estable = true; msg = `Vuelta ${vueltas}: ninguna flecha cambió, así que la política es <b>óptima</b>. Total: <b>${vueltas} vueltas</b>, contando la última que solo confirma.`; return; }
+      pol = nueva; evaluada = false;
+      msg = `Vuelta ${vueltas}: ${vieja ? `cambiaron <b>${cambiadas.size}</b> flechas (borde ámbar)` : "aparecen las flechas por primera vez"}. Ahora toca <b>evaluar</b> la política nueva.`;
+    }
+    function dibujar() {
+      T.fondo("#000").paredes(PARED); calor(T, V); T.salida();
+      if (Array.isArray(pol[0])) cruces(T);
+      else {
+        const path = Cueva.camino(env, pol, 200);
+        if (path[path.length - 1] === GOAL) T.trayecto(path, "rgba(61,220,132,.7)", .1);
+        for (const s of cambiadas) borde(T, s, COL.lamp, 2.5, 2);
+        flechas(T, pol, V, { alfa: evaluada ? .9 : .55 });
+      }
+      if (!evaluada) { T.ctx.fillStyle = "rgba(0,0,0,.35)"; T.ctx.fillRect(0, 0, env.W * T.cell, env.H * T.cell); }
+      bE.classList.toggle("sug", !evaluada && !estable); bM.classList.toggle("sug", evaluada && !estable);
+      hud.innerHTML = `<span>vueltas <b>${vueltas}</b></span><span>V<sup>π</sup>(S) <b>${fmt(V[START], 4)}</b>${evaluada ? "" : " (de la política vieja)"}</span>` +
+        (historia.length ? `<span>flechas que cambian: <b>${historia.join(", ")}</b></span>` : "") + (estable ? `<span><b style="color:var(--exit)">óptima</b></span>` : "");
+      cap.innerHTML = msg;
+    }
+    bE.onclick = () => { paso1(); dibujar(); };
+    bM.onclick = () => { paso2(); dibujar(); };
+    $("piFin").onclick = () => { for (let i = 0; i < 300 && !estable; i++) { paso1(); paso2(); } dibujar(); };
+    $("piReset").onclick = () => { reset(); dibujar(); };
+    document.querySelectorAll("#segPI button").forEach(b => b.onclick = () => { inicio = b.dataset.i; marcar("#segPI button", "i", inicio); reset(); dibujar(); });
+    reset(); dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); }, contar: ini => { inicio = ini; reset(); for (let i = 0; i < 300 && !estable; i++) { paso1(); paso2(); } const r = { vueltas, historia: historia.slice(), VS: V[START] }; inicio = "dado"; marcar("#segPI button", "i", "dado"); reset(); dibujar(); return r; } };
+  });
+
+  // =====================================================================
+  // B6. Iteración de valor: el máximo en cada vuelta
+  // =====================================================================
+  const vit = await tarea(() => {
+    const cv = $("cvVI"), sl = $("slVI"), out = $("outVI"), hud = $("hudVI"), btn = $("viPlay");
+    $("legVI").style.background = Cueva.gradienteCSS("valor");
+    sl.max = KVI;
+    const T = Cueva.tablero(cv, env, { maxCell: 40 });
+    const POLK = HVI.map(V => mejorar(valoresQ(V)));
+    const FRAC = POLK.map(fracOpt);
+    const kOpt = FRAC.findIndex((f, k) => FRAC.slice(k).every(x => x === n - 1));
+    let k = +sl.value, raf = 0;
+    function dibujar() {
+      const V = HVI[k], Q = valoresQ(V); out.textContent = k;
+      T.fondo("#000").paredes(PARED); calor(T, V); T.salida();
+      flechas(T, POLK[k], V, { gris: s => Math.max(...Q[s]) <= 0 });
+      borde(T, START, COL.sonar, 2);
+      const con = V.filter((v, s) => v > 0 && s !== GOAL).length;
+      hud.innerHTML = `<span>vuelta <b>${k}</b> de ${KVI}</span><span>casillas con valor <b>${con}</b>/${n - 1}</span><span>flechas óptimas <b>${FRAC[k]}</b>/${n - 1}</span>` +
+        `<span>V<sub>k</sub>(S) <b>${fmt(V[START], 4)}</b></span><span>todas óptimas desde la vuelta <b>${kOpt}</b></span>`;
+    }
+    function play(on) {
+      cancelAnimationFrame(raf); raf = 0; btn.textContent = on ? "Pausa" : "Animar"; if (!on) return;
+      if (k >= KVI) k = 0; let ult = 0, acc = 0;
+      const paso = now => { const dt = ult ? now - ult : 0; ult = now; acc += dt;
+        if (acc > (reducir ? 400 : 220)) { acc = 0; k = Math.min(KVI, k + 1); sl.value = k; dibujar(); }
+        if (k < KVI) raf = requestAnimationFrame(paso); else { raf = 0; btn.textContent = "Animar"; } };
+      raf = requestAnimationFrame(paso);
+    }
+    btn.onclick = () => play(!raf);
+    sl.oninput = () => { k = +sl.value; dibujar(); };
+    $("viMas").onclick = () => { k = Math.min(KVI, k + 1); sl.value = k; dibujar(); };
+    $("viCero").onclick = () => { play(false); k = 0; sl.value = 0; dibujar(); };
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); }, KVI, kOpt };
+  });
+
+  // =====================================================================
+  // B7. Slip, costo por paso y γ; 12 partidas con y sin slip
+  // =====================================================================
+  function viCompleta({ gamma = 0.99, costo = 0, slip = 0 } = {}) {   // misma cuenta que Cueva.iteracionValor, con P armada una vez
+    const P = Cueva.transiciones(env, slip);
+    let V = new Array(n).fill(0), it = 0;
+    while (it < 20000) {
+      const NV = V.slice(); let delta = 0; it++;
+      for (let s = 0; s < n; s++) {
+        if (s === GOAL) { NV[s] = 0; continue; }
+        let best = -Infinity;
+        for (let a = 0; a < 4; a++) { let q = 0; for (const [s2, p] of P[s][a]) q += p * (Cueva.recompensa(env, s2, costo) + gamma * (s2 === GOAL ? 0 : V[s2])); if (q > best) best = q; }
+        NV[s] = best; delta = Math.max(delta, Math.abs(best - V[s]));
+      }
+      V = NV; if (delta < 1e-10) break;
+    }
+    return { V, it };
+  }
+  const per = await tarea(() => {
+    const cv = $("cvPer"), hud = $("hudPer"), sg = $("slG"), sc = $("slCosto"), ss = $("slSlip");
+    const T = Cueva.tablero(cv, env, { maxCell: 40 });
+    let est = null;
+    function calcular() {
+      const op = { gamma: +sg.value, costo: +sc.value, slip: +ss.value };
+      $("outG").textContent = fmt(op.gamma, 2); $("outCosto").textContent = op.costo ? `−${fmt(op.costo, 2)}` : "0"; $("outSlip").textContent = fmt(op.slip, 2);
+      const { V, it } = viCompleta(op), pol = Cueva.politicaGreedy(env, V, op), path = Cueva.camino(env, pol, 60);
+      est = { op, V, it, pol, path, llega: path[path.length - 1] === GOAL, distintas: pol.reduce((t, a, s) => t + (s !== GOAL && !OPT[s][a] ? 1 : 0), 0) };
+      document.querySelectorAll("#b-perillas [data-pre]").forEach(b => { const [g, c, sp] = b.dataset.pre.split(",").map(Number); b.setAttribute("aria-pressed", g === op.gamma && c === op.costo && sp === op.slip); });
+    }
+    function dibujar() {
+      const { V, pol, path, llega, it, op, distintas } = est;
+      const vals = V.filter((_, s) => s !== GOAL), lo = Math.min(...vals), hi = Math.max(...vals);
+      T.fondo("#000").paredes(PARED).valores(V).salida();
+      flechas(T, pol, V, { lo, hi });
+      if (llega) T.trayecto(path, "rgba(61,220,132,.85)", .1);
+      borde(T, START, COL.sonar, 2);
+      const empate = hi - lo < 1e-9;
+      hud.innerHTML = `<span>V*(S) <b>${fmt(V[START], 4)}</b></span><span>vueltas <b>${it}</b></span><span>flechas distintas de las del piso normal <b>${distintas}</b></span>` +
+        (llega ? `<span>desde S: <b style="color:var(--exit)">${path.length - 1} pasos</b>${op.slip ? " si no resbala" : ""}</span>` : `<span><b style="color:var(--ember)">no llega</b>${empate ? ": todas las casillas valen lo mismo y las acciones empatan" : ""}</span>`);
+    }
+    for (const el of [sg, sc, ss]) el.oninput = () => { calcular(); dibujar(); };
+    document.querySelectorAll("#b-perillas [data-pre]").forEach(b => b.onclick = () => { const [g, c, sp] = b.dataset.pre.split(","); sg.value = g; sc.value = c; ss.value = sp; calcular(); dibujar(); });
+    calcular(); dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); }, viCompleta };
+  });
+
+  const partidas = await tarea(() => {
+    const N = 12, SLIP = 0.2, hud = $("hudPart");
+    const T0 = Cueva.tablero($("cvP0"), env, { maxCell: 30 }), T1 = Cueva.tablero($("cvP1"), env, { maxCell: 30 });
+    const pol0 = Cueva.politicaGreedy(env, viCompleta({ gamma: GAMMA }).V, { gamma: GAMMA });
+    const pol1 = Cueva.politicaGreedy(env, viCompleta({ gamma: GAMMA, slip: SLIP }).V, { gamma: GAMMA, slip: SLIP });
+    let semilla = 1, tr0 = [], tr1 = [], prog = 1, raf = 0;
+    function jugar(slip, u, pol, lim = 200) {
+      let s = START; const p = [s];
+      for (let i = 0; i < lim && s !== GOAL; i++) { let a = pol[s]; if (slip > 0 && u() < slip) a = (a + (u() < .5 ? 1 : 3)) % 4; s = env.move(s, a)[0]; p.push(s); }
+      return p;
+    }
+    function simular() { const u = Cueva.rng(semilla * 7919); tr0 = Array.from({ length: N }, () => jugar(0, u, pol0)); tr1 = Array.from({ length: N }, () => jugar(SLIP, u, pol1)); }
+    function trazar(T, trs, color) {
+      const ctx = T.ctx, cell = T.cell;
+      T.fondo("#000").paredes(PARED).salida().entrada();
+      trs.forEach((p, i) => {
+        const off = (i - (N - 1) / 2) / N * cell * .5, m = Math.max(1, Math.floor((p.length - 1) * prog));
+        ctx.strokeStyle = color; ctx.lineWidth = Math.max(1.5, cell * .07); ctx.lineJoin = "round"; ctx.globalAlpha = .55;
+        ctx.beginPath(); p.slice(0, m + 1).forEach((s, j) => { const [r, c] = env.free[s], x = c * cell + cell / 2 + off, y = r * cell + cell / 2 + off; j ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+        ctx.globalAlpha = 1;
+      });
+    }
+    function dibujar() {
+      trazar(T0, tr0, COL.lamp); trazar(T1, tr1, COL.sonar);
+      const l0 = tr0.map(p => p.length - 1), l1 = tr1.map(p => p.length - 1), media = l1.reduce((a, b) => a + b, 0) / N;
+      hud.innerHTML = `<span>piso normal: <b>${Math.min(...l0) === Math.max(...l0) ? `${l0[0]} pasos` : `entre ${Math.min(...l0)} y ${Math.max(...l0)}`}</b> las 12</span>` +
+        `<span>slip 0,2: entre <b>${Math.min(...l1)}</b> y <b>${Math.max(...l1)}</b> pasos, promedio <b>${fmt(media, 1)}</b></span><span>(simulado en el navegador)</span>`;
+    }
+    function animar() {
+      cancelAnimationFrame(raf);
+      if (reducir) { prog = 1; dibujar(); return; }
+      prog = 0; const t0 = performance.now();
+      const paso = now => { prog = Math.min(1, (now - t0) / 1300); dibujar(); if (prog < 1) raf = requestAnimationFrame(paso); };
+      raf = requestAnimationFrame(paso);
+    }
+    $("otras").onclick = () => { semilla++; simular(); animar(); };
+    simular(); dibujar();
+    return { dibujar: () => { T0.medir(); T1.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B8. El robot de reciclaje
+  // =====================================================================
+  const robot = await tarea(() => {
+    const RB = 2, RR = -3, G = 0.9, ACC = ["buscar", "esperar", "recargar"], COLA = [COL.lamp, COL.sonar, COL.exit];
+    const cv = $("cvRobot"), hud = $("hudRobot"), tb = $("tbRobot"), sa = $("slA"), sb = $("slB"), sw = $("slW");
+    function resolver(a, b, rw) {   // iteración de valor hasta que el cambio sea < 1e-10 (resolver_chico del notebook)
+      let V = [0, 0], Q;
+      for (let it = 0; it < 20000; it++) {
+        Q = [[RB + G * (a * V[0] + (1 - a) * V[1]), rw + G * V[0], -Infinity],
+             [b * (RB + G * V[1]) + (1 - b) * (RR + G * V[0]), rw + G * V[1], G * V[0]]];
+        const NV = Q.map(q => Math.max(...q)), d = Math.max(Math.abs(NV[0] - V[0]), Math.abs(NV[1] - V[1])); V = NV; if (d < 1e-10) break;
+      }
+      return { V, Q, pi: Q.map(q => q.indexOf(Math.max(...q))) };
+    }
+    function umbral(a, rw) {   // el β a partir del cual, con batería baja, conviene buscar (bisección, como umbral_beta)
+      const acc = b => resolver(a, b, rw).pi[1];
+      if (acc(0) === 0 || acc(1) !== 0) return NaN;
+      let lo = 0, hi = 1; for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2; if (acc(m) === 0) hi = m; else lo = m; }
+      return (lo + hi) / 2;
+    }
+    let mapa = null, clave = "", caja = null;
+    function dibujar() {
+      const al = +sa.value, be = +sb.value, rw = +sw.value;
+      $("outA").textContent = fmt(al, 2); $("outB").textContent = fmt(be, 2); $("outW").textContent = fmt(rw, 2);
+      const sol = resolver(al, be, rw);
+      const { w, h, ctx } = Cueva.lienzo(cv, 470)();
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      // diagrama de dos estados
+      const dh = 220, xa = w * .2, xb = w * .8, y0 = dh * .5, R0 = Math.max(26, Math.min(32, w * .07));
+      const op = (s, a) => sol.pi[s] === a, cA = (s, a) => op(s, a) ? COL.exit : "rgba(141,147,163,.45)", wA = (s, a) => op(s, a) ? 3 : 1.2;
+      const curva = (x1, y1, x2, y2, cv_, color, ancho, et) => {
+        ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = ancho; const mx = (x1 + x2) / 2, my = (y1 + y2) / 2 + cv_;
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.quadraticCurveTo(mx, my, x2, y2); ctx.stroke();
+        const ang = Math.atan2(y2 - my, x2 - mx); ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(x2 - 9 * Math.cos(ang - .4), y2 - 9 * Math.sin(ang - .4)); ctx.lineTo(x2 - 9 * Math.cos(ang + .4), y2 - 9 * Math.sin(ang + .4)); ctx.fill();
+        if (et) { ctx.font = `11px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(et, mx, (y1 + y2) / 2 + cv_ / 2 + (cv_ > 0 ? 9 : -9)); }
+      };
+      const lazo = (x, arriba, color, ancho, et) => { const d = arriba ? -1 : 1; ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = ancho; ctx.beginPath(); ctx.arc(x, y0 + d * (R0 + 16), 16, 0, 7); ctx.stroke();
+        ctx.font = `11px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(et, x, y0 + d * (R0 + 44)); };
+      lazo(xa, true, cA(0, 0), wA(0, 0), `buscar (α) +2`);
+      lazo(xa, false, cA(0, 1), wA(0, 1), `esperar +${fmt(rw, 1)}`);
+      lazo(xb, true, cA(1, 0), wA(1, 0), `buscar (β) +2`);
+      lazo(xb, false, cA(1, 1), wA(1, 1), `esperar +${fmt(rw, 1)}`);
+      curva(xa + R0, y0 - 8, xb - R0, y0 - 8, -26, cA(0, 0), wA(0, 0), "buscar, 1−α");
+      curva(xb - R0, y0 + 8, xa + R0, y0 + 8, 26, op(1, 2) || op(1, 0) ? COL.exit : "rgba(141,147,163,.45)", op(1, 2) || op(1, 0) ? 3 : 1.2, "");
+      ctx.font = `11px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillStyle = op(1, 2) ? COL.exit : COL.muted; ctx.fillText("recargar: 0", w / 2, y0 + 40);
+      ctx.fillStyle = op(1, 0) ? COL.exit : COL.muted; ctx.fillText("se agota (1−β): −3", w / 2, y0 + 55);
+      [["alta", xa], ["baja", xb]].forEach(([t, x], s) => { ctx.fillStyle = "#1e2331"; ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y0, R0, 0, 7); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = COL.ink; ctx.font = `600 13px ${MONO}`; ctx.textBaseline = "middle"; ctx.fillText(t, x, y0 - 6); ctx.font = `10px ${MONO}`; ctx.fillStyle = COL.lamp; ctx.fillText("V " + fmt(sol.V[s], 1), x, y0 + 9); });
+      // mapa β × r_espera con batería baja
+      const mx0 = 40, my0 = dh + 22, mw = w - 50, mh = h - dh - 52, NB = 40;
+      const k = fmt(al, 2);
+      if (k !== clave) { clave = k; mapa = []; for (let i = 0; i <= NB; i++) { mapa.push([]); for (let j = 0; j <= NB; j++) mapa[i].push(resolver(al, j / NB, 2.5 * i / NB).pi[1]); } }
+      for (let i = 0; i <= NB; i++) for (let j = 0; j <= NB; j++) { ctx.fillStyle = COLA[mapa[i][j]]; ctx.globalAlpha = .55; ctx.fillRect(mx0 + mw * j / (NB + 1), my0 + mh - mh * (i + 1) / (NB + 1), mw / (NB + 1) + .6, mh / (NB + 1) + .6); }
+      ctx.globalAlpha = 1;
+      const cuenta = [0, 0, 0], cen = [[0, 0], [0, 0], [0, 0]]; for (let i = 0; i <= NB; i++) for (let j = 0; j <= NB; j++) { const q = mapa[i][j]; cuenta[q]++; cen[q][0] += j; cen[q][1] += i; }
+      ctx.font = `600 12px ${MONO}`; ctx.fillStyle = "#0b0d12"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      cen.forEach((c, q) => { if (cuenta[q] > 20) ctx.fillText(ACC[q], Math.max(mx0 + 34, Math.min(mx0 + mw - 34, mx0 + mw * (c[0] / cuenta[q] + .5) / (NB + 1))), my0 + mh - mh * (c[1] / cuenta[q] + .5) / (NB + 1)); });
+      const px = mx0 + mw * be, py = my0 + mh - mh * rw / 2.5;
+      ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px, py, 6, 0, 7); ctx.stroke();
+      ctx.fillStyle = COL.muted; ctx.font = `11px ${MONO}`; ctx.textBaseline = "top"; ctx.textAlign = "center"; ctx.fillText("β →", mx0 + mw / 2, my0 + mh + 4);
+      ctx.textAlign = "left"; ctx.fillText("0", mx0, my0 + mh + 4); ctx.textAlign = "right"; ctx.fillText("1", mx0 + mw, my0 + mh + 4);
+      ctx.save(); ctx.translate(mx0 - 24, my0 + mh / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.fillText("r_espera (0 a 2,5) →", 0, 0); ctx.restore();
+      ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillStyle = COL.ink; ctx.fillText("¿qué hace con batería baja?", mx0, my0 - 4);
+      caja = { mx0, my0, mw, mh };
+      // tabla de la política
+      tb.innerHTML = ["alta", "baja"].map((t, s) => `<tr><td>${t}</td><td class="op">${ACC[sol.pi[s]]}</td><td class="num">${fmt(sol.V[s], 2)}</td>` +
+        sol.Q[s].map((q, a) => `<td class="num${a === sol.pi[s] ? " mejor" : ""}">${isFinite(q) ? fmt(q, 2) : "—"}</td>`).join("") + `</tr>`).join("");
+      const u = umbral(al, rw);
+      hud.innerHTML = `<span>con batería baja conviene buscar si β &gt; <b>${isNaN(u) ? "–" : fmt(u, 3)}</b> (con este α y este r_espera)</span>`;
+    }
+    for (const el of [sa, sb, sw]) el.oninput = dibujar;
+    const tocar = e => { const m = caja, b = cv.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top; if (!m || x < m.mx0 || x > m.mx0 + m.mw || y < m.my0 || y > m.my0 + m.mh) return;
+      sb.value = Math.round((x - m.mx0) / m.mw * 100) / 100; sw.value = Math.round((1 - (y - m.my0) / m.mh) * 2.5 * 20) / 20; dibujar(); };
+    cv.addEventListener("pointerdown", tocar); cv.addEventListener("pointermove", e => { if (e.buttons) tocar(e); });
+    dibujar();
+    return { dibujar, resolver, umbral };
+  });
+
+  // para verificar a mano en la consola (las cifras del notebook)
+
+  let tRes = 0;
+  addEventListener("resize", () => { clearTimeout(tRes); tRes = setTimeout(() => { for (const f of [mdp, mrp, qq, mejora, pit, vit, per, partidas, robot]) f.dibujar(); }, 120); });
+})();
+</script>
+</body>
+</html>
