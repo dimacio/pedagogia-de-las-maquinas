@@ -770,11 +770,11 @@ window.MODULOS = {
       },
       {
         objetivo: "O4",
-        pregunta: "Go-Explore guardó una secuencia de 52 acciones que en la cueva determinista lleva de S a la salida. Repetida 1000 veces con acciones pegajosas, llega el 44,1 % de las veces con p = 0,05 y el 0,9 % con p = 0,25. ¿Qué se lee?",
+        pregunta: "Go-Explore guardó la secuencia que guardó Go-Explore sin bucles, de 52 acciones, que en la cueva determinista lleva de S a la salida. Repetida 1000 veces con acciones pegajosas, llega el 44,1 % de las veces con p = 0,05 y el 0,9 % con p = 0,25. ¿Qué se lee?",
         opciones: [
           { texto: "Una traba hace perder un paso, pero la secuencia sigue el rumbo; con partidas más largas llegaría casi siempre.", explicacion: "No: después de una traba el agente queda corrido una casilla y el resto de la secuencia ya no corresponde al lugar donde está: choca y termina en cualquier parte. Más pasos no lo arreglan." },
           { texto: "La secuencia estaba mal guardada: una sin rodeos, como el camino más corto de 44 pasos, llegaría igual con p = 0,25.", explicacion: "No: una más corta tiene menos pasos para trabarse, pero sigue sin poder corregir una traba. El problema es que no mira dónde está." },
-          { texto: "Una secuencia memorizada no sabe dónde está: tras una traba se desvía y no se corrige. Por eso Atari se evalúa con p = 0,25.", explicacion: "Correcto. Con p = 0,25 casi nunca llega: así un agente no puede ganar memorizando botones. Lo que cuenta es una política que mira dónde está, no una secuencia que funcionó una vez." },
+          { texto: "Una secuencia memorizada no sabe dónde está: tras una traba se desvía y no se corrige. Por eso Machado et al. (2018) propusieron evaluar en Atari con p = 0,25.", explicacion: "Correcto. Con p = 0,25 casi nunca llega: así un agente no puede ganar memorizando botones. Lo que cuenta es una política que mira dónde está, no una secuencia que funcionó una vez." },
           { texto: "Las acciones pegajosas castigan a cualquier agente por igual, así que en Atari se evalúa sin ellas para medir lo aprendido.", explicacion: "No: está al revés. Machado et al. propusieron evaluar con p = 0,25 justamente para que memorizar no alcance; una política que mira dónde está se recupera de una traba." }
         ],
         correcta: 2

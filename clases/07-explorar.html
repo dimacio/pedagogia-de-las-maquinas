@@ -139,7 +139,7 @@
       <div class="paso">Paso 4</div>
       <h2>De los bandits a la cueva: ε-greedy no llega</h2>
       <p>En la cueva el premio está al final de un camino, así que hasta llegar una vez a la salida todas las recompensas valen 0. Sin recompensa, ε-greedy es una caminata al azar con costumbres que no distingue una casilla pisada mil veces de una nunca vista. En la cueva grande, con 155 casillas y la salida a 44 pasos, cada explorador tiene 30&nbsp;000 pasos repartidos en partidas de 300. En el notebook, con 20 semillas, el azar puro no llega nunca y ε-greedy llega en el 5 % tanto con ε = 0,1 como con ε = 0,3, aunque con 0,3 pisa 100,3 casillas en promedio contra 63,4.</p>
-      <div class="eq">r = 1 al entrar a la salida, 0 en otro caso</div>
+      <div class="eq">r = 1 al entrar a la salida, 0 si no</div>
       <p class="nota pregunta">¿Por qué subir ε de 0,1 a 0,3 hace pisar más casillas pero no llegar más seguido?</p>
     </div>
   </section>
@@ -163,7 +163,7 @@
     <div class="texto">
       <div class="paso">Paso 5</div>
       <h2>Optimismo en la cueva: contar visitas</h2>
-      <p>Con valores iniciales optimistas, Q arranca en 1 en vez de 0, así que cada flecha no probada promete hasta que el agente la prueba y no encuentra nada. La exploración por conteo (<i>count-based exploration</i>) suma en cada paso una bonificación que es grande en las casillas poco visitadas. En una tabla el conteo solo no alcanza, porque una flecha nunca probada vale 0 mientras los caminos conocidos ya juntaron bonificaciones. En el notebook, con 20 semillas, el conteo solo no llega nunca mientras que el optimismo llega siempre, con una mediana de 8&nbsp;666 pasos que baja a 5&nbsp;218 si se le suma el conteo.</p>
+      <p>Con valores iniciales optimistas, Q arranca en 1 en vez de 0, así que cada flecha no probada promete hasta que el agente la prueba y no encuentra nada. La exploración por conteo (<i>count-based exploration</i>) suma en cada paso una bonificación que es grande en las casillas poco visitadas. En una tabla con Q en 0, el conteo solo no alcanza, porque una flecha nunca probada vale 0 mientras los caminos conocidos ya juntaron bonificaciones. En el notebook, con 20 semillas, el conteo solo no llega nunca mientras que el optimismo llega siempre, con una mediana de 8&nbsp;666 pasos que baja a 5&nbsp;218 si se le suma el conteo.</p>
       <div class="eq">r_total = r + β / √N(s′)</div>
       <p class="nota pregunta">Mirá el conteo solo. ¿Por qué la bonificación empuja hacia lo nuevo recién cuando lo nunca probado vale al menos tanto como lo ya visto?</p>
     </div>
@@ -228,7 +228,7 @@
     <div class="texto">
       <div class="paso">Paso 7</div>
       <h2>Cuando volver no es exacto</h2>
-      <p>Las acciones pegajosas (<i>sticky actions</i>) hacen que el entorno ignore con probabilidad p la acción elegida y repita la anterior, como un joystick que se traba. En el notebook, la secuencia de 52 acciones que guardó Go-Explore llega siempre con p = 0, en el 44,1 % de los intentos con p = 0,05, en el 17,8 % con p = 0,1 y en el 0,9 % con p = 0,25, mientras que con el piso resbaloso de la clase 4 llega en el 7,2 % con slip = 0,05. Go-Explore, si vuelve repitiendo secuencias en una cueva pegajosa, encuentra la salida en 3 de 20 semillas con p = 0,1 y en 1 de 20 con p = 0,25. Por eso la evaluación de agentes de Atari agrega acciones pegajosas a propósito, para que ninguno gane memorizando botones.</p>
+      <p>Las acciones pegajosas (<i>sticky actions</i>) hacen que el entorno ignore con probabilidad p la acción elegida y repita la anterior, como un joystick que se traba. En el notebook, la secuencia que guardó Go-Explore, sin bucles (52 acciones), llega siempre con p = 0, en el 44,1 % de los intentos con p = 0,05, en el 17,8 % con p = 0,1 y en el 0,9 % con p = 0,25, mientras que con el piso resbaloso de la clase 4 llega en el 7,2 % con slip = 0,05. Go-Explore, si vuelve repitiendo secuencias en una cueva pegajosa, encuentra la salida en 3 de 20 semillas con p = 0,1 y en 1 de 20 con p = 0,25. Por eso Machado et al. (2018) propusieron entrenar y evaluar en Atari con acciones pegajosas a propósito, para que ninguno gane memorizando botones.</p>
       <div class="eq">acción real = la anterior, con prob. p</div>
       <p class="nota pregunta">Una traba en el paso 10 deja al agente una casilla corrido. ¿Qué pasa con las 42 acciones que faltan?</p>
     </div>

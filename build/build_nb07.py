@@ -471,7 +471,7 @@ $$\text{puntaje}(a) = \underbrace{\hat\mu_a}_{\text{promedio de clics}} + \under
 
 donde $n_a$ es cuántas veces se mostró el anuncio $a$ y $t$ cuántas impresiones van en total. La bonificación es **grande si $n_a$ es chico**: lo poco probado recibe el beneficio de la duda. Es el **optimismo ante la incertidumbre** (*optimism in the face of uncertainty*): ante la duda, suponer que puede ser bueno, y probarlo. Si no lo era, su $n_a$ crece, la bonificación se achica y deja de elegirse.
 
-Usamos $c = 0{,}2$. El valor de libro es $\sqrt 2 \approx 1{,}41$, pensado para premios repartidos entre 0 y 1; acá los clics son raros y el desvío de un clic con probabilidad 5 % es $\sqrt{0{,}05 \cdot 0{,}95} \approx 0{,}22$, así que la duda se mide en esa escala (en el ejercicio pueden probar $1{,}41$).
+Usamos $c = 0{,}2$. El valor de libro es $\sqrt 2 \approx 1{,}41$, pensado para el peor caso de premios entre 0 y 1 (desvío de hasta 0,5); acá los clics son raros y el desvío de un clic con probabilidad 5 % es $\sqrt{0{,}05 \cdot 0{,}95} \approx 0{,}22$, así que la duda se mide en esa escala (en el ejercicio pueden probar $1{,}41$).
 
 ### Paso 1 — Las barras de UCB se achican
 
