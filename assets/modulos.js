@@ -399,5 +399,83 @@ window.MODULOS = {
         "La recompensa corregida es medible y cierra la trampa, o reconoce con honestidad qué queda abierto."
       ]
     }
+  },
+
+  "3": {
+    objetivos: [
+      "Describir al caminante al azar en la cueva como una cadena de Markov y leer una fila de su matriz de transición P.",
+      "Calcular el retorno descontado de una secuencia de recompensas y explicar qué cambia con γ, incluido el feed con γ ≈ 0 de la clase 1.",
+      "Explicar el valor V(s) como retorno esperado y escribir la ecuación de Bellman de un proceso de recompensa de Markov.",
+      "Resolver la ecuación de Bellman iterando desde V = 0 y explicar cómo el valor se derrama desde la salida."
+    ],
+    tiempo: { pagina: 35, notebook: 75 },
+    previos: ["2", "0c"],
+    requisitos: ["Haber hecho la clase 2: estado, supuesto de Markov y recompensa escasa y demorada.", "La nivelación 0c ayuda en el paso 6, donde la ecuación de Bellman se resuelve como sistema lineal."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "La fila de P de la casilla S, (1,1), tiene 0,50 en la diagonal y 0,25 en (1,2) y en (2,1). ¿Cómo se lee esa fila?",
+        opciones: [
+          { texto: "Desde sus dos vecinas, el caminante llega a S con probabilidad 0,50 en el próximo paso.", explicacion: "No: eso sería leer una columna. Una fila es una casilla de partida: dice adónde va el caminante que está en S." },
+          { texto: "El caminante elige quedarse en S la mitad de las veces, porque desde ahí la salida está lejos.", explicacion: "No: el caminante no elige nada, tira un dado. El 0,50 sale de las caras que chocan, no de una preferencia." },
+          { texto: "Desde S, dos caras del dado chocan (↑ y ←) y se queda; cada una de las otras lo lleva a una vecina.", explicacion: "Correcto. Se queda con 2/4 = 0,50 y va a cada vecina con 1/4 = 0,25. La fila suma 1: a algún lugar hay que llegar." },
+          { texto: "La mitad de todas las caminatas pasa por S en algún momento, y un cuarto de ellas por cada una de las vecinas.", explicacion: "No: la fila habla de un solo paso desde S, no de cuántas caminatas pasan por cada casilla a lo largo del tiempo." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O2",
+        pregunta: "Una caminata llega a la salida en el paso 3: sus recompensas son 0, 0 y +1. Con la convención de la clase (el primer paso no se descuenta), ¿cuánto vale su retorno G con γ = 0,9?",
+        opciones: [
+          { texto: "0,81: el +1 llega en el paso 3 y pesa γ² = 0,9².", explicacion: "Correcto. Un premio en el paso T pesa γ^(T−1): 0 + 0,9 · 0 + 0,9² · 1 = 0,81." },
+          { texto: "0,729: el +1 llega en el paso 3 y pesa γ³ = 0,9³.", explicacion: "No: eso descuenta también el primer paso. En la clase el premio del paso 20 pesa γ¹⁹, y el del paso 3, γ²." },
+          { texto: "1: el retorno suma las recompensas y en la caminata hubo un solo +1.", explicacion: "No: eso es el retorno sin descuento (γ = 1). Con γ = 0,9, llegar tarde cuesta." },
+          { texto: "0,9: hay un solo premio, así que se multiplica una sola vez por γ.", explicacion: "No: el descuento depende de cuántos pasos tarda el premio, no de cuántos premios hay. Este tarda dos pasos más que el primero." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O2",
+        pregunta: "En el modelo de juguete del paso 4, un feed con γ ≈ 0 compara «siempre gancho» con «siempre útil». ¿Qué regla elige y qué le pasa al usuario?",
+        opciones: [
+          { texto: "Elige «útil», porque en 90 días junta 112,0 clics contra 32,0 y el feed suma todo lo que va a cobrar.", explicacion: "No: con γ ≈ 0 los clics de mañana no pesan nada. «Útil» gana recién cuando γ supera 0,924." },
+          { texto: "Elige «gancho», pero al usuario no le pasa nada: su satisfacción está oculta y el feed no la toca.", explicacion: "No: que el feed no vea la satisfacción no quiere decir que no la cambie. En el modelo, el gancho la baja y por eso el usuario deja de volver." },
+          { texto: "Elige «gancho» hasta el día 17 y después pasa a «útil», cuando sus clics acumulados lo superan.", explicacion: "No: el día 17 es cuando se cruzan los clics acumulados, pero el feed elige una regla fija de una vez. Lo que la cambia es γ, no el día." },
+          { texto: "Elige «gancho» por los 6,0 clics del primer día, y el día 30 ya no vuelve ningún usuario (0,0 %).", explicacion: "Correcto. Con γ ≈ 0 solo cuentan los clics de hoy (6,0 contra 3,0). Con «útil» el día 30 todavía vuelve el 44,8 %." }
+        ],
+        correcta: 3
+      },
+      {
+        objetivo: "O3",
+        pregunta: "En la casilla (7,12), pegada a la salida, V = 0,786 y R = 0,25. Según la ecuación de Bellman V = R + γPV, ¿qué dice cada término?",
+        opciones: [
+          { texto: "R es la probabilidad de llegar algún día a la salida, y γPV le resta lo que se pierde por tardar.", explicacion: "No: R es el premio esperado en el próximo paso (una de cuatro caras entra a la salida), y γPV se suma, no se resta." },
+          { texto: "R = 0,25 es el premio esperado ahora; γPV, el resto, es γ por el valor promedio de adonde puede ir según su fila de P.", explicacion: "Correcto. Lo que vale estar acá es lo que gano ahora más lo que vale, un poco descontado, el lugar adonde voy a parar." },
+          { texto: "R = 0,25 es el premio de ahora, y γPV es γ por el valor de la mejor vecina, la que lleva a la salida.", explicacion: "No: el caminante no elige, así que PV es un promedio pesado con la fila de P, no el máximo. Quedarse con la mejor es lo de la clase 4." },
+          { texto: "R es el retorno de una caminata que arranca en (7,12), y γPV lo promedia con el de muchas otras caminatas.", explicacion: "No: promediar caminatas es otra forma de estimar V (paso 5). En la ecuación, R es el premio esperado de un solo paso." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O4",
+        pregunta: "Arrancando con V = 0 en todas las casillas y aplicando Vₖ₊₁ = R + γPVₖ, ¿qué casillas tienen valor después de la vuelta 10?",
+        opciones: [
+          { texto: "Todas, aunque con números chicos, porque cada vuelta usa la matriz P entera.", explicacion: "No: cada vuelta mira un solo paso más hacia adelante. Una casilla a más de 10 pasos de la salida todavía no puede llegar en 10." },
+          { texto: "Solo las dos vecinas de la salida, las únicas con R distinto de 0, hasta que la iteración converge.", explicacion: "No: eso pasa en la vuelta 1. En cada vuelta siguiente el valor avanza una casilla más hacia atrás." },
+          { texto: "Justo las que están a 10 pasos o menos de la salida; S, a 20 pasos, sigue en 0 hasta la vuelta 20.", explicacion: "Correcto. El valor nace al lado de la salida y se derrama una casilla por vuelta: a S le llega en la vuelta 20, con un número del orden de 10⁻¹²." },
+          { texto: "Las que están a 10 pasos o menos, y a S le llega en la vuelta 20 solo con γ = 0,99; con γ = 0,9, más tarde.", explicacion: "No: la vuelta en que llega depende de la distancia, no de γ. En el ejercicio del notebook, con γ = 0,9 también le llega en la vuelta 20; lo que cambia es cuánto vale." }
+        ],
+        correcta: 2
+      }
+    ],
+    actividad: {
+      titulo: "¿Cuánto pesa tu futuro?",
+      consigna: "Elegí una decisión propia en la que algo de ahora compite con algo que llega después: estudiar o salir, ahorrar o gastar, dormir o seguir mirando el teléfono. Proponé un γ para esa decisión, contá en cuántos pasos (días, semanas) llega el premio lejano y cuánto pesa hoy con ese γ, usando las barras γᵗ de la página. Después contala con la oración de «Para enseñarlo»: lo que gano ahora más lo que vale, un poco descontado, el lugar adonde voy a parar. Publicalo en Discussions; otra persona te devuelve con la rúbrica.",
+      rubrica: [
+        "La decisión enfrenta un premio de ahora con uno que llega después, y se dice en cuántos pasos llega el lejano.",
+        "El γ está justificado con el peso γᵗ del premio lejano, y se dice qué elegiría alguien con γ ≈ 0, como el feed miope.",
+        "La decisión se cuenta como Bellman (lo de ahora más el valor descontado de adonde lleva)."
+      ]
+    }
   }
 };

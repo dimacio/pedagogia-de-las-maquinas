@@ -21,6 +21,7 @@ Formato: una sección por versión (SemVer sobre el curso, ver `fabrica/CONVENCI
   política π(a|s) como bloque propio, E[Σr] separado del ciclo, Markov explicado por lo que viene, bigotes solo como adelanto de la clase 9,
   tutor partido en planteo y trampa, recompensa de mejora calculada en el notebook; referencias con la numeración de 16 clases.
 - Chequeos: no recorren `.venv` ni `.superpowers` como sitio.
+- Clase 3 (nueva): cadena de Markov → MRP → retorno y γ → valor → Bellman, sin acciones; recuadro Future You en B3.
 
 ### Aviso
 - El progreso de los cuestionarios guardado en el navegador vuelve a cero (los ids cambian de significado).
