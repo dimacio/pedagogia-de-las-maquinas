@@ -45,6 +45,8 @@ def correr(ctx: Contexto) -> Resultado:
         for rx, pct in ((PORCENTAJE, True), (DECIMAL, False)):
             for m in rx.finditer(texto):
                 num = m.group(1)
+                if not pct and "," in num and texto[m.start() - 1:m.start()] == "(" and texto[m.end():m.end() + 1] == ")":
+                    continue   # coordenadas de casilla como (7,12), no un decimal
                 if (num, pct) in vistos or (not pct and any(num == v for v, _ in vistos)):
                     continue
                 vistos.add((num, pct))
