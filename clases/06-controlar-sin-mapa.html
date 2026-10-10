@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Controlar sin mapa · RL a ciegas</title>
+<meta name="description" content="Clase 6: sin mapa, el agente aprende Q(s,a) jugando. Por qué Q y no V, ε-greedy, una actualización de SARSA y una de Q-learning con números, on-policy contra off-policy y el mapa de visitas en la cueva a ciegas.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .lz { min-width: 0; }
+  .seg { flex-wrap: wrap; }
+  .seg button { min-width: 0; }
+  .cap { font-size: 13px; color: var(--muted); }
+  .cap b { color: var(--ink); }
+  .duo { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+  .duo > div { min-width: 0; display: grid; gap: 6px; align-content: start; }
+  .duo h3 { font-family: var(--mono); font-size: 12.5px; font-weight: 400; color: var(--muted); }
+  .duo h3 b { color: var(--ink); font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+  .chips span { display: inline-flex; align-items: center; gap: 6px; }
+  .chips i { width: 14px; height: 3px; display: inline-block; border-radius: 1px; }
+  /* las fórmulas largas se parten en un punto elegido (los espacios duros no cortan) */
+  .eq.parte { white-space: normal; }
+  .eq .nw { white-space: nowrap; margin-right: 1.2em; }
+  /* la cuenta de una actualización */
+  .cuenta { font-family: var(--mono); font-size: 13px; line-height: 1.6; background: var(--rock); border: 1px solid var(--rock-2); border-radius: 3px;
+    padding: 8px 10px; overflow-x: auto; white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .cuenta b { color: var(--ink); font-weight: 600; }
+  .cuenta .v { color: var(--lamp); }
+  .cuenta .d { color: var(--sonar); }
+  .cuenta .apag { opacity: .28; }
+  @media (max-width: 560px) { .cuenta { white-space: normal; } }
+  /* tablas de cifras del notebook */
+  .tabla.nb table { font-size: 13px; }
+  .tabla.nb tr.sel td { color: var(--lamp); }
+  .tabla.nb tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--lamp); }
+  @media (max-width: 560px) { .tabla.nb table { font-size: 12px; } .tabla.nb th, .tabla.nb td { padding: 6px 5px; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase 6</div>
+    <h1>Controlar sin <span class="g">mapa</span></h1>
+    <p class="thesis">Sin mapa, el agente aprende jugando cuánto vale cada flecha, probando de vez en cuando las que no parecen las mejores.</p>
+  </section>
+
+  <!-- B1: sin mapa, V no alcanza para elegir -->
+  <section class="bloque" id="b-qv" data-objetivos="O1">
+    <div class="stage">
+      <div class="duo">
+        <div><h3>con <b>V</b>: ¿adónde lleva cada flecha?</h3><div class="lz"><canvas id="cvConV" aria-label="La casilla elegida con su valor V y cuatro flechas con signo de pregunta, porque sin mapa no se sabe adónde lleva cada una"></canvas></div></div>
+        <div><h3>con <b>Q</b>: un número por flecha</h3><div class="lz"><canvas id="cvConQ" aria-label="La misma casilla partida en cuatro triángulos, uno por flecha, con su valor Q; la mejor con borde verde"></canvas></div></div>
+      </div>
+      <div class="lz"><canvas id="cvElegir" aria-label="La cueva con el valor óptimo de cada casilla; la casilla elegida tiene borde ámbar. Tocá otra para verla arriba"></canvas></div>
+      <div class="hud" id="hudQV"></div>
+      <p class="cap">V* y Q* calculados en el navegador por iteración de valor (γ = 0,99), como en la clase 4, con el mapa que el agente no tiene. Tocá una casilla de la cueva.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 1</div>
+      <h2>Sin mapa, V no alcanza para elegir</h2>
+      <p>En la clase 4, el mapa decía adónde lleva cada flecha y con eso V alcanzaba para elegir. Sin mapa, aunque alguien le soplara al agente que V*(S) = 0,8262, no sabría qué flecha lo lleva a la casilla vecina que más vale. Por eso se aprende directamente el valor de cada acción Q(s,a), un número pegado a cada flecha. En S, Q* vale 0,8179 hacia ↑, 0,8262 hacia →, 0,8097 hacia ↓ y 0,8179 hacia ←, así que elegir es quedarse con el mayor.</p>
+      <div class="eq">π(s) = argmaxₐ Q(s,a)</div>
+      <p class="nota pregunta">Si el piso fuera resbaloso, como en la clase 4, ¿le alcanzaría al agente con saber hacia dónde apunta cada flecha para usar V?</p>
+    </div>
+  </section>
+
+  <!-- B2: ε-greedy -->
+  <section class="bloque" id="b-eps" data-objetivos="O1">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Exploración ε" id="segEps">
+        <button aria-pressed="false" data-e="0">ε = 0</button>
+        <button aria-pressed="false" data-e="0.01">0,01</button>
+        <button aria-pressed="false" data-e="0.05">0,05</button>
+        <button aria-pressed="true" data-e="0.1">0,1</button>
+        <button aria-pressed="false" data-e="0.3">0,3</button>
+        <button aria-pressed="false" data-e="0.5">0,5</button>
+        <button aria-pressed="false" data-e="1">1</button>
+      </div>
+      <div class="lz"><canvas id="cvEps" aria-label="Las visitas de 300 partidas de aprendizaje en celeste y, encima, el recorrido de una partida más jugada con lo aprendido"></canvas></div>
+      <div class="legend"><span>0 visitas</span><span class="bar" id="legEps"></span><span id="legEpsHi"></span></div>
+      <div class="row"><button class="btn primary" id="epsOtra">Otra semilla</button></div>
+      <div class="hud" id="hudEps"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>ε (notebook)</th><th>encuentran la salida</th><th>1.ª salida (mediana)</th><th>pasos al final</th></tr></thead>
+          <tbody id="tbEps"></tbody>
+        </table>
+      </div>
+      <p class="cap">Q arranca en 0 más un ruido minúsculo que desempata las flechas como una costumbre de cada casilla: sin él, el desempate elegiría siempre ↑. Q-learning (paso 4) con α = 0,2, 300 partidas de hasta 200 pasos desde S, simulado en el navegador con otra semilla que el notebook. La línea es una partida más con el mismo ε, sin aprender. La tabla es la del notebook, con 8 semillas.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 2</div>
+      <h2>Probar a veces con ε-greedy</h2>
+      <p>Si elige siempre la flecha de mayor Q, que se llama jugar codicioso (<i>greedy</i>), el agente nunca prueba las otras ni se entera de si valían más. La receta <b>ε-greedy</b> elige en cada paso una flecha al azar con probabilidad ε, para probar (<i>exploration</i>), o la de mayor Q, para aprovechar (<i>exploitation</i>). En el notebook, con 300 partidas desde S, con ε = 0 el agente casi nunca encuentra la salida (1 de 8 semillas), con ε = 0,01 la encuentra en 5 de 8 y desde ε = 0,05 en las 8. Probar siempre tampoco es lo mejor, porque con ε = 1 la descubre más tarde que con ε = 0,5 (mediana en la partida 48 contra 36) y al final tarda 198,9 pasos por partida, contra 32,3 con ε = 0,1.</p>
+      <div class="eq">P(la mejor) = 1 − ε + ε/4</div>
+      <p class="nota pregunta">Con ε = 0,1, ¿con qué probabilidad elige la mejor flecha? Ojo, que el azar también puede elegirla.</p>
+    </div>
+  </section>
+
+  <!-- B3: SARSA -->
+  <section class="bloque" id="b-sarsa" data-objetivos="O2">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué acción siguiente a′ le tocó" id="segAp">
+        <button aria-pressed="true" data-a="izq">a′ = ← (salió al azar)</button>
+        <button aria-pressed="false" data-a="arr">a′ = ↑ (la mejor de s′)</button>
+      </div>
+      <div class="duo">
+        <div><h3>el paso, <b>ampliado</b></h3><div class="lz"><canvas id="cvSarsa" aria-label="Las casillas s = (3,6) y s′ = (2,6) ampliadas, con sus cuatro valores Q; la flecha usada a en ámbar y la acción siguiente a′ en celeste"></canvas></div></div>
+        <div><h3>dónde está, <b>en la cueva</b></h3><div class="lz"><canvas id="cvSarsaMapa" aria-label="La cueva con s en ámbar y s′ en celeste"></canvas></div></div>
+      </div>
+      <div class="cuenta" id="cuentaSarsa" aria-live="polite"></div>
+      <div class="row"><button class="btn primary" id="sarsaSig">Siguiente paso de la cuenta</button></div>
+      <p class="cap">Los números son los del notebook: SARSA con ε = 0,2 y α = 0,2 después de 300 partidas, y un paso de una partida más (γ = 0,99).</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 3</div>
+      <h2>SARSA aprende de lo que hago</h2>
+      <p><b>SARSA</b> es la TD(0) de la clase 5 aplicada a Q, con un objetivo que usa la acción a′ que el agente de verdad va a tomar en s′. Su nombre junta en inglés los cinco datos de cada corrección, <i>State–Action–Reward–State–Action</i> (s, a, r, s′, a′). En el notebook, un agente con ε = 0,2 y α = 0,2 sube de (3,6) a (2,6) con r = 0 y después le sale al azar a′ = ←. El objetivo queda en 0,99 · 0,2372 = 0,2348, por debajo del Q(s,a) = 0,3378 que ya creía, así que δ = −0,1030 y Q(s,a) baja a 0,3172.</p>
+      <div class="eq parte">Q(s,a)&nbsp;←&nbsp;Q(s,a)&nbsp;+ α&nbsp;[r&nbsp;+&nbsp;γQ(s′,a′)&nbsp;−&nbsp;Q(s,a)]</div>
+      <p class="nota pregunta">Elegí a′ = ↑. ¿Por qué cambia tanto la corrección de ↑ en s por una acción que el agente todavía no tomó?</p>
+    </div>
+  </section>
+
+  <!-- B4: Q-learning -->
+  <section class="bloque" id="b-qlearning" data-objetivos="O2">
+    <div class="stage">
+      <div class="duo">
+        <div><h3>el mismo paso, <b>con el máximo</b></h3><div class="lz"><canvas id="cvQl" aria-label="Las mismas casillas s y s′ ampliadas; en s′ se resalta en verde la flecha de mayor Q, la que usa Q-learning"></canvas></div></div>
+        <div><h3>la misma experiencia, <b>dos reglas</b></h3><div class="lz"><canvas id="cvQlBarras" aria-label="Barras con Q(s,a) antes, después de SARSA y después de Q-learning, y la respuesta correcta Q* con línea punteada"></canvas></div></div>
+      </div>
+      <div class="cuenta" id="cuentaQl" aria-live="polite"></div>
+      <div class="row"><button class="btn primary" id="qlSig">Siguiente paso de la cuenta</button></div>
+      <p class="cap">Números del notebook: el mismo paso, la misma tabla Q, α = 0,2 y γ = 0,99. Q*(s,a) = 0,8864 es la respuesta correcta, calculada con el mapa.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 4</div>
+      <h2>Q-learning aprende de lo mejor que podría hacer</h2>
+      <p><b>Q-learning</b> (Watkins y Dayan, 1992) cambia un solo término del objetivo, que usa la mejor flecha de s′ aunque después el agente no la tome. Con el mismo paso y la misma tabla, la mejor de (2,6) es ↑ con 0,3865, así que el objetivo es 0,99 · 0,3865 = 0,3827. Ahora δ = +0,0449 y Q(s,a) sube de 0,3378 a 0,3468, mientras que SARSA lo bajaba a 0,3172. Q-learning no le cobra a la flecha ↑ el desvío al azar que viene después.</p>
+      <div class="eq parte">Q(s,a)&nbsp;←&nbsp;Q(s,a)&nbsp;+ α&nbsp;[r&nbsp;+&nbsp;γ&nbsp;maxₐ′&nbsp;Q(s′,a′)&nbsp;−&nbsp;Q(s,a)]</div>
+      <p class="nota pregunta">Si el agente nunca explorara (ε = 0), ¿en qué se diferenciarían las cuentas de SARSA y de Q-learning?</p>
+    </div>
+  </section>
+
+  <!-- B5: SARSA contra Q-learning -->
+  <section class="bloque" id="b-onoff" data-objetivos="O3">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Exploración ε" id="segComp">
+        <button aria-pressed="false" data-e="0.1">ε = 0,1</button>
+        <button aria-pressed="false" data-e="0.2">ε = 0,2</button>
+        <button aria-pressed="true" data-e="0.3">ε = 0,3</button>
+        <button aria-pressed="false" data-e="0.5">ε = 0,5</button>
+      </div>
+      <div class="lz"><canvas id="cvComp" aria-label="El valor de S que cree cada método, max Q(S), partida a partida en escala logarítmica, con V* punteado y el valor de jugar explorando con puntos"></canvas></div>
+      <div class="chips"><span><i style="background:var(--lamp)"></i>Q-learning</span><span><i style="background:var(--sonar)"></i>SARSA</span><span>guiones: V*(S)</span><span>puntos: jugar explorando con ε</span></div>
+      <div class="row"><button class="btn" id="compOtra">Otra semilla</button></div>
+      <div class="hud" id="hudComp"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>ε (notebook)</th><th>Q-learning</th><th>SARSA</th><th>jugar explorando</th></tr></thead>
+          <tbody id="tbComp"></tbody>
+        </table>
+      </div>
+      <p class="cap">Curvas simuladas en el navegador como en el notebook (20 000 partidas con inicio al azar, α = 0,2, una semilla). La tabla es la del notebook, con max Q(S) promediado en las últimas 2000 partidas de 5 semillas. V*(S) = 0,8262 y el valor de jugar explorando se calculan con el mapa.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 5</div>
+      <h2>SARSA contra Q-learning</h2>
+      <p>Como SARSA aprende el valor de la misma política con la que juega, pruebas al azar incluidas, se dice que es <i>on-policy</i>. Q-learning, en cambio, es <i>off-policy</i>, porque aprende el valor de la mejor política mientras juega otra, la que explora. En el notebook, con 20 000 partidas, Q-learning llega a V(S) = 0,8196 con ε = 0,2 y al V* de 0,8262 con ε = 0,3 y 0,5, mientras que SARSA baja a 0,7850, 0,7534 y 0,6734, casi el valor de jugar explorando. Con ε = 0,1 los dos empatan por debajo, con 0,7545 y 0,7523, porque explorando tan poco las partidas no alcanzan y la diferencia aparece recién desde ε = 0,2.</p>
+      <div class="eq parte"><span class="nw">SARSA: r + γQ(s′,a′)</span> <span class="nw">Q-learning: r + γ maxₐ′ Q(s′,a′)</span></div>
+      <p class="nota pregunta">Si el agente va a seguir explorando siempre, cerca de un precipicio, ¿qué valor predice mejor lo que de verdad va a cobrar?</p>
+    </div>
+  </section>
+
+  <!-- B6: el mapa de visitas -->
+  <section class="bloque" id="b-visitas" data-objetivos="O4">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué mirar" id="segVis">
+        <button aria-pressed="true" data-v="visitas">Visitas</button>
+        <button aria-pressed="false" data-v="error">Error</button>
+        <button aria-pressed="false" data-v="flechas">Flechas</button>
+      </div>
+      <div class="lz"><canvas id="cvVis" aria-label="Mapa de la cueva con las visitas de cada casilla en escala log, o su error, o la flecha aprendida; las cruces rojas marcan flechas que no son óptimas"></canvas></div>
+      <div class="legend"><span id="legVisLo"></span><span class="bar" id="legVis"></span><span id="legVisHi"></span></div>
+      <div class="row"><button class="btn" id="visOtra">Otra semilla</button></div>
+      <div class="hud" id="hudVis"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>visitas (notebook)</th><th>casillas</th><th>error medio</th><th>flechas óptimas</th></tr></thead>
+          <tbody>
+            <tr><td>0–9</td><td class="num">32</td><td class="num">0,9305</td><td class="num">41 %</td></tr>
+            <tr><td>10–99</td><td class="num">18</td><td class="num">0,4130</td><td class="num">67 %</td></tr>
+            <tr><td>100–999</td><td class="num">106</td><td class="num">0,5580</td><td class="num">65 %</td></tr>
+            <tr><td>1000 o más</td><td class="num">139</td><td class="num">0,0775</td><td class="num">86 %</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">Q-learning desde S con ε = 0,1 y α = 0,2, 2000 partidas simuladas en el navegador (otra semilla que el notebook). Tocá una casilla para ver sus números. La tabla es la del notebook, con las 59 casillas de 5 semillas.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 6</div>
+      <h2>El mapa de visitas</h2>
+      <p>El <b>mapa de visitas</b> (<i>visit count</i>) cuenta cuántas veces pisó cada casilla un agente de Q-learning que jugó 2000 partidas desde S con ε = 0,1. En la semilla 0 del notebook, el 80 % de las flechas aprendidas son óptimas y 10 casillas quedaron sin pisar, entre ellas las 8 que el notebook lista con un error de 0,91 a 0,95. En las 5 semillas, el error medio es de 0,93 con menos de 10 visitas y de 0,0775 con 1000 o más. No baja siempre con las visitas, porque de 100 a 999 el error medio (0,56) supera al de 10 a 99 (0,41) por casillas que el agente pisa de paso, explorando, sin que el +1 llegue a asentarse ahí.</p>
+      <div class="eq">error(s) = |maxₐ Q(s,a) − V*(s)|</div>
+      <p class="nota pregunta">En la semilla 0 del notebook, la flecha de S quedó en ↓, el camino de 22 pasos. ¿Por qué el agente casi nunca se entera de que → era mejor?</p>
+    </div>
+  </section>
+
+  <!-- B7: Para enseñarlo -->
+  <section class="bloque full" id="b-ensenar" data-objetivos="O2 O3">
+    <div class="texto prose">
+      <div class="paso">Para enseñarlo</div>
+      <h2>Cómo contar esta clase en una oración</h2>
+      <p>"SARSA aprende de lo que de verdad hago; Q-learning, de lo mejor que podría hacer desde ahí."</p>
+      <p class="nota pregunta">Pregunta para hacerle a quien te escucha: si a veces tomás una calle nueva para ver si es más corta, ¿cuánto tardás en llegar a tu casa, lo que tardarías por el mejor camino o lo que tardás de verdad con tus pruebas?</p>
+      <p><b>Ejercicio de 5 minutos:</b> dibujen en el pizarrón dos casillas, A y B, con la salida después de B y dos flechas en B, → con Q = 1 porque entra a la salida y ↓ con Q = 0,2 porque va a un rincón. Una persona da el paso de A a B y tira una moneda para elegir su próxima flecha en B. La mitad de la clase corrige Q(A,→) con SARSA, usando la flecha que salió, mientras la otra mitad lo corrige con Q-learning, usando la mejor, con α = 0,5, sin descuento y Q(A,→) = 0 al empezar. Repitan cinco pasadas y comparen adónde llega cada mitad.</p>
+      <p class="small muted">Adelanto: el agente solo aprende de donde pasa. ¿Cómo explorar mejor que tirando una moneda? Viene la clase 7, explorar, de las máquinas tragamonedas (<i>bandits</i>) a la cueva.</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(async () => {
+  // cada figura se arma en su propia tarea, para no trabar el navegador al cargar
+  const tarea = f => new Promise(r => setTimeout(() => r(f()), 0));
+  Cueva.pagina("6", { lecturas: [
+    { texto: "Sutton y Barto (2018), Reinforcement Learning: An Introduction, 2.ª ed., cap. 2 (2.2–2.3 ε-greedy) y cap. 6 (6.4 SARSA, 6.5 Q-learning)", url: "http://incompleteideas.net/book/the-book-2nd.html" },
+    { texto: "Stanford CS234 (Brunskill), clase 4, primera mitad: control sin modelo, ε-greedy, SARSA y Q-learning", url: "https://web.stanford.edu/class/cs234/" },
+    { texto: "Watkins y Dayan (1992), Q-learning, Machine Learning 8, 279–292", url: "https://doi.org/10.1007/BF00992698" }
+  ] });
+
+  const env = Cueva.makeEnv(Cueva.MAPS.chica), n = env.nS, GOAL = env.goal, START = env.start;
+  const COL = Cueva.COL(), MONO = COL.mono || "monospace", AR = Cueva.ARROW;
+  const PARED = "#2c3346", GAMMA = 0.99, ALFA = 0.2, MAXP = 200;
+  const reducir = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = id => document.getElementById(id);
+  const coma = s => String(s).replace(".", ",").replace("-", "−");
+  const fmt = (x, d = 3) => coma(x.toFixed(d));
+  const rc = s => `(${env.free[s][0]},${env.free[s][1]})`;
+  const nom = s => s === START ? "S" : rc(s);
+  const marcar = (sel, attr, v) => document.querySelectorAll(sel).forEach(b => b.setAttribute("aria-pressed", b.dataset[attr] === v));
+  const casillaDe = (T, e) => { const [r, c] = T.celdaEn(e); return env.idx[r + "," + c]; };
+  const NOMETA = Array.from({ length: n }, (_, s) => s).filter(s => s !== GOAL);
+  const maxQ = q => Math.max(q[0], q[1], q[2], q[3]);
+  const argmax = q => { let b = 0; for (let a = 1; a < 4; a++) if (q[a] > q[b]) b = a; return b; };   // la primera si empatan, como en el notebook
+
+  // ---------- el mapa (solo para la respuesta correcta; el agente no lo usa) ----------
+  const NXT = Array.from({ length: n }, (_, s) => [0, 1, 2, 3].map(a => s === GOAL ? GOAL : env.move(s, a)[0]));
+  const RSA = (s, a) => (s !== GOAL && NXT[s][a] === GOAL ? 1 : 0);
+  // Q* y V* por iteración de valor (clase 4)
+  const { QS, VS } = (() => {
+    let V = new Float64Array(n);
+    for (let k = 0; k < 20000; k++) {
+      const NV = new Float64Array(n); let d = 0;
+      for (const s of NOMETA) { let b = -Infinity; for (let a = 0; a < 4; a++) b = Math.max(b, RSA(s, a) + GAMMA * V[NXT[s][a]]); NV[s] = b; d = Math.max(d, Math.abs(b - V[s])); }
+      V = NV; if (d < 1e-13) break;
+    }
+    const Q = Array.from({ length: n }, (_, s) => [0, 1, 2, 3].map(a => s === GOAL ? 0 : RSA(s, a) + GAMMA * V[NXT[s][a]]));
+    return { QS: Q, VS: V };
+  })();
+  const optima = (s, a) => Math.abs(QS[s][a] - maxQ(QS[s])) < 1e-9;
+  // lo que vale S si después se sigue jugando ε-greedy (la mejor con 1 − ε, el dado con ε): el valor al que llega SARSA
+  function valorExplorando(eps) {
+    let Q = Array.from({ length: n }, () => [0, 0, 0, 0]);
+    for (let k = 0; k < 20000; k++) {
+      const V = Q.map(q => (1 - eps) * maxQ(q) + eps * (q[0] + q[1] + q[2] + q[3]) / 4);
+      let d = 0;
+      const NQ = Q.map((q, s) => [0, 1, 2, 3].map(a => { const x = s === GOAL ? 0 : RSA(s, a) + GAMMA * V[NXT[s][a]]; d = Math.max(d, Math.abs(x - q[a])); return x; }));
+      Q = NQ; if (d < 1e-13) break;
+    }
+    return maxQ(Q[START]);
+  }
+
+  // ---------- el agente sin mapa: solo juega (s, a) → (r, s′) ----------
+  const inicioAzar = u => { const s = Math.floor(u() * (n - 1)); return s < GOAL ? s : s + 1; };
+  // SARSA ("sarsa") o Q-learning ("q") con ε-greedy, como `aprender` del notebook: Q arranca en 0 más un ruido minúsculo
+  function aprender(metodo, eps, nPart, semilla, inicio = "S") {
+    const u = Cueva.rng(semilla), sarsa = metodo === "sarsa";
+    const Q = Array.from({ length: n }, () => [u() * 1e-4, u() * 1e-4, u() * 1e-4, u() * 1e-4]);
+    const elegir = s => (u() < eps ? Math.floor(u() * 4) : argmax(Q[s]));
+    const pasos = new Uint16Array(nPart), salio = new Uint8Array(nPart), VSt = new Float32Array(nPart), vis = new Uint32Array(n);
+    for (let k = 0; k < nPart; k++) {
+      let s = inicio === "S" ? START : inicioAzar(u), a = elegir(s), t = 0; vis[s]++;
+      while (true) {
+        const s2 = NXT[s][a], r = s2 === GOAL ? 1 : 0; t++; vis[s2]++;
+        const a2 = elegir(s2);
+        const obj = s2 === GOAL ? r : r + GAMMA * (sarsa ? Q[s2][a2] : maxQ(Q[s2]));
+        Q[s][a] += ALFA * (obj - Q[s][a]);
+        s = s2; a = a2;
+        if (s2 === GOAL || t >= MAXP) break;
+      }
+      pasos[k] = t; salio[k] = s === GOAL ? 1 : 0; VSt[k] = maxQ(Q[START]);
+    }
+    return { Q, pasos, salio, VS: VSt, vis };
+  }
+  // una partida desde S con ε-greedy sobre Q, sin aprender
+  function jugar(Q, eps, u) {
+    const camino = [START]; let s = START, choques = 0;
+    for (let t = 0; t < MAXP && s !== GOAL; t++) { const a = u() < eps ? Math.floor(u() * 4) : argmax(Q[s]); const s2 = NXT[s][a]; if (s2 === s) choques++; camino.push(s2); s = s2; }
+    return { camino, choques, salio: s === GOAL };
+  }
+
+  // ---------- utilidades de dibujo ----------
+  function rotulo(T, s, txt, color = COL.ink, escala = .34) {
+    const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s];
+    ctx.font = `600 ${Math.max(8, Math.round(cell * escala))}px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.85)"; ctx.strokeText(txt, c * cell + cell / 2, r * cell + cell / 2 + 1);
+    ctx.fillStyle = color; ctx.fillText(txt, c * cell + cell / 2, r * cell + cell / 2 + 1);
+  }
+  function borde(T, s, color, ancho = 2, inset = 1.5) {
+    const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s];
+    ctx.strokeStyle = color; ctx.lineWidth = ancho; ctx.strokeRect(c * cell + inset, r * cell + inset, cell - 2 * inset, cell - 2 * inset);
+  }
+  function cruz(T, s, color = COL.ember) {
+    const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s], k = cell * .28;
+    ctx.strokeStyle = color; ctx.lineWidth = Math.max(2, cell * .08); ctx.beginPath();
+    ctx.moveTo(c * cell + k, r * cell + k); ctx.lineTo((c + 1) * cell - k, (r + 1) * cell - k); ctx.moveTo((c + 1) * cell - k, r * cell + k); ctx.lineTo(c * cell + k, (r + 1) * cell - k); ctx.stroke();
+  }
+  function calor(T, V, lo, hi, rampa = "valor") {
+    for (const s of NOMETA) { const v = V[s]; if (!isFinite(v)) continue; const [r, c] = env.free[s]; T.casilla(r, c, Cueva.rampa(rampa, (v - lo) / ((hi - lo) || 1))); }
+  }
+  // una casilla ampliada: cuatro triángulos con su Q; marcas = {a: color} con el borde de cada flecha resaltada
+  function celdaGrande(ctx, x, y, L, q, { lo = 0, hi = 1, marcas = {}, guiones = {} } = {}) {
+    const cx = x + L / 2, cy = y + L / 2;
+    const esq = [[[x, y], [x + L, y]], [[x + L, y], [x + L, y + L]], [[x + L, y + L], [x, y + L]], [[x, y + L], [x, y]]];
+    const pos = [[cx, y + L * .2], [x + L * .79, cy], [cx, y + L * .8], [x + L * .21, cy]];
+    for (let a = 0; a < 4; a++) {
+      const t = (q[a] - lo) / ((hi - lo) || 1);
+      ctx.fillStyle = Cueva.rampa("valor", t); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(...esq[a][0]); ctx.lineTo(...esq[a][1]); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,.8)"; ctx.lineWidth = 1; ctx.stroke();
+    }
+    for (let a = 0; a < 4; a++) {
+      if (!marcas[a]) continue;
+      // el mismo triángulo, achicado hacia su centro para que el borde quede adentro
+      const v = [[cx, cy], esq[a][0], esq[a][1]], gx = (v[0][0] + v[1][0] + v[2][0]) / 3, gy = (v[0][1] + v[1][1] + v[2][1]) / 3, k = .86;
+      ctx.strokeStyle = marcas[a]; ctx.lineWidth = 3; ctx.setLineDash(guiones[a] ? [6, 4] : []);
+      ctx.beginPath(); v.forEach(([px, py], i) => { const X = gx + (px - gx) * k, Y = gy + (py - gy) * k; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
+    }
+    const fs = Math.max(10, Math.min(14, Math.round(L * .1)));
+    ctx.font = `600 ${fs}px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (let a = 0; a < 4; a++) {
+      const t = (q[a] - lo) / ((hi - lo) || 1), claro = t > .62;
+      ctx.fillStyle = claro ? "#0b0d12" : COL.ink;
+      ctx.fillText(AR[a], pos[a][0], pos[a][1] - fs * .62);
+      ctx.fillText(coma(q[a].toFixed(4)), pos[a][0], pos[a][1] + fs * .62);
+    }
+  }
+  // un gráfico con ejes (x o y en escala log si se pide)
+  function ejes(cv, alto, { x0, x1, y0, y1, xlog = false, ticksX = [], ticksY = [], fx = coma, fy = coma, tituloX = "", tituloY = "" }) {
+    const { w, h, ctx } = Cueva.lienzo(cv, alto)();
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    const m = { l: 44, r: 12, t: 22, b: 30 };
+    const gx = xlog ? Math.log10 : v => v;
+    const X = v => m.l + (gx(v) - gx(x0)) / (gx(x1) - gx(x0)) * (w - m.l - m.r);
+    const Y = v => h - m.b - (v - y0) / (y1 - y0) * (h - m.t - m.b);
+    ctx.font = `11px ${MONO}`; ctx.strokeStyle = "rgba(141,147,163,.18)"; ctx.lineWidth = 1; ctx.fillStyle = COL.muted;
+    for (const t of ticksY) { const y = Math.round(Y(t)) + .5; ctx.beginPath(); ctx.moveTo(m.l, y); ctx.lineTo(w - m.r, y); ctx.stroke(); ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(fy(t), m.l - 5, y); }
+    for (const t of ticksX) { const x = Math.round(X(t)) + .5; ctx.beginPath(); ctx.moveTo(x, m.t); ctx.lineTo(x, h - m.b); ctx.stroke(); ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(fx(t), x, h - m.b + 5); }
+    ctx.textAlign = "right"; ctx.textBaseline = "top"; ctx.fillText(tituloX, w - m.r, h - 12);
+    ctx.textAlign = "left"; ctx.fillText(tituloY, 4, 4);
+    const recortar = () => { ctx.save(); ctx.beginPath(); ctx.rect(m.l, m.t - 2, w - m.l - m.r, h - m.t - m.b + 4); ctx.clip(); };
+    return { ctx, w, h, m, X, Y, recortar };
+  }
+  function horizontal(g, v, color, guiones) { const { ctx, m, w, Y } = g; ctx.setLineDash(guiones); ctx.strokeStyle = color; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(m.l, Y(v) + .5); ctx.lineTo(w - m.r, Y(v) + .5); ctx.stroke(); ctx.setLineDash([]); }
+
+  // =====================================================================
+  // B1. La misma casilla con V y con Q
+  // =====================================================================
+  const b1 = await tarea(() => {
+    const cvV = $("cvConV"), cvQ = $("cvConQ"), T = Cueva.tablero($("cvElegir"), env, { maxCell: 30 }), hud = $("hudQV");
+    const VLO = Math.min(...NOMETA.map(s => VS[s])), VHI = Math.max(...NOMETA.map(s => VS[s]));
+    let sel = START;
+    function panel(cv) { const alto = Math.max(150, Math.min(230, (cv.parentElement.clientWidth - 2) * .8)); const { ctx, w, h } = Cueva.lienzo(cv, alto)(); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h); return { ctx, w, h }; }
+    function dibujar() {
+      // con V: el número de la casilla y cuatro flechas que no se sabe adónde llevan
+      { const { ctx, w, h } = panel(cvV), L = Math.min(h - 70, w * .42), x = (w - L) / 2, y = (h - L) / 2, cx = x + L / 2, cy = y + L / 2;
+        ctx.fillStyle = Cueva.rampa("valor", (VS[sel] - VLO) / (VHI - VLO)); ctx.fillRect(x, y, L, L);
+        ctx.font = `600 ${Math.round(L * .16)}px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillStyle = (VS[sel] - VLO) / (VHI - VLO) > .62 ? "#0b0d12" : COL.ink; ctx.fillText(fmt(VS[sel], 4), cx, cy);
+        ctx.font = `600 ${Math.round(L * .1)}px ${MONO}`; ctx.fillText("V*", cx, cy - L * .22);
+        const fl = [[0, -1], [1, 0], [0, 1], [-1, 0]], dd = L / 2 + 18;
+        ctx.font = `600 14px ${MONO}`; ctx.fillStyle = COL.muted;
+        fl.forEach(([dx, dy], a) => ctx.fillText(AR[a] + "?", cx + dx * dd, cy + dy * dd));
+      }
+      // con Q: cuatro triángulos
+      { const { ctx, w, h } = panel(cvQ), L = Math.min(h - 16, w * .8), x = (w - L) / 2, y = (h - L) / 2;
+        const marcas = {}; for (let a = 0; a < 4; a++) if (optima(sel, a)) marcas[a] = COL.exit;
+        celdaGrande(ctx, x, y, L, QS[sel], { lo: VLO * .99, hi: VHI, marcas });
+      }
+      T.fondo("#000").paredes(PARED); calor(T, VS, VLO, VHI); T.salida();
+      borde(T, sel, COL.lamp, 2.5); if (sel !== START) rotulo(T, START, "S", COL.ink, .4);
+      const mej = [0, 1, 2, 3].filter(a => optima(sel, a)).map(a => AR[a]).join(" y ");
+      hud.innerHTML = `<span>casilla <b>${nom(sel)}</b></span><span>V* <b>${fmt(VS[sel], 4)}</b></span>` +
+        `<span>Q*: ${[0, 1, 2, 3].map(a => `${AR[a]} <b>${fmt(QS[sel][a], 4)}</b>`).join(" ")}</span><span>la mejor: <b style="color:var(--exit)">${mej}</b></span>`;
+    }
+    $("cvElegir").addEventListener("pointerdown", e => { const s = casillaDe(T, e); if (s !== undefined && s !== GOAL) { sel = s; dibujar(); } });
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B2. ε-greedy: cuánto probar
+  // =====================================================================
+  const NB_EPS = [   // celda 15 del notebook (8 semillas, 300 partidas desde S, α = 0,2)
+    ["0", "1 de 8", "195", "177,8"], ["0.01", "5 de 8", "201", "128,8"], ["0.05", "8 de 8", "138", "29,4"], ["0.1", "8 de 8", "90", "32,3"],
+    ["0.3", "8 de 8", "56", "36,0"], ["0.5", "8 de 8", "36", "48,0"], ["1", "8 de 8", "48", "198,9"]
+  ];
+  const NB_PARTIDA = { "0": "200 pasos sin salir, por 17 casillas", "0.1": "sale en 24 pasos", "1": "200 pasos sin salir, con 90 choques" };   // celda 17
+  const b2 = await tarea(() => {
+    const T = Cueva.tablero($("cvEps"), env, { maxCell: 40 }), hud = $("hudEps"), tb = $("tbEps");
+    $("legEps").style.background = Cueva.gradienteCSS("visitas");
+    let eps = "0.1", semilla = 11, R = null, P = null, prog = 1, raf = 0;
+    function entrenar() {
+      R = aprender("q", +eps, 300, semilla);
+      P = jugar(R.Q, +eps, Cueva.rng(semilla + 500));
+    }
+    function dibujar() {
+      const L = R.vis.map(v => Math.log10(1 + v)), hi = Math.max(...NOMETA.map(s => L[s]));
+      $("legEpsHi").textContent = `${Math.max(...NOMETA.map(s => R.vis[s]))} (log)`;
+      T.fondo("#000").paredes(PARED); calor(T, L, 0, hi, "visitas"); T.salida();
+      const k = Math.max(1, Math.round((P.camino.length - 1) * prog)), cam = P.camino.slice(0, k + 1);
+      T.trayecto(cam, "rgba(242,179,90,.75)", .1);
+      T.sprite(cam[cam.length - 1], 2, k % 2); rotulo(T, START, "S", COL.ink, .38);
+      let primera = -1; for (let i = 0; i < R.salio.length; i++) if (R.salio[i]) { primera = i + 1; break; }
+      const fin = R.pasos.slice(-50).reduce((x, y) => x + y, 0) / 50;
+      const distintas = new Set(P.camino).size;
+      hud.innerHTML = `<span>simulado: 1.ª salida <b>${primera > 0 ? "en la partida " + primera : "nunca en 300"}</b></span><span>pasos al final <b>${fmt(fin, 1)}</b></span>` +
+        `<span>una partida más: <b>${P.camino.length - 1}</b> pasos${P.salio ? "" : " sin salir"}, ${distintas} casillas, ${P.choques} choques</span>` +
+        (NB_PARTIDA[eps] ? `<span>en el notebook: ${NB_PARTIDA[eps]}</span>` : "");
+      tb.innerHTML = NB_EPS.map(([e, ...f]) => `<tr${e === eps ? ' class="sel"' : ""}><td>${coma(e)}</td>${f.map(x => `<td class="num">${x}</td>`).join("")}</tr>`).join("");
+    }
+    function animar() {
+      cancelAnimationFrame(raf);
+      if (reducir) { prog = 1; dibujar(); return; }
+      prog = 0; const t0 = performance.now(), dur = Math.min(2400, 300 + P.camino.length * 10);
+      const paso = now => { prog = Math.min(1, (now - t0) / dur); dibujar(); if (prog < 1) raf = requestAnimationFrame(paso); };
+      raf = requestAnimationFrame(paso);
+    }
+    document.querySelectorAll("#segEps button").forEach(b => b.onclick = () => { eps = b.dataset.e; marcar("#segEps button", "e", eps); entrenar(); animar(); });
+    $("epsOtra").onclick = () => { semilla++; entrenar(); animar(); };
+    entrenar(); dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B3 y B4. Una actualización a mano (números del notebook, celdas 20, 22 y 25)
+  // =====================================================================
+  const S_MANO = env.idx["3,6"], S2_MANO = env.idx["2,6"];
+  const Q_S = [0.3378, 0.1777, 0.1690, 0.1822], Q_S2 = [0.3865, 0.2755, 0.1204, 0.2372];
+  const CUENTAS = {   // [Q(s′,·) que usa, objetivo, δ, Q nuevo], tal como los imprime el notebook
+    izq: { ap: 3, sig: "0,2372", obj: "0,2348", d: "−0,1030", nuevo: 0.3172 },
+    arr: { ap: 0, sig: "0,3865", obj: "0,3827", d: "+0,0449", nuevo: 0.3468 }
+  };
+  const LO_M = 0.1, HI_M = 0.45;
+  function parAmpliado(cv, { resaltar, guion, nuevo = null }) {
+    const pe = cv.parentElement, w = pe.clientWidth - 2;
+    const L = Math.max(96, Math.min(132, (w - 110))), alto = 2 * L + 20;
+    const { ctx } = Cueva.lienzo(cv, alto)(); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, alto);
+    const x = Math.max(6, (w - L - 96) / 2), y2 = 10, y1 = 10 + L;
+    const qs = Q_S.slice(); if (nuevo !== null) qs[0] = nuevo;
+    celdaGrande(ctx, x, y2, L, Q_S2, { lo: LO_M, hi: HI_M, marcas: { [resaltar]: guion ? COL.sonar : COL.exit }, guiones: { [resaltar]: guion } });
+    celdaGrande(ctx, x, y1, L, qs, { lo: LO_M, hi: HI_M, marcas: { 0: COL.lamp } });
+    ctx.font = `12px ${MONO}`; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillStyle = COL.muted;
+    ctx.fillText("s′ = (2,6)", x + L + 10, y2 + L / 2); ctx.fillText("s = (3,6)", x + L + 10, y1 + L / 2);
+    ctx.fillStyle = COL.lamp; ctx.fillText("a = ↑", x + L + 10, y1 + L / 2 + 18);
+    ctx.fillStyle = guion ? COL.sonar : COL.exit; ctx.fillText(guion ? `a′ = ${AR[resaltar]}` : `max: ${AR[resaltar]}`, x + L + 10, y2 + L / 2 + 18);
+    if (nuevo !== null) { ctx.fillStyle = COL.ink; ctx.fillText("Q(s,a) nuevo", x + L + 10, y1 + L / 2 + 36); }
+  }
+  function textoCuenta(regla, c, paso) {
+    const sig = regla === "sarsa" ? `Q(s′,a′ = ${AR[c.ap]})` : "max Q(s′,·)";
+    const lin = [
+      `s = (3,6), a = ↑, r = <b>0</b>, s′ = (2,6)${regla === "sarsa" ? `, a′ = <b>${AR[c.ap]}</b>` : ""}, α = 0,2, γ = 0,99`,
+      `1. objetivo = r + γ ${sig} = 0 + 0,99 · <span class="v">${c.sig}</span> = <b>${c.obj}</b>`,
+      `2. δ = objetivo − Q(s,a) = ${c.obj} − <span class="v">0,3378</span> = <span class="d">${c.d}</span>`,
+      `3. Q(s,a) ← 0,3378 + 0,2 · (<span class="d">${c.d}</span>) = <b>${fmt(c.nuevo, 4)}</b>`
+    ];
+    return lin.map((l, i) => i <= paso ? l : `<span class="apag">${l}</span>`).join("<br>");
+  }
+  const b3 = await tarea(() => {
+    const cv = $("cvSarsa"), T = Cueva.tablero($("cvSarsaMapa"), env, { maxCell: 26 }), cuenta = $("cuentaSarsa");
+    let ap = "izq", paso = 3;
+    function dibujar() {
+      const c = CUENTAS[ap];
+      parAmpliado(cv, { resaltar: c.ap, guion: true, nuevo: paso >= 3 ? c.nuevo : null });
+      cuenta.innerHTML = textoCuenta("sarsa", c, paso) + (ap === "arr" ? `<br><span class="small">con a′ = ↑ el objetivo de SARSA coincide con el de Q-learning (paso 4)</span>` : "");
+      T.fondo("#000").paredes(PARED); T.salida();
+      T.casilla(...env.free[S_MANO], "rgba(242,179,90,.55)"); T.casilla(...env.free[S2_MANO], "rgba(94,200,216,.55)");
+      rotulo(T, START, "S", COL.ink, .4); rotulo(T, S_MANO, "s", COL.ink, .4); rotulo(T, S2_MANO, "s′", COL.ink, .4);
+    }
+    document.querySelectorAll("#segAp button").forEach(b => b.onclick = () => { ap = b.dataset.a; marcar("#segAp button", "a", ap); paso = 3; dibujar(); });
+    $("sarsaSig").onclick = () => { paso = (paso + 1) % 4; dibujar(); };
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  const b4 = await tarea(() => {
+    const cv = $("cvQl"), cvb = $("cvQlBarras"), cuenta = $("cuentaQl");
+    let paso = 3;
+    function barras() {
+      const pe = cvb.parentElement, w = pe.clientWidth - 2, alto = 2 * Math.max(96, Math.min(132, (w - 110))) + 20;
+      const { ctx } = Cueva.lienzo(cvb, alto)(); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, alto);
+      const filas = [["antes", 0.3378, COL.muted], ["SARSA", 0.3172, COL.sonar], ["Q-learning", paso >= 3 ? 0.3468 : null, COL.lamp]];
+      const m = { l: 86, r: 14, t: 26, b: 26 }, X = v => m.l + v / 1 * (w - m.l - m.r), bh = Math.min(30, (alto - m.t - m.b) / 3 - 14);
+      ctx.font = `12px ${MONO}`; ctx.textBaseline = "middle";
+      filas.forEach(([t, v, c], i) => {
+        const y = m.t + i * ((alto - m.t - m.b) / 3) + 10;
+        ctx.fillStyle = COL.muted; ctx.textAlign = "right"; ctx.fillText(t, m.l - 8, y + bh / 2);
+        if (v === null) { ctx.textAlign = "left"; ctx.fillText("…", m.l + 4, y + bh / 2); return; }
+        ctx.fillStyle = c; ctx.fillRect(m.l, y, X(v) - m.l, bh);
+        ctx.fillStyle = COL.ink; ctx.textAlign = "left"; ctx.fillText(fmt(v, 4), X(v) + 6, y + bh / 2);
+      });
+      ctx.strokeStyle = COL.exit; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(X(0.8864) + .5, m.t - 8); ctx.lineTo(X(0.8864) + .5, alto - m.b + 4); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = COL.exit; ctx.textAlign = "right"; ctx.textBaseline = "top"; ctx.fillText("Q* = 0,8864", X(0.8864) - 4, alto - m.b + 6);
+      ctx.fillStyle = COL.muted; ctx.textAlign = "left"; ctx.fillText("Q(s,a) para a = ↑", m.l, 4);
+    }
+    function dibujar() {
+      const c = CUENTAS.arr;
+      parAmpliado(cv, { resaltar: 0, guion: false, nuevo: paso >= 3 ? c.nuevo : null });
+      cuenta.innerHTML = textoCuenta("q", c, paso);
+      barras();
+    }
+    $("qlSig").onclick = () => { paso = (paso + 1) % 4; dibujar(); };
+    dibujar();
+    return { dibujar };
+  });
+
+  // =====================================================================
+  // B5. SARSA contra Q-learning: qué V(S) aprende cada uno
+  // =====================================================================
+  const NB_COMP = {   // celda 30 del notebook: max Q(S), promedio de las últimas 2000 de 20 000 partidas, 5 semillas
+    "0.1": ["0,7545", "0,7523", "0,8080"], "0.2": ["0,8196", "0,7850", "0,7857"], "0.3": ["0,8262", "0,7534", "0,7577"], "0.5": ["0,8262", "0,6734", "0,6734"]
+  };
+  const EXPL = {}; for (const e of Object.keys(NB_COMP)) EXPL[e] = valorExplorando(+e);
+  const NCOMP = 20000;
+  const b5 = await tarea(() => {
+    const cv = $("cvComp"), hud = $("hudComp"), tb = $("tbComp");
+    let eps = "0.3", semilla = 21, RS, RQ;
+    function entrenar() { RS = aprender("sarsa", +eps, NCOMP, semilla, "azar"); RQ = aprender("q", +eps, NCOMP, semilla + 1000, "azar"); }
+    const cola = R => R.VS.slice(-2000).reduce((x, y) => x + y, 0) / 2000;
+    function curva(g, arr, color) {
+      const ctx = g.ctx; ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.beginPath();
+      let ult = -1;
+      for (let i = 0; i < arr.length; i++) {
+        const x = Math.round(g.X(i + 1)); if (x === ult && i < arr.length - 1) continue; ult = x;
+        const y = g.Y(arr[i]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.stroke();
+    }
+    function dibujar() {
+      const g = ejes(cv, 240, { x0: 1, x1: NCOMP, y0: 0, y1: .9, xlog: true, ticksX: [1, 10, 100, 1000, 10000], ticksY: [0, .2, .4, .6, .8], fx: v => String(v), fy: v => coma(v.toFixed(1)), tituloX: "partidas (log) →", tituloY: "max Q(S)" });
+      g.recortar();
+      horizontal(g, VS[START], COL.ink, [6, 4]); horizontal(g, EXPL[eps], COL.sonar, [1.5, 3]);
+      curva(g, RQ.VS, COL.lamp); curva(g, RS.VS, COL.sonar);
+      g.ctx.restore();
+      hud.innerHTML = `<span>simulado, últimas 2000 partidas: Q-learning <b>${fmt(cola(RQ), 4)}</b>, SARSA <b>${fmt(cola(RS), 4)}</b></span>` +
+        `<span>con mapa: V*(S) <b>${fmt(VS[START], 4)}</b>, jugar explorando <b>${fmt(EXPL[eps], 4)}</b></span>`;
+      tb.innerHTML = Object.entries(NB_COMP).map(([e, f]) => `<tr${e === eps ? ' class="sel"' : ""}><td>${coma(e)}</td>${f.map(x => `<td class="num">${x}</td>`).join("")}</tr>`).join("");
+    }
+    document.querySelectorAll("#segComp button").forEach(b => b.onclick = () => { eps = b.dataset.e; marcar("#segComp button", "e", eps); entrenar(); dibujar(); });
+    $("compOtra").onclick = () => { semilla++; entrenar(); dibujar(); };
+    entrenar(); dibujar();
+    return { dibujar };
+  });
+
+  // =====================================================================
+  // B6. El mapa de visitas
+  // =====================================================================
+  const b6 = await tarea(() => {
+    const T = Cueva.tablero($("cvVis"), env, { maxCell: 40 }), hud = $("hudVis");
+    let vista = "visitas", semilla = 31, R, sel = null;
+    const entrenar = () => { R = aprender("q", 0.1, 2000, semilla); sel = null; };
+    function dibujar() {
+      const err = Array.from({ length: n }, (_, s) => Math.abs(maxQ(R.Q[s]) - VS[s]));
+      const bien = s => optima(s, argmax(R.Q[s]));
+      T.fondo("#000").paredes(PARED);
+      if (vista === "visitas") {
+        const L = Array.from(R.vis, v => Math.log10(1 + v)), hi = Math.max(...NOMETA.map(s => L[s]));
+        calor(T, L, 0, hi, "visitas");
+        $("legVis").style.background = Cueva.gradienteCSS("visitas"); $("legVisLo").textContent = "0 visitas"; $("legVisHi").textContent = `${Math.max(...NOMETA.map(s => R.vis[s]))} (log)`;
+        T.salida(); for (const s of NOMETA) if (!bien(s)) cruz(T, s);
+      } else if (vista === "error") {
+        calor(T, err, 0, 0.95, "valor");
+        $("legVis").style.background = Cueva.gradienteCSS("valor"); $("legVisLo").textContent = "error 0"; $("legVisHi").textContent = "0,95";
+        T.salida(); for (const s of NOMETA) if (!bien(s)) cruz(T, s);
+      } else {
+        for (const s of NOMETA) { const [r, c] = env.free[s]; T.casilla(r, c, bien(s) ? "rgba(61,220,132,.22)" : "rgba(224,100,90,.35)"); }
+        $("legVis").style.background = "linear-gradient(90deg, rgba(224,100,90,.6) 50%, rgba(61,220,132,.45) 50%)"; $("legVisLo").textContent = "no óptima"; $("legVisHi").textContent = "óptima";
+        T.salida(); for (const s of NOMETA) T.texto(s, AR[argmax(R.Q[s])], bien(s) ? COL.ink : COL.ember, .5);
+      }
+      if (sel !== null) borde(T, sel, COL.lamp, 2.5);
+      rotulo(T, START, "S", COL.lamp, .3);
+      const nunca = NOMETA.filter(s => R.vis[s] === 0), pct = Math.round(100 * NOMETA.filter(bien).length / NOMETA.length);
+      const errNunca = nunca.length ? nunca.reduce((t, s) => t + err[s], 0) / nunca.length : null;
+      let txt = `<span>simulado: flechas óptimas <b>${pct} %</b></span><span>nunca pisadas <b>${nunca.length}</b>${errNunca !== null ? `, error medio ahí <b>${fmt(errNunca, 2)}</b>` : ""}</span>` +
+        `<span>flecha en S <b>${AR[argmax(R.Q[START])]}</b> (óptima: →)</span>`;
+      if (sel !== null) txt += `<span>casilla ${nom(sel)}: visitas <b>${R.vis[sel]}</b>, max Q <b>${fmt(maxQ(R.Q[sel]), 4)}</b>, V* <b>${fmt(VS[sel], 4)}</b>, error <b>${fmt(err[sel], 2)}</b>, flecha ${bien(sel) ? "<b style='color:var(--exit)'>óptima</b>" : "<b style='color:var(--ember)'>no óptima</b>"}</span>`;
+      hud.innerHTML = txt;
+    }
+    document.querySelectorAll("#segVis button").forEach(b => b.onclick = () => { vista = b.dataset.v; marcar("#segVis button", "v", vista); dibujar(); });
+    $("visOtra").onclick = () => { semilla++; entrenar(); dibujar(); };
+    $("cvVis").addEventListener("pointerdown", e => { const s = casillaDe(T, e); if (s !== undefined && s !== GOAL) { sel = s; dibujar(); } });
+    entrenar(); dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  Cueva.alCargarSprites(() => b2.dibujar());
+  let tRes = 0;
+  addEventListener("resize", () => { clearTimeout(tRes); tRes = setTimeout(() => { for (const f of [b1, b2, b3, b4, b5, b6]) f.dibujar(); }, 120); });
+})();
+</script>
+</body>
+</html>

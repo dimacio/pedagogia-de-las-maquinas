@@ -633,5 +633,83 @@ window.MODULOS = {
         "Se compara corregir cada día con esperar al final de la semana, y la conclusión usa cuándo actualiza cada método y cuánto tiembla la predicción."
       ]
     }
+  },
+
+  "6": {
+    objetivos: [
+      "Explicar por qué, sin mapa, conviene aprender Q(s,a) en lugar de V para elegir, y por qué el agente tiene que probar acciones (ε-greedy).",
+      "Aplicar a mano una actualización de SARSA y una de Q-learning con α, r y γ.",
+      "Distinguir SARSA (on-policy) de Q-learning (off-policy) por el término objetivo y prever qué valores aprende cada uno cuando el agente explora.",
+      "Leer el mapa de visitas y relacionarlo con los errores de lo aprendido."
+    ],
+    tiempo: { pagina: 35, notebook: 75 },
+    previos: ["5"],
+    requisitos: ["Haber hecho la clase 5: TD(0) y el error δ, la sorpresa con la que se corrige un valor después de cada paso.", "De la clase 4, Q(s,a) y la mejora de política: en cada casilla, quedarse con la acción de mayor Q."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "Sin mapa, alguien le sopla al agente el V* de cada casilla vecina del cruce (5,6): por ejemplo, V*(5,7) = 0,9321. ¿Por qué eso no le alcanza para elegir y conviene aprender Q(s,a)?",
+        opciones: [
+          { texto: "Porque sin mapa los V* de las vecinas no se pueden conocer bien; en cambio, las Q aprendidas jugando salen exactas desde la primera partida.", explicacion: "No: el problema no es la precisión de V. Aunque V* sea exacto, falta saber adónde lleva cada flecha. Y las Q aprendidas también arrancan en 0 y tardan en asentarse." },
+          { texto: "Para pasar de V a una flecha hay que saber adónde lleva cada acción, y eso es P; Q(s,a) trae el número pegado a la flecha.", explicacion: "Correcto. Con el mapa, Q(cruce, →) = 0 + 0,99 · 0,9321 = 0,9227 usa P para saber que → lleva a (5,7). Sin mapa, se aprende directamente Q(s,a) y se elige la mayor." },
+          { texto: "Porque V no incluye el descuento γ y Q sí: por eso Q(cruce, →) da 0,9227 y no 0,9321, y solo con Q se comparan bien las flechas.", explicacion: "No: V* ya está descontado. La diferencia entre 0,9321 y 0,9227 es el paso que lleva de una casilla a la otra, y para saber qué flecha da ese paso hace falta P." },
+          { texto: "No hace falta Q: alcanza con ir siempre hacia la vecina de mayor V, sin probar otras acciones, porque V ya dice cuál es la mejor casilla.", explicacion: "No: para saber qué flecha lleva a esa vecina hace falta P (y con piso resbaloso ni siquiera alcanza la dirección). Además, sin probar (ε = 0) el agente encontró la salida en 1 de 8 semillas." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O2",
+        pregunta: "SARSA, con α = 0,2 y γ = 0,99, ve el paso de (3,6) con ↑ a (2,6), r = 0, y Q(s,↑) = 0,3378. En s′ las Q son ↑ 0,3865, → 0,2755, ↓ 0,1204 y ← 0,2372, y la acción siguiente salió al azar: a′ = ←. ¿Cómo queda Q(s,↑)?",
+        opciones: [
+          { texto: "Sube a 0,3468: el objetivo es 0 + 0,99 · 0,3865 = 0,3827, porque se usa la mejor flecha de s′.", explicacion: "No: eso es Q-learning. SARSA usa la acción que de verdad va a tomar, a′ = ←, aunque haya salido al azar y valga menos que la mejor." },
+          { texto: "Baja a 0,2348: Q(s,↑) pasa directamente al objetivo 0 + 0,99 · 0,2372, el valor de la acción que tomó.", explicacion: "No: eso sería α = 1. Con α = 0,2 se corrige una quinta parte del error δ = −0,1030." },
+          { texto: "Queda en 0,3378: como a′ salió al azar y no es la mejor flecha, ese paso no se usa para aprender.", explicacion: "No: SARSA aprende de todos los pasos, también de los que exploran. Justamente por eso le cobra a la flecha ↑ el desvío que viene después." },
+          { texto: "Baja a 0,3172: objetivo 0,99 · 0,2372 = 0,2348, δ = 0,2348 − 0,3378 = −0,1030 y Q ← 0,3378 + 0,2 · (−0,1030).", explicacion: "Correcto. La acción siguiente vale menos que lo que ya creía de ↑, así que δ es negativo y Q(s,↑) baja: SARSA aprende de lo que de verdad hace." }
+        ],
+        correcta: 3
+      },
+      {
+        objetivo: "O2",
+        pregunta: "Q-learning, con α = 0,2 y γ = 0,99, ve el mismo paso: de (3,6) con ↑ a (2,6), r = 0, Q(s,↑) = 0,3378, y en s′ ↑ 0,3865, → 0,2755, ↓ 0,1204, ← 0,2372 (después tomó ←, al azar). ¿Cuánto vale δ y cómo queda Q(s,↑)?",
+        opciones: [
+          { texto: "δ = 0 + 0,99 · 0,3865 − 0,3378 = +0,0449, y Q(s,↑) sube a 0,3378 + 0,2 · 0,0449 = 0,3468.", explicacion: "Correcto. El objetivo usa la mejor flecha de s′ (↑, 0,3865), aunque después el agente tome ←. Con la misma experiencia, SARSA lo había dejado en 0,3172." },
+          { texto: "δ = 0,99 · 0,2372 − 0,3378 = −0,1030, y Q(s,↑) baja a 0,3172, porque el objetivo usa la acción ← que el agente tomó.", explicacion: "No: esa es la cuenta de SARSA. Q-learning cambia un solo término: en vez de la acción que va a tomar, usa el máximo de Q en s′." },
+          { texto: "δ = 0,3865 − 0,3378 = +0,0487, y Q(s,↑) sube a 0,3475: con r = 0 no hace falta el γ.", explicacion: "No: γ descuenta el valor de s′ aunque el premio sea 0. El objetivo es 0,99 · 0,3865 = 0,3827, y δ = +0,0449." },
+          { texto: "δ = +0,0449, y Q(s,↑) pasa a 0,8864, su Q*, porque Q-learning aprende el valor óptimo y no el de lo que juega.", explicacion: "No: aprende hacia Q*, pero de a un paso. Cada actualización mueve Q una fracción α de δ: queda en 0,3468, todavía lejos de 0,8864." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O3",
+        pregunta: "Tras 20 000 partidas con inicio al azar y ε = 0,5, el max Q(S) de SARSA quedó en 0,6734 y el de Q-learning en 0,8262 (V*(S) = 0,8262), los dos con 100 % de flechas óptimas. Con ε = 0,1 quedaron en 0,7523 y 0,7545. ¿Qué lo explica?",
+        opciones: [
+          { texto: "SARSA aprende peor que Q-learning: con ε = 0,5 muchas de sus flechas quedan desordenadas por tanta exploración, y por eso el valor que le da a S es más bajo.", explicacion: "No: con ε = 0,5 los dos tienen 100 % de flechas óptimas. La diferencia no está en las flechas sino en qué valor estima cada uno." },
+          { texto: "Q-learning se equivoca por arriba: jugando con ε = 0,5 nadie cobra 0,8262, así que el valor correcto de S es el que encontró SARSA.", explicacion: "No: no hay un solo valor correcto. Q-learning estima V*, el valor de jugar perfecto; SARSA, el de jugar como juega, explorando. Cada uno acierta lo que mide." },
+          { texto: "SARSA pone en el objetivo la acción que toma: aprende el valor de jugar explorando (0,6734, como con el mapa); Q-learning usa el máximo y aprende V*.", explicacion: "Correcto. SARSA es on-policy y Q-learning off-policy. Con ε = 0,1 quedan parejos: la exploración pesa poco y Q-learning, que explora poco, no siempre encuentra el camino más corto." },
+          { texto: "La diferencia viene de α: SARSA necesita un α más chico, así que con ε = 0,5 todavía no llegó a converger en 20 000 partidas.", explicacion: "No: los dos usan el mismo α, y SARSA está asentado (0,6734 ± 0,0022 entre semillas). Más partidas no lo acercan a V*: su objetivo apunta a otro valor." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O4",
+        pregunta: "Q-learning con ε = 0,1, 2000 partidas, 5 semillas. Error medio del valor según las visitas: 0–9, 0,9305; 10–99, 0,4130; 100–999, 0,5580; 1000 o más, 0,0775. En la semilla 0, las 8 casillas nunca pisadas que lista el notebook tienen error entre 0,91 y 0,95. ¿Qué se lee?",
+        opciones: [
+          { texto: "Más visitas, siempre menos error: cada visita corrige un poco el valor, así que el error baja de manera pareja con la cantidad de pasos por la casilla.", explicacion: "No: la tabla no baja de manera pareja. Las casillas con 100 a 999 visitas tienen más error medio (0,56) que las de 10 a 99 (0,41)." },
+          { texto: "El error alto de las casillas nunca pisadas se debe a que tienen la flecha equivocada; donde la flecha de mayor Q es la óptima, el error es casi 0.", explicacion: "No: el error es del valor, no de la flecha. (1,12) nunca se pisó, su flecha es óptima por azar del ruido inicial, y su error es 0,9227." },
+          { texto: "Es un problema de α: con un α más grande, el agente corregiría también las casillas sin visitas, sin tener que pasar por ellas.", explicacion: "No: sin visitas no hay ninguna actualización, sea cual sea α. El agente solo aprende de las casillas por las que pasa." },
+          { texto: "Donde nunca pisó, Q quedó en casi 0 y el error es casi todo V*; pero pisar no alcanza: con 100–999 visitas el error (0,56) supera al de 10–99 (0,41).", explicacion: "Correcto. Hay casillas que se pisan cientos de veces, pero solo de paso, explorando, y no asientan su valor. El error es casi 0 solo sobre el camino que usa, con miles de visitas." }
+        ],
+        correcta: 3
+      }
+    ],
+    actividad: {
+      titulo: "Tu camino de todos los días",
+      consigna: "Elegí un recorrido que hacés seguido y que tenga varias rutas posibles: ir al trabajo o a la facultad, volver a casa, ir al súper. Durante una semana anotá qué ruta tomaste cada día, si fue la que creías mejor o una que probaste, y cuánto tardaste. Contá tu ε: qué fracción de los días probaste otra ruta. Después decí qué número te hacés del trayecto: ¿es lo que tardás de verdad, con tus pruebas y desvíos incluidos (lo que aprende SARSA), o lo que tardarías si fueras siempre por la mejor (lo que aprende Q-learning)? Contá qué pasaría con esa estimación si probaras más o menos seguido. Cerralo con la oración de «Para enseñarlo»: SARSA aprende de lo que de verdad hago; Q-learning, de lo mejor que podría hacer desde ahí. Publicalo en Discussions; otra persona te devuelve con la rúbrica.",
+      rubrica: [
+        "Hay un registro de la semana con la ruta de cada día, si fue la mejor conocida o una prueba, y el tiempo; el ε está bien contado a partir de ese registro.",
+        "Se distinguen dos estimaciones del trayecto, la de lo que de verdad se hace (con las pruebas) y la de lo mejor posible, con números del registro, y se dice cuál se parece a SARSA y cuál a Q-learning.",
+        "Se prevé qué cambiaría con un ε más grande o más chico: cuánto se aleja la estimación «de lo que hago» de la «mejor posible» y qué rutas se dejarían de conocer."
+      ]
+    }
   }
 };
