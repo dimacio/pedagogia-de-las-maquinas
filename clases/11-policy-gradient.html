@@ -137,12 +137,12 @@
           <tbody id="tbBase"></tbody>
         </table>
       </div>
-      <p class="cap">Curvas simuladas en el navegador como en el notebook: REINFORCE en lotes de 10 partidas, 1000 partidas, 8 semillas (otras que las del notebook). Con otras semillas la cantidad de trabadas cambia, y a veces también se traba alguna con línea de base. La línea de base es el retorno promedio desde cada casilla, aprendido con b(s) += 0,1 (G − b(s)). La línea es el promedio y la banda, ± 1 desvío. La tabla es la del notebook (mediana de partidas hasta llegar a 0,75).</p>
+      <p class="cap">Curvas simuladas en el navegador como en el notebook: REINFORCE en lotes de 10 partidas, 1000 partidas, 8 semillas. Las semillas del primer dibujo están elegidas para que se parezca al del notebook, y con el botón se ven otras, donde la cantidad de trabadas cambia y a veces también se traba alguna con línea de base. La línea de base es el retorno promedio desde cada casilla, aprendido con b(s) += 0,1 (G − b(s)). La línea es el promedio y la banda, ± 1 desvío. La tabla es la del notebook (mediana de partidas hasta llegar a 0,75).</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 4</div>
       <h2>La línea de base</h2>
-      <p>Cuando el agente ya sale casi siempre, todas las partidas traen G &gt; 0 y REINFORCE empuja para arriba todo lo que hizo, rodeos incluidos. Restar una línea de base (<i>baseline</i>) b(s), el retorno promedio desde cada casilla, hace subir solo lo que salió mejor que lo esperado, sin cambiar hacia dónde apunta el gradiente en promedio. En el notebook, la varianza (<i>variance</i>) del gradiente de una partida baja de 23,06 a 4,20, unas 5 veces menos, aunque con α = 3 no aprende antes (llega a V(S) = 0,75 en 430 partidas sin línea de base y en 485 con ella). Su ventaja es que admite pasos más grandes con semillas más parejas, porque con α = 10 sin línea de base 7 de 8 semillas quedan trabadas, mientras que con ella aprende en 150 partidas y termina en 0,811 ± 0,007.</p>
+      <p>Cuando el agente ya sale casi siempre, todas las partidas traen G &gt; 0 y REINFORCE empuja para arriba todo lo que hizo, rodeos incluidos. Restar una línea de base (<i>baseline</i>) b(s), el retorno promedio desde cada casilla, hace subir solo lo que salió mejor que lo esperado, sin cambiar hacia dónde apunta el gradiente en promedio. En el notebook, la varianza (<i>variance</i>) del gradiente de una partida, con la línea de base exacta, calculada con el mapa solo para medir, baja de 23,06 a 4,20, unas 5 veces menos, aunque con α = 3 no aprende antes (llega a V(S) = 0,75 en 430 partidas sin línea de base y en 485 con ella). Su ventaja es que admite pasos más grandes con semillas más parejas, porque con α = 10 sin línea de base 7 de 8 semillas quedan trabadas, mientras que con ella aprende en 150 partidas.</p>
       <div class="eq parte"><span class="nw sigue">θ&nbsp;←&nbsp;θ&nbsp;+ α&nbsp;(G&nbsp;−&nbsp;b(s))</span> <span class="nw">∇&nbsp;log&nbsp;π(a|s)</span></div>
       <p class="nota pregunta">Si todas las partidas cobraran lo mismo, G = 0,5, ¿qué empujaría REINFORCE sin línea de base? ¿Y con b = 0,5?</p>
     </div>
@@ -171,7 +171,7 @@
           </tbody>
         </table>
       </div>
-      <p class="cap">Actor-crítico con α = 10 y α<sub>V</sub> = 0,5, 1000 partidas desde S simuladas en el navegador. «Aprende en» es la mediana de partidas hasta que V(S) llega a 0,75. En el notebook, el crítico queda a menos de 0,05 del valor verdadero del actor en solo el 39 % de las casillas, porque acierta sobre el camino del actor y no fuera de él.</p>
+      <p class="cap">Actor-crítico con α = 10 y α<sub>V</sub> = 0,5, 1000 partidas desde S simuladas en el navegador. La semilla del primer dibujo está elegida para que se parezca al del notebook, y con el botón se ven otras. «Aprende en» es la mediana de partidas hasta que V(S) llega a 0,75. En el notebook, el crítico queda a menos de 0,05 del valor verdadero del actor en solo el 39 % de las casillas, porque acierta sobre el camino del actor y no fuera de él.</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 5</div>
@@ -202,7 +202,7 @@
           </tbody>
         </table>
       </div>
-      <p class="cap">El histograma está simulado en el navegador: una política a medio aprender (REINFORCE con línea de base, 100 partidas), un lote de 10 partidas y 50 pasadas con paso 1. El recorte actúa cuando se reusa el lote, porque en la primera pasada la razón vale 1, y por eso con una sola pasada da lo mismo con o sin él. Tampoco es un candado perfecto, ya que algunas razones se escapan de la banda, aunque en un lote del notebook la razón mediana queda en 1,043 con recorte contra 0,070 sin él. La misma idea se usa para ajustar modelos de lenguaje (clases 12 y 13).</p>
+      <p class="cap">El histograma está simulado en el navegador: una política a medio aprender (REINFORCE con línea de base, 100 partidas), un lote de 10 partidas y 50 pasadas con paso 1. La semilla de esa política está elegida para que el primer dibujo se parezca al del notebook, y con el botón se ven otros lotes. El recorte actúa cuando se reusa el lote, porque en la primera pasada la razón vale 1, y por eso con una sola pasada da lo mismo con o sin él. Tampoco es un candado perfecto, ya que algunas razones se escapan de la banda, aunque en un lote del notebook la razón mediana queda en 1,043 con recorte contra 0,070 sin él. La misma idea se usa para ajustar modelos de lenguaje (clases 12 y 13).</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 6</div>
@@ -220,7 +220,7 @@
       <h2>Cómo contar esta clase en una oración</h2>
       <p>"Policy gradient es reforzar lo que salió bien: hacer más probable lo que hiciste en las partidas buenas, comparadas con lo que esperabas."</p>
       <p class="nota pregunta">Pregunta para hacerle a quien te escucha: si alguien que siempre saca 9 en los exámenes saca un 7, ¿merece el mismo festejo que alguien que siempre saca 4 y esta vez sacó 7?</p>
-      <p><b>Ejercicio de 5 minutos:</b> dibujen en el pizarrón una casilla con cuatro flechas y anoten una preferencia 0 al lado de cada una. Una persona tira un dado de cuatro caras para elegir la flecha. Si salió → o ↓ tira además una moneda, que con cara vale G = 1, mientras que ↑, ← o ceca valen G = 0. Con α = 1, súmenle 0,75 · G a la preferencia de la flecha elegida y réstenle 0,25 · G a cada una de las otras tres. Después de diez tiros calculen las probabilidades con softmax. Repitan en otra casilla restándole a cada G una línea de base b = 0,25 y comparen cuánto bajaron ↑ y ← en cada caso.</p>
+      <p><b>Ejercicio de 5 minutos:</b> dibujen en el pizarrón una casilla con cuatro flechas y anoten una preferencia 0 al lado de cada una. Una persona tira un dado de cuatro caras para elegir la flecha. Si salió → o ↓ tira además una moneda, que con cara vale G = 1, mientras que ↑, ← o ceca valen G = 0. Con α = 1, súmenle 0,75 · G a la preferencia de la flecha elegida y réstenle 0,25 · G a cada una de las otras tres (como si la política siguiera siendo el dado). Después de diez tiros calculen las probabilidades con softmax. Repitan en otra casilla restándole a cada G una línea de base b = 0,25 y comparen cuánto bajaron ↑ y ← en cada caso.</p>
       <p class="small muted">Adelanto: hasta acá la recompensa venía dada, +1 al entrar a la salida. ¿Y si nadie sabe escribirla, pero sí decir cuál de dos cosas prefiere? Viene la clase 12, aprender la recompensa.</p>
     </div>
   </section>

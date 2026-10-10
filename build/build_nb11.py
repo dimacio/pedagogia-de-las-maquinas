@@ -479,7 +479,7 @@ En la clase 10 imitábamos: mirar qué hizo alguien en cada casilla y copiar esa
 - Si $G$ fuera 1 siempre, REINFORCE sería clonar todo lo que se jugó.
 - Con $G$ de verdad, una partida que no salió pesa 0, y una que salió rápido pesa más que una que salió tarde.
 
-Para verlo sin esperar a que REINFORCE dé muchos pasitos, saltamos directo a adonde apuntan: jugamos 2000 partidas con el dado desde S y **contamos** qué hizo en cada casilla, con tres pesos distintos. (REINFORCE da pasitos hacia la tercera.)
+Para verlo sin esperar a que REINFORCE dé muchos pasitos, saltamos directo a adonde apuntan: jugamos 2000 partidas con el dado desde S y **contamos** qué hizo en cada casilla, con tres pesos distintos. (REINFORCE da pasitos en la dirección de la tercera.)
 
 1. **Clonar todas** las partidas: cada paso pesa 1.
 2. **Clonar las exitosas**: pesa 1 si la partida salió, 0 si no.
@@ -565,7 +565,7 @@ def coseno(x, y):
 
 var_sin, var_con = varianza(g_sin), varianza(g_con)
 print(f"política a medio aprender: V(S) = {V_medio[env.start]:.4f}")
-print(f"varianza del gradiente de UNA partida:  sin línea de base = {var_sin:.3f}   con = {var_con:.3f}   "
+print(f"varianza del gradiente de UNA partida:  sin línea de base = {var_sin:.2f}   con = {var_con:.2f}   "
       f"({var_sin / var_con:.0f} veces menos)")
 for nombre, gs in [("sin", g_sin), ("con", g_con)]:
     lotes10 = np.mean([coseno(gs[i:i + 10].mean(0), g_true) for i in range(0, N_GRAD, 10)])
@@ -596,7 +596,7 @@ for n in [10, 100, 1000, N_GRAD]:
     print(f"promediando {ns[i]:5d} partidas:  coseno sin = {cs_sin[i]:.3f}   con = {cs_con[i]:.3f}")
 """))
 cells.append(md(r"""
-Las dos versiones apuntan, en promedio, al mismo lado: las dos curvas suben hacia 1. Pero con línea de base el temblor de cada partida es varias veces más chico, y con unas 100 partidas apunta tan bien como sin línea de base con unas 1000.
+Las dos versiones apuntan, en promedio, al mismo lado: las dos curvas suben hacia 1. Pero con línea de base el temblor de cada partida es varias veces más chico, y con unas 100 partidas apunta casi tan bien como sin línea de base con unas 1000.
 
 ### Paso 2 — ¿Y el aprendizaje?
 
@@ -635,7 +635,7 @@ print(f"V*(S) = {V_estrella[env.start]:.4f}")
 cells.append(md(r"""
 Con $\alpha = 3$ las dos versiones terminan cerca y llegan a 0,75 en una cantidad de partidas parecida, pero la de línea de base sube más parejo: a las 200 partidas va más arriba y las semillas se parecen mucho más entre sí (la banda es más angosta), mientras que la otra tiembla de lote a lote. Con $\alpha = 10$ la diferencia es de otro orden: sin línea de base, el empuje de todas las partidas es tan grande que la política se vuelve casi determinista antes de tiempo, y casi todas las semillas terminan trabadas lejos de la salida (algunas llegaron a 0,75 y después se derrumbaron); con línea de base, el mismo $\alpha$ aprende rápido y bien en las 8. Menos temblor significa que se puede **dar pasos más grandes** sin romper nada.
 
-> Ojo con una sutileza de esta cueva: como el único premio es el $+1$ de la salida, una partida que no sale da $G = 0$ y sin línea de base no empuja nada. Eso hace que REINFORCE sin línea de base, partida por partida y con $\alpha$ bien elegido, aprenda sorprendentemente bien acá. La ventaja de la línea de base se ve cuando se promedian lotes, se buscan pasos grandes o el premio no es solo «llegar o no llegar».
+> Ojo con una sutileza de esta cueva: como el único premio es el $+1$ de la salida, una partida que no sale da $G = 0$ y sin línea de base no empuja nada. Por eso, con $\alpha = 3$, la versión sin línea de base también llega a 0,75 (mediana 430 partidas, contra 485 con línea de base): en esta cueva la ventaja de la línea de base no es aprender con pasos chicos, sino poder dar pasos grandes como $\alpha = 10$ sin romper nada.
 """))
 
 # ======================================================================= 5

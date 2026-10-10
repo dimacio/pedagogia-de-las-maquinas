@@ -982,7 +982,7 @@ window.MODULOS = {
       },
       {
         objetivo: "O3",
-        pregunta: "Restar una línea de base b(s), el retorno promedio desde cada casilla, baja la varianza del gradiente de una partida de 23,06 a 4,20. Con α = 3 llega a V(S) = 0,75 en 485 partidas contra 430 sin ella. ¿Para qué sirve, entonces?",
+        pregunta: "Restar una línea de base b(s), el retorno promedio desde cada casilla, baja la varianza del gradiente de una partida de 23,06 a 4,20 (con la línea de base exacta, calculada con el mapa solo para medir). Con α = 3 llega a V(S) = 0,75 en 485 partidas contra 430 sin ella. ¿Para qué sirve, entonces?",
         opciones: [
           { texto: "Para aprender más rápido siempre: con menos varianza cada actualización vale más, y en cualquier α llega antes a 0,75.", explicacion: "No: con α = 3 no aprende antes (485 contra 430 partidas). La ventaja aparece al usar pasos más grandes, no con el mismo α." },
           { texto: "Para cambiar hacia dónde apunta el gradiente: deja de empujar las acciones de las partidas buenas y empuja las de las malas.", explicacion: "No: en promedio el gradiente apunta igual, por eso no sesga. Lo que cambia es que sube solo lo que salió mejor que lo esperado y baja lo que salió peor." },
