@@ -11,3 +11,5 @@ Formato: `fecha · clase · decisión — por qué — qué cuesta si está mal`
 
 - 2026-10-10 · general · El autor eligió: mergear yo cada clase cuando el revisor aprueba, y ante decisiones suyas decidir lo más conservador dentro del plan y registrarlo acá.
 - 2026-10-10 · 3 · Spine de la clase 3 escrito sin aprobación explícita del texto final (el autor aprobó la propuesta con «dale») — consistente con el pedido — ninguno.
+- 2026-10-10 · general · Coma decimal en el texto de las páginas y cuestionarios (castellano rioplatense; así están la clase 1 y la 3). La clase 2 usa punto: se unifica en la pasada de alumno cero — es una convención de estilo que CLAUDE.md no fija — cuesta cambiar cifras de una clase.
+- 2026-10-10 · 3 · B5 muestra caminatas simuladas en el navegador (otra semilla) cuyo promedio puede diferir del V(S) del notebook dentro del error; quedan rotuladas como simuladas y el texto cita la cifra del notebook — regla 5 — si confunde, se lanzan más caminatas al cargar.
