@@ -477,5 +477,83 @@ window.MODULOS = {
         "La decisión se cuenta como Bellman (lo de ahora más el valor descontado de adonde lleva)."
       ]
     }
+  },
+
+  "4": {
+    objetivos: [
+      "Describir la cueva como proceso de decisión de Markov (S, A, P(s′|s,a), R, γ) y explicar por qué un MDP con una política fija es un proceso de recompensa de Markov.",
+      "Calcular el valor de una acción Q(s,a) en una casilla a partir de los valores de la política y usarlo para mejorarla.",
+      "Diferenciar iteración de política (evaluar, mejorar, repetir) de iteración de valor (quedarse con la mejor acción en cada vuelta).",
+      "Predecir el efecto del piso resbaloso, del costo por paso y de γ sobre los valores y las flechas, y plantear otro problema como MDP."
+    ],
+    tiempo: { pagina: 40, notebook: 75 },
+    previos: ["3"],
+    requisitos: ["Haber hecho la clase 3: el valor V como retorno esperado, la ecuación de Bellman de un MRP y la iteración desde V = 0."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "En la cueva como MDP se fija la política al azar: π(a|s) = 1/4 para cada acción en cada casilla. Al evaluarla da V(S) = 0,0136, el mismo valor de la clase 3. ¿Por qué?",
+        opciones: [
+          { texto: "Porque con el mapa a la vista el agente elige siempre la mejor acción, y en esta cueva la mejor coincide justo con la cara que salía en el dado de la clase 3.", explicacion: "No: si eligiera la mejor acción, V(S) sería 0,8262, no 0,0136. Con la política al azar nadie elige: se promedian las cuatro acciones." },
+          { texto: "Porque con la política fija cada casilla queda con una sola distribución de destinos, P^π = Σₐ π(a|s) P(s′|s,a): un MRP; con 1/4 por acción, el dado.", explicacion: "Correcto. Un MDP con la política fija vuelve a ser una cadena con recompensa. El notebook comprueba que P^π y R^π son iguales a la P y la R del caminante de la clase 3." },
+          { texto: "Porque las cuatro tablas P(s′|s,a) son iguales entre sí, así que da lo mismo qué acción se elija en cada casilla.", explicacion: "No: hay una tabla por acción y son distintas. Desde el cruce (5,6), ↑ choca y se queda, → va a (5,7), ↓ a (6,6) y ← a (5,5)." },
+          { texto: "Porque en la cueva R no depende de la acción; si R(s,a) cambiara con la acción, el MDP con política fija ya no sería un MRP.", explicacion: "No: R sí depende de la acción (solo la que entra a la salida cobra +1). Con la política fija, R^π(s) = Σₐ π(a|s) R(s,a) y sigue siendo un MRP." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O2",
+        pregunta: "En el cruce (5,6), con los valores de la política al azar, Q^π de ↑, →, ↓ y ← vale 0,0763, 0,1070, 0,0623 y 0,0627, y V^π(cruce) = 0,0771. ¿Qué se lee en esos números?",
+        opciones: [
+          { texto: "V^π(cruce) está mal calculado: el valor de una casilla es el de su mejor acción, así que debería dar 0,1070.", explicacion: "No: quedarse con el máximo es el valor óptimo V*. Para la política al azar, V^π es el promedio de las cuatro Q, pesado con 1/4 cada una." },
+          { texto: "Para saber qué acción conviene en el cruce hay que jugar muchas partidas desde ahí con cada acción y comparar los retornos promedio.", explicacion: "No: con el mapa a la vista no hace falta jugar. Q^π(s,a) = R(s,a) + γ Σ P(s′|s,a) V^π(s′) se calcula con P, R y los valores de la política." },
+          { texto: "Q(cruce, →) = 0,1070 es mayor que V(5,7) = 0,1081 porque al valor de adonde voy se le suma el premio de este paso.", explicacion: "No: 0,1070 es menor que 0,1081. Este paso no cobra nada (R = 0), así que Q = 0 + 0,99 · 0,1081: el descuento le saca un poco." },
+          { texto: "→ es la de mayor Q y la mejora pone esa flecha; el promedio de las cuatro Q da 0,0771 porque el dado elige cada una con 1/4.", explicacion: "Correcto. Mejorar es quedarse en cada casilla con la acción de mayor Q^π. Y como V^π es el promedio de las cuatro Q, alguna tiene que estar por encima." }
+        ],
+        correcta: 3
+      },
+      {
+        objetivo: "O3",
+        pregunta: "En la cueva, la iteración de política y la iteración de valor llegan a la misma política y al mismo V*. ¿En qué se diferencian?",
+        opciones: [
+          { texto: "La de política evalúa y después mejora en cada vuelta (4 vueltas desde el dado, 21 desde «todas ↑»); la de valor toma el máximo sin evaluar (22 vueltas).", explicacion: "Correcto. Las vueltas de la iteración de política son caras (un sistema de 60 ecuaciones) y pocas; las de la iteración de valor, baratas y muchas." },
+          { texto: "La de valor encuentra mejores flechas porque se queda con el máximo; la de política se queda con lo que da el promedio de las acciones.", explicacion: "No: la de política también mejora con el máximo de Q. Las dos llegan al mismo V*: la diferencia entre ambos es 0." },
+          { texto: "La de política siempre necesita pocas vueltas, cualquiera sea la política de la que arranque, y por eso es siempre la más rápida de las dos recetas.", explicacion: "No: desde el dado necesitó 4 vueltas, pero desde «todas ↑» necesitó 21, casi tantas como la de valor. Y cada vuelta suya resuelve un sistema entero." },
+          { texto: "La de valor arranca de una política inicial y la va corrigiendo; la de política arranca de V = 0 y deja que el valor se derrame.", explicacion: "No: está al revés. La iteración de política arranca de una política (el dado, «todas ↑»); la de valor arranca de V = 0 y el valor se derrama desde la salida." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O4",
+        pregunta: "Con slip 0,2 el agente se resbala hacia un costado con esa probabilidad. ¿Qué pasa en la cueva con la política óptima?",
+        opciones: [
+          { texto: "Cambian las flechas cerca de las paredes: conviene alejarse de ellas para no chocar al resbalar, aunque el camino sea más largo.", explicacion: "No: es la intuición típica, pero en esta cueva cambian 0 flechas. No hay pozos ni peligros, así que resbalar solo hace perder tiempo y la mejor dirección es la misma." },
+          { texto: "Nada cambia: la política óptima es la misma, así que V*(S) sigue en 0,8262; lo único que varía es el largo de cada partida.", explicacion: "No: V es un retorno esperado. Si las partidas tardan más en promedio, el valor baja, aunque la política sea la misma." },
+          { texto: "V*(S) baja de 0,8262 a 0,7742 y no cambia ninguna flecha; con la misma política, las partidas duran entre 21 y 29 pasos.", explicacion: "Correcto. Resbalar cuesta pasos y eso baja el valor esperado. Sin slip, las 12 partidas son la misma: 20 pasos." },
+          { texto: "V*(S) baja, pero las partidas duran siempre 20 pasos, porque la política óptima sigue el camino más corto desde S.", explicacion: "No: con slip cada partida es distinta aunque la política sea la misma. En las 12 partidas del notebook el promedio fue 25,9 pasos." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O4",
+        pregunta: "El robot de reciclaje, con α = 0,8, β = 0,4 y r_esperar = 1, tiene la batería baja. ¿Qué hace la política óptima y por qué?",
+        opciones: [
+          { texto: "Busca, porque buscar rinde 2 por turno, más que esperar (1) y que recargar (0), y la política se queda con el premio más alto.", explicacion: "No: la política se queda con la mayor Q, no con el mayor premio inmediato. Q(baja, buscar) = 13,64 es la más baja de las tres." },
+          { texto: "Recarga: buscar arriesga un 60 % de agotarse y pagar el rescate de −3; buscar convendría recién con β > 0,863 (con α = 0,8).", explicacion: "Correcto. Q(baja, recargar) = 15,25, contra 14,73 de esperar y 13,64 de buscar. Si β supera 0,863 (con α = 0,8), arriesgarse vale la pena." },
+          { texto: "Espera, porque no gasta batería y cobra 1 seguro, mientras que recargar le hace perder un turno sin ningún premio.", explicacion: "No: esperar (Q = 14,73) queda debajo de recargar (15,25). Con β = 0,4, esperar gana recién cuando r_esperar supera 1,53." },
+          { texto: "Recarga, porque con batería baja recargar es siempre la mejor acción, cualquiera sea β o la recompensa por esperar.", explicacion: "No: depende de los parámetros. Con β > 0,863 conviene buscar, y con r_esperar alto conviene esperar. Nadie programó la regla: sale de resolver el MDP." }
+        ],
+        correcta: 1
+      }
+    ],
+    actividad: {
+      titulo: "Tu MDP chiquito",
+      consigna: "Planteá como MDP un problema de un dominio propio con 3 a 5 estados y 2 o 3 acciones (regar o no una planta según qué tan seca está, estudiar o descansar según el cansancio, un tutor que elige un problema fácil o difícil). Escribí los estados, las acciones, las probabilidades P(s′|s,a), las recompensas R y el γ, y antes de resolverlo decí qué política esperás que salga y por qué. Si lo resolvés en el notebook, contá si salió lo que esperabas. Cerralo con la oración de «Para enseñarlo»: en cada estado, qué pasaría con cada acción, quedarse con la mejor y repetir hasta que nada cambie. Publicalo en Discussions; otra persona te devuelve con la rúbrica.",
+      rubrica: [
+        "El MDP está completo: estados, acciones, probabilidades que suman 1 para cada estado y acción, recompensas y un γ justificado.",
+        "Se predice la política antes de resolver, con una razón que mire más allá del premio inmediato (por ejemplo, el riesgo de caer en un estado malo).",
+        "Se dice qué parámetro (una probabilidad, una recompensa o γ) haría cambiar la política, y hacia cuál."
+      ]
+    }
   }
 };
