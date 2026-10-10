@@ -9,7 +9,7 @@
 */
 (function () {
   // ---------- configuración del repositorio (editar al publicar) ----------
-  const REPO = "USUARIO/rl-a-ciegas";   // ← reemplazar por usuario/repositorio de GitHub
+  const REPO = "dimacio/pedagogia-de-las-maquinas";   // ← reemplazar por usuario/repositorio de GitHub
   const RAMA = "main";
 
   const MAPS = {
