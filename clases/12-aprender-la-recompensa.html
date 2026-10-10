@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aprender la recompensa · RL a ciegas</title>
+<meta name="description" content="Clase 12: cuando no sabés escribir la recompensa, se aprende de comparaciones. Preferencias, Bradley-Terry, el mapa de la recompensa aprendida, RLHF con penalización por alejarse, la sobreoptimización y DPO en la cueva a ciegas.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .lz { min-width: 0; }
+  .seg { flex-wrap: wrap; }
+  .seg button { min-width: 0; }
+  .cap { font-size: 13px; color: var(--muted); }
+  .cap b { color: var(--ink); }
+  .duo { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+  .duo > div { min-width: 0; display: grid; gap: 6px; align-content: start; }
+  .duo h3 { font-family: var(--mono); font-size: 12.5px; font-weight: 400; color: var(--muted); }
+  .duo h3 b { color: var(--ink); font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+  .chips span { display: inline-flex; align-items: center; gap: 6px; }
+  .chips i { width: 14px; height: 3px; display: inline-block; border-radius: 1px; }
+  /* la cuenta a mano */
+  .cuenta { font-family: var(--mono); font-size: 13px; line-height: 1.6; background: var(--rock); border: 1px solid var(--rock-2); border-radius: 3px;
+    padding: 8px 10px; overflow-x: auto; white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .cuenta b { color: var(--ink); font-weight: 600; }
+  .cuenta .v { color: var(--lamp); }
+  @media (max-width: 560px) { .cuenta { white-space: normal; } }
+  /* tablas de cifras del notebook */
+  .tabla.nb table { font-size: 13px; }
+  .tabla.nb tr.sel td { color: var(--lamp); }
+  .tabla.nb tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--lamp); }
+  @media (max-width: 560px) { .tabla.nb table { font-size: 12px; } .tabla.nb th, .tabla.nb td { padding: 6px 5px; } }
+  /* respuestas del lector */
+  .btn.elegir-a { border-color: var(--sonar); }
+  .btn.elegir-b { border-color: var(--lamp); }
+  .eq sub { font-size: .75em; }
+  .hat { font-family: var(--body); }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase 12</div>
+    <h1>Aprender la <span class="g">recompensa</span></h1>
+    <p class="thesis">Si no sabés escribir con números qué es un buen camino pero mirando dos sabés cuál preferís, la máquina puede aprender la recompensa de tus comparaciones, con sus aciertos y sus huecos.</p>
+  </section>
+
+  <!-- B1: una recompensa difícil de escribir -->
+  <section class="bloque" id="b-escribir" data-objetivos="O1">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué camino mostrar" id="segCam">
+        <button aria-pressed="false" data-c="corto">Camino más corto</button>
+        <button aria-pressed="false" data-c="opt">El que prefiere la persona</button>
+        <button aria-pressed="true" data-c="dos">Los dos</button>
+      </div>
+      <div class="lz"><canvas id="cvEscribir" aria-label="La cueva con la recompensa escondida de cada casilla: las tres casillas de derrumbe en rojo. Encima, el camino más corto, que cruza los derrumbes, y el que da la vuelta por abajo"></canvas></div>
+      <div class="legend"><span>−1</span><span class="bar" id="legEsc"></span><span>+0,3</span></div>
+      <div class="chips"><span><i style="background:var(--ember)"></i>camino más corto</span><span><i style="background:var(--exit)"></i>el que prefiere la persona</span></div>
+      <div class="hud" id="hudEscribir"></div>
+      <p class="cap">Recompensa escondida de la persona simulada del notebook, que se cobra al entrar a cada casilla. Los dos caminos se calculan en el navegador por iteración de valor (clase 4) con γ = 0,99. Los retornos son los del notebook.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 1</div>
+      <h2>Cuando no sabés escribir la recompensa</h2>
+      <p>Hasta ahora la recompensa venía escrita en la cueva como un +1 al salir. Imaginá ahora a alguien que quiere salir rápido pero detesta la zona de derrumbes, las tres casillas rojas, aunque no sabría decir cuántos pasos de más vale evitarla. Para poder medir, el notebook le esconde una recompensa de −0,1 por casilla, −1 por derrumbe y +1 al salir. Con ella, el camino más corto de 20 pasos rinde −3,48, contra −1,09 del camino de 22 pasos que esquiva los derrumbes, el que esa persona elegiría si viera los dos.</p>
+      <p class="nota pregunta">¿Cuántos pasos de más aceptarías para no pisar un derrumbe? ¿Respondería lo mismo otra persona?</p>
+    </div>
+  </section>
+
+  <!-- B2: comparar -->
+  <section class="bloque" id="b-preferis" data-objetivos="O1">
+    <div class="stage">
+      <div class="lz"><canvas id="cvPar" aria-label="Dos pedazos de partida de 12 pasos que arrancan en la misma casilla: A en celeste y B en ámbar. Cada uno empieza en un círculo y termina en una punta de flecha"></canvas></div>
+      <div class="chips"><span><i style="background:var(--sonar)"></i>A</span><span><i style="background:var(--lamp)"></i>B</span><span>círculo: inicio · punta: final · borde rojo: derrumbe</span></div>
+      <div class="row">
+        <button class="btn elegir-a" id="parA">Prefiero A</button>
+        <button class="btn elegir-b" id="parB">Prefiero B</button>
+        <button class="btn" id="parIgual">Me da igual</button>
+        <button class="btn primary" id="parOtro" hidden>Otro par</button>
+      </div>
+      <div class="hud" id="hudPar" aria-live="polite"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>cómo decide (notebook)</th><th>el mejor gana</th></tr></thead>
+          <tbody>
+            <tr class="sel"><td>comparar en el mismo momento</td><td class="num">70,6 %</td></tr>
+            <tr><td>puntajes de días distintos, humor con desvío 0,5</td><td class="num">70,2 %</td></tr>
+            <tr><td>puntajes de días distintos, humor con desvío 1</td><td class="num">66,9 %</td></tr>
+            <tr><td>puntajes de días distintos, humor con desvío 2</td><td class="num">63,9 %</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">Pedazos de 12 flechas al azar generados en el navegador, con otra semilla que el notebook. Al responder se revela la recompensa escondida de cada pedazo y con qué probabilidad elegiría A la persona simulada (τ = 0,3). La tabla es la del notebook, sobre los 930 pares de recompensas distintas.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 2</div>
+      <h2>¿Cuál preferís?</h2>
+      <p>En vez de pedirle números, le mostramos dos pedazos de partida de 12 pasos desde la misma casilla y le preguntamos cuál prefiere. Cada pregunta es una comparación de a pares (<i>pairwise comparison</i>) y cada respuesta, una preferencia (<i>preference</i>). Comparar es más consistente que poner puntaje, porque el humor del día afecta a los dos pedazos por igual y se cancela. En el notebook, con una persona que a veces se equivoca (ruido τ = 0,3), el mejor pedazo gana en el 70,6 % de las comparaciones, contra 70,2, 66,9 y 63,9 % con puntajes de días distintos según cuánto le cambie el humor.</p>
+      <p class="nota pregunta">¿En qué pares dudaste? ¿Coinciden con los pares en que la persona simulada elige casi a la suerte?</p>
+    </div>
+  </section>
+
+  <!-- B3: Bradley-Terry -->
+  <section class="bloque" id="b-bt" data-objetivos="O2">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Ruido de la persona τ" id="segTau">
+        <button aria-pressed="true" data-t="0.3">τ = 0,3 (la del notebook)</button>
+        <button aria-pressed="false" data-t="1">τ = 1</button>
+      </div>
+      <div class="lz"><canvas id="cvBT" aria-label="La curva sigmoide: probabilidad de preferir A según la diferencia de recompensas R(A) − R(B), para τ = 0,3 y para τ = 1, con un punto en la diferencia elegida"></canvas></div>
+      <div class="ctl">
+        <label for="rgDif">R(A) − R(B) <output id="outDif"></output></label>
+        <input type="range" id="rgDif" min="-1.5" max="1.5" step="0.05" value="-0.2">
+      </div>
+      <div class="cuenta" id="cuentaBT" aria-live="polite"></div>
+      <div class="row"><button class="btn" id="btP1">Volver a la pregunta 1</button></div>
+      <p class="cap">La cuenta de la pregunta 1 del notebook, con R(A) = +0,70 y R(B) = +0,90, da P(A ≻ B) = 0,339 con τ = 0,3 y 0,450 con τ = 1. La curva se dibuja en el navegador.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 3</div>
+      <h2>De comparaciones a una recompensa: Bradley-Terry</h2>
+      <p>El modelo de <b>Bradley-Terry</b> (1952) dice que la probabilidad de preferir A depende solo de la diferencia entre las recompensas de A y de B. Si valen lo mismo da 0,5, como una moneda. En la pregunta 1 del notebook, R(A) = +0,70 y R(B) = +0,90 con una persona de ruido τ = 0,3 en lugar de 1, así que r = R/τ y P(A ≻ B) = σ(−0,20 / 0,3) = 0,339, contra 0,450 con τ = 1. Al revés, con muchas elecciones se busca la recompensa que mejor las explica, con una regresión logística como la de clasificar en dos clases.</p>
+      <div class="eq">P(A ≻ B) = σ(r(A) − r(B))</div>
+      <p class="nota pregunta">En la pregunta 1 la persona eligió A, la menos probable. ¿Qué le dice esa elección al ajuste sobre r(A) y r(B)?</p>
+    </div>
+  </section>
+
+  <!-- B4: el mapa de la recompensa aprendida -->
+  <section class="bloque" id="b-mapa" data-objetivos="O2">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Cantidad de comparaciones" id="segN">
+        <button aria-pressed="false" data-n="100">N = 100</button>
+        <button aria-pressed="true" data-n="300">300</button>
+        <button aria-pressed="false" data-n="1000">1000</button>
+        <button aria-pressed="false" data-n="3000">3000</button>
+      </div>
+      <div class="duo">
+        <div><h3>la recompensa <b>escondida</b></h3><div class="lz"><canvas id="cvEsc" aria-label="La recompensa escondida de cada casilla"></canvas></div></div>
+        <div><h3>la <b>aprendida</b> y el plan con ella</h3><div class="lz"><canvas id="cvApr" aria-label="La recompensa aprendida de cada casilla con las comparaciones elegidas, y el camino que planifica la iteración de valor con ella; un círculo marca dónde se queda si no sale"></canvas></div></div>
+      </div>
+      <div class="legend"><span>−1</span><span class="bar" id="legApr"></span><span>+0,3</span></div>
+      <div class="hud" id="hudMapa" aria-live="polite"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>comparaciones (notebook)</th><th>correlación</th><th>el plan sale</th></tr></thead>
+          <tbody id="tbMapa"></tbody>
+        </table>
+      </div>
+      <p class="cap">Comparaciones simuladas y ajuste de Bradley-Terry en el navegador como en el notebook (persona con τ = 0,3, pedazos de 12 pasos, otra semilla). La aprendida se muestra multiplicada por τ. La línea es el plan de la iteración de valor (clase 4) con la aprendida. La tabla es la del notebook, con 5 semillas.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 4</div>
+      <h2>El mapa de la recompensa aprendida</h2>
+      <p>Si la recompensa de un pedazo es la suma de una recompensa por casilla, ajustar Bradley-Terry a muchas comparaciones arma un mapa, que se llama modelo de recompensa (<i>reward model</i>). En el notebook, la correlación entre el mapa aprendido y el escondido es 0,228 con 100 comparaciones, 0,841 con 300, 0,981 con 1000 y 0,992 con 3000. Planificar con ese mapa (clase 4) explota sus errores, porque con 300 comparaciones el plan se queda para siempre en (5,4), donde la aprendida vale +0,300 y la escondida −0,1, con un retorno verdadero de −10. El plan sale de la cueva en 0 de 5 semillas con 300 comparaciones, en 3 de 5 con 1000 y en 5 de 5 con 3000, ya con el retorno óptimo de −1,09.</p>
+      <div class="eq"><span class="hat">r̂</span>(pedazo) = Σ<sub>s</sub> θ<sub>s</sub> · veces(s)</div>
+      <p class="nota pregunta">Con 300 comparaciones, mirá las casillas verdes del mapa aprendido. ¿Por qué el plan va a buscar justo esas?</p>
+    </div>
+  </section>
+
+  <!-- B5: RLHF -->
+  <section class="bloque" id="b-rlhf" data-objetivos="O3">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Etapa de RLHF" id="segEtapa">
+        <button aria-pressed="false" data-e="ref">1. Imitar</button>
+        <button aria-pressed="false" data-e="rm">2. Aprender la recompensa</button>
+        <button aria-pressed="false" data-e="sin">3. Optimizar sin freno</button>
+        <button aria-pressed="true" data-e="con">3. Con penalización</button>
+      </div>
+      <div class="lz"><canvas id="cvRlhf" aria-label="La cueva en cada etapa de RLHF: las flechas más probables y el camino más probable de la política, o el mapa de la recompensa aprendida"></canvas></div>
+      <div class="hud" id="hudRlhf" aria-live="polite"></div>
+      <div class="lz"><canvas id="cvRlhfBarras" aria-label="Barras con el retorno verdadero desde S en el notebook: política imitada −3,91, sin penalización −10, con penalización −1,33 y óptimo −1,09"></canvas></div>
+      <p class="cap">Las cuatro vistas de la cueva se simulan en el navegador como en el notebook (200 partidas grabadas, 300 comparaciones, β = 0,3, otra semilla). Las barras son el retorno verdadero desde S del notebook, con la media de 5 semillas.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 5</div>
+      <h2>RLHF: imitar, aprender la recompensa, optimizar</h2>
+      <p>El aprendizaje por refuerzo con preferencias humanas (<i>reinforcement learning from human feedback</i>, RLHF) tiene tres etapas (Christiano et al., 2017; Ouyang et al., 2022). Primero se imita (clase 10) para tener una política de referencia π<sub>ref</sub>, después se aprende un modelo de recompensa con comparaciones y al final se optimiza con PPO (clase 11). Esa optimización resta una penalización por alejarse de π<sub>ref</sub> (<i>KL penalty</i>), medida con la divergencia KL. En el notebook, con 300 comparaciones, π<sub>ref</sub> rinde −3,91, optimizar sin penalización da −10 y con β = 0,3 da −1,33, cerca del óptimo de −1,09.</p>
+      <div class="eq">objetivo = <span class="hat">r̂</span> − β · KL(π ‖ π<sub>ref</sub>)</div>
+      <p class="nota pregunta">El modelo de recompensa es el mismo en las dos versiones de la etapa 3. ¿Por qué la penalización ayuda justo cuando ese modelo tiene errores?</p>
+    </div>
+  </section>
+
+  <!-- B6: sobreoptimizar -->
+  <section class="bloque" id="b-sobre" data-objetivos="O3">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Cantidad de comparaciones" id="segSobreN">
+        <button aria-pressed="true" data-n="300">300 comparaciones</button>
+        <button aria-pressed="false" data-n="3000">3000 comparaciones</button>
+      </div>
+      <div class="lz"><canvas id="cvSobre" aria-label="El retorno desde S según β, de β grande a la izquierda a β chico a la derecha: con la recompensa aprendida, que sube siempre, y con la verdadera, que con 300 comparaciones se desploma a −10"></canvas></div>
+      <div class="chips"><span><i style="background:var(--lamp)"></i>recompensa aprendida (lo que cree el optimizador)</span><span><i style="background:var(--exit)"></i>recompensa verdadera</span><span>guiones: V*(S)</span></div>
+      <div class="ctl">
+        <label for="rgBeta">β <output id="outBeta"></output></label>
+        <input type="range" id="rgBeta" min="0" max="7" step="1" value="4">
+      </div>
+      <div class="hud" id="hudSobre" aria-live="polite"></div>
+      <p class="cap">Cifras del notebook, con la mediana de 5 semillas para cada β. No se simula en el navegador.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 6</div>
+      <h2>Sobreoptimizar una recompensa aprendida</h2>
+      <p>Cuanto más chico es β, más fuerte se optimiza la recompensa aprendida y más se aleja la política de π<sub>ref</sub>. En el notebook, con 300 comparaciones, la recompensa aprendida sube siempre, hasta 13,4, mientras la verdadera sube hasta −1,18 con β = 0,1 y cae a −10 con β = 0,03 o menos. Es la sobreoptimización de la recompensa (<i>reward overoptimization</i>) que midieron Gao, Schulman y Hilton (2023), la trampa de la clase 2 con una recompensa que escribió una máquina. Con 3000 comparaciones el modelo tiene menos errores y la verdadera no cae, porque se queda en −1,09.</p>
+      <p class="nota pregunta">En la vida real nadie conoce la recompensa verdadera. ¿Cómo elegirías β?</p>
+    </div>
+  </section>
+
+  <!-- B7: DPO -->
+  <section class="bloque" id="b-dpo" data-objetivos="O4">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Ruta resaltada" id="segRuta">
+        <button aria-pressed="false" data-r="0">A</button>
+        <button aria-pressed="true" data-r="1">B</button>
+        <button aria-pressed="false" data-r="2">C</button>
+        <button aria-pressed="false" data-r="3">D</button>
+      </div>
+      <div class="duo">
+        <div><h3>las cuatro <b>respuestas</b></h3><div class="lz"><canvas id="cvRutas" aria-label="Las cuatro rutas enteras desde S, con la elegida resaltada"></canvas></div></div>
+        <div><h3>π<sub>ref</sub> y π <b>después de DPO</b></h3><div class="lz"><canvas id="cvDpo" aria-label="Barras con la probabilidad de cada ruta en la política de referencia, en gris, y después de DPO, en color"></canvas></div></div>
+      </div>
+      <div class="ctl">
+        <label for="rgDpo">pasos de descenso de gradiente <output id="outDpo"></output></label>
+        <input type="range" id="rgDpo" min="0" max="100" step="1" value="100">
+      </div>
+      <div class="hud" id="hudDpo" aria-live="polite"></div>
+      <p class="cap">DPO con β = 1 sobre 1000 comparaciones simuladas en el navegador (persona con τ = 1, otra semilla que el notebook). Las probabilidades de referencia son inventadas, como en el notebook.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 7</div>
+      <h2>DPO: saltear el modelo de recompensa</h2>
+      <p>La optimización directa de preferencias (<i>Direct Preference Optimization</i>, DPO) de Rafailov et al. (2023) ajusta la política directamente para que la respuesta preferida gane probabilidad frente a la otra, siempre relativa a la política de referencia. En el notebook, una política elige entre cuatro rutas enteras desde S, con probabilidades de referencia inventadas. DPO sube la ruta B, la que prefiere la persona, de 0,20 a 0,566, mientras la A baja de 0,55 a 0,135. RLHF en dos pasos, con las mismas comparaciones y el mismo β, llega a la misma política hasta el tercer decimal.</p>
+      <div class="eq">r(y) = β · log[π(y) / π<sub>ref</sub>(y)]</div>
+      <p class="nota pregunta">Si DPO llega a lo mismo que RLHF, ¿qué se ahorra? ¿Qué problema del paso 6 sigue ahí?</p>
+    </div>
+  </section>
+
+  <!-- B8: Para enseñarlo -->
+  <section class="bloque full" id="b-ensenar" data-objetivos="O1 O3">
+    <div class="texto prose">
+      <div class="paso">Para enseñarlo</div>
+      <h2>Cómo contar esta clase en una oración</h2>
+      <p>"Cuando no sabés escribir lo que querés, podés enseñarlo comparando; pero la máquina aprende tus comparaciones, no lo que querías."</p>
+      <p class="nota pregunta">Pregunta para hacerle a quien te escucha: si alguien mira mil veces cuál de dos fotos elegís, ¿qué aprende de tus gustos? ¿Y qué no puede aprender nunca?</p>
+      <p><b>Ejercicio de 5 minutos:</b> dibujen la cueva en el pizarrón con una zona marcada como derrumbe y muestren cinco pares de caminos para que la clase vote cuál prefiere en cada uno. Una persona que no escuchó la consigna anota un puntaje por casilla solo a partir de los votos. Después dibuja el camino que más puntos le da según su tabla. Comparen ese camino con el que la clase quería y busquen las casillas por las que no pasaba ningún par.</p>
+      <p class="small muted">Adelanto: todo esto se usa para ajustar modelos de lenguaje, donde las respuestas son textos y la política es el modelo. Viene la clase 13, el modelo de lenguaje como política.</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(async () => {
+  // cada figura se arma en su propia tarea, para no trabar el navegador al cargar
+  const tarea = f => new Promise(r => setTimeout(() => r(f()), 0));
+  Cueva.pagina("12", { lecturas: [
+    { texto: "Bradley y Terry (1952), Rank Analysis of Incomplete Block Designs: I. The Method of Paired Comparisons, Biometrika 39, 324–345", url: "https://doi.org/10.2307/2334029" },
+    { texto: "Christiano et al. (2017), Deep Reinforcement Learning from Human Preferences, NeurIPS 2017", url: "https://arxiv.org/abs/1706.03741" },
+    { texto: "Ouyang et al. (2022), Training language models to follow instructions with human feedback, NeurIPS 2022", url: "https://arxiv.org/abs/2203.02155" },
+    { texto: "Rafailov et al. (2023), Direct Preference Optimization: Your Language Model is Secretly a Reward Model, NeurIPS 2023", url: "https://arxiv.org/abs/2305.18290" },
+    { texto: "Gao, Schulman y Hilton (2023), Scaling Laws for Reward Model Overoptimization, ICML 2023", url: "https://arxiv.org/abs/2210.10760" },
+    { texto: "Stanford CS234 (Brunskill, 2026), clase 8: preferencias, RLHF y DPO; CS224R (2026), clases 8 y 9", url: "https://web.stanford.edu/class/cs234/" }
+  ] });
+
+  const env = Cueva.makeEnv(Cueva.MAPS.chica), n = env.nS, GOAL = env.goal, START = env.start;
+  const COL = Cueva.COL(), MONO = COL.mono || "monospace", AR = Cueva.ARROW;
+  const PARED = "#2c3346", GAMMA = 0.99, TAU = 0.3;
+  const $ = id => document.getElementById(id);
+  const coma = s => String(s).replace(".", ",").replace("-", "−");
+  const fmt = (x, d = 2) => coma(x.toFixed(d));
+  const fmtS = (x, d = 2) => (x > 0 ? "+" : "") + fmt(x, d);
+  const rc = s => `(${env.free[s][0]},${env.free[s][1]})`;
+  const marcar = (sel, attr, v) => document.querySelectorAll(sel).forEach(b => b.setAttribute("aria-pressed", b.dataset[attr] === v));
+  const NOMETA = Array.from({ length: n }, (_, s) => s).filter(s => s !== GOAL);
+  const sigma = x => 1 / (1 + Math.exp(-x));
+
+  // ---------- la cueva como tabla y la recompensa escondida (la persona la usa; el que aprende, no) ----------
+  const NXT = Array.from({ length: n }, (_, s) => [0, 1, 2, 3].map(a => env.move(s, a)[0]));
+  const DERRUMBE = ["3,3", "3,4", "4,3"].map(k => env.idx[k]);
+  const rEsc = new Float64Array(n).fill(-0.1); DERRUMBE.forEach(s => { rEsc[s] = -1; }); rEsc[GOAL] = 1;
+
+  // planificar (clase 4) con una recompensa por casilla, que se cobra al entrar; en la salida ya no se cobra nada
+  const Rde = r => Array.from({ length: n }, (_, s) => [0, 1, 2, 3].map(a => s === GOAL ? 0 : r[NXT[s][a]]));
+  function iteracionValor(r) {
+    const R = Rde(r); let V = new Float64Array(n), Q;
+    for (let k = 0; k < 100000; k++) {
+      Q = R.map((q, s) => q.map((x, a) => s === GOAL ? 0 : x + GAMMA * V[NXT[s][a]]));
+      const NV = Float64Array.from(Q, q => Math.max(...q)); let d = 0;
+      for (let s = 0; s < n; s++) d = Math.max(d, Math.abs(NV[s] - V[s]));
+      V = NV; if (d < 1e-10) break;
+    }
+    return { V, Q };
+  }
+  const argmax = q => { let b = 0; for (let a = 1; a < q.length; a++) if (q[a] > q[b]) b = a; return b; };   // la primera si empatan, como numpy
+  const greedy = Q => Q.map(q => { const p = [0, 0, 0, 0]; p[argmax(q)] = 1; return p; });
+  // el camino más probable de una política (hasta la salida, o hasta que se queda quieta o repite)
+  function caminoDe(pi, lim = 60) {
+    const p = [START]; let s = START; const vistos = new Set([s]);
+    for (let i = 0; i < lim && s !== GOAL; i++) { const s2 = NXT[s][argmax(pi[s])]; if (s2 === s || vistos.has(s2)) return { p, queda: s2 === s ? s : s2 }; p.push(s2); vistos.add(s2); s = s2; }
+    return { p, queda: s === GOAL ? null : s };
+  }
+  // V^π exacto (clase 3): (I − γP) V = r_π, sin tope de pasos
+  function evaluar(pi, r) {
+    const R = Rde(r), A = Array.from({ length: n }, (_, i) => { const f = new Float64Array(n + 1); f[i] = 1; return f; });
+    for (let s = 0; s < n; s++) {
+      if (s === GOAL) continue;
+      let rp = 0; for (let a = 0; a < 4; a++) { rp += pi[s][a] * R[s][a]; A[s][NXT[s][a]] -= GAMMA * pi[s][a]; }
+      A[s][n] = rp;
+    }
+    for (let c = 0; c < n; c++) {
+      let piv = c; for (let i = c + 1; i < n; i++) if (Math.abs(A[i][c]) > Math.abs(A[piv][c])) piv = i;
+      [A[c], A[piv]] = [A[piv], A[c]];
+      for (let i = 0; i < n; i++) { if (i === c) continue; const f = A[i][c] / A[c][c]; if (f) for (let j = c; j <= n; j++) A[i][j] -= f * A[c][j]; }
+    }
+    return Float64Array.from({ length: n }, (_, i) => A[i][n] / A[i][i]);
+  }
+  // iteración de valor «suave»: maximiza r − β·KL(π ‖ π_ref); π(a|s) ∝ π_ref(a|s)·e^(Q(s,a)/β)
+  function conPenalizacion(r, beta, piRef) {
+    const R = Rde(r), lref = piRef.map(p => p.map(Math.log)); let V = new Float64Array(n);
+    const zDe = V => R.map((q, s) => q.map((x, a) => lref[s][a] + (x + GAMMA * V[NXT[s][a]]) / beta));
+    for (let k = 0; k < 50000; k++) {
+      const z = zDe(V), NV = new Float64Array(n); let d = 0;
+      for (let s = 0; s < n; s++) { if (s === GOAL) continue; const m = Math.max(...z[s]); NV[s] = beta * (m + Math.log(z[s].reduce((t, x) => t + Math.exp(x - m), 0))); d = Math.max(d, Math.abs(NV[s] - V[s])); }
+      V = NV; if (d < 1e-10) break;
+    }
+    return zDe(V).map(z => { const m = Math.max(...z), e = z.map(x => Math.exp(x - m)), t = e.reduce((a, b) => a + b, 0); return e.map(x => x / t); });
+  }
+
+  // ---------- trayectos, la persona y Bradley-Terry ----------
+  const casillaAzar = u => { const s = Math.floor(u() * (n - 1)); return s < GOAL ? s : s + 1; };
+  function pedazo(u, s0, L = 12) { const p = [s0]; let s = s0; for (let i = 0; i < L; i++) { s = NXT[s][Math.floor(u() * 4)]; p.push(s); if (s === GOAL) break; } return p; }
+  const conteo = p => { const f = new Float64Array(n); for (let i = 1; i < p.length; i++) f[p[i]]++; return f; };
+  const valorDe = (f, r) => f.reduce((t, x, s) => t + x * r[s], 0);
+  // N preguntas «¿cuál preferís?»; guarda la diferencia de conteos en forma rala
+  function comparaciones(N, tau, semilla) {
+    const u = Cueva.rng(semilla), D = [], Y = new Float64Array(N);
+    for (let i = 0; i < N; i++) {
+      const s0 = casillaAzar(u), fa = conteo(pedazo(u, s0)), fb = conteo(pedazo(u, s0));
+      const idx = [], val = []; for (let s = 0; s < n; s++) if (fa[s] !== fb[s]) { idx.push(s); val.push(fa[s] - fb[s]); }
+      D.push([idx, val]); Y[i] = u() < sigma(valorDe(fa, rEsc) / tau - valorDe(fb, rEsc) / tau) ? 1 : 0;
+    }
+    return { D, Y };
+  }
+  // Bradley-Terry como regresión logística, descenso de gradiente con inercia, como `ajustar_bt` del notebook
+  function ajustarBT({ D, Y }, pasos = 3000, lr = 0.05, inercia = 0.95, lam = 1e-4) {
+    const N = Y.length; let th = new Float64Array(n), v = new Float64Array(n);
+    const mira = new Float64Array(n), g = new Float64Array(n);
+    for (let k = 0; k < pasos; k++) {
+      for (let s = 0; s < n; s++) { mira[s] = th[s] + inercia * v[s]; g[s] = lam * mira[s]; }
+      for (let i = 0; i < N; i++) {
+        const [idx, val] = D[i]; let z = 0; for (let j = 0; j < idx.length; j++) z += mira[idx[j]] * val[j];
+        const e = (sigma(z) - Y[i]) / N; for (let j = 0; j < idx.length; j++) g[idx[j]] += e * val[j];
+      }
+      for (let s = 0; s < n; s++) { v[s] = inercia * v[s] - lr * g[s]; th[s] += v[s]; }
+    }
+    return th;
+  }
+  function correlacion(r) {
+    const a = NOMETA.map(s => r[s]), b = NOMETA.map(s => rEsc[s]), m = x => x.reduce((t, y) => t + y, 0) / x.length;
+    const ma = m(a), mb = m(b); let sab = 0, saa = 0, sbb = 0;
+    for (let i = 0; i < a.length; i++) { sab += (a[i] - ma) * (b[i] - mb); saa += (a[i] - ma) ** 2; sbb += (b[i] - mb) ** 2; }
+    return sab / Math.sqrt(saa * sbb);
+  }
+  const aprendidas = {};   // N → recompensa aprendida × τ (simulada, se calcula una vez)
+  const aprendida = N => aprendidas[N] || (aprendidas[N] = Float64Array.from(ajustarBT(comparaciones(N, TAU, 1200 + N)), x => TAU * x));
+
+  // ---------- utilidades de dibujo ----------
+  const colorR = v => Cueva.rampa("signo", v < 0 ? 0.5 + 0.5 * Math.max(-1, v) : 0.5 + 0.5 * Math.min(1, v / 0.3));
+  function mapaR(T, r) { for (const s of NOMETA) { const [rr, c] = env.free[s]; T.casilla(rr, c, colorR(r[s])); } }
+  function rotulo(T, s, txt, color = COL.ink, escala = .38) {
+    const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s];
+    ctx.font = `600 ${Math.max(8, Math.round(cell * escala))}px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.85)"; ctx.strokeText(txt, c * cell + cell / 2, r * cell + cell / 2 + 1);
+    ctx.fillStyle = color; ctx.fillText(txt, c * cell + cell / 2, r * cell + cell / 2 + 1);
+  }
+  function borde(T, s, color, ancho = 2, guiones = []) {
+    const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s];
+    ctx.strokeStyle = color; ctx.lineWidth = ancho; ctx.setLineDash(guiones); ctx.strokeRect(c * cell + 1.5, r * cell + 1.5, cell - 3, cell - 3); ctx.setLineDash([]);
+  }
+  const derrumbes = T => DERRUMBE.forEach(s => borde(T, s, COL.ember, 2, [4, 3]));
+  function circulo(T, s, color) { const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s]; ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(c * cell + cell / 2, r * cell + cell / 2, cell * .42, 0, 7); ctx.stroke(); }
+  // un trayecto con su inicio (círculo) y su final (punta de flecha), corrido un poco para que dos no se tapen
+  function trazo(T, path, color, corr = 0, ancho = .12) {
+    const ctx = T.ctx, cell = T.cell, P = path.map(s => { const [r, c] = env.free[s]; return [(c + .5 + corr) * cell, (r + .5 + corr) * cell]; });
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = Math.max(2, cell * ancho); ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.beginPath(); P.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
+    ctx.beginPath(); ctx.arc(P[0][0], P[0][1], Math.max(3, cell * .2), 0, 7); ctx.fill();
+    let k = P.length - 1; while (k > 0 && P[k][0] === P[k - 1][0] && P[k][1] === P[k - 1][1]) k--;
+    if (k > 0) {
+      const [x1, y1] = P[k - 1], [x2, y2] = P[k], ang = Math.atan2(y2 - y1, x2 - x1), L = Math.max(7, cell * .42);
+      ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(x2 - L * Math.cos(ang - .45), y2 - L * Math.sin(ang - .45)); ctx.lineTo(x2 - L * Math.cos(ang + .45), y2 - L * Math.sin(ang + .45)); ctx.closePath(); ctx.fill();
+    }
+  }
+  function flechas(T, pi) { for (const s of NOMETA) T.texto(s, AR[argmax(pi[s])], "rgba(232,230,223,.6)", .45); }
+  // un gráfico con ejes (x en escala log si se pide)
+  function ejes(cv, alto, { x0, x1, y0, y1, xlog = false, ticksX = [], ticksY = [], fx = coma, fy = coma, tituloX = "", tituloY = "" }) {
+    const { w, h, ctx } = Cueva.lienzo(cv, alto)();
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    const m = { l: 44, r: 14, t: 22, b: 32 };
+    const gx = xlog ? Math.log10 : v => v;
+    const X = v => m.l + (gx(v) - gx(x0)) / (gx(x1) - gx(x0)) * (w - m.l - m.r);
+    const Y = v => h - m.b - (v - y0) / (y1 - y0) * (h - m.t - m.b);
+    ctx.font = `11px ${MONO}`; ctx.strokeStyle = "rgba(141,147,163,.18)"; ctx.lineWidth = 1; ctx.fillStyle = COL.muted;
+    for (const t of ticksY) { const y = Math.round(Y(t)) + .5; ctx.beginPath(); ctx.moveTo(m.l, y); ctx.lineTo(w - m.r, y); ctx.stroke(); ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(fy(t), m.l - 5, y); }
+    for (const t of ticksX) { const x = Math.round(X(t)) + .5; ctx.beginPath(); ctx.moveTo(x, m.t); ctx.lineTo(x, h - m.b); ctx.stroke(); ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(fx(t), x, h - m.b + 5); }
+    ctx.textAlign = "right"; ctx.textBaseline = "top"; ctx.fillText(tituloX, w - m.r, h - 13);
+    ctx.textAlign = "left"; ctx.fillText(tituloY, 4, 4);
+    return { ctx, w, h, m, X, Y };
+  }
+
+  // =====================================================================
+  // B1. El camino más corto contra el que prefiere la persona
+  // =====================================================================
+  const soloSalida = new Float64Array(n); soloSalida[GOAL] = 1;
+  const CORTO = caminoDe(greedy(iteracionValor(soloSalida).Q)).p;
+  const OPT = caminoDe(greedy(iteracionValor(rEsc).Q)).p;
+  const enDerrumbe = p => p.filter(s => DERRUMBE.includes(s)).length;
+  const b1 = await tarea(() => {
+    const T = Cueva.tablero($("cvEscribir"), env, { maxCell: 40 }), hud = $("hudEscribir");
+    $("legEsc").style.background = Cueva.gradienteCSS("signo");
+    let ver = "dos";
+    function dibujar() {
+      T.fondo("#000").paredes(PARED); mapaR(T, rEsc); T.salida(); derrumbes(T);
+      if (ver !== "opt") trazo(T, CORTO, "rgba(224,100,90,.9)", -.1);
+      if (ver !== "corto") trazo(T, OPT, "rgba(61,220,132,.9)", .1);
+      rotulo(T, START, "S", COL.ink, .4);
+      const lin = [];
+      if (ver !== "opt") lin.push(`<span>más corto: <b>${CORTO.length - 1}</b> pasos, <b>${enDerrumbe(CORTO)}</b> derrumbes, retorno <b style="color:var(--ember)">−3,48</b></span>`);
+      if (ver !== "corto") lin.push(`<span>el de la persona: <b>${OPT.length - 1}</b> pasos, <b>${enDerrumbe(OPT)}</b> derrumbes, retorno <b style="color:var(--exit)">−1,09</b> = V*(S)</span>`);
+      hud.innerHTML = lin.join("");
+    }
+    document.querySelectorAll("#segCam button").forEach(b => b.onclick = () => { ver = b.dataset.c; marcar("#segCam button", "c", ver); dibujar(); });
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B2. ¿Cuál preferís? El lector compara
+  // =====================================================================
+  const b2 = await tarea(() => {
+    const T = Cueva.tablero($("cvPar"), env, { maxCell: 40 }), hud = $("hudPar"), u = Cueva.rng(26);
+    const bA = $("parA"), bB = $("parB"), bI = $("parIgual"), bOtro = $("parOtro");
+    let par = null, resp = null, k = 0, conDif = 0, coincide = 0;
+    function nuevo() {
+      const s0 = casillaAzar(u), pa = pedazo(u, s0), pb = pedazo(u, s0);
+      par = { pa, pb, RA: valorDe(conteo(pa), rEsc), RB: valorDe(conteo(pb), rEsc) }; resp = null; k++;
+    }
+    function dibujar() {
+      T.fondo("#000").paredes(PARED); T.salida(); derrumbes(T);
+      trazo(T, par.pa, "rgba(94,200,216,.9)", -.12); trazo(T, par.pb, "rgba(242,179,90,.9)", .12);
+      [bA, bB, bI].forEach(b => { b.hidden = resp !== null; }); bOtro.hidden = resp === null;
+      if (resp === null) { hud.innerHTML = `<span>par <b>${k}</b>: ¿cuál preferís?</span>` + (conDif ? `<span>hasta ahora elegiste el mejor en <b>${coincide} de ${conDif}</b> pares de recompensas distintas</span>` : ""); return; }
+      const p = sigma((par.RA - par.RB) / TAU), mejor = par.RA > par.RB ? "A" : par.RB > par.RA ? "B" : null;
+      hud.innerHTML = `<span>vos: <b>${resp === "=" ? "me da igual" : resp}</b></span><span>recompensa escondida: A <b>${fmtS(par.RA, 1)}</b>, B <b>${fmtS(par.RB, 1)}</b></span>` +
+        `<span>la persona simulada elige A con probabilidad <b>${fmt(p, 3)}</b></span>` +
+        (mejor ? `<span>coincidiste con el mejor en <b>${coincide} de ${conDif}</b> pares de recompensas distintas</span>` : `<span>valen lo mismo: la persona tira una moneda</span>`);
+    }
+    function responder(x) {
+      resp = x; const mejor = par.RA > par.RB ? "A" : par.RB > par.RA ? "B" : null;
+      if (mejor) { conDif++; if (x === mejor) coincide++; }
+      dibujar();
+    }
+    bA.onclick = () => responder("A"); bB.onclick = () => responder("B"); bI.onclick = () => responder("=");
+    bOtro.onclick = () => { nuevo(); dibujar(); bA.focus(); };
+    nuevo(); dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B3. Bradley-Terry: la curva y la cuenta a mano
+  // =====================================================================
+  const b3 = await tarea(() => {
+    const cv = $("cvBT"), rg = $("rgDif"), out = $("outDif"), cuenta = $("cuentaBT");
+    let tau = 0.3;
+    function dibujar() {
+      const dR = +rg.value; out.textContent = fmtS(dR, 2);
+      const g = ejes(cv, 220, { x0: -1.5, x1: 1.5, y0: 0, y1: 1, ticksX: [-1.5, -1, -0.5, 0, 0.5, 1, 1.5], ticksY: [0, .25, .5, .75, 1], fx: v => coma(v), fy: v => coma(v), tituloX: "R(A) − R(B) →", tituloY: "P(A ≻ B)" });
+      const { ctx, X, Y } = g;
+      for (const t of [1, 0.3]) {
+        ctx.strokeStyle = t === tau ? COL.lamp : "rgba(141,147,163,.6)"; ctx.lineWidth = t === tau ? 2.2 : 1.4; ctx.setLineDash(t === tau ? [] : [5, 4]);
+        ctx.beginPath(); for (let i = 0; i <= 200; i++) { const x = -1.5 + 3 * i / 200, y = sigma(x / t); i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y)); } ctx.stroke(); ctx.setLineDash([]);
+      }
+      ctx.font = `11px ${MONO}`; ctx.fillStyle = COL.muted; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      ctx.fillText("τ = 0,3", X(0.32), Y(sigma(0.32 / 0.3)) + 2); ctx.fillText("τ = 1", X(1.02), Y(sigma(1.02)) + 12);
+      const p = sigma(dR / tau);
+      ctx.strokeStyle = "rgba(94,200,216,.5)"; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(X(dR), Y(0)); ctx.lineTo(X(dR), Y(p)); ctx.lineTo(X(-1.5), Y(p)); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = COL.sonar; ctx.beginPath(); ctx.arc(X(dR), Y(p), 5.5, 0, 7); ctx.fill();
+      const t = coma(tau), dr = dR / tau, e = Math.exp(-dr);
+      cuenta.innerHTML = [
+        `${Math.abs(dR + 0.2) < 1e-9 ? "pregunta 1: R(A) = +0,70, R(B) = +0,90, " : ""}R(A) − R(B) = <span class="v">${fmtS(dR, 2)}</span>, τ = ${t}`,
+        `1. r(A) − r(B) = (R(A) − R(B)) / τ = ${fmtS(dR, 2)} / ${t} = <b>${fmtS(dr, 3)}</b>`,
+        `2. P(A ≻ B) = 1 / (1 + e<sup>${coma((-dr).toFixed(3))}</sup>) = 1 / (1 + ${fmt(e, 4)}) = <b>${fmt(p, 3)}</b>`
+      ].join("<br>");
+    }
+    document.querySelectorAll("#segTau button").forEach(b => b.onclick = () => { tau = +b.dataset.t; marcar("#segTau button", "t", b.dataset.t); dibujar(); });
+    rg.addEventListener("input", dibujar);
+    $("btP1").onclick = () => { rg.value = "-0.2"; dibujar(); };
+    dibujar();
+    return { dibujar };
+  });
+
+  // =====================================================================
+  // B4. El mapa de la recompensa aprendida y el plan con ella
+  // =====================================================================
+  const NB_MAPA = [["100", "0,228", "0 de 5"], ["300", "0,841", "0 de 5"], ["1000", "0,981", "3 de 5"], ["3000", "0,992", "5 de 5"]];   // celdas 21 y 26
+  const b4 = await tarea(() => {
+    const TE = Cueva.tablero($("cvEsc"), env, { maxCell: 30 }), TA = Cueva.tablero($("cvApr"), env, { maxCell: 30 }), hud = $("hudMapa"), tb = $("tbMapa");
+    $("legApr").style.background = Cueva.gradienteCSS("signo");
+    let N = "300", res = null;
+    function calcular() {
+      const r = aprendida(+N), pi = greedy(iteracionValor(r).Q), cam = caminoDe(pi);
+      res = { r, cam, ret: evaluar(pi, rEsc)[START], cor: correlacion(r) };
+    }
+    function dibujar() {
+      TE.fondo("#000").paredes(PARED); mapaR(TE, rEsc); TE.salida(); derrumbes(TE); rotulo(TE, START, "S", COL.ink, .4);
+      TA.fondo("#000").paredes(PARED);
+      if (res) {
+        mapaR(TA, res.r); TA.salida(); derrumbes(TA); trazo(TA, res.cam.p, "rgba(232,230,223,.85)", 0, .1);
+        if (res.cam.queda !== null) circulo(TA, res.cam.queda, COL.sonar);
+        rotulo(TA, START, "S", COL.ink, .4);
+        const q = res.cam.queda;
+        hud.innerHTML = `<span>simulado, N = <b>${N}</b>: correlación <b>${fmt(res.cor, 3)}</b></span>` +
+          (q === null ? `<span>el plan <b style="color:var(--exit)">sale</b> en ${res.cam.p.length - 1} pasos, retorno verdadero <b>${fmt(res.ret)}</b></span>`
+            : `<span>el plan <b style="color:var(--ember)">no sale</b>: se queda en ${rc(q)}, donde la aprendida vale <b>${fmtS(res.r[q], 3)}</b> y la escondida <b>${fmtS(rEsc[q], 1)}</b></span><span>retorno verdadero <b>${fmt(res.ret)}</b></span>`);
+      } else hud.innerHTML = `<span>calculando ${N} comparaciones…</span>`;
+      tb.innerHTML = NB_MAPA.map(([k, ...f]) => `<tr${k === N ? ' class="sel"' : ""}><td>${k}</td>${f.map(x => `<td class="num">${x}</td>`).join("")}</tr>`).join("");
+    }
+    document.querySelectorAll("#segN button").forEach(b => b.onclick = () => {
+      N = b.dataset.n; marcar("#segN button", "n", N); res = null; dibujar();
+      setTimeout(() => { calcular(); dibujar(); }, 30);
+    });
+    calcular(); dibujar();
+    return { dibujar: () => { TE.medir(); TA.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B5. RLHF en chico: imitar, aprender la recompensa, optimizar
+  // =====================================================================
+  // imitar (clase 10): gente que quiere salir rápido elige más seguido la flecha que acerca a la salida
+  function grabarEImitar(nPartidas, semilla, T = 0.5, L = 40) {
+    const d = new Array(n).fill(-1); d[GOAL] = 0; const cola = [GOAL];
+    while (cola.length) { const s = cola.shift(); for (let a = 0; a < 4; a++) { const s2 = NXT[s][a]; if (d[s2] < 0) { d[s2] = d[s] + 1; cola.push(s2); } } }
+    const u = Cueva.rng(semilla), cnt = Array.from({ length: n }, () => [0, 0, 0, 0]);
+    for (let k = 0; k < nPartidas; k++) {
+      let s = casillaAzar(u);
+      for (let t = 0; t < L; t++) {
+        const z = NXT[s].map(s2 => -d[s2] / T - (s2 === s ? 5 : 0)), m = Math.max(...z), e = z.map(x => Math.exp(x - m)), tot = e.reduce((x, y) => x + y, 0);
+        let x = u() * tot, a = 0; while (a < 3 && x > e[a]) { x -= e[a]; a++; }
+        cnt[s][a]++; s = NXT[s][a]; if (s === GOAL) break;
+      }
+    }
+    return cnt.map(c => { const t = c.reduce((x, y) => x + y, 0) + 2; return c.map(x => (x + 0.5) / t); });
+  }
+  const b5 = await tarea(() => {
+    const T = Cueva.tablero($("cvRlhf"), env, { maxCell: 40 }), cvb = $("cvRlhfBarras"), hud = $("hudRlhf");
+    const piRef = grabarEImitar(200, 77), r300 = aprendida(300);
+    const vistas = {
+      ref: { pi: piRef, nombre: "π_ref (imitar)" },
+      sin: { pi: greedy(iteracionValor(r300).Q), nombre: "sin penalización" },
+      con: { pi: conPenalizacion(r300, 0.3, piRef), nombre: "con penalización, β = 0,3" }
+    };
+    for (const v of Object.values(vistas)) { v.cam = caminoDe(v.pi); v.ret = evaluar(v.pi, rEsc)[START]; }
+    let etapa = "con";
+    const BARRAS = [["π_ref", -3.91, COL.muted], ["sin penalización", -10, COL.ember], ["con penalización", -1.33, COL.lamp], ["óptimo V*(S)", -1.09, COL.exit]];   // celdas 29 y 31
+    function barras() {
+      const pe = cvb.parentElement, w = pe.clientWidth - 2, alto = 150;
+      const { ctx } = Cueva.lienzo(cvb, alto)(); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, alto);
+      const m = { l: 122, r: 50, t: 22, b: 8 }, X = v => m.l + (-v / 10) * (w - m.l - m.r), fila = (alto - m.t - m.b) / 4, bh = Math.min(18, fila - 8);
+      ctx.font = `12px ${MONO}`; ctx.textBaseline = "middle"; ctx.fillStyle = COL.muted; ctx.textAlign = "left";
+      ctx.fillText("retorno verdadero desde S (notebook)", 4, 10);
+      const sel = { ref: 0, sin: 1, con: 2 }[etapa];
+      BARRAS.forEach(([t, v, c], i) => {
+        const y = m.t + i * fila + (fila - bh) / 2;
+        ctx.fillStyle = i === sel ? COL.ink : COL.muted; ctx.textAlign = "right"; ctx.fillText(t, m.l - 8, y + bh / 2);
+        ctx.fillStyle = c; ctx.globalAlpha = i === sel || sel === undefined ? 1 : .55; ctx.fillRect(m.l, y, X(v) - m.l, bh); ctx.globalAlpha = 1;
+        ctx.fillStyle = COL.ink; ctx.textAlign = "left"; ctx.fillText(fmt(v), X(v) + 6, y + bh / 2);
+      });
+    }
+    function dibujar() {
+      T.fondo("#000").paredes(PARED);
+      if (etapa === "rm") {
+        mapaR(T, r300); T.salida(); derrumbes(T); rotulo(T, START, "S", COL.ink, .4);
+        hud.innerHTML = `<span>simulado: recompensa aprendida con <b>300</b> comparaciones (× τ), correlación <b>${fmt(correlacion(r300), 3)}</b></span>`;
+      } else {
+        const v = vistas[etapa];
+        T.salida(); derrumbes(T); flechas(T, v.pi); trazo(T, v.cam.p, etapa === "sin" ? "rgba(224,100,90,.9)" : "rgba(242,179,90,.9)", 0, .12);
+        if (v.cam.queda !== null) circulo(T, v.cam.queda, COL.sonar);
+        rotulo(T, START, "S", COL.ink, .4);
+        const enS = v.pi[START].map((p, a) => `${AR[a]} ${fmt(p)}`).join(" ");
+        hud.innerHTML = `<span>simulado, ${v.nombre}: retorno verdadero desde S <b>${fmt(v.ret)}</b></span><span>π en S: <b>${enS}</b></span>`;
+      }
+      barras();
+    }
+    document.querySelectorAll("#segEtapa button").forEach(b => b.onclick = () => { etapa = b.dataset.e; marcar("#segEtapa button", "e", etapa); dibujar(); });
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B6. Sobreoptimizar: cifras del notebook (celdas 34 y 36)
+  // =====================================================================
+  const BETAS = [10, 3, 1, 0.3, 0.1, 0.03, 0.01, 0.003];
+  const NB_SOBRE = {
+    "300": { apr: [-4.43, -4.22, -3.39, -1.69, -1.56, 12.53, 13.40, 13.40], ver: [-3.82, -3.62, -2.85, -1.28, -1.18, -10, -10, -10] },
+    "3000": { apr: [-2.91, -2.77, -2.40, -1.03, -0.86, -0.81, -0.80, -0.80], ver: [-3.83, -3.67, -3.11, -1.35, -1.19, -1.11, -1.09, -1.09] }
+  };
+  const b6 = await tarea(() => {
+    const cv = $("cvSobre"), rg = $("rgBeta"), out = $("outBeta"), hud = $("hudSobre");
+    let N = "300";
+    function dibujar() {
+      const j = +rg.value, D = NB_SOBRE[N]; out.textContent = coma(BETAS[j]);
+      const g = ejes(cv, 250, { x0: 10, x1: 0.003, y0: -11, y1: 15, xlog: true, ticksX: [10, 1, 0.1, 0.01], ticksY: [-10, -5, 0, 5, 10, 15], fx: v => coma(v), fy: v => coma(v),
+        tituloX: "β (← poca optimización · mucha →)", tituloY: "retorno desde S" });
+      const { ctx, X, Y, m, w } = g;
+      ctx.setLineDash([6, 4]); ctx.strokeStyle = COL.ink; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(m.l, Y(-1.09) + .5); ctx.lineTo(w - m.r, Y(-1.09) + .5); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = "rgba(94,200,216,.45)"; ctx.beginPath(); ctx.moveTo(X(BETAS[j]) + .5, m.t); ctx.lineTo(X(BETAS[j]) + .5, Y(-11)); ctx.stroke();
+      for (const [serie, color] of [[D.apr, COL.lamp], [D.ver, COL.exit]]) {
+        ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2; ctx.beginPath();
+        serie.forEach((v, i) => i ? ctx.lineTo(X(BETAS[i]), Y(v)) : ctx.moveTo(X(BETAS[i]), Y(v))); ctx.stroke();
+        serie.forEach((v, i) => { ctx.beginPath(); ctx.arc(X(BETAS[i]), Y(v), i === j ? 5.5 : 3, 0, 7); ctx.fill(); });
+      }
+      hud.innerHTML = `<span>notebook, ${N} comparaciones, β = <b>${coma(BETAS[j])}</b></span><span>aprendida <b style="color:var(--lamp)">${fmt(D.apr[j])}</b></span>` +
+        `<span>verdadera <b style="color:var(--exit)">${fmt(D.ver[j])}</b></span><span>V*(S) <b>−1,09</b></span>`;
+    }
+    document.querySelectorAll("#segSobreN button").forEach(b => b.onclick = () => { N = b.dataset.n; marcar("#segSobreN button", "n", N); dibujar(); });
+    rg.addEventListener("input", dibujar);
+    dibujar();
+    return { dibujar };
+  });
+
+  // =====================================================================
+  // B7. DPO en un bandit de cuatro rutas
+  // =====================================================================
+  // camino más corto que pasa por una lista de casillas (búsqueda en anchura entre cada par), como `ruta_por` del notebook
+  function rutaPor(...puntos) {
+    const path = [START];
+    for (const destino of [...puntos.map(p => env.idx[p]), GOAL]) {
+      const previo = new Map([[path[path.length - 1], null]]), cola = [path[path.length - 1]];
+      while (cola.length) { const s = cola.shift(); for (let a = 0; a < 4; a++) { const s2 = NXT[s][a]; if (!previo.has(s2)) { previo.set(s2, s); cola.push(s2); } } }
+      const tramo = []; let s = destino; while (s !== path[path.length - 1]) { tramo.push(s); s = previo.get(s); }
+      path.push(...tramo.reverse());
+    }
+    return path;
+  }
+  const RUTAS = [CORTO, OPT, rutaPor("1,9"), rutaPor("8,3")];
+  const NOM_R = ["A: corta, por los derrumbes", "B: por abajo, sin derrumbes", "C: la vuelta por arriba", "D: por abajo, con un rodeo"];
+  const COL_R = [COL.ember, COL.exit, COL.sonar, COL.lamp];
+  const R_RUTAS = RUTAS.map(p => valorDe(conteo(p), rEsc));
+  const P_REF = [0.55, 0.20, 0.10, 0.15];   // inventadas, como en el notebook
+  function preferenciasRutas(N, semilla) {
+    const u = Cueva.rng(semilla), G = [], L = [];
+    const sacar = (p, fuera) => { const q = p.map((x, i) => i === fuera ? 0 : x), t = q.reduce((a, b) => a + b, 0); let x = u() * t, i = 0; while (i < 3 && x >= q[i]) { x -= q[i]; i++; } while (q[i] === 0) i--; return i; };
+    for (let k = 0; k < N; k++) {
+      const i = sacar(P_REF, -1), j = sacar(P_REF, i);
+      if (u() < sigma(R_RUTAS[i] - R_RUTAS[j])) { G.push(i); L.push(j); } else { G.push(j); L.push(i); }
+    }
+    return { G, L };
+  }
+  // DPO sobre los logits z de la política, como `dpo` del notebook: β = 1, paso 0,5/β², 2000 pasos, guarda cada 20
+  function dpo({ G, L }, beta = 1, pasos = 2000) {
+    const lr = 0.5 / beta ** 2, zr = P_REF.map(Math.log), z = zr.slice(), N = G.length, hist = [P_REF.slice()];
+    const sm = z => { const m = Math.max(...z), e = z.map(x => Math.exp(x - m)), t = e.reduce((a, b) => a + b, 0); return e.map(x => x / t); };
+    for (let k = 1; k <= pasos; k++) {
+      const grad = [0, 0, 0, 0];
+      for (let i = 0; i < N; i++) { const uu = beta * ((z[G[i]] - z[L[i]]) - (zr[G[i]] - zr[L[i]])), g = beta * (1 - sigma(uu)) / N; grad[G[i]] -= g; grad[L[i]] += g; }
+      for (let a = 0; a < 4; a++) z[a] -= lr * grad[a];
+      if (k % 20 === 0) hist.push(sm(z));
+    }
+    return hist;
+  }
+  const b7 = await tarea(() => {
+    const T = Cueva.tablero($("cvRutas"), env, { maxCell: 30 }), cvb = $("cvDpo"), rg = $("rgDpo"), out = $("outDpo"), hud = $("hudDpo");
+    const hist = dpo(preferenciasRutas(1000, 1));
+    let sel = 1;
+    function barras(p) {
+      const w = cvb.parentElement.clientWidth - 2, alto = Math.max(170, Math.min(230, T.cell * env.H));
+      const { ctx } = Cueva.lienzo(cvb, alto)(); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, alto);
+      const m = { l: 34, r: 8, t: 16, b: 24 }, Y = v => alto - m.b - v / 0.7 * (alto - m.t - m.b), ancho = (w - m.l - m.r) / 4, bw = Math.min(26, ancho * .32);
+      ctx.font = `11px ${MONO}`; ctx.strokeStyle = "rgba(141,147,163,.18)"; ctx.fillStyle = COL.muted; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      for (const t of [0, .2, .4, .6]) { const y = Math.round(Y(t)) + .5; ctx.beginPath(); ctx.moveTo(m.l, y); ctx.lineTo(w - m.r, y); ctx.stroke(); ctx.fillText(coma(t), m.l - 4, y); }
+      for (let i = 0; i < 4; i++) {
+        const cx = m.l + ancho * (i + .5);
+        ctx.fillStyle = "rgba(141,147,163,.55)"; ctx.fillRect(cx - bw - 1, Y(P_REF[i]), bw, Y(0) - Y(P_REF[i]));
+        ctx.fillStyle = COL_R[i]; ctx.globalAlpha = i === sel ? 1 : .7; ctx.fillRect(cx + 1, Y(p[i]), bw, Y(0) - Y(p[i])); ctx.globalAlpha = 1;
+        ctx.fillStyle = i === sel ? COL.ink : COL.muted; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("ABCD"[i], cx, alto - m.b + 5);
+        ctx.textBaseline = "bottom"; ctx.fillStyle = COL.ink; ctx.fillText(fmt(p[i]), cx + 1 + bw / 2, Y(p[i]) - 2);
+      }
+      ctx.fillStyle = COL.muted; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText("gris: π_ref · color: π", m.l, 2);
+    }
+    function dibujar() {
+      const k = +rg.value, p = hist[k]; out.textContent = String(k * 20);
+      T.fondo("#000").paredes(PARED); T.salida(); derrumbes(T);
+      RUTAS.forEach((r, i) => { if (i !== sel) trazo(T, r, "rgba(141,147,163,.35)", (i - 1.5) * .08, .07); });
+      trazo(T, RUTAS[sel], COL_R[sel], (sel - 1.5) * .08, .13); rotulo(T, START, "S", COL.ink, .4);
+      barras(p);
+      hud.innerHTML = `<span>${NOM_R[sel]}: <b>${RUTAS[sel].length - 1}</b> pasos, R = <b>${fmt(R_RUTAS[sel], 2)}</b></span>` +
+        `<span>simulado: π_ref <b>${fmt(P_REF[sel])}</b> → π <b>${fmt(p[sel], 3)}</b></span>` +
+        `<span>notebook: B de 0,20 a 0,566, A de 0,55 a 0,135</span>`;
+    }
+    document.querySelectorAll("#segRuta button").forEach(b => b.onclick = () => { sel = +b.dataset.r; marcar("#segRuta button", "r", b.dataset.r); dibujar(); });
+    rg.addEventListener("input", dibujar);
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  let tRes = 0;
+  addEventListener("resize", () => { clearTimeout(tRes); tRes = setTimeout(() => { for (const f of [b1, b2, b3, b4, b5, b6, b7]) f.dibujar(); }, 120); });
+})();
+</script>
+</body>
+</html>
