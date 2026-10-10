@@ -8,7 +8,7 @@ import html
 import re
 from datetime import datetime
 
-from comun import (REPORTES, RAIZ, Contexto, Resultado, clases, datos_js, fuente_celda, leer_nb, notebook_de,
+from comun import (REPORTES, RAIZ, Contexto, Resultado, clases_activas, datos_js, fuente_celda, leer_nb, notebook_de,
                    objetivos_spine, pagina_de, rel, sopa, spines)
 
 TAG_RE = re.compile(r"^objetivo:(\S+)$")
@@ -65,7 +65,7 @@ def correr(ctx: Contexto) -> Resultado:
     M = datos_js()["modulos"]
     filas_md, secciones_html = [], []
     cubiertos = total_obj = 0
-    for c in clases():
+    for c in clases_activas():
         cid = c["id"]
         pag, nbp = pagina_de(c), notebook_de(c)
         mp, nbloques, nmarc = marcas_pagina(pag) if pag.exists() else ({}, 0, 0)

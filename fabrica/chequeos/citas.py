@@ -8,7 +8,7 @@ import re
 import subprocess
 import unicodedata
 
-from comun import (CHEQUEOS, RAIZ, Contexto, Resultado, clases, notebook_de, pagina_de, rel, spines, texto_completo_nb)
+from comun import (CHEQUEOS, RAIZ, Contexto, Resultado, clases_activas, notebook_de, pagina_de, rel, spines, texto_completo_nb)
 
 LLAMADA = re.compile(r"Cueva\.pagina\s*\(")
 JUSTIF_HTML = re.compile(r"<!--\s*fabrica:sin-lecturas\s+(.+?)-->", re.S)
@@ -77,7 +77,7 @@ def correr(ctx: Contexto) -> Resultado:
     r = Resultado("citas")
     S = spines()
     llamadas, claves = [], []
-    for c in clases():
+    for c in clases_activas():
         p = pagina_de(c)
         if not p.exists():
             continue

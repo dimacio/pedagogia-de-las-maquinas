@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import re
 
-from comun import RAIZ, Contexto, Resultado, clase_por_id, clases, objetivos_spine, rel, spines
+from comun import RAIZ, Contexto, Resultado, clase_por_id, clases, en_preparacion, objetivos_spine, rel, spines
 
-OBLIGATORIOS = ("id", "titulo", "trimestre", "estado", "pagina", "notebook", "previos", "objetivos", "fuentes")
+OBLIGATORIOS = ("id", "titulo", "unidad", "estado", "pagina", "notebook", "previos", "objetivos", "fuentes")
 ESTADOS = {"borrador", "en-produccion", "publicada"}
 OBJ_RE, FUENTE_RE = re.compile(r"^O\d+$"), re.compile(r"^F\d+$")
 CUBRE_RE = re.compile(r"^#{2,4}\s.*\(cubre:\s*([^)]*)\)", re.M)
@@ -16,6 +16,7 @@ def correr(ctx: Contexto) -> Resultado:
     r = Resultado("spines")
     S = spines()
     cls = clase_por_id()
+    prep = en_preparacion()
     if not S:
         r.falla(f"faltan specs: no hay ningún specs/<id>.md (se esperan {len(cls)}: {', '.join(cls)})")
         return r.cerrar(f"0 de {len(cls)} spines")
@@ -40,21 +41,26 @@ def correr(ctx: Contexto) -> Resultado:
             r.falla(f"{k}: `titulo` vacío")
         elif c and y["titulo"] != c["titulo"]:
             r.aviso(f"{k}: titulo «{y['titulo']}» distinto del de cueva.js «{c['titulo']}»")
-        tri = y.get("trimestre")
-        if tri not in (1, 2, 3, 4, "N"):
-            r.falla(f"{k}: trimestre = {tri!r} (1–4 o \"N\")")
-        elif c and str(tri) != str(c.get("trimestre")):
-            r.falla(f"{k}: trimestre {tri} distinto del de cueva.js ({c.get('trimestre')})")
+        uni = y.get("unidad")
+        if uni not in (1, 2, 3, 4, "N"):
+            r.falla(f"{k}: unidad = {uni!r} (1–4 o \"N\")")
+        elif c and str(uni) != str(c.get("unidad")):
+            r.falla(f"{k}: unidad {uni} distinta de la de cueva.js ({c.get('unidad')})")
         if "estado" in y and y["estado"] not in ESTADOS:
             r.falla(f"{k}: estado = {y['estado']!r} (borrador | en-produccion | publicada)")
+        pronto = cid in prep
+        if pronto and y.get("estado") != "borrador":
+            r.falla(f"{k}: la clase está en preparación (pronto en cueva.js) y su estado es «{y.get('estado')}»")
         pag = y.get("pagina")
-        if not pag or not (RAIZ / str(pag)).is_file():
+        if pronto and pag and not (RAIZ / str(pag)).is_file():
+            r.aviso(f"{k}: en preparación, todavía sin página")
+        elif not pag or not (RAIZ / str(pag)).is_file():
             r.falla(f"{k}: pagina «{pag}» no existe")
         elif c and pag != f"clases/{c['archivo']}":
             r.falla(f"{k}: pagina «{pag}» distinta de la de cueva.js (clases/{c['archivo']})")
         if "notebook" in y:
             nb = y["notebook"]
-            if nb is not None and not (RAIZ / str(nb)).is_file():
+            if nb is not None and not (RAIZ / str(nb)).is_file() and not pronto:
                 r.falla(f"{k}: notebook «{nb}» no existe")
             esperado = f"notebooks/{c['nb']}" if c and c.get("nb") else None
             if c and nb != esperado:
@@ -67,7 +73,9 @@ def correr(ctx: Contexto) -> Resultado:
                 if str(pv) not in cls:
                     r.falla(f"{k}: previo «{pv}» no es un id de clase")
         objs = y.get("objetivos")
-        if not isinstance(objs, list) or not objs:
+        if pronto and objs == []:
+            pass
+        elif not isinstance(objs, list) or not objs:
             r.falla(f"{k}: objetivos tiene que ser una lista no vacía")
         else:
             for i, o in enumerate(objs, 1):
