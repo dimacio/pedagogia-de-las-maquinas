@@ -5,8 +5,8 @@ Contrato entre los spines, los artefactos y los chequeos. Si algo de este archiv
 ## 1. El spine de cada clase: `specs/<id>.md`
 
 Un archivo por clase, con nombre igual al id: `specs/0a.md`, `specs/0b.md`, `specs/0c.md`, `specs/1.md` … `specs/16.md`.
-Una clase en preparación lleva `pronto: true` en `CLASES` de `assets/cueva.js` y su spine en `estado: borrador`, con `objetivos` y
-`fuentes` vacíos hasta `/disenar-clase`; los chequeos la saltean salvo `spines`. Los spines de la v1 están en `specs/v1/` y no se chequean.
+Una clase en preparación lleva `pronto: true` en `CLASES` de `assets/cueva.js` y su spine en `estado: borrador` (o `en-produccion` después
+de `/disenar-clase`), con `objetivos` y `fuentes` vacíos hasta `/disenar-clase`; `/producir-clase` quita `pronto` cuando la página existe; los chequeos la saltean salvo `spines`. Los spines de la v1 están en `specs/v1/` y no se chequean.
 Es la **fuente de verdad**: lo escribe el autor; los agentes lo leen y nunca lo cambian sin pedirlo en el PR.
 
 Encabezado YAML (obligatorio):

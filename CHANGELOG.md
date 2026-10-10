@@ -18,6 +18,7 @@ Formato: una sección por versión (SemVer sobre el curso, ver `fabrica/CONVENCI
 
 ### Pendiente
 - Marcas de trazabilidad en páginas (`data-objetivos`) y notebooks (`objetivo:Ox`): hoy el chequeo `trazabilidad` falla.
+- Referencias a la numeración vieja en los notebooks de nivelación (0a–0c) y de la clase 2 (se corrigen en sus builders).
 - Rediseño de las clases con `/disenar-clase`, una por vez, usando CS234 y CS224R como guía. Falta policy gradient.
 
 ## [1.0.0] — 2026-10-08

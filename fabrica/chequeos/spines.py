@@ -49,8 +49,9 @@ def correr(ctx: Contexto) -> Resultado:
         if "estado" in y and y["estado"] not in ESTADOS:
             r.falla(f"{k}: estado = {y['estado']!r} (borrador | en-produccion | publicada)")
         pronto = cid in prep
-        if pronto and y.get("estado") != "borrador":
-            r.falla(f"{k}: la clase está en preparación (pronto en cueva.js) y su estado es «{y.get('estado')}»")
+        if pronto and y.get("estado") not in ("borrador", "en-produccion"):
+            r.falla(f"{k}: estado «{y.get('estado')}» con la clase en preparación: quitá `pronto` de CLASES en cueva.js "
+                    f"(cuando la página ya existe) o volvé el estado a borrador / en-produccion")
         pag = y.get("pagina")
         if pronto and pag and not (RAIZ / str(pag)).is_file():
             r.aviso(f"{k}: en preparación, todavía sin página")
