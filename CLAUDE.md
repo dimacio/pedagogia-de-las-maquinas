@@ -37,6 +37,8 @@ Las clases en preparación llevan `pronto: true` en `CLASES` y su spine en `esta
 6. **Castellano rioplatense neutro**, términos técnicos en inglés entre paréntesis la primera vez. Sin emojis.
 7. **Honestidad sobre los modelos chicos**: si Qwen 0.5B lo hace mal, se dice y se usa como lección.
 8. **Trazabilidad**: marcas de objetivos según `fabrica/CONVENCIONES.md` §2 en página, notebook y cuestionario.
+9. **Marco filosófico**: todo cambio al marco filosófico (clase 1, README y menciones en otras clases) respeta `fabrica/marco-filosofico.md`:
+   Freire y Foucault plantean la pregunta, Dawkins explica la propagación y Pataranutaporn entra como evidencia, no como cuarta idea.
 
 ## Definición de terminado (para cualquier PR de contenido)
 
