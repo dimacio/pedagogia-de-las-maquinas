@@ -248,8 +248,8 @@ window.MODULOS = {
   "1": {
     objetivos: [
       "Distinguir educación bancaria de educación problematizadora (Freire) y explicar por qué el curso propone enseñarle a una máquina en lugar de recibir contenidos.",
-      "Explicar qué significa que un feed optimice con γ ≈ 0 y relacionarlo con la recompensa inmediata.",
-      "Explicar la relación entre cuidado de sí y conocimiento de sí que plantea Foucault, y leerla como la pregunta de quién elige la función de recompensa.",
+      "Explicar qué pierde un agente que decide solo por la recompensa inmediata, con el feed como ejemplo.",
+      "Leer el cuidado de sí (Foucault) como la pregunta de quién elige la función de recompensa y reconocer en un día propio los pesos que puso otro.",
       "Usar fidelidad, fecundidad y longevidad (Dawkins) para explicar cómo se propaga el curso."
     ],
     tiempo: { pagina: 40 },
@@ -269,14 +269,14 @@ window.MODULOS = {
       },
       {
         objetivo: "O2",
-        pregunta: "En la figura del feed se dice que funciona con γ ≈ 0. ¿Qué significa?",
+        pregunta: "En la figura «El feed mira solo el próximo clic», ¿qué optimiza el feed al elegir cada tarjeta y qué pierde al decidir así?",
         opciones: [
-          { texto: "Que no muestra ningún contenido.", explicacion: "No: muestra contenido sin parar; γ no mide cuánto muestra." },
-          { texto: "Que pesa el futuro tanto como el presente.", explicacion: "No: eso sería γ cerca de 1." },
-          { texto: "Que elige cada contenido mirando solo la recompensa inmediata, el próximo clic.", explicacion: "Correcto. Con γ ≈ 0 lo que pase después no cuenta en la decisión de ahora." },
-          { texto: "Que el usuario elige cada tarjeta.", explicacion: "No: en la figura las tarjetas llegan solas; tus decisiones quedan en 0." }
+          { texto: "Elige la tarjeta que más te sirve a lo largo del día; no pierde nada, porque cada clic también suma para después.", explicacion: "No: en la figura el feed elige «Clip 15 s» o «Clickbait» aunque dejen casi 0 para después; lo que llega tarde no entra en su cuenta." },
+          { texto: "Elige la tarjeta con más chances de clic ahora; junta más clics, pero pierde lo que cada tarjeta deja para después: lo aprendido, la charla con alguien, el resto del día.", explicacion: "Correcto. Es un agente que decide solo por la recompensa inmediata. En la clase 3 esto se llama descuento γ, y en este feed vale casi 0." },
+          { texto: "Elige sumando el clic de ahora y lo que deja para después; por eso junta menos clics que la otra fila.", explicacion: "No: eso describe la segunda fila, la de quien elige sumando lo que viene después; el feed mira solo el clic de ahora." },
+          { texto: "Elige al azar entre las cuatro candidatas; lo que pierde son clics.", explicacion: "No: el feed no elige al azar, se queda siempre con la candidata de barra «clic ahora» más larga, y es la fila que más clics junta." }
         ],
-        correcta: 2
+        correcta: 1
       },
       {
         objetivo: "O3",
@@ -301,15 +301,15 @@ window.MODULOS = {
         correcta: 3
       },
       {
-        objetivo: "O2",
-        pregunta: "¿Qué dice el curso sobre la dopamina y las redes?",
+        objetivo: "O3",
+        pregunta: "En el recuadro «Esto hoy se mide», el estudio de cuatro semanas con 981 personas (Fang et al., 2025), ¿qué encontró y qué no se puede concluir de él?",
         opciones: [
-          { texto: "Que el «loop de dopamina» está demostrado y explica la adicción a las redes.", explicacion: "No: el curso lo presenta como metáfora y aclara que la adicción a redes es un tema en debate." },
-          { texto: "Que hay evidencia de que la dopamina señala un error de predicción de recompensa (Schultz, Dayan y Montague, 1997), y que el «loop de dopamina» es una metáfora.", explicacion: "Correcto. Lo primero se ve en la clase 5 junto al aprendizaje por diferencias temporales; lo segundo es una advertencia honesta." },
-          { texto: "Que la dopamina no tiene relación con la recompensa.", explicacion: "No: justamente el trabajo de 1997 la vincula con el error de predicción de recompensa." },
-          { texto: "Que el curso cura el uso excesivo del celular.", explicacion: "No: el curso no promete eso; propone ver el mecanismo." }
+          { texto: "Que el chatbot causa soledad: las condiciones que asignaron los investigadores aumentaron la soledad y la dependencia.", explicacion: "No: según el recuadro, las condiciones asignadas no cambiaron los resultados; afirmar que el chatbot causa soledad es sobreafirmar." },
+          { texto: "Que el uso intenso aumenta la soledad en cualquier persona y por años, porque el estudio fue grande.", explicacion: "No: fueron cuatro semanas con un grupo concreto; no se puede generalizar al largo plazo ni a todas las personas, y además es una asociación, no un efecto." },
+          { texto: "Que quienes usaron más el chatbot por su cuenta reportaron más soledad y más dependencia emocional; es una asociación, y no se puede concluir que el chatbot cause la soledad.", explicacion: "Correcto. El recuadro dice qué se midió y su límite: el uso voluntario intenso va junto con más soledad, pero eso no prueba causa." },
+          { texto: "Que, como hoy se mide, la pregunta de Foucault ya está respondida y no hace falta elegir los propios pesos.", explicacion: "No: el recuadro dice que la pregunta de Foucault no se responde con un experimento; los estudios la acompañan, no la reemplazan." }
         ],
-        correcta: 1
+        correcta: 2
       }
     ],
     actividad: {
