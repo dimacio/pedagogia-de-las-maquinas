@@ -325,76 +325,76 @@ window.MODULOS = {
 
   "2": {
     objetivos: [
-      "Identificar agente, entorno, acción, observación y recompensa en la cueva y en otro problema.",
+      "Identificar agente, entorno, acción, observación, recompensa y política en la cueva y en otro problema.",
+      "Explicar qué maximiza el agente (la suma de recompensas) y por qué una recompensa escasa y demorada, sin mapa ni respuesta correcta, vuelve difícil aprender.",
       "Distinguir historia de estado y decidir si una observación cumple el supuesto de Markov.",
-      "Explicar con el tutor de sumas y restas qué es la trampa de la recompensa (reward hacking).",
-      "Proponer una recompensa alternativa y anticipar cómo podría ser engañada."
+      "Explicar con el tutor la trampa de la recompensa, proponer una recompensa alternativa y anticipar cómo podría ser engañada."
     ],
-    tiempo: { pagina: 25, notebook: 60 },
+    tiempo: { pagina: 35, notebook: 60 },
     previos: ["0a", "0b"],
     requisitos: ["Haber jugado un rato a la cueva a ciegas en modo fácil."],
     cuestionario: [
       {
         objetivo: "O1",
-        pregunta: "En la cueva el agente recibe 0 durante 21 pasos seguidos y +1 al final. ¿Qué dificultad muestra eso?",
+        pregunta: "Un termostato decide cada 10 minutos si prende o apaga la calefacción. Lee la temperatura de la habitación y recibe −1 cada vez que alguien de la casa lo cambia a mano. ¿Qué lista nombra bien las partes?",
         opciones: [
-          { texto: "Que la recompensa es escasa y llega tarde: mientras recibe 0, perderse y acercarse se ven igual.", explicacion: "Correcto. Sin pistas intermedias, el agente no sabe si iba bien hasta que llega." },
-          { texto: "Que la recompensa está mal programada.", explicacion: "No: es un diseño deliberado y muy común; muchas tareas solo pagan al final." },
-          { texto: "Que el agente no tiene acciones suficientes.", explicacion: "No: con las cuatro flechas puede llegar; el problema es saber cuáles convenían." },
-          { texto: "Que el entorno no es determinista.", explicacion: "No: en esta cueva el mismo paso da siempre lo mismo." }
+          { texto: "Agente: la persona que lo cambia a mano. Entorno: la calefacción. Acción: el cambio a mano. Recompensa: la temperatura.", explicacion: "No: la persona es parte del entorno. Quien decide en cada paso es el termostato, y la temperatura es lo que lee, no lo que cobra." },
+          { texto: "Agente: el termostato. Entorno: la casa con su gente. Acción: prender o apagar. Observación: la temperatura. Recompensa: el −1.", explicacion: "Correcto. El termostato elige, la casa responde con una temperatura y con el −1 cuando alguien lo corrige a mano." },
+          { texto: "Agente: el termostato. Entorno: la casa. Acción: la temperatura que mide. Observación: prender o apagar. Recompensa: el −1.", explicacion: "No: están cruzadas. Prender o apagar es lo que el termostato elige (acción); la temperatura es lo que le devuelve el mundo (observación)." },
+          { texto: "Agente: el termostato. Entorno: la casa. Acción: prender o apagar. Observación: el −1. Recompensa: la temperatura de la habitación.", explicacion: "No: la temperatura la observa, pero no es lo que se busca maximizar. El número que se suma es el −1 por cada corrección a mano." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O2",
+        pregunta: "En la partida al azar del notebook el agente recibió 1833 ceros seguidos y un +1 en el paso 1834. ¿Por qué una recompensa así vuelve difícil aprender?",
+        opciones: [
+          { texto: "Porque la suma total, 1, es demasiado chica para que el agente pueda aprender algo de ella.", explicacion: "No: la partida de las flechas también suma 1. El problema no es el tamaño del número sino cuándo llega y qué no dice." },
+          { texto: "Porque el agente al azar nunca sale de la cueva, así que nunca llega a ver un +1.", explicacion: "No: en esa partida sí salió, en el paso 1834. Con el límite de 200 pasos sale poco (3.7 % de los episodios), pero sale." },
+          { texto: "Porque el entorno conoce la flecha correcta de cada paso y se la muestra al agente recién al final.", explicacion: "No: en RL nadie da la flecha correcta, ni durante la partida ni al final. El +1 dice que salió, no qué convenía en cada casilla." },
+          { texto: "Porque ningún número dice cuál de los 1834 pasos fue el bueno: el mérito se reparte entre todos.", explicacion: "Correcto. Mientras recibe 0, perderse y acercarse se ven igual; es una recompensa escasa y demorada." }
+        ],
+        correcta: 3
+      },
+      {
+        objetivo: "O3",
+        pregunta: "Las historias A (6 pasos) y B (18 pasos) terminan en la misma casilla. Si en vez de la casilla el agente usara como estado la cantidad de pasos que lleva dados, ¿cumpliría el supuesto de Markov?",
+        opciones: [
+          { texto: "No: con igual cantidad de pasos se puede estar en casillas que piden flechas distintas.", explicacion: "Correcto. A llega a esa casilla en 6 pasos y B en 18; contar pasos no dice dónde está el agente, y eso es lo que decide qué conviene." },
+          { texto: "Sí: la cantidad de pasos resume toda la historia, porque crece en cada paso igual que ella.", explicacion: "No: que crezcan juntas no la convierte en un resumen útil. El estado tiene que alcanzar para decidir, y el conteo no alcanza." },
+          { texto: "Sí, siempre que el agente no choque, porque así cada paso lo acerca un poco a la salida.", explicacion: "No: sin chocar también se puede ir y volver por los mismos pasillos, como el agente al azar. El conteo sigue sin decir dónde está." },
+          { texto: "No, porque el supuesto de Markov pide guardar la historia completa, no un solo número.", explicacion: "No: es al revés. Markov dice que un resumen (en la cueva, la casilla) alcanza y que el resto de la historia ya no importa." }
         ],
         correcta: 0
       },
       {
-        objetivo: "O2",
-        pregunta: "¿Qué es el estado?",
+        objetivo: "O1",
+        pregunta: "En el paso 7, un tutor le da problemas de suma o de resta a un alumno y cobra +1 si acierta y −1 si se equivoca. ¿Qué es la política del tutor?",
         opciones: [
-          { texto: "La historia completa de acciones, observaciones y recompensas.", explicacion: "Eso es la historia hₜ. El estado es un resumen de ella." },
-          { texto: "Un resumen de la historia que alcanza para decidir.", explicacion: "Correcto. sₜ = f(hₜ): lo mínimo que hay que recordar para elegir bien." },
-          { texto: "La última observación, siempre.", explicacion: "A veces alcanza (si es Markov), pero no siempre: con solo bigotes no alcanza." },
-          { texto: "El mapa completo de la cueva.", explicacion: "El agente no tiene el mapa; eso lo conoce solo el entorno." }
+          { texto: "El problema concreto que da en cada turno: una suma o una resta.", explicacion: "No: eso es la acción. La política es la regla que decide cuál de las dos dar." },
+          { texto: "El +1 o el −1 que cobra cada vez que el alumno acierta o se equivoca.", explicacion: "No: eso es la recompensa, lo que el tutor busca sumar." },
+          { texto: "La regla con la que elige el próximo problema según lo que vio del alumno.", explicacion: "Correcto. a = π(s): el estado es lo que vio del alumno y la política dice qué problema dar con eso." },
+          { texto: "La habilidad real del alumno en suma y en resta, que sube cada vez que practica.", explicacion: "No: eso está dentro del entorno y queda oculto para el tutor; cómo cambia al practicar es la dinámica." }
         ],
-        correcta: 1
+        correcta: 2
       },
       {
         objetivo: "O4",
-        pregunta: "Para enderezar al tutor cambiás la recompensa: +1 por cada resta acertada y 0 por todo lo demás. ¿Qué trampa nueva podría aparecer?",
+        pregunta: "Para enderezar al tutor, la escuela le paga +1 solo si el alumno aprueba el examen final de restas, que todos los años tiene las mismas diez cuentas. ¿Qué trampa nueva podría aparecer?",
         opciones: [
-          { texto: "Ninguna: si solo se premian las restas, el tutor tiene que enseñar a restar.", explicacion: "No: premiar restas acertadas no es lo mismo que premiar que el alumno aprenda; el tutor puede cobrar sin que aprenda." },
-          { texto: "Dar restas cada vez más fáciles (como 5 − 0) para cobrar aciertos sin que el alumno aprenda a restar de verdad.", explicacion: "Correcto. El tutor sigue optimizando el número que le pedimos: si lo que paga es acertar restas, conviene que sean triviales." },
-          { texto: "Volver a dar solo sumas, porque son más fáciles.", explicacion: "No: con esta recompensa una suma acertada paga 0, así que las sumas dejaron de convenir." },
-          { texto: "Dejar de dar problemas, porque ya no hay castigo por equivocarse.", explicacion: "No: sin problemas no cobra nada; la recompensa sigue empujando a dar restas, y el riesgo está en cuáles." }
+          { texto: "Volver a dar solo sumas, porque se aciertan más rápido y suman puntos.", explicacion: "No: con esta recompensa una suma acertada no paga nada; solo cuenta aprobar el examen de restas." },
+          { texto: "Hacerle practicar esas diez restas hasta que las memorice, sin enseñarle a restar.", explicacion: "Correcto. El tutor optimiza aprobar ese examen, no saber restar: si el examen se repite, conviene enseñar las respuestas." },
+          { texto: "Ninguna: el examen es de restas, así que aprobarlo prueba que el alumno sabe restar.", explicacion: "No: prueba que acierta esas diez cuentas. Lo que pedimos (aprobar) y lo que queremos (que reste) se pueden separar." },
+          { texto: "Dar problemas al azar, porque durante la práctica el tutor ya no cobra nada por acertar.", explicacion: "No: que el pago llegue recién al final lo vuelve más difícil de aprender, pero la política que más cobra es la que asegura el examen." }
         ],
         correcta: 1
-      },
-      {
-        objetivo: "O2",
-        pregunta: "Si el agente solo siente cuatro bigotes (paredes vecinas), las 60 casillas dan 12 lecturas distintas. ¿Por qué eso rompe el supuesto de Markov?",
-        opciones: [
-          { texto: "Porque 12 lecturas son demasiadas para aprender.", explicacion: "No: el problema no es la cantidad, es que se mezclan casillas distintas." },
-          { texto: "Porque casillas que se sienten igual pueden pedir flechas distintas.", explicacion: "Correcto. Un pasillo vertical se siente igual en toda la cueva, pero en unos conviene subir y en otros bajar." },
-          { texto: "Porque los bigotes a veces fallan.", explicacion: "En la figura los bigotes no fallan; aun siendo exactos no alcanzan." },
-          { texto: "No lo rompe: con bigotes el agente sabe dónde está.", explicacion: "No: los bigotes describen el entorno inmediato, no la posición." }
-        ],
-        correcta: 1
-      },
-      {
-        objetivo: "O3",
-        pregunta: "El tutor cobra +1 si el alumno acierta y −1 si se equivoca. ¿Qué política le da más recompensa?",
-        opciones: [
-          { texto: "Alternar sumas y restas.", explicacion: "Ese alumno aprende más, pero el tutor cobra menos: el alumno se equivoca mucho al principio." },
-          { texto: "Mayormente restas.", explicacion: "Es la que más enseña a restar y la que peor paga con +1/−1." },
-          { texto: "Solo sumas, y el alumno nunca aprende a restar.", explicacion: "Correcto. El tutor optimiza lo que le pedimos (aciertos), no lo que queríamos (aprendizaje): es la trampa de la recompensa." },
-          { texto: "Todas dan lo mismo.", explicacion: "No: el gráfico ordena las políticas al revés según qué se mida." }
-        ],
-        correcta: 2
       }
     ],
     actividad: {
       titulo: "Tu propio tutor tramposo",
-      consigna: "Elegí un problema real donde alguien (persona o programa) es premiado por un número: un tutor, un vendedor, una app. Escribí agente, entorno, acción, observación y recompensa; describí una forma en que el agente podría cobrar mucho sin lograr lo que se quería, y proponé una recompensa mejor. Publicalo en Discussions; un compañero busca una trampa nueva en tu recompensa corregida y te devuelve la rúbrica.",
+      consigna: "Elegí un problema real donde alguien (persona o programa) es premiado por un número: un tutor, un vendedor, una app. Escribí agente, entorno, acción, observación, recompensa y política; describí una forma en que el agente podría cobrar mucho sin lograr lo que se quería, y proponé una recompensa mejor. Publicalo en Discussions; un compañero busca una trampa nueva en tu recompensa corregida y te devuelve la rúbrica.",
       rubrica: [
-        "Los cinco elementos están bien identificados y la acción la elige el agente, no el entorno.",
+        "Los seis elementos están bien identificados: la acción la elige el agente, no el entorno, y la política es la regla que la elige.",
         "La trampa es concreta y verosímil, como el tutor que solo da sumas.",
         "La recompensa corregida es medible y cierra la trampa, o reconoce con honestidad qué queda abierto."
       ]
