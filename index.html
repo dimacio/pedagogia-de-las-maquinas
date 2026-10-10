@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>RL a ciegas</title>
-<meta name="description" content="Curso libre y abierto (MOOC) de aprendizaje por refuerzo, en castellano: doce clases en cuatro trimestres, contadas desde un juego, una cueva a oscuras y una salida verde.">
+<meta name="description" content="Curso libre y abierto (MOOC) de aprendizaje por refuerzo, en castellano: dieciséis clases en cuatro unidades, una por semana: un cuatrimestre, contadas desde un juego, una cueva a oscuras y una salida verde.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -27,6 +27,8 @@
   .clase { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; text-decoration: none; color: var(--ink);
     background: var(--rock); border: 1px solid var(--rock-2); border-radius: 4px; padding: 12px 14px; }
   .clase:hover { border-color: var(--lamp); color: var(--ink); }
+  .clase.pronto { opacity: .6; }
+  .clase.pronto:hover { border-color: var(--rock-2); }
   .clase .num { font-family: var(--display); font-size: 20px; color: var(--exit); grid-row: span 2; align-self: start; min-width: 2.2ch; }
   .clase b { font-size: 15.5px; }
   .clase span { color: var(--muted); font-size: 13.5px; }
@@ -80,7 +82,7 @@
 
   <section class="seccion" id="clases">
     <h2>El recorrido</h2>
-    <p class="prose muted">Doce clases en cuatro trimestres de tres, desde la primera definición hasta Deep RL y los agentes. Antes, una nivelación optativa: Python, probabilidad y álgebra lineal, todo explicado con la misma cueva. Se basa en las primeras clases de Stanford CS234 y en el libro de Sutton y Barto.</p>
+    <p class="prose muted">Dieciséis clases en cuatro unidades de cuatro, una por semana: un cuatrimestre, desde la primera definición hasta los agentes de lenguaje. Las que dicen «próximamente» están en preparación. Antes, una nivelación optativa: Python, probabilidad y álgebra lineal, todo explicado con la misma cueva. Se basa en las primeras clases de Stanford CS234 y en el libro de Sutton y Barto.</p>
     <div class="ruta" id="ruta"></div>
   </section>
 
@@ -118,18 +120,24 @@
 <script>
   // recorrido
   const DESC = {
-    "1": "Por qué este curso: Freire, Foucault y el curso como meme.", "7": "Cuando la casilla no alcanza: memoria y modelos de lenguaje.",
-    "10": "El modelo de lenguaje como política: la acción es texto.", "11": "Difusión y tutor: a favor de quién juega la recompensa.", "12": "Proyecto final, el recorrido entero y cómo se propaga.",
     "0a": "La cueva es una matriz y una imagen.", "0b": "Variables aleatorias y Bayes con un piso que resbala.", "0c": "Bellman como sistema lineal: una matriz por clase.",
-    "2": "Agente, entorno, historia, estado y el tutor de IA.", "3": "Descuento, Bellman e iteración de valor.", "4": "Monte Carlo, TD y Q-learning.",
-    "5": "Recompensa escasa, curiosidad y Go-Explore.", "6": "De la tabla Q a una red neuronal.", "8": "Marketing, tutores, robots, deep search y RLHF.",
-    "9": "El feed, RL sin simulador (ReAgent) y agentes de LLM."
+    "1": "Por qué este curso: Freire, Foucault y el curso como meme.", "2": "Agente, entorno, historia, estado y el tutor de IA.",
+    "3": "De la cadena de Markov al retorno, el descuento y Bellman.", "4": "Iteración de valor y de política con el mapa a la vista.",
+    "5": "Monte Carlo contra TD: estimar el valor jugando.", "6": "ε-greedy, SARSA y Q-learning: decidir sin mapa.",
+    "7": "Bandits, UCB y Go-Explore: probar lo que no conocés.", "8": "Q como función: una red en lugar de la tabla, y DQN.",
+    "9": "Cuando la casilla no alcanza: memoria y modelos de lenguaje.", "10": "Imitar partidas grabadas y aprender solo de registros.",
+    "11": "Reforzar lo que salió bien: REINFORCE, línea base y crítico.", "12": "De preferencias entre trayectos a una recompensa: RLHF y DPO.",
+    "13": "El modelo de lenguaje como política: la acción es un token.", "14": "ReAct, herramientas y los riesgos de una recompensa engañable.",
+    "15": "Tutor y difusión: a favor de quién juega la recompensa.", "16": "Proyecto final, el recorrido entero y cómo se propaga."
   };
-  const grupos = [["Nivelación (optativa)", Cueva.CLASES.filter(c => c.trimestre === "N")], ...[1, 2, 3, 4].map(t => [`Trimestre ${t}`, Cueva.CLASES.filter(c => c.trimestre === t)]),
+  const UNIDADES = ["Fundamentos", "Sin mapa", "De la red a la política", "Lenguaje y agentes"];
+  const grupos = [["Nivelación (optativa)", Cueva.CLASES.filter(c => c.unidad === "N")], ...[1, 2, 3, 4].map(u => [`Unidad ${u} · ${UNIDADES[u - 1]}`, Cueva.CLASES.filter(c => c.unidad === u)]),
     ["Epílogo", [{ id: "∞", archivo: "../difusion/estrategia.html", titulo: "Cómo se propaga este curso" }]]];
   DESC["∞"] = "La campaña de difusión resuelta como bandit.";
   document.getElementById("ruta").innerHTML = grupos.map(([n, cs]) => `<div class="tramo"><div class="nombre">${n}</div><div class="clases">${
-    cs.map(c => `<a class="clase" href="clases/${c.archivo}"><span class="num">${c.id}</span><b>${c.titulo}</b><span>${DESC[c.id] || ""}</span></a>`).join("")}</div></div>`).join("");
+    cs.map(c => c.pronto
+      ? `<div class="clase pronto"><span class="num">${c.id}</span><b>${c.titulo}</b><span>Próximamente. ${DESC[c.id] || ""}</span></div>`
+      : `<a class="clase" href="clases/${c.archivo}"><span class="num">${c.id}</span><b>${c.titulo}</b><span>${DESC[c.id] || ""}</span></a>`).join("")}</div></div>`).join("");
   document.getElementById("ghLink").href = "https://github.com/" + Cueva.REPO;
 
   // héroe: el valor se derrama por la cueva grande y vuelve a empezar

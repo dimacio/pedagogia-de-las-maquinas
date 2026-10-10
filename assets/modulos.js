@@ -305,7 +305,7 @@ window.MODULOS = {
         pregunta: "¿Qué dice el curso sobre la dopamina y las redes?",
         opciones: [
           { texto: "Que el «loop de dopamina» está demostrado y explica la adicción a las redes.", explicacion: "No: el curso lo presenta como metáfora y aclara que la adicción a redes es un tema en debate." },
-          { texto: "Que hay evidencia de que la dopamina señala un error de predicción de recompensa (Schultz, Dayan y Montague, 1997), y que el «loop de dopamina» es una metáfora.", explicacion: "Correcto. Lo primero se ve en la clase 4 junto al aprendizaje por diferencias temporales; lo segundo es una advertencia honesta." },
+          { texto: "Que hay evidencia de que la dopamina señala un error de predicción de recompensa (Schultz, Dayan y Montague, 1997), y que el «loop de dopamina» es una metáfora.", explicacion: "Correcto. Lo primero se ve en la clase 5 junto al aprendizaje por diferencias temporales; lo segundo es una advertencia honesta." },
           { texto: "Que la dopamina no tiene relación con la recompensa.", explicacion: "No: justamente el trabajo de 1997 la vincula con el error de predicción de recompensa." },
           { texto: "Que el curso cura el uso excesivo del celular.", explicacion: "No: el curso no promete eso; propone ver el mecanismo." }
         ],

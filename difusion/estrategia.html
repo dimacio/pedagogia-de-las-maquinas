@@ -137,11 +137,11 @@
   <section class="material" aria-label="Material de la difusión">
     <div class="item"><h3>Los 12 posts</h3><a href="posts/grilla.png"><img class="posts-img" src="posts/grilla.png" alt="Grilla de perfil con los 12 posts de la campaña, del 12 arriba a la izquierda al 1 abajo a la derecha" loading="lazy" width="1080" height="1800"></a><p class="small">Imágenes de 1080×1350 en <code>difusion/posts/</code>.</p></div>
     <div class="item"><h3>Textos y calendario</h3><p class="small">Pie de cada post, hashtags, texto alternativo y el tipo de acción del bandit; 12 posts en 4 semanas.</p><p class="small"><a id="lnTextos" href="textos.md">Abrir textos.md</a></p></div>
-    <div class="item"><h3>Notebook</h3><p class="small">Clase 8, sección final: la difusión de este curso como bandit, con una celda para pegar las métricas reales.</p><p class="row small"><a id="lnColab" href="#">Abrir en Colab</a><a id="lnNb" href="#">Ver en GitHub</a></p></div>
+    <div class="item"><h3>Notebook</h3><p class="small">Notebook 08 del recorrido anterior (v1), sección final: la difusión de este curso como bandit, con una celda para pegar las métricas reales.</p><p class="row small"><a id="lnColab" href="#">Abrir en Colab</a><a id="lnNb" href="#">Ver en GitHub</a></p></div>
   </section>
 
   <nav class="pager" aria-label="Clases">
-    <a href="../clases/11-agentes-aplicados.html"><span>← Clase 11</span><b>Agentes aplicados</b></a>
+    <a href="../index.html#clases"><span>← El recorrido</span><b>Las dieciséis clases</b></a>
     <a class="next" href="../index.html"><span>Volver →</span><b>Portada</b></a>
   </nav>
 </main>
@@ -153,8 +153,8 @@
   const COL = Cueva.COL();
   const quieto = matchMedia("(prefers-reduced-motion: reduce)").matches;
   document.getElementById("gh").href = "https://github.com/" + Cueva.REPO;
-  document.getElementById("lnColab").href = Cueva.colab("08-aplicaciones.ipynb");
-  document.getElementById("lnNb").href = Cueva.github("notebooks/08-aplicaciones.ipynb");
+  document.getElementById("lnColab").href = `https://colab.research.google.com/github/${Cueva.REPO}/blob/main/build/v1/notebooks/08-aplicaciones.ipynb`;
+  document.getElementById("lnNb").href = Cueva.github("build/v1/notebooks/08-aplicaciones.ipynb");
   document.getElementById("lnTextos").href = Cueva.github("difusion/textos.md");
   const $ = id => document.getElementById(id);
   const fmt = (x, d = 1) => x.toLocaleString("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d });

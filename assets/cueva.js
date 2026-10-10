@@ -227,11 +227,12 @@
   const APROBAR = 4;   // respuestas correctas sobre 5 para aprobar
   function leerProgreso() { try { const g = JSON.parse(localStorage.getItem(CLAVE_PROGRESO) || "{}"); return g && typeof g === "object" ? g : {}; } catch (e) { return {}; } }
   function guardarProgreso(g) { try { localStorage.setItem(CLAVE_PROGRESO, JSON.stringify(g)); } catch (e) { /* sin almacenamiento */ } }
-  const aprobados = () => { const g = leerProgreso(); return CLASES.filter(c => g[c.id] && g[c.id].aprobado).length; };
+  const activas = () => CLASES.filter(c => !c.pronto);   // las clases en preparación no tienen cuestionario todavía
+  const aprobados = () => { const g = leerProgreso(); return activas().filter(c => g[c.id] && g[c.id].aprobado).length; };
   const esc = t => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
   function pintarProgreso() {
-    const n = aprobados(), tot = CLASES.length;
+    const n = aprobados(), tot = activas().length;
     document.querySelectorAll("[data-progreso]").forEach(el => {
       el.querySelector("i").style.width = (100 * n / tot) + "%";
       el.querySelector("b").textContent = `${n}/${tot}`;
