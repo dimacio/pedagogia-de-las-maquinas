@@ -17,15 +17,17 @@ Formato: una sección por versión (SemVer sobre el curso, ver `fabrica/CONVENCI
 - Clase 1: spine, página y cuestionario rediseñados. B1 (Freire) y B2 (el feed que mira solo el próximo clic, figura nueva) separados;
   γ solo como adelanto de la clase 3; B3 y B4 más cortos; recuadro «Esto hoy se mide» con Cyborg Psychology (F6, F7); Q2 sin γ y Q5
   sobre el recuadro. README: Cyborg Psychology como evidencia contemporánea.
-- Clase 2: spine rediseñado (B1 «por qué RL» con los cuatro ingredientes, política como bloque propio, objetivo E[Σr] separado del ciclo,
-  bigotes solo como adelanto de la clase 9, tutor partido en planteo y trampa).
+- Clase 2: spine, página, notebook y cuestionario rediseñados. B1 «por qué RL» (cuatro ingredientes y el contraste con supervisado),
+  política π(a|s) como bloque propio, E[Σr] separado del ciclo, Markov explicado por lo que viene, bigotes solo como adelanto de la clase 9,
+  tutor partido en planteo y trampa, recompensa de mejora calculada en el notebook; referencias con la numeración de 16 clases.
+- Chequeos: no recorren `.venv` ni `.superpowers` como sitio.
 
 ### Aviso
 - El progreso de los cuestionarios guardado en el navegador vuelve a cero (los ids cambian de significado).
 
 ### Pendiente
 - Marcas de trazabilidad en páginas (`data-objetivos`) y notebooks (`objetivo:Ox`): hoy el chequeo `trazabilidad` falla.
-- Referencias a la numeración vieja en los notebooks de nivelación (0a–0c) y de la clase 2 (se corrigen en sus builders).
+- Referencias a la numeración vieja en los notebooks de nivelación (0a–0c) (se corrigen en sus builders).
 - Rediseño de las clases con `/disenar-clase`, una por vez, usando CS234 y CS224R como guía. Falta policy gradient.
 
 ## [1.0.0] — 2026-10-08
