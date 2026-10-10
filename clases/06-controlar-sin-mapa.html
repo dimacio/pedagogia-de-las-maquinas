@@ -91,7 +91,7 @@
           <tbody id="tbEps"></tbody>
         </table>
       </div>
-      <p class="cap">Q-learning (paso 4) con α = 0,2, 300 partidas de hasta 200 pasos desde S, simulado en el navegador con otra semilla que el notebook. La línea es una partida más con el mismo ε, sin aprender. La tabla es la del notebook, con 8 semillas.</p>
+      <p class="cap">Q arranca en 0 más un ruido minúsculo que desempata las flechas como una costumbre de cada casilla: sin él, el desempate elegiría siempre ↑. Q-learning (paso 4) con α = 0,2, 300 partidas de hasta 200 pasos desde S, simulado en el navegador con otra semilla que el notebook. La línea es una partida más con el mismo ε, sin aprender. La tabla es la del notebook, con 8 semillas.</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 2</div>
@@ -218,7 +218,7 @@
       <p>"SARSA aprende de lo que de verdad hago; Q-learning, de lo mejor que podría hacer desde ahí."</p>
       <p class="nota pregunta">Pregunta para hacerle a quien te escucha: si a veces tomás una calle nueva para ver si es más corta, ¿cuánto tardás en llegar a tu casa, lo que tardarías por el mejor camino o lo que tardás de verdad con tus pruebas?</p>
       <p><b>Ejercicio de 5 minutos:</b> dibujen en el pizarrón dos casillas, A y B, con la salida después de B y dos flechas en B, → con Q = 1 porque entra a la salida y ↓ con Q = 0,2 porque va a un rincón. Una persona da el paso de A a B y tira una moneda para elegir su próxima flecha en B. La mitad de la clase corrige Q(A,→) con SARSA, usando la flecha que salió, mientras la otra mitad lo corrige con Q-learning, usando la mejor, con α = 0,5, sin descuento y Q(A,→) = 0 al empezar. Repitan cinco pasadas y comparen adónde llega cada mitad.</p>
-      <p class="small muted">Adelanto: el agente solo aprende de donde pasa. ¿Cómo explorar mejor que tirando una moneda? Viene la clase 7, explorar, de los bandits a la cueva.</p>
+      <p class="small muted">Adelanto: el agente solo aprende de donde pasa. ¿Cómo explorar mejor que tirando una moneda? Viene la clase 7, explorar, de las máquinas tragamonedas (<i>bandits</i>) a la cueva.</p>
     </div>
   </section>
 </main>

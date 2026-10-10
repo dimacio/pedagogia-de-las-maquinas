@@ -681,18 +681,18 @@ window.MODULOS = {
       },
       {
         objetivo: "O3",
-        pregunta: "Tras 2000 partidas con ε = 0,5, el max Q(S) de SARSA quedó en 0,6734 y el de Q-learning en 0,8262 (V*(S) = 0,8262), los dos con 100 % de flechas óptimas. Con ε = 0,1 quedaron en 0,7523 y 0,7545. ¿Qué lo explica?",
+        pregunta: "Tras 20 000 partidas con inicio al azar y ε = 0,5, el max Q(S) de SARSA quedó en 0,6734 y el de Q-learning en 0,8262 (V*(S) = 0,8262), los dos con 100 % de flechas óptimas. Con ε = 0,1 quedaron en 0,7523 y 0,7545. ¿Qué lo explica?",
         opciones: [
           { texto: "SARSA aprende peor que Q-learning: con ε = 0,5 muchas de sus flechas quedan desordenadas por tanta exploración, y por eso el valor que le da a S es más bajo.", explicacion: "No: con ε = 0,5 los dos tienen 100 % de flechas óptimas. La diferencia no está en las flechas sino en qué valor estima cada uno." },
           { texto: "Q-learning se equivoca por arriba: jugando con ε = 0,5 nadie cobra 0,8262, así que el valor correcto de S es el que encontró SARSA.", explicacion: "No: no hay un solo valor correcto. Q-learning estima V*, el valor de jugar perfecto; SARSA, el de jugar como juega, explorando. Cada uno acierta lo que mide." },
           { texto: "SARSA pone en el objetivo la acción que toma: aprende el valor de jugar explorando (0,6734, como con el mapa); Q-learning usa el máximo y aprende V*.", explicacion: "Correcto. SARSA es on-policy y Q-learning off-policy. Con ε = 0,1 quedan parejos: la exploración pesa poco y Q-learning, que explora poco, no siempre encuentra el camino más corto." },
-          { texto: "La diferencia viene de α: SARSA necesita un α más chico, así que con ε = 0,5 todavía no llegó a converger en 2000 partidas.", explicacion: "No: los dos usan el mismo α, y SARSA está asentado (0,6734 ± 0,0022 entre semillas). Más partidas no lo acercan a V*: su objetivo apunta a otro valor." }
+          { texto: "La diferencia viene de α: SARSA necesita un α más chico, así que con ε = 0,5 todavía no llegó a converger en 20 000 partidas.", explicacion: "No: los dos usan el mismo α, y SARSA está asentado (0,6734 ± 0,0022 entre semillas). Más partidas no lo acercan a V*: su objetivo apunta a otro valor." }
         ],
         correcta: 2
       },
       {
         objetivo: "O4",
-        pregunta: "Q-learning con ε = 0,1, 2000 partidas, 5 semillas. Error medio del valor según las visitas: 0–9, 0,9305; 10–99, 0,4130; 100–999, 0,5580; 1000 o más, 0,0775. En la semilla 0, las 10 casillas nunca pisadas tienen error entre 0,91 y 0,95. ¿Qué se lee?",
+        pregunta: "Q-learning con ε = 0,1, 2000 partidas, 5 semillas. Error medio del valor según las visitas: 0–9, 0,9305; 10–99, 0,4130; 100–999, 0,5580; 1000 o más, 0,0775. En la semilla 0, las 8 casillas nunca pisadas que lista el notebook tienen error entre 0,91 y 0,95. ¿Qué se lee?",
         opciones: [
           { texto: "Más visitas, siempre menos error: cada visita corrige un poco el valor, así que el error baja de manera pareja con la cantidad de pasos por la casilla.", explicacion: "No: la tabla no baja de manera pareja. Las casillas con 100 a 999 visitas tienen más error medio (0,56) que las de 10 a 99 (0,41)." },
           { texto: "El error alto de las casillas nunca pisadas se debe a que tienen la flecha equivocada; donde la flecha de mayor Q es la óptima, el error es casi 0.", explicacion: "No: el error es del valor, no de la flecha. (1,12) nunca se pisó, su flecha es óptima por azar del ruido inicial, y su error es 0,9227." },
