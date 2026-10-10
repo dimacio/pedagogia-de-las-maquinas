@@ -8,6 +8,8 @@ Formato: una sección por versión (SemVer sobre el curso, ver `fabrica/CONVENCI
 - Fábrica: spines de las 15 clases (`specs/`), convenciones, chequeos automáticos (`fabrica/chequeos/`), workflows de GitHub Actions,
   agentes y skills de Claude Code (`.claude/`), plantillas de issue y PR, guía de referencias de Stanford.
 - Campo `objetivo` en cada pregunta de los cuestionarios.
+- `fabrica/marco-filosofico.md`: jerarquía de autores del marco (Freire, Foucault, Dawkins) y Cyborg Psychology (Pataranutaporn)
+  como evidencia contemporánea; regla 9 de contenido en `CLAUDE.md`.
 
 ### Cambiado
 - Estructura de 16 clases en cuatro unidades (`build/PLAN-16-clases.md`); clases 3–16 en preparación; material de la v1 en
