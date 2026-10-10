@@ -143,9 +143,9 @@ offline con IS y WIS; derivaciones de PPO, DPO y SAC; RL basado en modelos, mult
 
 1. **PR de estructura**: lo de §6 salvo las redirecciones. Los spines actuales se mueven a `specs/v1/` (los ids 1–12 se repiten y
    cambian de significado); se crean 16 spines nuevos en `specs/` con `estado: borrador` y encabezado mínimo. Los de las clases 1 y 2
-   parten de su spine v1. Las páginas, notebooks y builders viejos quedan en su lugar, fuera de `CLASES`, hasta que su contenido se
-   migra. Mientras una clase está en borrador sin página, los chequeos que abren páginas la saltean y la barra del curso la muestra
-   como «próximamente».
+   parten de su spine v1. Las páginas y notebooks viejos que cambian de id se mueven a `build/v1/` (y sus entradas de `modulos.js` a
+   `build/v1/modulos-v1.js`); el resto de los builders queda en `build/`. Una clase en preparación lleva `pronto: true` en `CLASES`:
+   los chequeos la saltean salvo `spines`, y el sitio la muestra como «próximamente», sin enlace.
 2. **Una clase por vez, en orden del 1 al 16**, porque cada clase hereda de la anterior. Cada una: issue → rama `clase-<id>` →
    `/disenar-clase <id>` (spine aprobado por el autor) → `/producir-clase <id>` → `/revisar-clase <id>` → PR. El PR que absorbe
    la última parte de una clase vieja borra su página, su notebook y su builder, y agrega la redirección.

@@ -1,3 +1,5 @@
+> **Histórico.** Reemplazado por build/PLAN-16-clases.md.
+
 # Estructura definitiva del MOOC "RL a ciegas" (12 clases, 3 por trimestre)
 
 El curso es un MOOC libre (GitHub Pages, sin videos, foro en GitHub Discussions). Las unidades se llaman "Clase" en el recorrido

@@ -24,7 +24,8 @@ MOOC libre de aprendizaje por refuerzo en castellano, contado desde un juego (la
 | `fabrica/chequeos/` | Control de calidad automático | — |
 | `referencias/` | Guías externas (presentaciones de Stanford CS234 y CS224R). **Los PDF no se suben al repo.** | — |
 
-Ids de clase: `0a 0b 0c` (nivelación) y `1`…`12`. Tabla completa en `build/PLAN-12-clases.md` y en `CLASES` de `assets/cueva.js`.
+Ids de clase: `0a 0b 0c` (nivelación) y `1`…`16`. Tabla completa en `build/PLAN-16-clases.md` y en `CLASES` de `assets/cueva.js`.
+Las clases en preparación llevan `pronto: true` en `CLASES` y su spine en `estado: borrador`. El material de la v1 está en `build/v1/` y `specs/v1/`.
 
 ## Reglas de contenido (no negociables)
 

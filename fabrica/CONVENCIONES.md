@@ -4,7 +4,9 @@ Contrato entre los spines, los artefactos y los chequeos. Si algo de este archiv
 
 ## 1. El spine de cada clase: `specs/<id>.md`
 
-Un archivo por clase, con nombre igual al id: `specs/0a.md`, `specs/0b.md`, `specs/0c.md`, `specs/1.md` … `specs/12.md`.
+Un archivo por clase, con nombre igual al id: `specs/0a.md`, `specs/0b.md`, `specs/0c.md`, `specs/1.md` … `specs/16.md`.
+Una clase en preparación lleva `pronto: true` en `CLASES` de `assets/cueva.js` y su spine en `estado: borrador`, con `objetivos` y
+`fuentes` vacíos hasta `/disenar-clase`; los chequeos la saltean salvo `spines`. Los spines de la v1 están en `specs/v1/` y no se chequean.
 Es la **fuente de verdad**: lo escribe el autor; los agentes lo leen y nunca lo cambian sin pedirlo en el PR.
 
 Encabezado YAML (obligatorio):
@@ -13,7 +15,7 @@ Encabezado YAML (obligatorio):
 ---
 id: "7"
 titulo: "Redes recurrentes: cuando el estado no alcanza"
-trimestre: 3            # 1–4, o "N" para nivelación
+unidad: 3               # 1–4, o "N" para nivelación
 estado: publicada       # borrador | en-produccion | publicada
 pagina: clases/07-redes-recurrentes.html
 notebook: notebooks/07-redes-recurrentes.ipynb   # o null

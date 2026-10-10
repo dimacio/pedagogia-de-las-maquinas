@@ -9,6 +9,13 @@ Formato: una sección por versión (SemVer sobre el curso, ver `fabrica/CONVENCI
   agentes y skills de Claude Code (`.claude/`), plantillas de issue y PR, guía de referencias de Stanford.
 - Campo `objetivo` en cada pregunta de los cuestionarios.
 
+### Cambiado
+- Estructura de 16 clases en cuatro unidades (`build/PLAN-16-clases.md`); clases 3–16 en preparación; material de la v1 en
+  `build/v1/` y `specs/v1/`.
+
+### Aviso
+- El progreso de los cuestionarios guardado en el navegador vuelve a cero (los ids cambian de significado).
+
 ### Pendiente
 - Marcas de trazabilidad en páginas (`data-objetivos`) y notebooks (`objetivo:Ox`): hoy el chequeo `trazabilidad` falla.
 - Rediseño de las clases con `/disenar-clase`, una por vez, usando CS234 y CS224R como guía. Falta policy gradient.
