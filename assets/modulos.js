@@ -358,14 +358,14 @@ window.MODULOS = {
       },
       {
         objetivo: "O3",
-        pregunta: "Las historias A (6 pasos) y B (18 pasos) terminan en la misma casilla. Si en vez de la casilla el agente usara como estado la cantidad de pasos que lleva dados, ¿cumpliría el supuesto de Markov?",
+        pregunta: "Supongamos que el agente, en vez de la casilla, solo sabe cuántos pasos lleva dados. Con ese conteo y la acción que elige, ¿puede predecir en qué casilla va a quedar?",
         opciones: [
-          { texto: "No: con igual cantidad de pasos se puede estar en casillas que piden flechas distintas.", explicacion: "Correcto. A llega a esa casilla en 6 pasos y B en 18; contar pasos no dice dónde está el agente, y eso es lo que decide qué conviene." },
-          { texto: "Sí: la cantidad de pasos resume toda la historia, porque crece en cada paso igual que ella.", explicacion: "No: que crezcan juntas no la convierte en un resumen útil. El estado tiene que alcanzar para decidir, y el conteo no alcanza." },
-          { texto: "Sí, siempre que el agente no choque, porque así cada paso lo acerca un poco a la salida.", explicacion: "No: sin chocar también se puede ir y volver por los mismos pasillos, como el agente al azar. El conteo sigue sin decir dónde está." },
+          { texto: "Sí: el conteo crece en cada paso igual que la historia, así que la resume entera.", explicacion: "No: que crezcan juntos no lo vuelve un resumen. Dos historias con el mismo conteo pueden dejar al agente en lugares distintos." },
+          { texto: "Sí, siempre que no choque, porque cada paso sin chocar lo acerca a la salida.", explicacion: "No: sin chocar también se puede ir y volver por los mismos pasillos, como el agente al azar. El conteo no dice dónde está." },
+          { texto: "No: con el mismo conteo puede estar en casillas distintas, que llevan a otros lados.", explicacion: "Correcto. Después de 6 pasos, la historia A está en (3,3) y seis pasos hacia abajo desde S dejan en (7,1); con el mismo conteo y la misma acción, la próxima casilla cambia. El conteo no cumple el supuesto de Markov." },
           { texto: "No, porque el supuesto de Markov pide guardar la historia completa, no un solo número.", explicacion: "No: es al revés. Markov dice que un resumen (en la cueva, la casilla) alcanza y que el resto de la historia ya no importa." }
         ],
-        correcta: 0
+        correcta: 2
       },
       {
         objetivo: "O1",
@@ -373,7 +373,7 @@ window.MODULOS = {
         opciones: [
           { texto: "El problema concreto que da en cada turno: una suma o una resta.", explicacion: "No: eso es la acción. La política es la regla que decide cuál de las dos dar." },
           { texto: "El +1 o el −1 que cobra cada vez que el alumno acierta o se equivoca.", explicacion: "No: eso es la recompensa, lo que el tutor busca sumar." },
-          { texto: "La regla con la que elige el próximo problema según lo que vio del alumno.", explicacion: "Correcto. a = π(s): el estado es lo que vio del alumno y la política dice qué problema dar con eso." },
+          { texto: "La regla con la que elige el próximo problema según lo que vio del alumno.", explicacion: "Correcto. El estado es lo que vio del alumno y la política π dice qué problema dar con eso." },
           { texto: "La habilidad real del alumno en suma y en resta, que sube cada vez que practica.", explicacion: "No: eso está dentro del entorno y queda oculto para el tutor; cómo cambia al practicar es la dinámica." }
         ],
         correcta: 2

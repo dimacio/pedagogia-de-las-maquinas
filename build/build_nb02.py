@@ -280,9 +280,15 @@ def simular_tutor(politica, recompensa=recompensa_original, n_problemas=60, n_al
 def comparar_politicas_tutor(recompensa=recompensa_original, titulo_r="recompensa +1/−1"):
     res = {n: simular_tutor(p, recompensa) for n, p in POLITICAS_TUTOR.items()}
     fig, axs = plt.subplots(1, 3, figsize=(17, 4.3))
+    finales_y = {n: c[-1] for n, (c, _) in res.items()}
+    rango = max(finales_y.values()) - min(min(finales_y.values()), 0) or 1
+    y_et, ult = {}, None
+    for n in sorted(finales_y, key=finales_y.get):          # separa las etiquetas que quedarían encimadas
+        y = finales_y[n] if ult is None else max(finales_y[n], ult + 0.06 * rango)
+        y_et[n] = ult = y
     for k, (n, (curva, fin)) in enumerate(res.items()):
         axs[0].plot(np.arange(1, len(curva) + 1), curva, color=COLORES[k], label=n)
-        axs[0].text(len(curva) + 1, curva[-1], n, va="center", fontsize=10, color="#333")
+        axs[0].text(len(curva) + 1, y_et[n], n, va="center", fontsize=10, color="#333")
     axs[0].set_xlim(0, len(curva) * 1.35)
     axs[0].set_xlabel("problema número"); axs[0].set_ylabel("recompensa acumulada")
     axs[0].set_title(f"Lo que ve el tutor: {titulo_r}"); axs[0].legend(loc="upper left", frameon=False)
@@ -307,10 +313,10 @@ cells.append(md(r"""
 
 Dos ejemplos conocidos, con su fuente:
 
-- **Juegos.** AlphaGo aprendió a jugar al Go combinando redes neuronales, búsqueda en el árbol de jugadas y aprendizaje por refuerzo jugando contra sí mismo; le ganó 5 a 0 al campeón europeo Fan Hui (Silver et al., 2016).
-- **Asistentes conversacionales.** Los modelos de lenguaje se ajustan con *RL a partir de retroalimentación humana* (*RL from human feedback*, RLHF): personas comparan respuestas, con esas comparaciones se entrena un modelo de recompensa y el modelo de lenguaje se optimiza con RL para obtener más recompensa. En el trabajo de InstructGPT, las personas prefirieron las respuestas de un modelo así ajustado de 1300 millones de parámetros a las de GPT-3, más de cien veces más grande (Ouyang et al., 2022).
+- **Juegos.** AlphaGo aprendió a jugar al Go combinando redes neuronales y búsqueda en el árbol de jugadas. Primero aprendió de forma supervisada, imitando jugadas de expertos, y después mejoró con aprendizaje por refuerzo jugando contra sí mismo; le ganó 5 a 0 al campeón europeo Fan Hui (Silver et al., 2016).
+- **Asistentes conversacionales.** Los modelos de lenguaje se ajustan primero de forma supervisada, con respuestas de ejemplo escritas por personas, y después con *RL a partir de retroalimentación humana* (*reinforcement learning from human feedback*, RLHF): personas comparan respuestas, con esas comparaciones se entrena un modelo de recompensa y el modelo de lenguaje se optimiza con RL para obtener más recompensa. En el trabajo de InstructGPT, las personas prefirieron las respuestas de un modelo así ajustado de 1300 millones de parámetros a las de GPT-3, más de cien veces más grande (Ouyang et al., 2022).
 
-¿Qué tienen en común estos problemas con salir de una cueva a oscuras? Que **nadie da la respuesta correcta**.
+¿Qué tienen en común estos problemas con salir de una cueva a oscuras? Que, en la parte que aprende por refuerzo, **nadie da la respuesta correcta**.
 
 ### Paso 1 — Lo que recibe el que aprende
 
@@ -333,7 +339,7 @@ En el aprendizaje supervisado, cada error se corrige en el momento: "acá era �
 | **Exploración** (*exploration*) | no vemos el mapa: solo sabemos qué hay detrás de una pared si chocamos con ella |
 | **Generalización** (*generalization*) | ¿lo aprendido en esta cueva sirve en otra? |
 
-En el Go y en los asistentes pasa lo mismo: nadie sabe cuál era "la jugada correcta" o "la respuesta correcta" en cada paso; solo se sabe, al final, si se ganó o qué respuesta prefirió una persona.
+En el Go y en los asistentes hay una primera etapa supervisada (jugadas de expertos, respuestas de ejemplo), pero no alcanza. La parte que aprende por refuerzo mejora sin que nadie le diga cuál era "la jugada correcta" o "la respuesta correcta" en cada paso: solo se sabe, al final, si se ganó o qué respuesta prefirió una persona.
 
 **Tres parientes de RL** que vamos a cruzar en el curso: el **RL basado en modelo** (*model-based RL*), donde el agente conoce o aprende cómo funciona el mundo —en la cueva, el mapa $P(s' \mid s, a)$— y planifica con él (clase 4); el **aprendizaje por imitación** (*imitation learning*), donde en vez de recompensa hay demostraciones de un experto (clase 10); y **RLHF**, donde la recompensa no se escribe a mano sino que se aprende de comparaciones hechas por personas (clase 12).
 """))
@@ -366,14 +372,18 @@ La cuarta acción (→) choca: la casilla no cambia y el agente se entera de que
 cells.append(md(r"""
 ## 3. La política: la regla que elige
 
-¿Quién elige la acción? Una **política** (*policy*): una regla que, para cada estado, dice qué hacer.
+¿Quién elige la acción? Una **política** (*policy*): una regla que, según dónde está el agente, dice qué hacer. Por ahora, "dónde está" es la casilla $s$; en la sección 5 la llamamos **estado** y vemos por qué alcanza.
 
-$$a = \pi(s)$$
+En general, una política le da a cada acción $a$ una probabilidad en cada casilla $s$ (Sutton y Barto, 3.5):
+
+$$\pi(a \mid s)$$
+
+Se lee "la probabilidad de elegir la acción $a$ estando en la casilla $s$".
 
 La política es **lo que el agente aprende**. Vamos a comparar dos políticas en la misma cueva:
 
-- **al azar**: en cada paso tira un dado de cuatro caras;
-- **flechas fijas**: en cada casilla hay una flecha y el agente siempre la sigue (son las flechas de la sección 1).
+- **al azar**: sortea; en cada casilla, $\pi(a \mid s) = 1/4$ para cada una de las cuatro acciones;
+- **flechas fijas**: en cada casilla hay una flecha y el agente siempre la sigue (son las flechas de la sección 1). Es el caso en que una acción tiene probabilidad 1 y las otras 0: una política **determinista**, que se escribe más corto $a = \pi(s)$.
 
 ### Paso 1 — Dos políticas, un episodio cada una (límite: 200 pasos)
 """, objetivos=["O1"]))
@@ -591,6 +601,23 @@ def mi_recompensa(acierto, tipo, hab_antes, hab_despues):
     return 1.0 if acierto else -1.0
 
 comparar_politicas_tutor(recompensa=mi_recompensa, titulo_r="recompensa del grupo")
+"""))
+
+cells.append(md(r"""
+### Una respuesta posible: premiar lo que aprendió
+
+(Si quieren pensarlo solos, hagan primero el ejercicio.) Probamos la tercera idea: el tutor cobra **cuánto subió la habilidad** del alumno en el tipo de problema que le dio, en puntos porcentuales: `100 * (hab_despues[tipo] - hab_antes[tipo])`. Ya no importa si acertó. Mismas tres políticas, mismos 60 problemas, mismos 300 alumnos simulados. La pregunta: ¿el orden de las políticas en recompensa sigue siendo el contrario al del aprendizaje?
+""", objetivos=["O4"]))
+cells.append(code(r"""
+def recompensa_mejora(acierto, tipo, hab_antes, hab_despues):
+    return 100 * (hab_despues[tipo] - hab_antes[tipo])
+
+comparar_politicas_tutor(recompensa=recompensa_mejora, titulo_r="recompensa: lo que aprendió")
+"""))
+cells.append(md(r"""
+Ahora el gráfico del medio y el de la derecha ordenan las políticas **igual**: "solo sumas", que ganaba con +1/−1, queda **última** en recompensa, y "alternar" pasa a ser la que más cobra y la que más enseña. No es casualidad: sumar todas las mejoras de un alumno da cuánto subió su habilidad entre el principio y el final, así que con esta recompensa cobrar más *es* enseñar más (en este modelo de alumno).
+
+La trampa no desaparece, se muda. Esta recompensa usa la **habilidad real** del alumno, que un tutor real no ve: solo ve aciertos y errores. Si la reemplazamos por algo medible (un examen, una encuesta), vuelve la pregunta del paso 8 de la página: ¿cómo podría el tutor cobrar mucho sin que el alumno aprenda?
 """))
 
 cells.append(md(r"""

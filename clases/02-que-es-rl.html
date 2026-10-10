@@ -14,6 +14,7 @@
   .lz { min-width: 0; }
   .seg { flex-wrap: wrap; }
   .seg button { min-width: 0; }
+  #segIng button { flex: 1 1 auto; }
   .hist { font-family: var(--mono); font-size: 12.5px; line-height: 1.5; height: 132px; overflow-y: auto; background: var(--rock);
     border: 1px solid var(--rock-2); border-radius: 3px; padding: 6px 8px; margin: 0; list-style: none; color: var(--muted); font-variant-numeric: tabular-nums; }
   .hist li { white-space: nowrap; }
@@ -48,15 +49,16 @@
         <button aria-pressed="false" data-i="demora">Consecuencias demoradas</button>
         <button aria-pressed="false" data-i="explorar">Explorar</button>
         <button aria-pressed="false" data-i="generalizar">Generalizar</button>
+        <button aria-pressed="false" data-i="supervisado">Contra supervisado</button>
       </div>
-      <div class="lz"><canvas id="cvIng" aria-label="La cueva vista desde cada uno de los cuatro ingredientes del aprendizaje por refuerzo"></canvas></div>
+      <div class="lz"><canvas id="cvIng" aria-label="La cueva vista desde cada uno de los cuatro ingredientes del aprendizaje por refuerzo y, en la última pestaña, con la flecha correcta en cada casilla como la daría el aprendizaje supervisado"></canvas></div>
       <div class="hud" id="hudIng"></div>
       <p class="cap" id="capIng"></p>
     </div>
     <div class="texto">
       <div class="paso">Paso 1</div>
       <h2>Por qué RL: lo que no tiene respuesta correcta</h2>
-      <p>Salir de la cueva junta los cuatro ingredientes del aprendizaje por refuerzo (<i>reinforcement learning</i>, RL): optimizar, cargar con consecuencias demoradas, explorar y generalizar. Con esos ingredientes, AlphaGo aprendió a jugar al Go y le ganó 5 a 0 al campeón europeo Fan Hui (Silver et al., 2016). Con RL a partir de preferencias humanas (RLHF), las personas prefirieron las respuestas de un InstructGPT de 1300 millones de parámetros a las de GPT-3 (Ouyang et al., 2022). En ninguno de los tres casos hay quien dé la respuesta correcta en cada paso, como sí pasa en el aprendizaje supervisado (<i>supervised learning</i>).</p>
+      <p>Salir de la cueva junta los cuatro ingredientes del aprendizaje por refuerzo (<i>reinforcement learning</i>, RL): optimizar, cargar con consecuencias demoradas, explorar y generalizar. AlphaGo empezó imitando jugadas de expertos y después mejoró por refuerzo jugando contra sí mismo, hasta ganarle 5 a 0 al campeón europeo Fan Hui (Silver et al., 2016). InstructGPT empezó con respuestas de ejemplo escritas por personas y siguió con RL a partir de retroalimentación humana (<i>reinforcement learning from human feedback</i>, RLHF), y las personas prefirieron sus respuestas, con 1300 millones de parámetros, a las de GPT-3 (Ouyang et al., 2022). En los tres casos, la parte que aprende por refuerzo mejora sin que nadie le dé la respuesta correcta en cada paso, que es lo que sí da el aprendizaje supervisado (<i>supervised learning</i>) de la última pestaña.</p>
       <p class="nota pregunta">En una partida de Go, ¿quién podría decir cuál era la jugada correcta en la jugada 30?</p>
     </div>
   </section>
@@ -75,7 +77,7 @@
     <div class="texto">
       <div class="paso">Paso 2</div>
       <h2>Alguien decide, el mundo responde</h2>
-      <p>En cada instante <i>t</i> el <b>agente</b> (<i>agent</i>) elige una acción y el <b>entorno</b> (<i>environment</i>) le devuelve una observación y una recompensa (<i>reward</i>). En la cueva la recompensa vale 0 en cada paso y +1 al llegar a la salida.</p>
+      <p>En cada instante <i>t</i> el <b>agente</b> (<i>agent</i>) elige una <b>acción</b> (<i>action</i>) y el <b>entorno</b> (<i>environment</i>) le devuelve una <b>observación</b> (<i>observation</i>) y una <b>recompensa</b> (<i>reward</i>). En la cueva la recompensa vale 0 en cada paso y +1 al llegar a la salida.</p>
       <p>La cueva de la izquierda es todo lo que sabe el agente. La de la derecha, con el mapa, la conoce solo el entorno.</p>
       <p class="nota pregunta">Mirá una vuelta del ciclo: ¿qué viaja del agente al entorno y qué vuelve?</p>
     </div>
@@ -88,7 +90,7 @@
         <button aria-pressed="true" data-p="azar">Al azar</button>
         <button aria-pressed="false" data-p="flechas">Flechas fijas</button>
       </div>
-      <div class="lz"><canvas id="cvPol" aria-label="La cueva con una política: al azar (un dado en cada paso) o una flecha fija por casilla, con el recorrido de un episodio"></canvas></div>
+      <div class="lz"><canvas id="cvPol" aria-label="La cueva con una política: al azar (cada acción con probabilidad 1/4 en cada casilla) o una flecha fija por casilla, con el recorrido de un episodio"></canvas></div>
       <div class="hud" id="hudPol"></div>
       <div class="row"><button class="btn" id="polOtro">Otro episodio al azar</button></div>
       <p class="cap" id="capPol"></p>
@@ -96,8 +98,8 @@
     <div class="texto">
       <div class="paso">Paso 3</div>
       <h2>La política: la regla que elige</h2>
-      <p>La <b>política</b> (<i>policy</i>) es la regla que le dice al agente qué acción tomar en cada casilla. Acá compiten dos en la misma cueva, una que tira un dado de cuatro caras en cada paso y otra que sigue una flecha fija por casilla. En los 300 episodios del notebook, el azar sale dentro de los 200 pasos solo el 3.7 % de las veces y las flechas salen siempre, en 20 pasos. Como el entorno y la recompensa son los mismos, lo que el agente tiene que aprender es la política.</p>
-      <div class="eq">a = π(s)</div>
+      <p>La <b>política</b> (<i>policy</i>) es la regla que elige la acción <i>a</i> según la casilla <i>s</i> (en el paso 5 la llamamos estado). En general le da a cada acción una probabilidad π(a|s), que al azar es 1/4 para cada una de las cuatro y con flechas fijas es 1 para la flecha de la casilla y 0 para las demás. En los 300 episodios del notebook, el azar sale dentro de los 200 pasos solo el 3.7 % de las veces y las flechas salen siempre, en 20 pasos. Como el entorno y la recompensa son los mismos, lo que el agente tiene que aprender es la política.</p>
+      <div class="eq">π(a | s)</div>
       <p class="nota pregunta">Si una sola flecha apuntara contra una pared, ¿qué le pasaría al agente que la sigue?</p>
     </div>
   </section>
@@ -116,7 +118,7 @@
     <div class="texto">
       <div class="paso">Paso 4</div>
       <h2>Qué se maximiza: la suma de recompensas</h2>
-      <p>El agente no busca la recompensa de este paso sino la suma de todas las que vienen. En la partida al azar del notebook recibió 1833 ceros seguidos y un +1 en el paso 1834, mientras que con las flechas recibió 19 ceros y el +1 en el paso 20. Las dos partidas suman 1, así que la suma sola no distingue una salida rápida de una lentísima (la clase 3 lo arregla con el descuento). A una recompensa así se la llama escasa y demorada (<i>sparse reward</i>).</p>
+      <p>El agente no busca la recompensa de este paso sino la suma de todas las que vienen. En la partida al azar del notebook recibió 1833 ceros seguidos y un +1 en el paso 1834, mientras que con las flechas recibió 19 ceros y el +1 en el paso 20. Las dos partidas suman 1, así que la suma sola no distingue una salida rápida de una lentísima. A una recompensa así se la llama escasa y demorada (<i>sparse reward</i>).</p>
       <div class="eq">maximizar  E[ r₁ + r₂ + r₃ + … ]</div>
       <p class="nota pregunta">Después de 1833 ceros llega un +1. ¿Cómo sabe el agente cuál de todos esos pasos fue el bueno?</p>
     </div>
@@ -148,9 +150,9 @@
     <div class="texto">
       <div class="paso">Paso 5</div>
       <h2>Historia contra estado</h2>
-      <p>Todo lo que viviste es tu <b>historia</b> (<i>history</i>), la lista de abajo que crece en cada paso. En el modo fácil la pantalla guarda la historia por vos. En el difícil la pared solo destella al chocar y la historia la tenés que llevar en la cabeza.</p>
+      <p>Todo lo que viviste es tu <b>historia</b> (<i>history</i>), hₜ = (a₁, o₁, r₁, …, aₜ, oₜ, rₜ), la lista de abajo que crece en cada paso. En el modo fácil la pantalla guarda la historia por vos. En el difícil la pared solo destella al chocar y la historia la tenés que llevar en la cabeza.</p>
       <p>El <b>estado</b> (<i>state</i>) es un resumen de la historia que alcanza para decidir.</p>
-      <div class="eq">hₜ = (a₁, o₁, r₁, …, aₜ, oₜ, rₜ)    sₜ = f(hₜ)</div>
+      <div class="eq">sₜ = f(hₜ)</div>
       <p class="nota pregunta">En el modo difícil, ¿qué parte de la lista te alcanza recordar para no volver a chocar?</p>
     </div>
   </section>
@@ -169,10 +171,10 @@
     <div class="texto">
       <div class="paso">Paso 6</div>
       <h2>El supuesto de Markov</h2>
-      <p>Las historias A y B son distintas pero terminan en la misma casilla. Desde ahí conviene hacer lo mismo, así que si el agente sabe su casilla el camino ya no importa. Eso es el <b>supuesto de Markov</b> (<i>Markov assumption</i>).</p>
-      <p class="small muted">Adelanto: si el agente solo sintiera las paredes vecinas, las 60 casillas darían apenas 12 sensaciones distintas y eso ya no alcanzaría para decidir, como veremos en la clase 9.</p>
+      <p>Las historias A y B son distintas pero terminan en la misma casilla. Si se sabe la casilla, lo que viene después (la próxima casilla y la recompensa) ya no depende del camino, y por eso desde ahí conviene hacer lo mismo. Eso es el <b>supuesto de Markov</b> (<i>Markov assumption</i>).</p>
       <div class="eq">p(sₜ₊₁ | sₜ, aₜ) = p(sₜ₊₁ | hₜ, aₜ)</div>
-      <p class="nota pregunta">Si en vez de la casilla el agente solo supiera cuántos pasos lleva dados, ¿le alcanzaría para decidir?</p>
+      <p class="small muted">Adelanto: si el agente solo sintiera las paredes vecinas, las 60 casillas darían apenas 12 sensaciones distintas y eso ya no alcanzaría para decidir, como veremos en la clase 9.</p>
+      <p class="nota pregunta">Si en vez de la casilla el agente solo supiera cuántos pasos lleva dados, ¿podría predecir en qué casilla va a quedar?</p>
     </div>
   </section>
 
@@ -223,12 +225,12 @@
       </div>
       <div class="lz"><canvas id="cvTutor" aria-label="Gráfico: recompensa acumulada del tutor contra aprendizaje final del alumno, para cada política"></canvas></div>
       <div class="hud" id="hudTutor"></div>
-      <p class="cap">Los tres puntos con nombre, con la recompensa +1/−1, son las cifras del notebook. La curva gris, tu política y la otra recompensa se simulan en tu navegador con el mismo modelo de alumno.</p>
+      <p class="cap">Cada punto es una política del tutor: 60 problemas promediados sobre 300 alumnos simulados. Los tres puntos con nombre son cifras del notebook, con las dos recompensas. La curva gris y la tuya (elegí «La tuya» y mové el deslizador) se simulan en tu navegador con el mismo modelo de alumno.</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 8</div>
       <h2>La trampa de la recompensa</h2>
-      <p>Cada punto del gráfico es una política del tutor, con 60 problemas promediados sobre 300 alumnos simulados. Con +1/−1 la política que más cobra es «solo sumas», con 45.3 puntos, y deja al alumno con un 5 % de acierto en restas. En la <b>trampa de la recompensa</b> (<i>reward hacking</i>) el tutor optimiza lo que le pedimos, no lo que queríamos. Probá tu propia política con el deslizador y cambiá la recompensa a «lo que aprendió».</p>
+      <p>Con +1/−1, la política que más cobra en el notebook es «solo sumas», con 45.3 puntos. Esa política deja al alumno con un 5 % de acierto en restas. En la <b>trampa de la recompensa</b> (<i>reward hacking</i>) el tutor optimiza lo que le pedimos, no lo que queríamos. Si se le paga por lo que aprendió el alumno, «solo sumas» cae al último lugar con 90.0 puntos y gana «alternar» con 155.1, que también es la que más enseña.</p>
       <p class="nota pregunta">¿Un tutor real podría medir «lo que aprendió»? Si la recompensa fuera aprobar un examen, ¿cómo podría hacer trampa el tutor?</p>
     </div>
   </section>
@@ -240,7 +242,7 @@
       <h2>Cómo contar esta clase en una oración</h2>
       <p>"Aprender por refuerzo es aprender a decidir cuando nadie te dice la respuesta correcta: solo te pagan, a veces mucho después, y te pagan por lo que pediste, no por lo que querías."</p>
       <p class="nota pregunta">Pregunta para hacerle a la otra persona: si te pagaran un punto por cada respuesta correcta de tus alumnos, ¿qué ejercicios les darías?</p>
-      <p><b>Ejercicio de 5 minutos:</b> en parejas, una persona hace de agente con los ojos cerrados y la otra de entorno. El agente dice una dirección; el entorno responde solo "pared" o "nada" y, al llegar a una salida imaginaria, "+1". Después de dos minutos cambian de rol y anotan en el pizarrón qué recordaba cada agente para no chocar dos veces con la misma pared: eso es su estado.</p>
+      <p><b>Ejercicio de 5 minutos:</b> en parejas, una persona hace de agente con los ojos cerrados y la otra de entorno. El agente dice una dirección; el entorno responde solo "pared" o "nada" y, al llegar a una salida imaginaria, "+1". Después de dos minutos cambian de rol y anotan en el pizarrón qué recordaba cada agente para no chocar dos veces con la misma pared. Eso es su estado.</p>
     </div>
   </section>
 </main>
@@ -321,15 +323,20 @@
       optimizar: "No alcanza con salir: queremos el mejor camino entre todos los posibles.",
       demora: "Cada paso paga 0 y solo la salida paga +1: el mérito de un buen giro aparece recién al final.",
       explorar: "A oscuras, una pared se conoce solo al chocarla: para aprender hay que probar.",
-      generalizar: "Otra cueva, más grande: ¿lo aprendido en la chica sirve acá?"
+      generalizar: "Otra cueva, más grande: ¿lo aprendido en la chica sirve acá?",
+      supervisado: "En aprendizaje supervisado alguien te daría la flecha correcta en cada casilla (acá la calculamos mirando el mapa). En RL no hay flechas: solo el +1 al salir."
     };
     function dibujar() {
       if (modo === "generalizar") {
         TG.medir().fondo("#000").paredes("#2c3346").salida().entrada().sprite(envG.start, 2);
         hud.innerHTML = `<span>casillas <b>${envG.nS}</b> (la chica tiene ${env.nS})</span><span>las flechas de la chica <b>no sirven acá</b></span>`;
+      } else if (modo === "supervisado") {
+        T.medir().fondo("#000").paredes("#2c3346").salida().entrada();
+        T.flechas(POL); T.sprite(env.start, 1);
+        hud.innerHTML = `<span>supervisado <b>una respuesta por casilla</b></span><span>RL <b>un +1 al salir</b></span>`;
       } else if (modo === "explorar") {
         T.medir().fondo("#000").tocadas(expl.toc).trayecto(expl.p, "rgba(242,179,90,.4)", .12).salida().sprite(expl.p[expl.p.length - 1], 2);
-        hud.innerHTML = `<span>pasos al azar <b>${expl.p.length - 1}</b></span><span>paredes conocidas <b>${expl.toc.size}</b></span><span>mapa <b>no visible</b></span>`;
+        hud.innerHTML = `<span>pasos al azar <b>${expl.p.length - 1}</b></span><span>paredes conocidas <b>${expl.toc.size}</b></span><span>mapa <b>no visible</b></span><span>(simulado en el navegador)</span>`;
       } else {
         T.medir().fondo("#000").paredes("#2c3346").salida().entrada();
         T.trayecto(OPT, modo === "optimizar" ? "rgba(61,220,132,.75)" : "rgba(141,147,163,.45)", .14);
@@ -412,7 +419,7 @@
       const G = pasos.slice(0, enCurso ? (fase >= 1 ? t + 1 : t) : pasos.length).reduce((a, q) => a + q.r, 0);
       hud.innerHTML = `<span>t <b>${Math.min(t + 1, pasos.length)}</b></span><span>aₜ <b>${AR[p.a]}</b></span>` +
         `<span>oₜ <b>${rcTxt(p.s2)}${p.choque ? ", chocó" : ""}</b></span><span>rₜ <b>${p.r}</b></span><span>suma <b>${G}</b></span>` +
-        (!enCurso || (t === pasos.length - 1 && fase >= 1) ? `<span style="color:var(--exit)">salió en ${pasos.length} pasos</span>` : "");
+        (!enCurso || (t === pasos.length - 1 && fase >= 1) ? `<span style="color:var(--exit)">salió en ${pasos.length} pasos</span><span>(partida armada en el navegador)</span>` : "");
     }
     function loop(now) {
       raf = 0;
@@ -455,13 +462,13 @@
         for (let s = 0; s < env.nS; s++) if (s !== env.goal) T.texto(s, "?", "rgba(141,147,163,.45)", .42);
         T.trayecto(ep.p, "rgba(224,100,90,.55)", .1);
         T.sprite(ep.p[ep.p.length - 1], 2);
-        hud.innerHTML = `<span>π(s) <b>un dado de 4 caras</b></span><span>este episodio <b>${ep.p.length - 1}</b> pasos</span><span>¿salió? <b style="color:${ep.salio ? "var(--exit)" : "var(--ember)"}">${ep.salio ? "sí" : "no"}</b></span>`;
+        hud.innerHTML = `<span>π(a|s) <b>1/4 para cada acción</b></span><span>este episodio <b>${ep.p.length - 1}</b> pasos</span><span>¿salió? <b style="color:${ep.salio ? "var(--exit)" : "var(--ember)"}">${ep.salio ? "sí" : "no"}</b></span>`;
         cap.innerHTML = `Un episodio al azar simulado en tu navegador, cortado a los ${LIM} pasos: va y vuelve por los mismos pasillos.`;
       } else {
         T.flechas(POL);
         T.trayecto(OPT, "rgba(61,220,132,.8)", .12);
         T.sprite(env.goal, 2);
-        hud.innerHTML = `<span>π(s) <b>la flecha de la casilla</b></span><span>este episodio <b>${OPT.length - 1}</b> pasos</span><span>¿salió? <b style="color:var(--exit)">sí</b></span>`;
+        hud.innerHTML = `<span>π(a|s) <b>1 para la flecha de la casilla</b></span><span>este episodio <b>${OPT.length - 1}</b> pasos</span><span>¿salió? <b style="color:var(--exit)">sí</b></span>`;
         cap.innerHTML = "Una flecha fija por casilla (calculada con el mapa, como en el notebook): siempre el mismo camino, el más corto.";
       }
       btnOtro.hidden = modo !== "azar";
@@ -620,7 +627,7 @@
       const [r, c] = env.free[fin]; ctx.strokeStyle = COL.ember; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(c * cell + cell / 2, r * cell + cell / 2, cell * .46, 0, 7); ctx.stroke();
       const h = cual === "A" ? histA : histB;
       hud.innerHTML = `<span>historia <b style="color:${cual === "A" ? "var(--lamp)" : "var(--sonar)"}">${cual}</b>: <b>${h.length - 1}</b> pasos</span><span>termina en <b>${rcTxt(fin)}</b></span><span>mejor acción ahí <b style="color:var(--exit)">${AR[POL[fin]]}</b></span>`;
-      cap.innerHTML = `A tiene ${histA.length - 1} pasos y B ${histB.length - 1}. Desde el círculo rojo, el camino verde punteado es el mismo para las dos: <b>el pasado no cambia la decisión</b>.`;
+      cap.innerHTML = `A tiene ${histA.length - 1} pasos y B ${histB.length - 1}. Desde el círculo rojo, lo que sigue (el camino verde punteado) es lo mismo para las dos: <b>el pasado no cambia lo que viene ni la decisión</b>.`;
       document.getElementById("mkA").setAttribute("aria-pressed", cual === "A");
       document.getElementById("mkB").setAttribute("aria-pressed", cual === "B");
     }
@@ -701,7 +708,7 @@
         chip(ctx, mx, (botY + cBot) / 2 - 4, `${ult.ok ? "acertó" : "erró"} · ${ult.r > 0 ? "+1" : "−1"}`, ult.ok ? COL.exit : COL.ember);
       }
       hud.innerHTML = `<span>problemas <b>${vistos.length}</b></span><span>recompensa acumulada <b>${G > 0 ? "+" : ""}${G}</b></span>` +
-        `<span>aciertos <b>${vistos.filter(v => v.ok).length}/${vistos.length}</b></span>`;
+        `<span>aciertos <b>${vistos.filter(v => v.ok).length}/${vistos.length}</b></span><span>(alumno simulado en el navegador)</span>`;
     }
     document.getElementById("trSuma").onclick = () => dar("suma");
     document.getElementById("trResta").onclick = () => dar("resta");
@@ -719,7 +726,9 @@
     const N_PROB = 60, N_ALUM = 300;
     // cifras del notebook (sección 6, recompensa +1/−1): recompensa, suma final, resta final
     const NB = { sumas: { G: 45.3, suma: 1.00, resta: .05 }, alternar: { G: 11.7, suma: .98, resta: .72 }, restas: { G: 7.3, suma: .79, resta: .86 } };
-    for (const k in NB) NB[k].apr = 50 * (NB[k].suma + NB[k].resta);
+    // cifras del notebook (después del ejercicio, recompensa_mejora: 100 × lo que subió la habilidad); las habilidades finales son las mismas
+    const NB_MEJORA = { sumas: { ...NB.sumas, G: 90.0 }, alternar: { ...NB.alternar, G: 155.1 }, restas: { ...NB.restas, G: 150.8 } };
+    for (const k in NB) { NB[k].apr = 50 * (NB[k].suma + NB[k].resta); NB_MEJORA[k].apr = NB[k].apr; }
     const cv = document.getElementById("cvTutor"), hud = document.getElementById("hudTutor");
     const sl = document.getElementById("slTuya"), out = document.getElementById("outTuya"), ctlT = document.getElementById("ctlTuya");
     const POLS = {
@@ -749,7 +758,7 @@
     function calcular() {
       if (cache[rec]) return cache[rec];
       const R = RECS[rec], fijas = {}, barrido = [];
-      for (const k in POLS) fijas[k] = rec === "acierto" ? NB[k] : simular(POLS[k].f, R);
+      for (const k in POLS) fijas[k] = rec === "acierto" ? NB[k] : NB_MEJORA[k];
       for (let p = 0; p <= 100; p += 5) barrido.push({ p, ...simular((t, u) => u() < p / 100 ? "resta" : "suma", R) });
       return (cache[rec] = { fijas, barrido });
     }
@@ -776,7 +785,7 @@
       for (const b of barrido) { ctx.fillStyle = "rgba(141,147,163,.8)"; ctx.beginPath(); ctx.arc(X(b.apr), Y(b.G), 2.2, 0, 7); ctx.fill(); }
       ctx.fillStyle = COL.muted; ctx.font = `10.5px ${MONO}`; ctx.textBaseline = "middle";
       const b1 = barrido[barrido.length - 1];
-      ctx.textAlign = "left"; ctx.fillText("la tuya, 100% restas", X(b1.apr) - 30, Y(b1.G) + 13);
+      if (pol === "tuya") { ctx.textAlign = "left"; ctx.fillText("la tuya, 100% restas", X(b1.apr) - 30, Y(b1.G) + 13); }
       const maxG = pts.reduce((a, b) => b.G > a.G ? b : a), maxA = pts.reduce((a, b) => b.apr > a.apr ? b : a);
       ctx.strokeStyle = COL.ember; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(X(maxG.apr), Y(maxG.G), 9, 0, 7); ctx.stroke();
       ctx.strokeStyle = COL.exit; ctx.beginPath(); ctx.arc(X(maxA.apr), Y(maxA.G), 12, 0, 7); ctx.stroke();
@@ -791,7 +800,7 @@
       ctx.strokeStyle = COL.ember; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(lx - 4, ly + 8, 5, 0, 7); ctx.stroke(); ctx.fillStyle = COL.ink; ctx.fillText("más recompensa", lx - 14, ly + 8);
       ctx.strokeStyle = COL.exit; ctx.beginPath(); ctx.arc(lx - 4, ly + 24, 5, 0, 7); ctx.stroke(); ctx.fillText("más aprendizaje", lx - 14, ly + 24);
       const nombre = pol === "tuya" ? `la tuya (${sl.value}% restas)` : POLS[pol].nombre;
-      const origen = pol !== "tuya" && rec === "acierto" ? "notebook" : "simulado en el navegador";
+      const origen = pol !== "tuya" ? "notebook" : "simulado en el navegador";
       hud.innerHTML = `<span><b>${nombre}</b></span><span>recompensa <b>${elegido.G.toFixed(1)}</b></span><span>suma final <b>${Math.round(elegido.suma * 100)}%</b></span><span>resta final <b>${Math.round(elegido.resta * 100)}%</b></span><span>(${origen})</span>` +
         `<span>${maxG === maxA ? '<b style="color:var(--exit)">recompensa y aprendizaje coinciden</b>' : '<b style="color:var(--ember)">la política que más cobra no es la que más enseña</b>'}</span>`;
     }
