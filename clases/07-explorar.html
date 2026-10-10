@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Explorar · RL a ciegas</title>
+<meta name="description" content="Clase 7: explorar cuesta. El bandit de cuatro anuncios, el arrepentimiento de una prueba A/B, ε-greedy y UCB, el optimismo y el conteo de visitas en la cueva grande, Go-Explore y por qué una secuencia memorizada deja de servir con acciones pegajosas.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .lz { min-width: 0; }
+  .seg { flex-wrap: wrap; }
+  .seg button { min-width: 0; }
+  .cap { font-size: 13px; color: var(--muted); }
+  .cap b { color: var(--ink); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+  .chips span { display: inline-flex; align-items: center; gap: 6px; }
+  .chips i { width: 14px; height: 3px; display: inline-block; border-radius: 1px; }
+  .chips i.cuad { width: 10px; height: 10px; border-radius: 2px; }
+  /* tablas de cifras del notebook */
+  .tabla.nb table { font-size: 13px; }
+  .tabla.nb tr.sel td { color: var(--lamp); }
+  .tabla.nb tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--lamp); }
+  @media (max-width: 560px) { .tabla.nb table { font-size: 12px; } .tabla.nb th, .tabla.nb td { padding: 6px 5px; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase 7</div>
+    <h1>Explorar: de los bandits a la <span class="g">cueva</span></h1>
+    <p class="thesis">Probar algo nuevo cuesta hoy y paga mañana. Cuando el premio es raro, conviene ir adonde menos se estuvo.</p>
+  </section>
+
+  <!-- B1: el bandit de cuatro anuncios -->
+  <section class="bloque" id="b-bandit" data-objetivos="O1">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Impresiones de cada anuncio" id="segN">
+        <button aria-pressed="false" data-n="50">50 de cada uno</button>
+        <button aria-pressed="true" data-n="500">500</button>
+        <button aria-pressed="false" data-n="5000">5000</button>
+      </div>
+      <div class="lz"><canvas id="cvAnuncios" aria-label="Cuatro barras con la tasa de clics observada de cada anuncio y su intervalo del 95 %; opcionalmente, una línea verde con la probabilidad verdadera"></canvas></div>
+      <div class="row">
+        <button class="btn primary" id="anOtra">Otra tirada</button>
+        <label class="check"><input type="checkbox" id="anVerdad"> Mostrar lo que nadie ve</label>
+      </div>
+      <div class="hud" id="hudAn"></div>
+      <p class="cap">Simulado en el navegador: cada anuncio se muestra la misma cantidad de veces. La rayita vertical es el intervalo del 95 % (de Wilson, como en el notebook). La línea verde es la probabilidad de clic verdadera.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 1</div>
+      <h2>Cuatro anuncios, un solo estado</h2>
+      <p>Una tienda tiene cuatro anuncios y muestra uno a cada persona que entra a la página. Cada anuncio recibe un clic con una probabilidad que nadie conoce, que en el notebook vale 4,0 % para A, 2,5 % para B, 5,5 % para C y 3,0 % para D. Es un bandit de varios brazos (<i>multi-armed bandit</i>), como una fila de tragamonedas en la que solo hay que elegir qué palanca tirar. En el lenguaje del curso es el problema de RL más chico, con un solo estado, cuatro acciones y partidas de un paso.</p>
+      <div class="eq">μ* = maxₐ μₐ = μ_C = 5,5 %</div>
+      <p class="nota pregunta">Con 50 impresiones de cada anuncio, ¿te animarías a decir cuál es el mejor? Probá con 500 y con 5000.</p>
+    </div>
+  </section>
+
+  <!-- B2: el arrepentimiento -->
+  <section class="bloque" id="b-regret" data-objetivos="O1">
+    <div class="stage">
+      <div class="lz"><canvas id="cvRegret" aria-label="Arrepentimiento acumulado a lo largo de 20&nbsp;000 impresiones para la prueba A/B fija, ε-greedy y UCB, con el promedio y una banda del 10 % al 90 % de las campañas"></canvas></div>
+      <div class="chips"><span><i style="background:var(--ember)"></i>A/B fijo</span><span><i style="background:var(--lamp)"></i>ε-greedy (ε = 0,1)</span><span><i style="background:var(--sonar)"></i>UCB (c = 0,2)</span></div>
+      <div class="row"><button class="btn" id="regOtra">Otras campañas</button></div>
+      <div class="hud" id="hudReg"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>notebook, 200 campañas</th><th>regret a las 20&nbsp;000</th><th>impresiones al mejor</th></tr></thead>
+          <tbody>
+            <tr><td>A/B fijo</td><td class="num">69,2</td><td class="num">81,7 %</td></tr>
+            <tr><td>ε-greedy, ε = 0,1</td><td class="num">89,6</td><td class="num">75,4 %</td></tr>
+            <tr class="sel"><td>UCB, c = 0,2</td><td class="num">36,7</td><td class="num">90,9 %</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">Curvas simuladas en el navegador: 60 campañas de 20&nbsp;000 impresiones por método, con otra semilla que el notebook. La línea es el promedio y la banda va del 10 % al 90 % de las campañas. La tabla es la del notebook.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 2</div>
+      <h2>Cuánto perdés por probar</h2>
+      <p>El arrepentimiento (<i>regret</i>) suma los clics esperados que se pierden por no mostrar siempre el mejor anuncio. La prueba A/B fija muestra 500 veces cada anuncio antes de quedarse con el ganador, mientras que ε-greedy con ε = 0,1 sigue probando al azar para siempre. En el notebook, con 200 campañas de 20&nbsp;000 impresiones, la prueba A/B pierde 69,2 clics, ε-greedy 89,6 y UCB 36,7. UCB le da al mejor anuncio el 90,9 % de las impresiones, contra el 81,7 % de la prueba A/B y el 75,4 % de ε-greedy.</p>
+      <div class="eq">regret_T = Σₜ (μ* − μ_aₜ)</div>
+      <p class="nota pregunta">¿Por qué la curva de ε-greedy nunca se aplana, aunque ya sepa cuál es el mejor anuncio?</p>
+    </div>
+  </section>
+
+  <!-- B3: UCB -->
+  <section class="bloque" id="b-ucb" data-objetivos="O2">
+    <div class="stage">
+      <div class="lz"><canvas id="cvUcb" aria-label="Para cada anuncio, un punto en su promedio de clics y una barra hasta su puntaje de UCB; la estrella marca el anuncio que UCB muestra"></canvas></div>
+      <div class="row">
+        <button class="btn primary" id="ucb1">Una impresión más</button>
+        <button class="btn" id="ucb1000">1000 más</button>
+        <button class="btn" id="ucbRe">Volver a t = 300</button>
+      </div>
+      <div class="hud" id="hudUcb"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>t = 300</th><th>clics/n</th><th>prom.</th><th>bonif.</th><th>puntaje</th></tr></thead>
+          <tbody>
+            <tr><td>A</td><td class="num">5 / 125</td><td class="num">0,0400</td><td class="num">0,0427</td><td class="num">0,0827</td></tr>
+            <tr><td>B</td><td class="num">4 / 108</td><td class="num">0,0370</td><td class="num">0,0460</td><td class="num">0,0830</td></tr>
+            <tr><td>C</td><td class="num">0 / 34</td><td class="num">0,0000</td><td class="num">0,0819</td><td class="num">0,0819</td></tr>
+            <tr class="sel"><td>D</td><td class="num">0 / 33</td><td class="num">0,0000</td><td class="num">0,0831</td><td class="num">0,0831</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">Al cargar, el gráfico muestra la impresión 300 de una campaña de UCB del notebook (c = 0,2). Los botones siguen esa campaña simulada en el navegador.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 3</div>
+      <h2>Optimismo ante la incertidumbre</h2>
+      <p>UCB (<i>upper confidence bound</i>, cota superior de confianza) muestra el anuncio con el mayor promedio de clics más una bonificación que crece si se lo probó poco. Es el optimismo ante la incertidumbre (<i>optimism in the face of uncertainty</i>), que le da a lo poco probado el beneficio de la duda hasta que las pruebas lo desmienten. Con c = 0,2, chico porque los clics son raros, en la impresión 300 del notebook A tiene el mayor promedio pero D gana con 0,0831 contra 0,0827 porque lleva solo 33 impresiones. El muestreo de Thompson (<i>Thompson sampling</i>) llega a lo mismo por otro camino, sorteando para cada anuncio una probabilidad plausible según lo visto y mostrando la más alta.</p>
+      <div class="eq">puntaje(a) = promedioₐ + c √(ln t / nₐ)</div>
+      <p class="nota pregunta">Si D no consigue clics en las próximas impresiones, ¿qué pasa con su promedio y con su bonificación?</p>
+    </div>
+  </section>
+
+  <!-- B4: ε-greedy no llega -->
+  <section class="bloque" id="b-eps" data-objetivos="O3">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Explorador" id="segEps"></div>
+      <div class="lz"><canvas id="cvEps" aria-label="La cueva grande con las visitas de cada casilla en celeste; las casillas nunca pisadas quedan negras"></canvas></div>
+      <div class="legend"><span>nunca</span><span class="bar" id="legEps"></span><span>muchas visitas (log)</span></div>
+      <div class="row"><button class="btn primary" id="epsVer">Ver correr</button><button class="btn" id="epsOtra">Otra semilla</button></div>
+      <div class="hud" id="hudEps"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>notebook, 20 semillas</th><th>llegan</th><th>1.ª salida (mediana)</th><th>casillas pisadas</th></tr></thead>
+          <tbody id="tbEps"></tbody>
+        </table>
+      </div>
+      <p class="cap">Simulado en el navegador con una semilla: Q-learning con α = 0,2 y γ = 0,99, Q en 0 más un ruido minúsculo, partidas de hasta 300 pasos desde S y 30&nbsp;000 pasos en total. La tabla es la del notebook.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 4</div>
+      <h2>De los bandits a la cueva: ε-greedy no llega</h2>
+      <p>En la cueva el premio está al final de un camino, así que hasta llegar una vez a la salida todas las recompensas valen 0. Sin recompensa, ε-greedy es una caminata al azar con costumbres que no distingue una casilla pisada mil veces de una nunca vista. En la cueva grande, con 155 casillas y la salida a 44 pasos, cada explorador tiene 30&nbsp;000 pasos repartidos en partidas de 300. En el notebook, con 20 semillas, el azar puro no llega nunca y ε-greedy llega en el 5 % tanto con ε = 0,1 como con ε = 0,3, aunque con 0,3 pisa 100,3 casillas en promedio contra 63,4.</p>
+      <div class="eq">r = 1 al entrar a la salida, 0 si no</div>
+      <p class="nota pregunta">¿Por qué subir ε de 0,1 a 0,3 hace pisar más casillas pero no llegar más seguido?</p>
+    </div>
+  </section>
+
+  <!-- B5: optimismo y conteo en la cueva -->
+  <section class="bloque" id="b-opt" data-objetivos="O2">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Explorador" id="segOpt"></div>
+      <div class="lz"><canvas id="cvOpt" aria-label="La cueva grande con las visitas de cada casilla para el explorador elegido; las casillas nunca pisadas quedan negras"></canvas></div>
+      <div class="legend"><span>nunca</span><span class="bar" id="legOpt"></span><span>muchas visitas (log)</span></div>
+      <div class="row"><button class="btn primary" id="optVer">Ver correr</button><button class="btn" id="optOtra">Otra semilla</button></div>
+      <div class="hud" id="hudOpt"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>notebook, 20 semillas</th><th>llegan</th><th>1.ª salida (mediana)</th><th>casillas pisadas</th></tr></thead>
+          <tbody id="tbOpt"></tbody>
+        </table>
+      </div>
+      <p class="cap">Simulado en el navegador con una semilla: el mismo Q-learning del paso 4 con ε = 0,1. Optimista: Q arranca en 1. Conteo: β = 0,01 con Q en 0. La tabla es la del notebook.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 5</div>
+      <h2>Optimismo en la cueva: contar visitas</h2>
+      <p>Con valores iniciales optimistas, Q arranca en 1 en vez de 0, así que cada flecha no probada promete hasta que el agente la prueba y no encuentra nada. La exploración por conteo (<i>count-based exploration</i>) suma en cada paso una bonificación que es grande en las casillas poco visitadas. En una tabla con Q en 0, el conteo solo no alcanza, porque una flecha nunca probada vale 0 mientras los caminos conocidos ya juntaron bonificaciones. En el notebook, con 20 semillas, el conteo solo no llega nunca mientras que el optimismo llega siempre, con una mediana de 8&nbsp;666 pasos que baja a 5&nbsp;218 si se le suma el conteo.</p>
+      <div class="eq">r_total = r + β / √N(s′)</div>
+      <p class="nota pregunta">Mirá el conteo solo. ¿Por qué la bonificación empuja hacia lo nuevo recién cuando lo nunca probado vale al menos tanto como lo ya visto?</p>
+    </div>
+  </section>
+
+  <!-- B6: Go-Explore -->
+  <section class="bloque" id="b-goexplore" data-objetivos="O3">
+    <div class="stage">
+      <div class="lz"><canvas id="cvGe" aria-label="Go-Explore en la cueva grande: las casillas del archivo coloreadas por la iteración en que entraron, la secuencia guardada en ámbar, la exploración en celeste y una estrella en la casilla elegida"></canvas></div>
+      <div class="chips"><span><i style="background:var(--lamp)"></i>secuencia guardada hasta la casilla elegida</span><span><i style="background:var(--sonar)"></i>30 pasos al azar desde ahí</span></div>
+      <div class="legend"><span>archivo: primeras iteraciones</span><span class="bar" id="legGe"></span><span>últimas</span></div>
+      <div class="row">
+        <button class="btn primary" id="geUna">Una iteración</button>
+        <button class="btn" id="geSalida">Hasta la salida</button>
+        <button class="btn" id="geOtra">Otra semilla</button>
+      </div>
+      <div class="hud" id="hudGe"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>notebook, 20 semillas</th><th>llegan</th><th>1.ª salida (mediana)</th></tr></thead>
+          <tbody>
+            <tr class="sel"><td>volviendo por restauración</td><td class="num">20 de 20</td><td class="num">4&nbsp;620</td></tr>
+            <tr><td>volviendo con la secuencia</td><td class="num">19 de 20</td><td class="num">16&nbsp;612</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">Simulado en el navegador, volviendo por restauración del estado: la vuelta no gasta pasos. El color de cada casilla dice en qué iteración entró al archivo. La tabla es la del notebook, con el mismo presupuesto de 30&nbsp;000 pasos.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 6</div>
+      <h2>Go-Explore: primero volver, después explorar</h2>
+      <p>Go-Explore, pensado para juegos de Atari como <i>Montezuma's Revenge</i>, guarda un archivo de casillas visitadas con la secuencia de acciones más corta para llegar a cada una. En cada iteración elige una casilla del archivo, más seguido cuanto menos vista, vuelve a ella sin explorar y recién desde ahí explora 30 pasos al azar. Así evita las dos fallas de los métodos de curiosidad, el desapego (<i>detachment</i>) de las fronteras ya dejadas atrás y el descarrilamiento (<i>derailment</i>) al volver con una política que explora. En el notebook, volviendo por restauración del estado llega a la salida en las 20 semillas con una mediana de 4&nbsp;620 pasos, mientras que repitiendo la secuencia guardada llega en 19 de 20 con 16&nbsp;612.</p>
+      <div class="eq">P(elegir casilla) ∝ 1 / √(vistas + 1)</div>
+      <p class="nota pregunta">Restaurar el estado es gratis en un simulador. ¿En qué problemas reales no se puede?</p>
+    </div>
+  </section>
+
+  <!-- B7: cuando volver no es exacto -->
+  <section class="bloque" id="b-pegajosas" data-objetivos="O4">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Cuánto azar" id="segPeg">
+        <button aria-pressed="false" data-k="p0">p = 0</button>
+        <button aria-pressed="false" data-k="p0.05">p = 0,05</button>
+        <button aria-pressed="true" data-k="p0.1">p = 0,1</button>
+        <button aria-pressed="false" data-k="p0.25">p = 0,25</button>
+        <button aria-pressed="false" data-k="s0.05">slip = 0,05</button>
+        <button aria-pressed="false" data-k="s0.1">slip = 0,1</button>
+        <button aria-pressed="false" data-k="s0.2">slip = 0,2</button>
+      </div>
+      <div class="lz"><canvas id="cvPeg" aria-label="La cueva grande con la secuencia memorizada sin azar en verde y 20 intentos de repetirla en ámbar; las cruces rojas marcan dónde termina cada intento"></canvas></div>
+      <div class="chips"><span><i style="background:var(--exit)"></i>la secuencia sin azar</span><span><i style="background:var(--lamp)"></i>20 intentos</span><span><i class="cuad" style="background:var(--ember)"></i>dónde termina cada uno</span></div>
+      <div class="row"><button class="btn" id="pegOtra">Otros 20 intentos</button></div>
+      <div class="hud" id="hudPeg"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>notebook, 1000 intentos</th><th>llegan a la salida</th></tr></thead>
+          <tbody id="tbPeg"></tbody>
+        </table>
+      </div>
+      <p class="cap">La secuencia de 52 acciones es la que guardó Go-Explore en el notebook (semilla 0, sin bucles). Los intentos dibujados y el porcentaje sobre 1000 intentos están simulados en el navegador. La tabla es la del notebook.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 7</div>
+      <h2>Cuando volver no es exacto</h2>
+      <p>Las acciones pegajosas (<i>sticky actions</i>) hacen que el entorno ignore con probabilidad p la acción elegida y repita la anterior, como un joystick que se traba. En el notebook, la secuencia que guardó Go-Explore, sin bucles (52 acciones), llega siempre con p = 0, en el 44,1 % de los intentos con p = 0,05, en el 17,8 % con p = 0,1 y en el 0,9 % con p = 0,25, mientras que con el piso resbaloso de la clase 4 llega en el 7,2 % con slip = 0,05. Go-Explore, si vuelve repitiendo secuencias en una cueva pegajosa, encuentra la salida en 3 de 20 semillas con p = 0,1 y en 1 de 20 con p = 0,25. Por eso Machado et al. (2018) propusieron entrenar y evaluar en Atari con acciones pegajosas a propósito, para que ninguno gane memorizando botones.</p>
+      <div class="eq">acción real = la anterior, con prob. p</div>
+      <p class="nota pregunta">Una traba en el paso 10 deja al agente una casilla corrido. ¿Qué pasa con las 42 acciones que faltan?</p>
+    </div>
+  </section>
+
+  <!-- B8: Para enseñarlo -->
+  <section class="bloque full" id="b-ensenar" data-objetivos="O1 O3">
+    <div class="texto prose">
+      <div class="paso">Para enseñarlo</div>
+      <h2>Cómo contar esta clase en una oración</h2>
+      <p>"Explorar es pagar hoy por saber algo que mañana te deja elegir mejor; cuando el premio es raro, conviene ir adonde menos estuviste."</p>
+      <p class="nota pregunta">Pregunta para hacerle a quien te escucha: ¿cuántas veces probás un restaurante nuevo antes de volver al de siempre? ¿Cambia tu respuesta si te quedan tres noches en la ciudad o tres años?</p>
+      <p><b>Ejercicio de 5 minutos:</b> preparen cuatro bolsas opacas con 10 fichas cada una, con 1, 2, 3 y 4 fichas verdes, sin decir cuál es cuál. Cada grupo tiene 20 sacadas, devolviendo la ficha cada vez. Un grupo saca 3 veces de cada bolsa y después se queda con la que dio más verdes, mientras que el otro saca siempre de la bolsa con mejor promedio, sumándole un punto a toda bolsa sacada menos de tres veces. Al final cuenten las verdes de cada grupo y compárenlas con las que habrían salido sacando siempre de la mejor bolsa.</p>
+      <p class="small muted">Adelanto: todo esto fue con una tabla, con una fila por casilla. En una pantalla de Atari no hay tabla posible. Viene la clase 8, de la tabla a la red.</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(async () => {
+  // cada figura se arma en su propia tarea, para no trabar el navegador al cargar
+  const tarea = f => new Promise(r => setTimeout(() => r(f()), 0));
+  Cueva.pagina("7", { lecturas: [
+    { texto: "Sutton y Barto (2018), Reinforcement Learning: An Introduction, 2.ª ed., cap. 2 (2.1–2.7: bandits, ε-greedy, valores iniciales optimistas y UCB)", url: "http://incompleteideas.net/book/the-book-2nd.html" },
+    { texto: "Stanford CS234 (Brunskill), clases 9 a 12: bandits, regret, optimismo (UCB), Thompson y exploración en MDP", url: "https://web.stanford.edu/class/cs234/" },
+    { texto: "Russo et al. (2018), A tutorial on Thompson sampling, Foundations and Trends in Machine Learning 11(1)", url: "https://arxiv.org/abs/1707.02038" },
+    { texto: "Bellemare et al. (2016), Unifying count-based exploration and intrinsic motivation, NeurIPS 2016", url: "https://arxiv.org/abs/1606.01868" },
+    { texto: "Ecoffet et al. (2021), First return, then explore, Nature 590, 580–586", url: "https://doi.org/10.1038/s41586-020-03157-9" },
+    { texto: "Machado et al. (2018), Revisiting the Arcade Learning Environment, Journal of Artificial Intelligence Research 61, 523–562", url: "https://doi.org/10.1613/jair.5699" }
+  ] });
+
+  const COL = Cueva.COL(), MONO = COL.mono || "monospace", AR = Cueva.ARROW;
+  const PARED = "#2c3346";
+  const reducir = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = id => document.getElementById(id);
+  const coma = s => String(s).replace(".", ",").replace("-", "−");
+  const fmt = (x, d = 3) => coma(x.toFixed(d));
+  const miles = x => String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  const pct = (x, d = 1) => coma((100 * x).toFixed(d)) + " %";
+  const marcar = (sel, attr, v) => document.querySelectorAll(sel).forEach(b => b.setAttribute("aria-pressed", b.dataset[attr] === v));
+
+  // un gráfico con ejes
+  function ejes(cv, alto, { x0, x1, y0, y1, ticksX = [], ticksY = [], fx = coma, fy = coma, tituloX = "", tituloY = "", m = { l: 44, r: 12, t: 22, b: 30 } }) {
+    const { w, h, ctx } = Cueva.lienzo(cv, alto)();
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    const X = v => m.l + (v - x0) / (x1 - x0) * (w - m.l - m.r);
+    const Y = v => h - m.b - (v - y0) / (y1 - y0) * (h - m.t - m.b);
+    ctx.font = `11px ${MONO}`; ctx.strokeStyle = "rgba(141,147,163,.18)"; ctx.lineWidth = 1; ctx.fillStyle = COL.muted;
+    for (const t of ticksY) { const y = Math.round(Y(t)) + .5; ctx.beginPath(); ctx.moveTo(m.l, y); ctx.lineTo(w - m.r, y); ctx.stroke(); ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(fy(t), m.l - 5, y); }
+    for (const t of ticksX) { const x = Math.round(X(t)) + .5; ctx.beginPath(); ctx.moveTo(x, m.t); ctx.lineTo(x, h - m.b); ctx.stroke(); ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(fx(t), x, h - m.b + 5); }
+    ctx.textAlign = "right"; ctx.textBaseline = "top"; ctx.fillText(tituloX, w - m.r, h - 12);
+    ctx.textAlign = "left"; ctx.fillText(tituloY, 4, 4);
+    return { ctx, w, h, m, X, Y };
+  }
+
+  // =====================================================================
+  // El bandit: cuatro anuncios (probabilidades del notebook, celda 8)
+  // =====================================================================
+  const CTR = [0.040, 0.025, 0.055, 0.030], NOMBRES = ["A", "B", "C", "D"], K = 4, MEJOR = 2, MU = Math.max(...CTR);
+  const argmax = v => { let b = 0; for (let a = 1; a < v.length; a++) if (v[a] > v[b]) b = a; return b; };   // la primera si empatan, como numpy
+  function wilson(clics, n) {
+    const z = 1.96, p = clics / n, centro = (p + z * z / (2 * n)) / (1 + z * z / n);
+    const mitad = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n);
+    return [Math.max(0, centro - mitad), centro + mitad];
+  }
+
+  // B1. probar parejo
+  const b1 = await tarea(() => {
+    const cv = $("cvAnuncios"), hud = $("hudAn");
+    let n = 500, semilla = 3, clics = [];
+    const tirar = () => { const u = Cueva.rng(semilla * 977 + n); clics = CTR.map(p => { let c = 0; for (let i = 0; i < n; i++) if (u() < p) c++; return c; }); };
+    function dibujar() {
+      const verdad = $("anVerdad").checked;
+      const ic = clics.map(c => wilson(c, n)), tope = Math.max(0.08, ...ic.map(x => x[1])) * 1.08;
+      const paso = tope > 0.12 ? 0.04 : 0.02, ticks = []; for (let t = 0; t <= tope + 1e-9; t += paso) ticks.push(t);
+      const g = ejes(cv, 230, { x0: 0, x1: K, y0: 0, y1: tope, ticksY: ticks, fy: v => coma((100 * v).toFixed(0)) + " %", tituloY: "clics observados", m: { l: 44, r: 12, t: 22, b: 44 } });
+      const { ctx, X, Y, h } = g;
+      for (let a = 0; a < K; a++) {
+        const cx = X(a + .5), bw = Math.min(56, (X(1) - X(0)) * .45), p = clics[a] / n;
+        ctx.fillStyle = "rgba(242,179,90,.75)"; ctx.fillRect(cx - bw / 2, Y(p), bw, Y(0) - Y(p));
+        ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.beginPath();
+        ctx.moveTo(cx, Y(ic[a][0])); ctx.lineTo(cx, Y(ic[a][1])); ctx.moveTo(cx - 6, Y(ic[a][0])); ctx.lineTo(cx + 6, Y(ic[a][0])); ctx.moveTo(cx - 6, Y(ic[a][1])); ctx.lineTo(cx + 6, Y(ic[a][1])); ctx.stroke();
+        if (verdad) { ctx.strokeStyle = COL.exit; ctx.lineWidth = 2; ctx.setLineDash([5, 3]); ctx.beginPath(); ctx.moveTo(cx - bw / 2 - 8, Y(CTR[a])); ctx.lineTo(cx + bw / 2 + 8, Y(CTR[a])); ctx.stroke(); ctx.setLineDash([]); }
+        ctx.fillStyle = COL.ink; ctx.font = `600 13px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "top";
+        ctx.fillText(NOMBRES[a], cx, h - 40);
+        ctx.fillStyle = COL.muted; ctx.font = `11px ${MONO}`; ctx.fillText(`${clics[a]}/${n}`, cx, h - 24);
+      }
+      hud.innerHTML = `<span>simulado: <b>${n}</b> impresiones de cada anuncio</span>` +
+        clics.map((c, a) => `<span>${NOMBRES[a]} <b>${pct(c / n)}</b></span>`).join("") +
+        (verdad ? `<span>verdadero: ${CTR.map((p, a) => `${NOMBRES[a]} <b style="color:var(--exit)">${pct(p)}</b>`).join(" ")}</span>` : "");
+    }
+    document.querySelectorAll("#segN button").forEach(b => b.onclick = () => { n = +b.dataset.n; marcar("#segN button", "n", b.dataset.n); tirar(); dibujar(); });
+    $("anOtra").onclick = () => { semilla++; tirar(); dibujar(); };
+    $("anVerdad").onchange = dibujar;
+    tirar(); dibujar();
+    return { dibujar };
+  });
+
+  // B2. regret acumulado de tres métodos, como correr_bandit del notebook
+  const T_IMP = 20000, CADA = 200, NCAMP = 60, N_AB = 500, EPS_B = 0.1, C_UCB = 0.2;
+  function campana(metodo, u) {
+    const n = new Float64Array(K), cl = new Float64Array(K), curva = new Float32Array(T_IMP / CADA + 1);
+    let reg = 0, fijo = -1, alMejor = 0;
+    const media = () => [0, 1, 2, 3].map(a => cl[a] / Math.max(n[a], 1));
+    for (let t = 0; t < T_IMP; t++) {
+      let a;
+      if (metodo === "ab") { if (t < N_AB * K) a = t % K; else { if (fijo < 0) fijo = argmax(media()); a = fijo; } }
+      else if (t < K) a = t;
+      else if (metodo === "eps") a = u() < EPS_B ? Math.floor(u() * K) : argmax(media());
+      else { const lt = Math.log(t); let b = 0, bs = -Infinity; for (let k = 0; k < K; k++) { const s = cl[k] / n[k] + C_UCB * Math.sqrt(lt / n[k]); if (s > bs) { bs = s; b = k; } } a = b; }
+      const clic = u() < CTR[a]; n[a]++; if (clic) cl[a]++;
+      reg += MU - CTR[a]; if (a === MEJOR) alMejor++;
+      if ((t + 1) % CADA === 0) curva[(t + 1) / CADA] = reg;
+    }
+    return { curva, alMejor: alMejor / T_IMP };
+  }
+  const METODOS = [["ab", "A/B fijo", COL.ember, "rgba(224,100,90,.16)"], ["eps", "ε-greedy", COL.lamp, "rgba(242,179,90,.16)"], ["ucb", "UCB", COL.sonar, "rgba(94,200,216,.16)"]];
+  const b2 = await tarea(() => {
+    const cv = $("cvRegret"), hud = $("hudReg");
+    let semilla = 101, R = null;
+    function simular() {
+      R = METODOS.map(([id], mi) => {
+        const u = Cueva.rng(semilla * 31 + mi * 7919), cs = [];
+        for (let k = 0; k < NCAMP; k++) cs.push(campana(id, u));
+        const P = cs[0].curva.length, prom = new Float32Array(P), p10 = new Float32Array(P), p90 = new Float32Array(P);
+        for (let i = 0; i < P; i++) {
+          const v = cs.map(c => c.curva[i]).sort((x, y) => x - y);
+          prom[i] = v.reduce((x, y) => x + y, 0) / v.length; p10[i] = v[Math.floor(.1 * (v.length - 1))]; p90[i] = v[Math.ceil(.9 * (v.length - 1))];
+        }
+        return { prom, p10, p90, alMejor: cs.reduce((x, c) => x + c.alMejor, 0) / NCAMP };
+      });
+    }
+    function dibujar() {
+      const tope = Math.ceil(Math.max(...R.map(r => r.p90[r.p90.length - 1])) / 50) * 50;
+      const ty = []; for (let t = 0; t <= tope; t += tope > 300 ? 100 : 50) ty.push(t);
+      const g = ejes(cv, 240, { x0: 0, x1: T_IMP, y0: 0, y1: tope, ticksX: [0, 5000, 10000, 15000, 20000], ticksY: ty, fx: miles, fy: v => String(v), tituloX: "impresiones →", tituloY: "regret acumulado (clics)", m: { l: 44, r: 26, t: 22, b: 30 } });
+      const { ctx, X, Y } = g;
+      R.forEach((r, mi) => {
+        ctx.fillStyle = METODOS[mi][3]; ctx.beginPath();
+        for (let i = 0; i < r.p90.length; i++) { const x = X(i * CADA); i ? ctx.lineTo(x, Y(r.p90[i])) : ctx.moveTo(x, Y(r.p90[i])); }
+        for (let i = r.p10.length - 1; i >= 0; i--) ctx.lineTo(X(i * CADA), Y(r.p10[i]));
+        ctx.closePath(); ctx.fill();
+      });
+      R.forEach((r, mi) => {
+        ctx.strokeStyle = METODOS[mi][2]; ctx.lineWidth = 2; ctx.beginPath();
+        for (let i = 0; i < r.prom.length; i++) { const x = X(i * CADA), y = Y(r.prom[i]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+        ctx.stroke();
+      });
+      hud.innerHTML = `<span>simulado, ${NCAMP} campañas:</span>` + R.map((r, mi) => `<span>${METODOS[mi][1]} <b>${fmt(r.prom[r.prom.length - 1], 1)}</b> clics, al mejor <b>${pct(r.alMejor)}</b></span>`).join("");
+    }
+    $("regOtra").onclick = () => { semilla++; simular(); dibujar(); };
+    simular(); dibujar();
+    return { dibujar };
+  });
+
+  // B3. UCB: barras de promedio a puntaje, desde la impresión 300 del notebook (celda 20)
+  const FOTO = { n: [125, 108, 34, 33], cl: [5, 4, 0, 0] };
+  const b3 = await tarea(() => {
+    const cv = $("cvUcb"), hud = $("hudUcb");
+    let n, cl, u, semilla = 7;
+    const reiniciar = () => { n = FOTO.n.slice(); cl = FOTO.cl.slice(); u = Cueva.rng(semilla); };
+    const tt = () => n.reduce((x, y) => x + y, 0);
+    const puntajes = () => { const lt = Math.log(tt()); return n.map((k, a) => [cl[a] / k, C_UCB * Math.sqrt(lt / k)]); };
+    const elegido = () => argmax(puntajes().map(([m, b]) => m + b));
+    function avanzar(k) { for (let i = 0; i < k; i++) { const a = elegido(); n[a]++; if (u() < CTR[a]) cl[a]++; } }
+    function dibujar() {
+      const P = puntajes(), el = elegido(), tope = Math.max(0.1, ...P.map(([m, b]) => m + b)) * 1.1;
+      const g = ejes(cv, 240, { x0: 0, x1: K, y0: 0, y1: tope, ticksY: [0, .02, .04, .06, .08, .1].filter(v => v <= tope), fy: v => coma(v.toFixed(2)), tituloY: "promedio → puntaje", m: { l: 44, r: 12, t: 22, b: 44 } });
+      const { ctx, X, Y, h } = g;
+      for (let a = 0; a < K; a++) {
+        const cx = X(a + .5), bw = Math.min(26, (X(1) - X(0)) * .22), [m, b] = P[a];
+        ctx.fillStyle = a === el ? "rgba(242,179,90,.85)" : "rgba(94,200,216,.55)"; ctx.fillRect(cx - bw / 2, Y(m + b), bw, Y(m) - Y(m + b));
+        ctx.fillStyle = COL.ink; ctx.beginPath(); ctx.arc(cx, Y(m), 5, 0, 7); ctx.fill();
+        ctx.strokeStyle = COL.exit; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(cx - bw, Y(CTR[a])); ctx.lineTo(cx + bw, Y(CTR[a])); ctx.stroke(); ctx.setLineDash([]);
+        if (a === el) { ctx.fillStyle = COL.lamp; ctx.font = `600 18px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText("★", cx, Y(m + b) - 3); }
+        ctx.fillStyle = COL.ink; ctx.font = `600 13px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(NOMBRES[a], cx, h - 40);
+        ctx.fillStyle = COL.muted; ctx.font = `11px ${MONO}`; ctx.fillText(`n = ${n[a]}`, cx, h - 24);
+      }
+      const t = tt(), mayorProm = argmax(P.map(([m]) => m));
+      hud.innerHTML = `<span>${t === 300 && n.every((k, a) => k === FOTO.n[a]) ? "notebook" : "simulado"}: impresión <b>t = ${miles(t)}</b></span>` +
+        `<span>mayor promedio <b>${NOMBRES[mayorProm]}</b></span><span>muestra <b style="color:var(--lamp)">${NOMBRES[el]}</b> con puntaje ${fmt(P[el][0] + P[el][1], 4)}</span><span>guiones verdes: la probabilidad verdadera</span>`;
+    }
+    $("ucb1").onclick = () => { avanzar(1); dibujar(); };
+    $("ucb1000").onclick = () => { avanzar(1000); dibujar(); };
+    $("ucbRe").onclick = () => { semilla++; reiniciar(); dibujar(); };
+    reiniciar(); dibujar();
+    return { dibujar };
+  });
+
+  // =====================================================================
+  // La cueva grande: exploradores con el mismo presupuesto (como `explorar` del notebook)
+  // =====================================================================
+  const env = Cueva.makeEnv(Cueva.MAPS.grande), nS = env.nS, GOAL = env.goal, START = env.start;
+  const NXT = Array.from({ length: nS }, (_, s) => [0, 1, 2, 3].map(a => env.move(s, a)[0]));
+  const PRESUP = 30000, MAXP = 300, ALFA = 0.2, GAMMA = 0.99;
+  function explorador({ eps = 0.1, q0 = 0, beta = 0 }, semilla) {
+    const u = Cueva.rng(semilla);
+    const Q = Array.from({ length: nS }, (_, s) => s === GOAL ? [0, 0, 0, 0] : [0, 1, 2, 3].map(() => q0 + u() * 1e-4));
+    const N = new Uint32Array(nS);
+    const X = { N, Q, s: START, t: 0, pasos: 0, primera: null, partidas: 0, llegadas: 0 };
+    N[START]++;
+    X.paso = () => {
+      const s = X.s, q = Q[s];
+      const a = u() < eps ? Math.floor(u() * 4) : argmax(q);
+      const s2 = NXT[s][a]; N[s2]++; X.pasos++; X.t++;
+      const fin = s2 === GOAL; let r = fin ? 1 : 0;
+      if (beta) r += beta / Math.sqrt(N[s2]);
+      const obj = fin ? r : r + GAMMA * Math.max(...Q[s2]);
+      q[a] += ALFA * (obj - q[a]); X.s = s2;
+      if (fin && X.primera === null) X.primera = X.pasos;
+      if (fin || X.t >= MAXP) { X.partidas++; if (fin) X.llegadas++; X.s = START; X.t = 0; N[START]++; }
+    };
+    return X;
+  }
+  function pintarVisitas(T, X, conSprite) {
+    T.fondo("#000").paredes(PARED);
+    let mx = 1; for (let s = 0; s < nS; s++) if (s !== GOAL) mx = Math.max(mx, X.N[s]);
+    const lm = Math.log10(1 + mx);
+    for (let s = 0; s < nS; s++) if (s !== GOAL && X.N[s] > 0) { const [r, c] = env.free[s]; T.casilla(r, c, Cueva.rampa("visitas", .12 + .88 * Math.log10(1 + X.N[s]) / lm)); }
+    T.salida(); T.entrada();
+    if (conSprite) T.sprite(X.s, 2);
+    const ctx = T.ctx, cell = T.cell, [r, c] = env.free[START];
+    ctx.font = `600 ${Math.max(8, Math.round(cell * .42))}px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.85)"; ctx.strokeText("S", c * cell + cell / 2, r * cell + cell / 2 + 1); ctx.fillStyle = COL.ink; ctx.fillText("S", c * cell + cell / 2, r * cell + cell / 2 + 1);
+  }
+  // una figura de carrera: botones para elegir el explorador, su mapa de visitas y la tabla del notebook
+  function carrera({ seg, canvas, hud, tb, ver, otra, leg, tipos, inicial }) {
+    const T = Cueva.tablero($(canvas), env, { maxCell: 30, minCell: 8 });
+    $(leg).style.background = Cueva.gradienteCSS("visitas");
+    $(seg).innerHTML = tipos.map(t => `<button aria-pressed="${t.id === inicial}" data-t="${t.id}">${t.nombre}</button>`).join("");
+    let sel = inicial, semilla = 1, X = null, raf = 0, corriendo = false;
+    const tipo = () => tipos.find(t => t.id === sel);
+    function nuevo(hastaElFinal) { X = explorador(tipo().cfg, semilla * 7919 + tipos.indexOf(tipo()) * 104729 + 13); if (hastaElFinal) while (X.pasos < PRESUP) X.paso(); }
+    function dibujar() {
+      pintarVisitas(T, X, corriendo);
+      const pisadas = Array.from(X.N).filter(v => v > 0).length;
+      $(hud).innerHTML = `<span>simulado, semilla ${semilla}: pasos <b>${miles(X.pasos)}</b> de ${miles(PRESUP)}</span><span>casillas pisadas <b>${pisadas}</b> de ${nS}</span>` +
+        (X.primera !== null ? `<span style="color:var(--exit)">1.ª salida en el paso <b style="color:var(--exit)">${miles(X.primera)}</b>, ${X.llegadas} partidas salen</span>` : `<span>no encontró la salida</span>`);
+      $(tb).innerHTML = tipos.map(t => `<tr${t.id === sel ? ' class="sel"' : ""}><td>${t.nombre}</td>${t.nb.map(x => `<td class="num">${x}</td>`).join("")}</tr>`).join("");
+    }
+    function parar() { cancelAnimationFrame(raf); corriendo = false; $(ver).textContent = "Ver correr"; }
+    function correr() {
+      parar(); nuevo(false);
+      if (reducir) { while (X.pasos < PRESUP) X.paso(); dibujar(); return; }
+      corriendo = true; $(ver).textContent = "Pausa";
+      const cuadro = () => { for (let i = 0; i < 150 && X.pasos < PRESUP; i++) X.paso(); if (X.pasos >= PRESUP) corriendo = false; dibujar(); if (corriendo) raf = requestAnimationFrame(cuadro); else $(ver).textContent = "Ver correr"; };
+      raf = requestAnimationFrame(cuadro);
+    }
+    document.querySelectorAll(`#${seg} button`).forEach(b => b.onclick = () => { parar(); sel = b.dataset.t; marcar(`#${seg} button`, "t", sel); nuevo(true); dibujar(); });
+    $(ver).onclick = () => { if (corriendo) { parar(); dibujar(); } else correr(); };
+    $(otra).onclick = () => { parar(); semilla++; nuevo(true); dibujar(); };
+    nuevo(true); dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  }
+  // B4. ε-greedy no llega (notebook, celda 25)
+  const b4 = await tarea(() => carrera({ seg: "segEps", canvas: "cvEps", hud: "hudEps", tb: "tbEps", ver: "epsVer", otra: "epsOtra", leg: "legEps", inicial: "e01", tipos: [
+    { id: "azar", nombre: "al azar (ε = 1)", cfg: { eps: 1 }, nb: ["0 %", "—", "54,3"] },
+    { id: "e01", nombre: "ε-greedy, ε = 0,1", cfg: { eps: 0.1 }, nb: ["5 %", "26 687", "63,4"] },
+    { id: "e03", nombre: "ε-greedy, ε = 0,3", cfg: { eps: 0.3 }, nb: ["5 %", "25 713", "100,3"] }
+  ] }));
+  // B5. optimismo y conteo (notebook, celda 28)
+  const b5 = await tarea(() => carrera({ seg: "segOpt", canvas: "cvOpt", hud: "hudOpt", tb: "tbOpt", ver: "optVer", otra: "optOtra", leg: "legOpt", inicial: "ambos", tipos: [
+    { id: "opt", nombre: "optimista (Q₀ = 1)", cfg: { q0: 1 }, nb: ["100 %", "8 666", "155"] },
+    { id: "conteo", nombre: "conteo solo", cfg: { beta: 0.01 }, nb: ["0 %", "—", "26,4"] },
+    { id: "ambos", nombre: "optimista + conteo", cfg: { q0: 1, beta: 0.01 }, nb: ["100 %", "5 218", "155"] }
+  ] }));
+
+  // =====================================================================
+  // B6. Go-Explore (como `go_explore` del notebook, volviendo por restauración)
+  // =====================================================================
+  const KEXP = 30;
+  function recorrer(acc, { p = 0, slip = 0, u = null } = {}) {
+    let s = START, prev = null; const cam = [s];
+    for (let a of acc) {
+      if (prev !== null && p > 0 && u() < p) a = prev;
+      prev = a;
+      if (slip > 0 && u() < slip) a = (a + (u() < .5 ? 1 : 3)) % 4;
+      s = NXT[s][a]; cam.push(s);
+      if (s === GOAL) break;
+    }
+    return cam;
+  }
+  const b6 = await tarea(() => {
+    const T = Cueva.tablero($("cvGe"), env, { maxCell: 30, minCell: 8 }), hud = $("hudGe");
+    $("legGe").style.background = Cueva.gradienteCSS("valor");
+    let semilla = 1, G;
+    function nuevo() { G = { u: Cueva.rng(semilla * 104729 + 7), arch: new Map([[START, { acc: [], vistas: 1, nacio: 0 }]]), it: 0, pasos: 0, hall: null, ult: null }; }
+    function iterar() {
+      if (G.hall) return;
+      const { u, arch } = G; G.it++;
+      const cs = [...arch.keys()], w = cs.map(c => 1 / Math.sqrt(arch.get(c).vistas + 1));
+      let x = u() * w.reduce((a, b) => a + b, 0), i = 0; while (i < cs.length - 1 && x >= w[i]) { x -= w[i]; i++; }
+      const c = cs[i], acc = arch.get(c).acc.slice(), volver = recorrer(acc), explorado = [c];
+      let s = c;
+      for (let j = 0; j < KEXP; j++) {
+        const a = Math.floor(u() * 4), s2 = NXT[s][a]; G.pasos++; acc.push(a); explorado.push(s2); s = s2;
+        const e = arch.get(s2);
+        if (e) { e.vistas++; if (acc.length < e.acc.length) e.acc = acc.slice(); }
+        else arch.set(s2, { acc: acc.slice(), vistas: 1, nacio: G.it });
+        if (s2 === GOAL) { G.hall = { it: G.it, pasos: G.pasos }; break; }
+      }
+      G.ult = { c, volver, explorado };
+    }
+    function dibujar() {
+      T.fondo("#000").paredes(PARED);
+      const itMax = Math.max(1, G.it);
+      for (const [s, d] of G.arch) { if (s === GOAL) continue; const [r, c] = env.free[s]; T.casilla(r, c, Cueva.rampa("valor", .08 + .92 * d.nacio / itMax)); }
+      T.salida(); T.entrada();
+      if (G.ult) {
+        T.trayecto(G.ult.volver, COL.lamp, .16);
+        T.trayecto(G.ult.explorado, COL.sonar, .1);
+        T.texto(G.ult.c, "★", COL.ink, .7);
+      }
+      hud.innerHTML = `<span>simulado, semilla ${semilla}: iteración <b>${G.it}</b></span><span>archivo <b>${G.arch.size}</b> de ${nS} casillas</span><span>pasos explorando <b>${miles(G.pasos)}</b></span>` +
+        (G.ult ? `<span>secuencia guardada hasta ★: <b>${G.ult.volver.length - 1}</b> acciones</span>` : "") +
+        (G.hall ? `<span style="color:var(--exit)">salida en la iteración <b style="color:var(--exit)">${G.hall.it}</b>, después de ${miles(G.hall.pasos)} pasos</span>` : "");
+    }
+    $("geUna").onclick = () => { iterar(); dibujar(); };
+    $("geSalida").onclick = () => { let k = 0; while (!G.hall && k++ < 3000) iterar(); dibujar(); };
+    $("geOtra").onclick = () => { semilla++; nuevo(); for (let i = 0; i < 40; i++) iterar(); dibujar(); };
+    nuevo(); for (let i = 0; i < 40; i++) iterar(); dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B7. La secuencia memorizada con acciones pegajosas o piso resbaloso (notebook, celdas 41 y 43)
+  // =====================================================================
+  const SEQ = Array.from("↓↓↓↓↓↓→→→→↑↑↑↑→→→→↑↑→→→→↓↓→→↓↓←←↓↓←←↓↓→→↓↓→→→→→→→→→→").map(ch => AR.indexOf(ch));
+  const NB_PEG = { "p0": "100,0 %", "p0.05": "44,1 %", "p0.1": "17,8 %", "p0.25": "0,9 %", "s0.05": "7,2 %", "s0.1": "0,2 %", "s0.2": "0,0 %" };
+  const nombrePeg = k => (k[0] === "p" ? "pegajosa, p = " : "resbaloso, slip = ") + coma(k.slice(1));
+  const b7 = await tarea(() => {
+    const T = Cueva.tablero($("cvPeg"), env, { maxCell: 30, minCell: 8 }), hud = $("hudPeg");
+    const det = recorrer(SEQ);
+    let clave = "p0.1", semilla = 5, intentos = [], tasa = 0;
+    const cfg = () => clave[0] === "p" ? { p: +clave.slice(1) } : { slip: +clave.slice(1) };
+    function simular() {
+      const u = Cueva.rng(semilla * 613 + 1); let ok = 0;
+      for (let i = 0; i < 1000; i++) if (recorrer(SEQ, { ...cfg(), u }).slice(-1)[0] === GOAL) ok++;
+      tasa = ok / 1000;
+      const v = Cueva.rng(semilla * 389 + 2); intentos = [];
+      for (let i = 0; i < 20; i++) intentos.push({ cam: recorrer(SEQ, { ...cfg(), u: v }), dx: (v() - .5) * .36, dy: (v() - .5) * .36 });
+    }
+    function linea(cam, dx, dy, color, ancho) {
+      const ctx = T.ctx, cell = T.cell; ctx.strokeStyle = color; ctx.lineWidth = ancho; ctx.lineJoin = "round"; ctx.lineCap = "round"; ctx.beginPath();
+      cam.forEach((s, i) => { const [r, c] = env.free[s], x = (c + .5 + dx) * cell, y = (r + .5 + dy) * cell; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+    }
+    function dibujar() {
+      T.fondo("#000").paredes(PARED); T.salida(); T.entrada();
+      const cell = T.cell, ctx = T.ctx;
+      linea(det, 0, 0, "rgba(61,220,132,.45)", Math.max(3, cell * .3));
+      for (const it of intentos) linea(it.cam, it.dx, it.dy, "rgba(242,179,90,.8)", Math.max(1.2, cell * .06));
+      for (const it of intentos) {
+        const [r, c] = env.free[it.cam[it.cam.length - 1]], x = (c + .5 + it.dx) * cell, y = (r + .5 + it.dy) * cell, k = Math.max(3, cell * .18);
+        ctx.strokeStyle = COL.ember; ctx.lineWidth = Math.max(2, cell * .08); ctx.beginPath(); ctx.moveTo(x - k, y - k); ctx.lineTo(x + k, y + k); ctx.moveTo(x + k, y - k); ctx.lineTo(x - k, y + k); ctx.stroke();
+      }
+      const llegan = intentos.filter(it => it.cam[it.cam.length - 1] === GOAL).length;
+      hud.innerHTML = `<span>simulado, ${nombrePeg(clave)}:</span><span>llegan <b>${pct(tasa)}</b> de 1000 intentos</span><span>dibujados: <b>${llegan}</b> de 20 llegan</span><span>secuencia de <b>${SEQ.length}</b> acciones</span>`;
+      $("tbPeg").innerHTML = Object.entries(NB_PEG).map(([k, v]) => `<tr${k === clave ? ' class="sel"' : ""}><td>${nombrePeg(k)}</td><td class="num">${v}</td></tr>`).join("");
+    }
+    document.querySelectorAll("#segPeg button").forEach(b => b.onclick = () => { clave = b.dataset.k; marcar("#segPeg button", "k", clave); simular(); dibujar(); });
+    $("pegOtra").onclick = () => { semilla++; simular(); dibujar(); };
+    simular(); dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  Cueva.alCargarSprites(() => { b4.dibujar(); b5.dibujar(); });
+  let tRes = 0;
+  addEventListener("resize", () => { clearTimeout(tRes); tRes = setTimeout(() => { for (const f of [b1, b2, b3, b4, b5, b6, b7]) f.dibujar(); }, 120); });
+})();
+</script>
+</body>
+</html>

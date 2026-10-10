@@ -711,5 +711,83 @@ window.MODULOS = {
         "Se prevé qué cambiaría con un ε más grande o más chico: cuánto se aleja la estimación «de lo que hago» de la «mejor posible» y qué rutas se dejarían de conocer."
       ]
     }
+  },
+
+  "7": {
+    objetivos: [
+      "Plantear un problema como bandit y comparar una prueba A/B fija, ε-greedy y UCB por su arrepentimiento acumulado (regret).",
+      "Explicar el optimismo ante la incertidumbre (UCB, valores iniciales altos, bonificación por conteo) y por qué ayuda cuando la recompensa es escasa.",
+      "Explicar por qué ε-greedy no encuentra la salida cuando la recompensa es escasa y cómo Go-Explore separa volver de explorar.",
+      "Reconocer el límite de volver exactamente a un estado: con acciones pegajosas o piso resbaloso, memorizar la secuencia de acciones deja de funcionar."
+    ],
+    tiempo: { pagina: 40, notebook: 75 },
+    previos: ["6"],
+    requisitos: ["Haber hecho la clase 6: ε-greedy y Q-learning, y el mapa de visitas.", "De la clase 4, el piso resbaloso: con cierta probabilidad el agente se resbala a un costado."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "Cuatro anuncios, 200 campañas de 20 000 impresiones. Regret promedio al final: A/B fijo (500 de cada uno y después el ganador) 69,2 clics; ε-greedy con ε = 0,1, 89,6; UCB, 36,7. ¿Qué se lee?",
+        opciones: [
+          { texto: "ε-greedy perdió más porque eligió mal: como A/B fijo, en muchas campañas se quedó para siempre con un anuncio peor.", explicacion: "No: lo que lo deja último es que nunca deja de probar. Aunque ya sepa cuál es el mejor, el 10 % al azar le cuesta un piso de 3,5 clics cada 2000 impresiones, que no se va nunca." },
+          { texto: "El regret mide cuántos clics se perdieron por probar, así que ningún método puede quedar debajo de A/B fijo, que prueba solo 2000.", explicacion: "No: se mide contra mostrar siempre el mejor y suma también lo que se pierde por elegir mal. A/B fijo eligió mal en el 12 % de las campañas y siguió perdiendo; UCB perdió la mitad." },
+          { texto: "ε-greedy sigue mostrando uno al azar el 10 % de las veces, para siempre; UCB prueba cada vez menos y su curva se aplana.", explicacion: "Correcto. Por tramo de 2000 impresiones, ε-greedy baja hacia un piso de 3,5 clics y UCB pasa de 16,4 a 1,0. A/B fijo deja de probar a las 2000, pero las campañas que eligieron mal pierden para siempre." },
+          { texto: "El peor es A/B fijo: en las primeras 2000 impresiones perdió 35,0 clics, contra 23,2 de ε-greedy y 16,4 de UCB.", explicacion: "No: al principio pierde más, pero después pierde 3,8 por tramo y ε-greedy lo pasa. Lo que importa es la forma de la curva entera, no un tramo." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O2",
+        pregunta: "UCB con c = 0,2 en la impresión t = 300 (ln t = 5,704). Llevan: A 5 clics en 125, B 4 en 108, C 0 en 34 y D 0 en 33. Puntaje = promedio + c · √(ln t / n). ¿Qué anuncio muestra y por qué?",
+        opciones: [
+          { texto: "D: su puntaje, 0 + 0,2 · √(5,704 / 33) = 0,0831, queda apenas arriba de B (0,0830), A (0,0827) y C (0,0819).", explicacion: "Correcto. D no gana porque UCB crea que es mejor, sino porque se probó poco y todavía no sabe si lo es. Si sigue sin clics, su n sube, la bonificación baja y deja de ganar." },
+          { texto: "A: tiene el mayor promedio (0,0400), y UCB muestra el mejor hasta ahora salvo cuando le toca probar al azar.", explicacion: "No: eso es ε-greedy. UCB no sortea; suma una bonificación que es grande si se probó poco, y con ella A queda en 0,0827, debajo de D." },
+          { texto: "C: es el mejor de verdad (5,5 %), y la bonificación está para encontrar justamente al mejor anuncio.", explicacion: "No: UCB no conoce las probabilidades verdaderas. C lleva 0 clics en 34 por mala suerte y su puntaje, 0,0819, es el más bajo. Lo encuentra más adelante." },
+          { texto: "A o B: C y D tienen promedio 0 sin un solo clic, así que UCB los deja de lado hasta que los otros fallen.", explicacion: "No: UCB no descarta lo que no tuvo clics; la bonificación le da el beneficio de la duda. D, con el n más chico (33), tiene la bonificación más alta: 0,0831." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O3",
+        pregunta: "En la cueva grande (155 casillas, camino más corto de 44 pasos, partidas de 300 pasos), con 30 000 pasos, Q-learning con ε-greedy llegó a la salida en 1 de 20 semillas (5 %), con ε = 0,1 y con 0,3; al azar, en 0. ¿Por qué?",
+        opciones: [
+          { texto: "Porque ε es chico: con ε = 0,3 o más probaría lo suficiente y llegaría a la salida en casi todas las semillas.", explicacion: "No: con ε = 0,3 pisa más casillas (100 de 155 en promedio) y llega igual en 1 de 20. El problema no es cuánto prueba, sino que prueba sin dirección." },
+          { texto: "Porque Q-learning no aprende con recompensa escasa: cuando por fin llega a la salida, no actualiza las Q del camino.", explicacion: "No: cuando llega, actualiza como en la clase 6. El problema es antes: casi nunca llega, y sin premio todas las Q siguen en 0." },
+          { texto: "Porque 30 000 pasos no alcanzan para recorrer una cueva de 155 casillas: con ese presupuesto, nadie llegaría.", explicacion: "No: el optimista (Q0 = 1) pisó las 155 casillas y llegó en las 20 semillas, con una mediana de 8666 pasos. El presupuesto alcanza si se explora con dirección." },
+          { texto: "Hasta el primer premio las Q valen 0 y «la mejor» no dice nada; probar al azar no distingue lo visitado de lo nuevo.", explicacion: "Correcto. Sin recompensa, ε-greedy es una caminata al azar con costumbres: cada partida arranca en S y las visitas se apagan con la distancia." }
+        ],
+        correcta: 3
+      },
+      {
+        objetivo: "O3",
+        pregunta: "Con los mismos 30 000 pasos en la cueva grande, Go-Explore volviendo por restauración llegó a la salida en 20 de 20 semillas; la bonificación por conteo sola, en 0 de 20. ¿Qué hace Go-Explore?",
+        opciones: [
+          { texto: "Le suma a Q una bonificación que crece en las casillas poco visitadas, como el conteo, pero con un β más grande.", explicacion: "No: Go-Explore no tiene tabla Q ni bonificación. Y el conteo solo falla por otra razón: en una tabla, una flecha nunca probada vale 0, menos que lo conocido, y el agente da vueltas por lo que ya conoce." },
+          { texto: "Guarda un archivo de lugares, elige uno (más seguido cuanto menos visto), vuelve sin explorar y explora desde ahí.", explicacion: "Correcto. Arrancar desde el borde de lo conocido evita el desapego (nada se olvida) y el descarrilamiento (la vuelta no explora). Restaurando, la mediana fue de 4620 pasos." },
+          { texto: "Guarda la mejor partida y la repite con ε-greedy, así explora siempre cerca del camino que ya funcionó.", explicacion: "No: volver explorando es lo que descarrila. Go-Explore separa: primero vuelve sin explorar a una celda del archivo y después explora 30 pasos al azar desde ahí." },
+          { texto: "Explora al azar desde S, como el dado puro, pero con partidas más largas, y así llega más lejos de la entrada.", explicacion: "No: el dado puro arranca siempre en S y no se aleja (0 de 20). Go-Explore arranca cada iteración en una celda del archivo, no en S." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O4",
+        pregunta: "Go-Explore guardó la secuencia que guardó Go-Explore sin bucles, de 52 acciones, que en la cueva determinista lleva de S a la salida. Repetida 1000 veces con acciones pegajosas, llega el 44,1 % de las veces con p = 0,05 y el 0,9 % con p = 0,25. ¿Qué se lee?",
+        opciones: [
+          { texto: "Una traba hace perder un paso, pero la secuencia sigue el rumbo; con partidas más largas llegaría casi siempre.", explicacion: "No: después de una traba el agente queda corrido una casilla y el resto de la secuencia ya no corresponde al lugar donde está: choca y termina en cualquier parte. Más pasos no lo arreglan." },
+          { texto: "La secuencia estaba mal guardada: una sin rodeos, como el camino más corto de 44 pasos, llegaría igual con p = 0,25.", explicacion: "No: una más corta tiene menos pasos para trabarse, pero sigue sin poder corregir una traba. El problema es que no mira dónde está." },
+          { texto: "Una secuencia memorizada no sabe dónde está: tras una traba se desvía y no se corrige. Por eso Machado et al. (2018) propusieron evaluar en Atari con p = 0,25.", explicacion: "Correcto. Con p = 0,25 casi nunca llega: así un agente no puede ganar memorizando botones. Lo que cuenta es una política que mira dónde está, no una secuencia que funcionó una vez." },
+          { texto: "Las acciones pegajosas castigan a cualquier agente por igual, así que en Atari se evalúa sin ellas para medir lo aprendido.", explicacion: "No: está al revés. Machado et al. propusieron evaluar con p = 0,25 justamente para que memorizar no alcance; una política que mira dónde está se recupera de una traba." }
+        ],
+        correcta: 2
+      }
+    ],
+    actividad: {
+      titulo: "¿Explorar o volver al de siempre?",
+      consigna: "Elegí una decisión que repetís seguido y que tenga varias opciones: dónde almorzar, qué ruta tomar, qué café comprar. Durante una semana anotá qué elegiste cada vez, si fue tu opción de siempre o una que probaste, y cuánto te gustó (de 0 a 10, o el tiempo que tardaste). Después estimá tu «regret» de la semana dos veces, contra la mejor opción que conocés al final: si hubieras ido siempre a la de siempre, y con lo que de verdad hiciste. Contá si probar te costó o te hizo encontrar algo mejor. Proponé una regla tipo UCB para la semana que viene: a cada opción, su promedio más una bonificación que crezca si la probaste poco, y decí qué elegirías mañana con esa regla. Cerralo con la oración de «Para enseñarlo»: explorar es pagar hoy por saber algo que mañana te deja elegir mejor; cuando el premio es raro, conviene ir adonde menos estuviste. Publicalo en Discussions; otra persona te devuelve con la rúbrica.",
+      rubrica: [
+        "Hay un registro de la semana con la opción de cada vez, si fue la de siempre o una prueba, y cuánto rindió; las opciones y los puntajes son concretos.",
+        "Se estima el regret de la semana en los dos escenarios (siempre lo de siempre y lo que de verdad se hizo) con números del registro, y se dice qué se pagó y qué se ganó por probar.",
+        "La regla tipo UCB tiene un promedio y una bonificación que crece si se probó poco, está aplicada a las opciones del registro y dice qué elegiría mañana y por qué."
+      ]
+    }
   }
 };

@@ -208,7 +208,7 @@
     { id: "4", archivo: "04-planificar-con-mapa.html", titulo: "Planificar con mapa: iteración de valor y de política", nb: "04-planificar-con-mapa.ipynb", bloque: "Clase 4", unidad: 1 },
     { id: "5", archivo: "05-evaluar-sin-mapa.html", titulo: "Evaluar sin mapa: Monte Carlo y TD", nb: "05-evaluar-sin-mapa.ipynb", bloque: "Clase 5", unidad: 2 },
     { id: "6", archivo: "06-controlar-sin-mapa.html", titulo: "Controlar sin mapa: SARSA y Q-learning", nb: "06-controlar-sin-mapa.ipynb", bloque: "Clase 6", unidad: 2 },
-    { id: "7", archivo: "07-explorar.html", titulo: "Explorar: de los bandits a la cueva", nb: "07-explorar.ipynb", bloque: "Clase 7", unidad: 2, pronto: true },
+    { id: "7", archivo: "07-explorar.html", titulo: "Explorar: de los bandits a la cueva", nb: "07-explorar.ipynb", bloque: "Clase 7", unidad: 2 },
     { id: "8", archivo: "08-de-la-tabla-a-la-red.html", titulo: "De la tabla a la red: aproximación y DQN", nb: "08-de-la-tabla-a-la-red.ipynb", bloque: "Clase 8", unidad: 2, pronto: true },
     { id: "9", archivo: "09-redes-recurrentes.html", titulo: "Redes recurrentes: cuando el estado no alcanza", nb: "09-redes-recurrentes.ipynb", bloque: "Clase 9", unidad: 3, pronto: true },
     { id: "10", archivo: "10-aprender-de-registros.html", titulo: "Aprender de registros: imitar y RL offline", nb: "10-aprender-de-registros.ipynb", bloque: "Clase 10", unidad: 3, pronto: true },

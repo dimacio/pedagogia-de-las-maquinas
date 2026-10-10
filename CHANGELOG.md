@@ -25,6 +25,7 @@ Formato: una sección por versión (SemVer sobre el curso, ver `fabrica/CONVENCI
 - Clase 4 (nueva): MDP, Q, mejora de política, iteración de política y de valor, piso resbaloso, robot de reciclaje.
 - Clase 5 (nueva): Monte Carlo, promedio incremental, TD(0), el error δ y la dopamina, sesgo y varianza, equivalencia de certeza.
 - Clase 6 (nueva): por qué Q y no V sin mapa, ε-greedy, SARSA, Q-learning, on-policy contra off-policy, mapa de visitas.
+- Clase 7 (nueva): bandits, regret, UCB, optimismo y conteos, Go-Explore, acciones pegajosas (Machado et al., 2018).
 
 ### Aviso
 - El progreso de los cuestionarios guardado en el navegador vuelve a cero (los ids cambian de significado).
