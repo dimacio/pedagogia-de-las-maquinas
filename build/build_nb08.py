@@ -652,7 +652,7 @@ print(f"error medio |max Q − V*| al final: {sin_trucos['error'][-1]:.1f}   (V*
 print(f"casillas desde las que sale la política greedy: {final(sin_trucos):.0%} (promedio de las últimas 4 mediciones)")
 """))
 cells.append(md(r"""
-En menos de mil pasos la red ya cree que hay casillas que valen decenas, y poco después más de cien, cuando nada puede valer más de 1. Después los valores bajan, pero al final siguen muy por encima de 1, y la política no sale casi desde ningún lado. Es el peso de recién, con 4612 pesos: cada paso empuja hacia arriba los valores de las casillas que acaba de pisar y, de paso, los de sus parecidas, que son las que usa el próximo objetivo.
+En menos de mil pasos la red ya cree que hay casillas que valen decenas, y poco después más de cien, cuando nada puede valer más de 1. Después los valores bajan, pero al final siguen muy por encima de 1, y la política no sale casi desde ningún lado. Es el peso de recién, con 4868 pesos: cada paso empuja hacia arriba los valores de las casillas que acaba de pisar y, de paso, los de sus parecidas, que son las que usa el próximo objetivo.
 """))
 
 # ======================================================================= 6
