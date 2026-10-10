@@ -791,6 +791,84 @@ window.MODULOS = {
     }
   },
 
+  "8": {
+    objetivos: [
+      "Leer la tabla Q como una matriz de casillas × acciones y como una función, y explicar por qué una red con entrada one-hot equivale a la tabla.",
+      "Explicar con un ejemplo qué es generalizar y cuándo engaña (vecinas separadas por una pared).",
+      "Nombrar los ingredientes de DQN (memoria de repetición, red objetivo, ε decreciente) y para qué sirve cada uno, incluido el objetivo que se mueve.",
+      "Describir cómo se compara un agente de forma justa: varias semillas, curvas de aprendizaje y azar en el entorno."
+    ],
+    tiempo: { pagina: 35, notebook: 90 },
+    previos: ["6", "7"],
+    requisitos: ["De la clase 6, Q-learning con su tabla Q y ε-greedy.", "De la clase 7, que en Atari cada pantalla es un estado y no hay tabla posible."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "En el notebook, una red sin capas ocultas con entrada one-hot (60 números en 0 salvo un 1 en la casilla) tiene 240 parámetros, tantos como números tiene la tabla Q. Entrenadas con las mismas 20 000 transiciones, la diferencia máxima entre las dos es 0. ¿Por qué?",
+        opciones: [
+          { texto: "Con 240 parámetros la red tiene la capacidad justa para copiar Q*, así que cualquier entrada que le diéramos terminaría en la misma tabla.", explicacion: "No: no importa cuántos parámetros hay sino a qué casillas toca cada uno. La red con coordenadas tiene 4612 y, aun con el Q* correcto de las 59 casillas, acierta la flecha en el 71 %." },
+          { texto: "Con el one-hot cada peso es de una sola casilla y flecha: un paso de gradiente toca 1 de los 240 pesos y repite la regla de Q-learning.", explicacion: "Correcto. Con la transición de (8,11) a la salida solo W[→, 58] tiene gradiente y queda en 0,50, igual que la tabla. Por eso tampoco generaliza: lo que aprende en una casilla no le dice nada a la de al lado." },
+          { texto: "Las dos llegan a Q* por caminos distintos: la red mueve todos sus pesos en cada paso, pero al final converge al mismo punto que la tabla.", explicacion: "No: no hay caminos distintos, son idénticas paso a paso, porque el gradiente es 0 salvo en un peso. Mover casi todos los pesos en cada paso es lo que hace la red de seis entradas." },
+          { texto: "La red generaliza entre casillas vecinas y la tabla no, pero con 20 000 transiciones se visitan todas y esa ventaja deja de notarse.", explicacion: "No: la red one-hot no generaliza nada, porque cada casilla prende un número distinto y ninguna se parece a otra. Empieza a generalizar cuando la entrada son las coordenadas." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O2",
+        pregunta: "Las casillas (7,6) y (7,8) están a dos columnas, con una pared en el medio: V* vale 0,9044 y 0,9606. Una red que recibe solo la fila y la columna, entrenada con el Q* correcto de las 59 casillas, elige → en (7,6), contra la pared. ¿Qué pasó?",
+        opciones: [
+          { texto: "Le faltaron datos: (7,6) fue una casilla poco visitada, y con más partidas en esa zona la red habría aprendido que conviene ir hacia ↑.", explicacion: "No: acá la red recibió el Q* correcto de las 59 casillas, sin esconderle ninguna, y aun así acierta la flecha en solo el 71 % de las casillas. No es falta de datos." },
+          { texto: "La red se equivoca mucho en el valor de esa zona: estima (7,6) muy por encima de 0,9044 y por eso cree que → la acerca a la salida.", explicacion: "No: el error en el valor es chico (0,9064 contra 0,9044). Pasa que las flechas de una casilla se diferencian en un 1 o un 2 %, y un error chico alcanza para elegir mal." },
+          { texto: "Una tabla tendría el mismo problema junto a esa pared: cualquier método que estime Q confunde dos casillas que están tan cerca.", explicacion: "No: la tabla guarda un número independiente por casilla y flecha, y junto a una pared no se equivoca así. Confundir vecinas es el precio de generalizar." },
+          { texto: "Las dos entradas son casi iguales y la red suaviza el salto: → desde (7,6) se parece a estar en (7,8). Con bigotes acierta el 97 %.", explicacion: "Correcto. La red estima 0,9064 y 0,9528 contra 0,9044 y 0,9606: le sube el valor a una y se lo baja a la otra. Con bigotes, que dicen dónde hay pared, (7,6) elige ↑ y el acierto pasa del 71 % al 97 %." }
+        ],
+        correcta: 3
+      },
+      {
+        objetivo: "O3",
+        pregunta: "En la cueva, la misma red (6 → 64 → 64 → 4) aprende Q con cuatro variantes. Solo con red objetivo, el Q más alto llega a 3,25 y la política sale desde el 0 % de las casillas; con red objetivo y memoria (DQN), desde el 97 %. ¿Para qué sirve la red objetivo?",
+        opciones: [
+          { texto: "Congela el objetivo: una copia puesta al día cada 40 pasos calcula r + γ max Q y la red lo puede alcanzar. Frena la explosión, pero sola no alcanza.", explicacion: "Correcto. Sin trucos el Q más alto llega a 128,83; con red objetivo, a 3,25. Pero la red sigue aprendiendo de lo último que vivió, y hace falta la memoria para que la política salga." },
+          { texto: "Guarda la mejor versión de la red hasta el momento y la usa para elegir las flechas, así la política no empeora mientras la otra sigue aprendiendo.", explicacion: "No: la copia calcula el objetivo, no elige las acciones, y se pone al día cada 40 pasos sea mejor o peor. Las flechas las elige la red que aprende, con ε-greedy." },
+          { texto: "Reemplaza a la memoria de repetición: con el objetivo quieto ya no importa de qué transiciones aprende, y la política sale desde casi todas las casillas.", explicacion: "No: solo con red objetivo la política sale desde el 0 % de las casillas. Cada ingrediente arregla un problema distinto, y DQN necesita los dos." },
+          { texto: "Baja ε de 1 a 0,1 a medida que la red aprende, para que el agente deje de explorar cuando los valores ya se parecen a los verdaderos.", explicacion: "No: el ε que baja es otro ingrediente; en la cueva baja de 1 a 0,1 en los primeros 4000 pasos en las cuatro variantes. La red objetivo no toca la exploración." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O3",
+        pregunta: "Sin trucos, la red llega a creer que una casilla vale 128,83, cuando ninguna puede pasar de 1. Con solo memoria de repetición (las últimas 10 000 transiciones, lotes al azar de 256), el Q más alto llega a 13,63 y, en la semilla 0, la política sale desde el 0 %. ¿Qué hace la memoria?",
+        opciones: [
+          { texto: "Guarda las partidas que llegaron a la salida y las repite más seguido que las otras, para que la red aprenda primero lo que dio premio.", explicacion: "No: los lotes se toman al azar de las últimas 10 000 transiciones, sin preferir las que dieron premio. Lo que importa es que mezclan partidas distintas." },
+          { texto: "Deja quieto el objetivo: como las transiciones guardadas son viejas, el objetivo que se calcula con ellas ya no cambia en cada paso.", explicacion: "No: el objetivo se sigue calculando con la red que se mueve; viejas son las transiciones, no la red. Por eso, solo con memoria, los valores se disparan al principio." },
+          { texto: "La red aprende de lotes que mezclan partidas en vez de los últimos pasos, casi iguales; eso frena mucho, pero el objetivo se sigue moviendo.", explicacion: "Correcto. Es el ejemplo del peso solo: con A → B crece hasta 27,30, y mezclado con B → salida se asienta en 0,5862. Sin red objetivo, el objetivo se mueve con cada paso y la política no sale." },
+          { texto: "Le da a la red más experiencia que la que juntó el agente sin trucos, y con más experiencia una red ya no puede sobreestimar los valores.", explicacion: "No: las dos variantes juegan los mismos 10 000 pasos y la memoria reusa esas transiciones. Y con memoria sola el Q más alto igual llega a 13,63, muy por encima de 1." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O4",
+        pregunta: "En la cueva, la semilla 0 de DQN sale desde el 100 % de las casillas en el paso 5000; Q-learning con red sin trucos, en la misma semilla, termina en el 3 %. ¿Qué hace falta para decir que DQN es mejor?",
+        opciones: [
+          { texto: "Nada más: si una corrida llega al 100 % y la otra se queda en el 3 %, la diferencia es tan grande que no puede deberse a la suerte.", explicacion: "No: en el paso 5000 el promedio de las cinco semillas de DQN es 68 % ± 36 %, y la semilla 2 termina en 84 %. Una corrida dice cuánto dio esa semilla, no cuánto da el método." },
+          { texto: "Correr los dos con varias semillas y mirar la curva entera con su dispersión: con 5, DQN termina en 94 % ± 5 % y sin trucos en 1 % ± 1 %.", explicacion: "Correcto. Con el mismo presupuesto de pasos para los dos y, si se puede, azar en el entorno, como las acciones pegajosas de la clase 7: es lo que piden Machado et al. (2018)." },
+          { texto: "Tomar la mejor semilla de cada método y comparar sus picos, porque el pico muestra hasta dónde puede llegar cada uno cuando aprende bien.", explicacion: "No: eso es elegir la corrida con suerte en el momento justo. El pico de la semilla 0 (100 %) cuenta mucho más que el promedio de las cinco en ese mismo paso (68 % ± 36 %)." },
+          { texto: "Comparar solo el final de la semilla 0, que es la misma para los dos, así la comparación queda pareja: 97 % contra 3 % al terminar.", explicacion: "No: usar la misma semilla no hace pareja la comparación, porque fija pesos, partidas y exploración que pueden favorecer a uno. El final de DQN va de 84 % a 97 % según la semilla." }
+        ],
+        correcta: 1
+      }
+    ],
+    actividad: {
+      titulo: "¿Dónde generaliza mal?",
+      consigna: "Pensá un ejemplo propio, fuera de la cueva, en el que dos situaciones que se describen casi igual piden decisiones distintas, como (7,6) y (7,8), vecinas separadas por una pared: dos paradas de colectivo a una cuadra pero de lados opuestos de una autopista, dos pacientes con los mismos síntomas y distinta alergia, dos jugadas que solo cambian en una pieza. Contá qué datos describen hoy cada situación, por qué con esos datos alguien (o una red) que generaliza las trataría igual y qué error cometería. Después decí qué dato agregarías para distinguirlas, como los bigotes que le dicen a la red dónde hay pared, y si ese dato arruinaría la generalización en casos que sí se parecen. Cerralo con la oración de «Para enseñarlo»: una red es una tabla que comparte números entre casillas: aprende más rápido de lo que no vio, y por eso también se equivoca en lo que no vio. Publicalo en Discussions; otra persona te devuelve con la rúbrica.",
+      rubrica: [
+        "El ejemplo es propio y concreto: dos situaciones con una descripción casi igual, dicha con sus datos, que piden decisiones distintas.",
+        "Se explica por qué con esa descripción quien generaliza las trataría igual y qué decisión equivocada tomaría en una de las dos, como la red que elige → contra la pared en (7,6).",
+        "Se propone un dato concreto que las distingue, se dice por qué alcanza (como los bigotes, que llevan la red del 71 % al 97 % de flechas óptimas) y si afecta a casos que sí se parecen."
+      ]
+    }
+  },
+
   "9": {
     objetivos: [
       "Distinguir observación de estado y explicar por qué la cueva con solo bigotes es un POMDP que pide memoria.",
