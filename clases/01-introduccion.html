@@ -58,6 +58,8 @@
   .trim a:hover { color: var(--lamp); }
   .trim a .id { font-family: var(--mono); color: var(--exit); font-size: 13px; }
   .trim a.aqui { color: var(--lamp); }
+  .trim .pronto { display: grid; grid-template-columns: 2.4ch minmax(0, 1fr); gap: 6px; color: var(--muted); font-size: 14px; line-height: 1.35; }
+  .trim .pronto .id { font-family: var(--mono); font-size: 13px; }
   .trim .tot { font-family: var(--mono); font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--rock-2); padding-top: 6px; font-variant-numeric: tabular-nums; }
   .trim .tot b { color: var(--ink); font-weight: 600; }
   .partes { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14.5px; }
@@ -186,7 +188,7 @@
   <section class="bloque full" id="cursada">
     <div class="texto" style="display:grid; gap:14px">
       <div class="paso">Cómo se cursa</div>
-      <h2>Doce clases, cuatro trimestres, dos vías</h2>
+      <h2>Dieciséis clases, cuatro unidades, dos vías</h2>
       <div class="seg" role="group" aria-label="Vía" id="segVia" style="max-width:420px">
         <button aria-pressed="true" data-v="visual">Vía visual (sin código)</button>
         <button aria-pressed="false" data-v="codigo">Vía con código</button>
@@ -198,11 +200,11 @@
       <div style="display:grid; gap:10px">
         <h3>Cada clase tiene</h3>
         <ol class="partes" id="partes"></ol>
-        <p class="small muted">La nivelación (0a Python, 0b Probabilidad, 0c Álgebra lineal) es optativa y no cuenta entre las doce: sirve a quien quiera hacer la vía con código o repasar las herramientas, todo con la misma cueva. Las clases 1 y 12 no tienen notebook.</p>
+        <p class="small muted">La nivelación (0a Python, 0b Probabilidad, 0c Álgebra lineal) es optativa y no cuenta entre las dieciséis: sirve a quien quiera hacer la vía con código o repasar las herramientas, todo con la misma cueva. Las clases 1 y 16 no tienen notebook.</p>
       </div>
       <div class="aviso">
         <h3>Lo que este curso no promete</h3>
-        <p>En la clase 4 vas a ver que la dopamina se comporta como un <b>error de predicción de recompensa</b> (Schultz, Dayan y Montague, 1997), el mismo error que usa el aprendizaje por diferencias temporales. Es uno de los puentes más lindos entre RL y neurociencia.</p>
+        <p>En la clase 5 vas a ver que la dopamina se comporta como un <b>error de predicción de recompensa</b> (Schultz, Dayan y Montague, 1997), el mismo error que usa el aprendizaje por diferencias temporales. Es uno de los puentes más lindos entre RL y neurociencia.</p>
         <p>Pero el «loop de dopamina» de las redes es una metáfora, no un diagnóstico, y si existe una adicción a las redes sociales es un tema que todavía se discute. El curso no promete curarte del scroll: propone que puedas ver el mecanismo.</p>
       </div>
     </div>
@@ -488,22 +490,24 @@
     };
     let via = "visual";
     function pintar() {
-      const grupos = [["Nivelación (optativa)", "N"], ["Trimestre 1", 1], ["Trimestre 2", 2], ["Trimestre 3", 3], ["Trimestre 4", 4]];
+      const grupos = [["Nivelación (optativa)", "N"], ["Unidad 1 · Fundamentos", 1], ["Unidad 2 · Sin mapa", 2], ["Unidad 3 · De la red a la política", 3], ["Unidad 4 · Lenguaje y agentes", 4]];
       let total = 0;
       $("anio").innerHTML = grupos.map(([n, t]) => {
-        const cs = Cueva.CLASES.filter(c => c.trimestre === t); let min = 0;
+        const cs = Cueva.CLASES.filter(c => c.unidad === t); let min = 0;
         const items = cs.map(c => {
+          if (c.pronto) return `<span class="pronto"><span class="id">${c.id}</span><span>${c.titulo} (próximamente)</span></span>`;
           const tm = (M[c.id] && M[c.id].tiempo) || {}, p = tm.pagina || DEF.pagina, nb = c.nb ? (tm.notebook || DEF.notebook) : 0;
           min += p + (via === "codigo" ? nb : 0);
           return `<a href="${c.archivo}"${c.id === "1" ? ' class="aqui" aria-current="page"' : ""}><span class="id">${c.id}</span><span>${c.titulo}</span></a>`;
         }).join("");
         if (t !== "N") total += min;
-        return `<div class="trim${t === "N" ? " opt" : ""}"><h3>${n}</h3>${items}<div class="tot">~<b>${Math.round(min / 60 * 2) / 2}</b> h de material</div></div>`;
+        const tot = min ? `~<b>${Math.round(min / 60 * 2) / 2}</b> h de material` : "En preparación";
+        return `<div class="trim${t === "N" ? " opt" : ""}"><h3>${n}</h3>${items}<div class="tot">${tot}</div></div>`;
       }).join("");
       $("partes").innerHTML = PARTES[via].map(p => `<li>${p}</li>`).join("");
       $("capVia").innerHTML = via === "visual"
-        ? `Vía visual: unas <b>${Math.round(total / 60)} h</b> de páginas en el año, más el juego, los cuestionarios y el foro. No hace falta programar.`
-        : `Vía con código: unas <b>${Math.round(total / 60)} h</b> de páginas y notebooks en el año, a razón de una clase por semana o una cada tres semanas si se cursa por trimestres.`;
+        ? `Vía visual: unas <b>${Math.round(total / 60)} h</b> de páginas en el cuatrimestre, más el juego, los cuestionarios y el foro. No hace falta programar.`
+        : `Vía con código: unas <b>${Math.round(total / 60)} h</b> de páginas y notebooks en el cuatrimestre, a razón de una clase por semana.`;
       document.querySelectorAll("#segVia button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === via ? "true" : "false"));
     }
     document.querySelectorAll("#segVia button").forEach(b => b.addEventListener("click", () => { via = b.dataset.v; pintar(); }));

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from comun import Contexto, Resultado, clases, notebook_de, pagina_de, rel, texto_completo_nb, texto_visible
+from comun import Contexto, Resultado, clases_activas, notebook_de, pagina_de, rel, texto_completo_nb, texto_visible
 
 DECIMAL = re.compile(r"(?<![\w.,])(\d+[.,]\d+)(?![\w]|[.,]\d)")
 PORCENTAJE = re.compile(r"(?<![\w.,])(\d+(?:[.,]\d+)?)\s?%")
@@ -31,7 +31,7 @@ def variantes(num: str, pct: bool) -> set[str]:
 def correr(ctx: Contexto) -> Resultado:
     r = Resultado("datos_sueltos")
     filas, sin_nb, total = [], [], 0
-    for c in clases():
+    for c in clases_activas():
         p, nb = pagina_de(c), notebook_de(c)
         if not p.exists():
             continue

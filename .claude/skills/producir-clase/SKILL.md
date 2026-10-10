@@ -13,5 +13,6 @@ Producís la clase `$ARGUMENTS` desde `specs/$ARGUMENTS.md` (tiene que estar en 
    c. `autor-cuestionario`.
 3. Corré `python fabrica/chequeos/correr.py --rapido --reporte fabrica/reportes/reporte.md`. Si algo falla, devolvéselo al agente que corresponde; como mucho 2 vueltas, después preguntá al autor.
 4. Delegá en `revisor`. Si el veredicto es CAMBIOS, aplicá los bloqueantes e importantes con el agente que corresponde y volvé a revisar (máximo 2 vueltas).
-5. Commit por artefacto con mensajes claros. Abrí el PR con la plantilla: resumen, informe del revisor, reporte de chequeos, capturas a 400 px.
+5. En el mismo PR, quitá `pronto: true` de la clase en `CLASES` (`assets/cueva.js`): la página ya existe. Si la clase reemplaza páginas de la v1
+   (`build/PLAN-16-clases.md` §6), agregá sus redirecciones. Commit por artefacto con mensajes claros. Abrí el PR con la plantilla: resumen, informe del revisor, reporte de chequeos, capturas a 400 px.
 6. Pasá el spine a `estado: publicada` recién cuando el autor apruebe el PR.

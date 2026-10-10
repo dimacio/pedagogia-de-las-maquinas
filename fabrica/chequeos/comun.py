@@ -95,6 +95,16 @@ def clase_por_id() -> dict[str, dict]:
     return {c["id"]: c for c in clases()}
 
 
+def clases_activas() -> list[dict]:
+    """Las clases de CLASES que no están en preparación (sin `pronto`)."""
+    return [c for c in clases() if not c.get("pronto")]
+
+
+def en_preparacion() -> set[str]:
+    """Ids de las clases marcadas `pronto` en CLASES: tienen spine en borrador y todavía no tienen página."""
+    return {c["id"] for c in clases() if c.get("pronto")}
+
+
 def pagina_de(c: dict) -> Path:
     return RAIZ / "clases" / c["archivo"]
 

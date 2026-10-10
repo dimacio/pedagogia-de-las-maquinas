@@ -197,37 +197,42 @@
   }
 
   // ---------- navegación del sitio ----------
-  // trimestre: "N" = nivelación (optativa, fuera de las 12); 1..4 = trimestre de tres clases
+  // unidad: "N" = nivelación (optativa, fuera de las 16); 1..4 = unidad de cuatro clases. pronto: clase en preparación (sin página todavía)
   const CLASES = [
-    { id: "0a", archivo: "00a-python.html", titulo: "Python desde la cueva", nb: "00a-python-desde-la-cueva.ipynb", bloque: "Nivelación · 0a", trimestre: "N" },
-    { id: "0b", archivo: "00b-probabilidad.html", titulo: "Probabilidad con piso resbaloso", nb: "00b-probabilidad.ipynb", bloque: "Nivelación · 0b", trimestre: "N" },
-    { id: "0c", archivo: "00c-algebra.html", titulo: "Álgebra lineal con Bellman", nb: "00c-algebra-lineal.ipynb", bloque: "Nivelación · 0c", trimestre: "N" },
-    { id: "1", archivo: "01-introduccion.html", titulo: "Introducción: por qué este curso", nb: null, bloque: "Clase 1", trimestre: 1 },
-    { id: "2", archivo: "02-que-es-rl.html", titulo: "¿Qué es RL?", nb: "02-que-es-rl.ipynb", bloque: "Clase 2", trimestre: 1 },
-    { id: "3", archivo: "03-mdp-y-bellman.html", titulo: "MDP y Bellman", nb: "03-mdp-y-bellman.ipynb", bloque: "Clase 3", trimestre: 1 },
-    { id: "4", archivo: "04-aprender-sin-mapa.html", titulo: "Aprender sin mapa", nb: "04-aprender-sin-mapa.ipynb", bloque: "Clase 4", trimestre: 2 },
-    { id: "5", archivo: "05-explorar-a-ciegas.html", titulo: "Explorar a ciegas", nb: "05-explorar-a-ciegas.ipynb", bloque: "Clase 5", trimestre: 2 },
-    { id: "6", archivo: "06-redes-neuronales.html", titulo: "Redes neuronales: de la tabla a la red", nb: "06-redes-neuronales.ipynb", bloque: "Clase 6", trimestre: 2 },
-    { id: "7", archivo: "07-redes-recurrentes.html", titulo: "Redes recurrentes: cuando el estado no alcanza", nb: "07-redes-recurrentes.ipynb", bloque: "Clase 7", trimestre: 3 },
-    { id: "8", archivo: "08-aplicaciones.html", titulo: "Aplicaciones", nb: "08-aplicaciones.ipynb", bloque: "Clase 8", trimestre: 3 },
-    { id: "9", archivo: "09-agentes-mundo-real.html", titulo: "Agentes I: RL en el mundo real", nb: "09-agentes-mundo-real.ipynb", bloque: "Clase 9", trimestre: 3 },
-    { id: "10", archivo: "10-agentes-de-lenguaje.html", titulo: "Agentes II: agentes de lenguaje", nb: "10-agentes-de-lenguaje.ipynb", bloque: "Clase 10", trimestre: 4 },
-    { id: "11", archivo: "11-agentes-aplicados.html", titulo: "Agentes aplicados: enseñar y difundir", nb: "11-agentes-aplicados.ipynb", bloque: "Clase 11", trimestre: 4 },
-    { id: "12", archivo: "12-cierre.html", titulo: "Cierre: proyecto final y cómo se propaga", nb: null, bloque: "Clase 12", trimestre: 4 }
+    { id: "0a", archivo: "00a-python.html", titulo: "Python desde la cueva", nb: "00a-python-desde-la-cueva.ipynb", bloque: "Nivelación · 0a", unidad: "N" },
+    { id: "0b", archivo: "00b-probabilidad.html", titulo: "Probabilidad con piso resbaloso", nb: "00b-probabilidad.ipynb", bloque: "Nivelación · 0b", unidad: "N" },
+    { id: "0c", archivo: "00c-algebra.html", titulo: "Álgebra lineal con Bellman", nb: "00c-algebra-lineal.ipynb", bloque: "Nivelación · 0c", unidad: "N" },
+    { id: "1", archivo: "01-introduccion.html", titulo: "Introducción: por qué este curso", nb: null, bloque: "Clase 1", unidad: 1 },
+    { id: "2", archivo: "02-que-es-rl.html", titulo: "¿Qué es RL?", nb: "02-que-es-rl.ipynb", bloque: "Clase 2", unidad: 1 },
+    { id: "3", archivo: "03-cuanto-pesa-el-futuro.html", titulo: "Cuánto pesa el futuro: de la cadena de Markov a Bellman", nb: "03-cuanto-pesa-el-futuro.ipynb", bloque: "Clase 3", unidad: 1, pronto: true },
+    { id: "4", archivo: "04-planificar-con-mapa.html", titulo: "Planificar con mapa: iteración de valor y de política", nb: "04-planificar-con-mapa.ipynb", bloque: "Clase 4", unidad: 1, pronto: true },
+    { id: "5", archivo: "05-evaluar-sin-mapa.html", titulo: "Evaluar sin mapa: Monte Carlo y TD", nb: "05-evaluar-sin-mapa.ipynb", bloque: "Clase 5", unidad: 2, pronto: true },
+    { id: "6", archivo: "06-controlar-sin-mapa.html", titulo: "Controlar sin mapa: SARSA y Q-learning", nb: "06-controlar-sin-mapa.ipynb", bloque: "Clase 6", unidad: 2, pronto: true },
+    { id: "7", archivo: "07-explorar.html", titulo: "Explorar: de los bandits a la cueva", nb: "07-explorar.ipynb", bloque: "Clase 7", unidad: 2, pronto: true },
+    { id: "8", archivo: "08-de-la-tabla-a-la-red.html", titulo: "De la tabla a la red: aproximación y DQN", nb: "08-de-la-tabla-a-la-red.ipynb", bloque: "Clase 8", unidad: 2, pronto: true },
+    { id: "9", archivo: "09-redes-recurrentes.html", titulo: "Redes recurrentes: cuando el estado no alcanza", nb: "09-redes-recurrentes.ipynb", bloque: "Clase 9", unidad: 3, pronto: true },
+    { id: "10", archivo: "10-aprender-de-registros.html", titulo: "Aprender de registros: imitar y RL offline", nb: "10-aprender-de-registros.ipynb", bloque: "Clase 10", unidad: 3, pronto: true },
+    { id: "11", archivo: "11-policy-gradient.html", titulo: "Policy gradient y actor-crítico: reforzar lo que salió bien", nb: "11-policy-gradient.ipynb", bloque: "Clase 11", unidad: 3, pronto: true },
+    { id: "12", archivo: "12-aprender-la-recompensa.html", titulo: "Aprender la recompensa: preferencias, RLHF y DPO", nb: "12-aprender-la-recompensa.ipynb", bloque: "Clase 12", unidad: 3, pronto: true },
+    { id: "13", archivo: "13-el-lenguaje-como-politica.html", titulo: "El modelo de lenguaje como política: token, temperatura, GRPO", nb: "13-el-lenguaje-como-politica.ipynb", bloque: "Clase 13", unidad: 4, pronto: true },
+    { id: "14", archivo: "14-agentes-de-lenguaje.html", titulo: "Agentes de lenguaje: ReAct, herramientas, riesgos", nb: "14-agentes-de-lenguaje.ipynb", bloque: "Clase 14", unidad: 4, pronto: true },
+    { id: "15", archivo: "15-agentes-aplicados.html", titulo: "Agentes aplicados: tutor, difusión, persuasión, alineación", nb: "15-agentes-aplicados.ipynb", bloque: "Clase 15", unidad: 4, pronto: true },
+    { id: "16", archivo: "16-cierre.html", titulo: "Cierre: proyecto final y cómo se propaga", nb: null, bloque: "Clase 16", unidad: 4, pronto: true }
   ];
   const colab = nb => `https://colab.research.google.com/github/${REPO}/blob/${RAMA}/notebooks/${nb}`;
   const github = ruta => `https://github.com/${REPO}/blob/${RAMA}/${ruta}`;
 
   // ---------- progreso del curso (localStorage, solo en este navegador) ----------
-  const CLAVE_PROGRESO = "rlac-cuestionarios";
+  const CLAVE_PROGRESO = "rlac-cuestionarios-v2";   // v2: los ids cambiaron de significado al pasar a 16 clases
   const APROBAR = 4;   // respuestas correctas sobre 5 para aprobar
   function leerProgreso() { try { const g = JSON.parse(localStorage.getItem(CLAVE_PROGRESO) || "{}"); return g && typeof g === "object" ? g : {}; } catch (e) { return {}; } }
   function guardarProgreso(g) { try { localStorage.setItem(CLAVE_PROGRESO, JSON.stringify(g)); } catch (e) { /* sin almacenamiento */ } }
-  const aprobados = () => { const g = leerProgreso(); return CLASES.filter(c => g[c.id] && g[c.id].aprobado).length; };
+  const activas = () => CLASES.filter(c => !c.pronto);   // las clases en preparación no tienen cuestionario todavía
+  const aprobados = () => { const g = leerProgreso(); return activas().filter(c => g[c.id] && g[c.id].aprobado).length; };
   const esc = t => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
   function pintarProgreso() {
-    const n = aprobados(), tot = CLASES.length;
+    const n = aprobados(), tot = activas().length;
     document.querySelectorAll("[data-progreso]").forEach(el => {
       el.querySelector("i").style.width = (100 * n / tot) + "%";
       el.querySelector("b").textContent = `${n}/${tot}`;
@@ -239,7 +244,7 @@
   function antesDeEmpezar(id, M) {
     const head = document.querySelector(".clase-head"); if (!head) return;
     const prev = (M.previos || []).map(p => CLASES.find(c => c.id === p)).filter(Boolean);
-    const req = prev.map(c => `<li><a href="${c.archivo}">${esc(c.bloque)} · ${esc(c.titulo)}</a></li>`).join("") +
+    const req = prev.map(c => c.pronto ? `<li>${esc(c.bloque)} · ${esc(c.titulo)} (próximamente)</li>` : `<li><a href="${c.archivo}">${esc(c.bloque)} · ${esc(c.titulo)}</a></li>`).join("") +
       (M.requisitos || []).map(r => `<li>${esc(r)}</li>`).join("");
     const t = M.tiempo || {};
     const sec = document.createElement("section"); sec.className = "antes"; sec.setAttribute("aria-label", "Antes de empezar");
@@ -365,8 +370,9 @@
     main.appendChild(mat);
     const pg = document.createElement("nav"); pg.className = "pager"; pg.setAttribute("aria-label", "Clases");
     const prev = CLASES[i - 1], next = CLASES[i + 1];
-    pg.innerHTML = (prev ? `<a href="${prev.archivo}"><span>← ${prev.bloque}</span><b>${prev.titulo}</b></a>` : `<a href="../clases/01-introduccion.html"><span>← Inicio</span><b>Por qué este curso</b></a>`) +
-      (next ? `<a class="next" href="${next.archivo}"><span>${next.bloque} →</span><b>${next.titulo}</b></a>` : `<a class="next" href="../difusion/estrategia.html"><span>Epílogo →</span><b>Cómo se propaga este curso</b></a>`);
+    const pronto = (c, cls, flecha) => `<span class="pronto${cls}"><span>${flecha(c.bloque + " · próximamente")}</span><b>${c.titulo}</b></span>`;
+    pg.innerHTML = (prev ? (prev.pronto ? pronto(prev, "", t => "← " + t) : `<a href="${prev.archivo}"><span>← ${prev.bloque}</span><b>${prev.titulo}</b></a>`) : `<a href="../clases/01-introduccion.html"><span>← Inicio</span><b>Por qué este curso</b></a>`) +
+      (next ? (next.pronto ? pronto(next, " next", t => t + " →") : `<a class="next" href="${next.archivo}"><span>${next.bloque} →</span><b>${next.titulo}</b></a>`) : `<a class="next" href="../difusion/estrategia.html"><span>Epílogo →</span><b>Cómo se propaga este curso</b></a>`);
     main.appendChild(pg);
     const ft = document.createElement("footer"); ft.className = "site wrap";
     ft.innerHTML = `RL a ciegas · curso libre para enseñar a las máquinas y a las personas. Basado en Stanford CS234 y Sutton &amp; Barto.`;

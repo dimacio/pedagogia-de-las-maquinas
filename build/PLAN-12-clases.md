@@ -1,3 +1,5 @@
+> **Histórico.** Reemplazado por build/PLAN-16-clases.md.
+
 # Plan de 12 clases (decisión del autor, 2026-10-08)
 
 El MOOC "RL a ciegas" pasa a 12 clases, dictables en cuatro trimestres de tres. Las unidades se llaman "Clase N" (no "Módulo").

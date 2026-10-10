@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from comun import Contexto, Resultado, clases, datos_js
+from comun import Contexto, Resultado, clases, clases_activas, datos_js, en_preparacion
 
 OBJ_RE = re.compile(r"^O\d+$")
 
@@ -25,7 +25,9 @@ def correr(ctx: Contexto) -> Resultado:
     sin_obj_total = preguntas_total = 0
     for extra in sorted(set(M) - set(orden)):
         r.falla(f"[{extra}] está en modulos.js pero no en CLASES de cueva.js")
-    for cid in orden:
+    for cid in sorted(set(M) & en_preparacion()):
+        r.falla(f"[{cid}] está en preparación: no lleva entrada en modulos.js hasta /producir-clase")
+    for cid in [c["id"] for c in clases_activas()]:
         m, c, k = M.get(cid), por_id[cid], f"[{cid}]"
         if not isinstance(m, dict):
             r.falla(f"{k} no tiene entrada en modulos.js")
@@ -98,7 +100,7 @@ def correr(ctx: Contexto) -> Resultado:
             rub = a.get("rubrica")
             if not isinstance(rub, list) or len(rub) != 3 or not all(txt(x) for x in rub):
                 r.falla(f"{k} actividad.rubrica: tiene que tener 3 criterios de texto")
-    res = f"{len(orden)} clases, {preguntas_total} preguntas"
+    res = f"{len(clases_activas())} clases activas ({len(en_preparacion())} en preparación), {preguntas_total} preguntas"
     if sin_obj_total:
         res += f"; faltan marcas de objetivo en {sin_obj_total} preguntas"
     return r.cerrar(res + f"; {len(r.errores)} problemas")

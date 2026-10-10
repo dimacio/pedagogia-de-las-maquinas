@@ -18,7 +18,7 @@ Para quien quiera entender RL desde cero: estudiantes, docentes y profesionales 
 
 ## Cómo se cursa
 
-- **Doce clases en cuatro trimestres.** Tres clases por trimestre, más una nivelación optativa. Todo es estático y está siempre disponible: no hay fechas, videos ni inscripción. A tu ritmo, a una clase por semana, el recorrido lleva unas **12 semanas** (entre 2 y 4 horas por semana); en un grupo, un trimestre por vez.
+- **Dieciséis clases en cuatro unidades.** Cuatro clases por unidad, más una nivelación optativa. Todo es estático y está siempre disponible: no hay fechas, videos ni inscripción. A una clase por semana, el recorrido lleva un cuatrimestre, unas **16 semanas** (entre 2 y 4 horas por semana). Las clases 3 a 16 están en preparación (ver `build/PLAN-16-clases.md`).
 - **Por dónde empezar.** Por la clase 1, que no tiene notebook, y por el juego: jugarlo en modo fácil y en difícil antes de la clase 2.
 - **Dos vías.** La *vía visual*: páginas interactivas con figuras que se tocan (ver primero, leer después) y el juego. La *vía profunda*: un notebook por clase que corre en Colab, en CPU, y escribe su propio entorno en la primera celda. Se puede hacer solo la primera o las dos.
 - **Antes de empezar.** Cada clase abre con sus objetivos, el tiempo estimado (página y notebook) y los requisitos previos.
@@ -34,19 +34,23 @@ Para quien quiera entender RL desde cero: estudiantes, docentes y profesionales 
 | Nivelación · 0c Álgebra lineal con Bellman | `clases/00c-algebra.html` | `notebooks/00c-algebra-lineal.ipynb` |
 | 1 · Introducción: por qué este curso | `clases/01-introduccion.html` | (sin notebook) |
 | 2 · ¿Qué es RL? | `clases/02-que-es-rl.html` | `notebooks/02-que-es-rl.ipynb` |
-| 3 · MDP y Bellman | `clases/03-mdp-y-bellman.html` | `notebooks/03-mdp-y-bellman.ipynb` |
-| 4 · Aprender sin mapa | `clases/04-aprender-sin-mapa.html` | `notebooks/04-aprender-sin-mapa.ipynb` |
-| 5 · Explorar a ciegas | `clases/05-explorar-a-ciegas.html` | `notebooks/05-explorar-a-ciegas.ipynb` |
-| 6 · Redes neuronales: de la tabla a la red | `clases/06-redes-neuronales.html` | `notebooks/06-redes-neuronales.ipynb` |
-| 7 · Redes recurrentes: cuando el estado no alcanza | `clases/07-redes-recurrentes.html` | `notebooks/07-redes-recurrentes.ipynb` |
-| 8 · Aplicaciones | `clases/08-aplicaciones.html` | `notebooks/08-aplicaciones.ipynb` |
-| 9 · Agentes I: RL en el mundo real | `clases/09-agentes-mundo-real.html` | `notebooks/09-agentes-mundo-real.ipynb` |
-| 10 · Agentes II: agentes de lenguaje | `clases/10-agentes-de-lenguaje.html` | `notebooks/10-agentes-de-lenguaje.ipynb` |
-| 11 · Agentes aplicados: enseñar y difundir | `clases/11-agentes-aplicados.html` | `notebooks/11-agentes-aplicados.ipynb` |
-| 12 · Cierre: proyecto final y cómo se propaga | `clases/12-cierre.html` | (sin notebook) |
-| Epílogo · Cómo se propaga este curso | `difusion/estrategia.html` | sección final del notebook 08 |
+| 3 · Cuánto pesa el futuro: de la cadena de Markov a Bellman (en preparación) | `clases/03-cuanto-pesa-el-futuro.html` | `notebooks/03-cuanto-pesa-el-futuro.ipynb` |
+| 4 · Planificar con mapa: iteración de valor y de política (en preparación) | `clases/04-planificar-con-mapa.html` | `notebooks/04-planificar-con-mapa.ipynb` |
+| 5 · Evaluar sin mapa: Monte Carlo y TD (en preparación) | `clases/05-evaluar-sin-mapa.html` | `notebooks/05-evaluar-sin-mapa.ipynb` |
+| 6 · Controlar sin mapa: SARSA y Q-learning (en preparación) | `clases/06-controlar-sin-mapa.html` | `notebooks/06-controlar-sin-mapa.ipynb` |
+| 7 · Explorar: de los bandits a la cueva (en preparación) | `clases/07-explorar.html` | `notebooks/07-explorar.ipynb` |
+| 8 · De la tabla a la red: aproximación y DQN (en preparación) | `clases/08-de-la-tabla-a-la-red.html` | `notebooks/08-de-la-tabla-a-la-red.ipynb` |
+| 9 · Redes recurrentes: cuando el estado no alcanza (en preparación) | `clases/09-redes-recurrentes.html` | `notebooks/09-redes-recurrentes.ipynb` |
+| 10 · Aprender de registros: imitar y RL offline (en preparación) | `clases/10-aprender-de-registros.html` | `notebooks/10-aprender-de-registros.ipynb` |
+| 11 · Policy gradient y actor-crítico: reforzar lo que salió bien (en preparación) | `clases/11-policy-gradient.html` | `notebooks/11-policy-gradient.ipynb` |
+| 12 · Aprender la recompensa: preferencias, RLHF y DPO (en preparación) | `clases/12-aprender-la-recompensa.html` | `notebooks/12-aprender-la-recompensa.ipynb` |
+| 13 · El modelo de lenguaje como política: token, temperatura, GRPO (en preparación) | `clases/13-el-lenguaje-como-politica.html` | `notebooks/13-el-lenguaje-como-politica.ipynb` |
+| 14 · Agentes de lenguaje: ReAct, herramientas, riesgos (en preparación) | `clases/14-agentes-de-lenguaje.html` | `notebooks/14-agentes-de-lenguaje.ipynb` |
+| 15 · Agentes aplicados: tutor, difusión, persuasión, alineación (en preparación) | `clases/15-agentes-aplicados.html` | `notebooks/15-agentes-aplicados.ipynb` |
+| 16 · Cierre: proyecto final y cómo se propaga (en preparación) | `clases/16-cierre.html` | (sin notebook) |
+| Epílogo · Cómo se propaga este curso | `difusion/estrategia.html` | sección final del notebook 08 de la v1 (`build/v1/notebooks/`) |
 
-La nivelación es el pre curso (Python, probabilidad y álgebra lineal, todo desde la cueva); quien ya maneje esas herramientas puede empezar por la clase 1, que explica el porqué del curso. Las 12 clases se dictan en cuatro trimestres de tres: T1 clases 1–3, T2 4–6, T3 7–9, T4 10–12. El juego está en `juego/la-cueva-a-ciegas.html`, con tres modos (Jugar, Planificar, Aprender) y tres niveles de memoria.
+La nivelación es el pre curso (Python, probabilidad y álgebra lineal, todo desde la cueva); quien ya maneje esas herramientas puede empezar por la clase 1, que explica el porqué del curso. Las 16 clases se agrupan en cuatro unidades: Fundamentos (1–4), Sin mapa (5–8), De la red a la política (9–12) y Lenguaje y agentes (13–16). El juego está en `juego/la-cueva-a-ciegas.html`, con tres modos (Jugar, Planificar, Aprender) y tres niveles de memoria.
 
 ## Publicar en GitHub Pages
 
