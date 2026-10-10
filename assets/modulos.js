@@ -474,7 +474,7 @@ window.MODULOS = {
       rubrica: [
         "La decisión enfrenta un premio de ahora con uno que llega después, y se dice en cuántos pasos llega el lejano.",
         "El γ está justificado con el peso γᵗ del premio lejano, y se dice qué elegiría alguien con γ ≈ 0, como el feed miope.",
-        "La decisión se cuenta como Bellman (lo de ahora más el valor descontado de adonde lleva) y se nombra quién más podría estar eligiendo ese γ."
+        "La decisión se cuenta como Bellman (lo de ahora más el valor descontado de adonde lleva)."
       ]
     }
   }

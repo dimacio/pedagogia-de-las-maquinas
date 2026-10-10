@@ -58,7 +58,7 @@
     <div class="texto">
       <div class="paso">Paso 1</div>
       <h2>El caminante sin memoria</h2>
-      <p>En cada paso, un caminante tira un dado de cuatro caras y va hacia donde salió, salvo que choque contra una pared y se quede donde está. Como adónde va depende solo de la casilla en la que está, el caminante es una <b>cadena de Markov</b> (<i>Markov chain</i>), sin acciones ni recompensas. Tocá una casilla para ver su fila de la <b>matriz de transición</b> P, que en S da 0,50 para quedarse y 0,25 para cada vecina. Aunque el camino más corto tiene 20 pasos, la mitad de la nube de probabilidad llega a la salida recién en el paso 1022.</p>
+      <p>En cada paso, un caminante tira un dado de cuatro caras y va hacia donde salió, salvo que choque contra una pared y se quede donde está. Como adónde va depende solo de la casilla en la que está, el caminante es una <b>cadena de Markov</b> (<i>Markov chain</i>), sin acciones ni recompensas. Tocá una casilla para ver su fila de la <b>matriz de transición</b> (<i>transition matrix</i>) P, que en S da 0,50 para quedarse y 0,25 para cada vecina. Aunque el camino más corto tiene 20 pasos, la mitad de la nube de probabilidad llega a la salida recién en el paso 1022.</p>
       <div class="eq">P[s, s'] = p(sₜ₊₁ = s' | sₜ = s)</div>
       <p class="nota pregunta">¿En qué casillas la fila de P tiene el número más grande sobre la diagonal, la de quedarse? Buscalas en la cueva antes de tocar.</p>
     </div>
@@ -105,7 +105,7 @@
     <div class="texto">
       <div class="paso">Paso 3</div>
       <h2>Cuánto pesa el futuro</h2>
-      <p>El <b>retorno</b> (<i>return</i>) Gₜ suma las recompensas que vienen, cada una multiplicada por γ elevado a los pasos que tarda en llegar. Al número γ, entre 0 y 1, se lo llama <b>factor de descuento</b> (<i>discount factor</i>). Con γ = 0 solo cuenta el premio inmediato. Como el primer paso no se descuenta, el premio del paso 20 pesa γ¹⁹, que vale 0,135 con γ = 0,9 y 0,826 con γ = 0,99.</p>
+      <p>El <b>retorno</b> (<i>return</i>) Gₜ suma las recompensas que vienen, y una recompensa que llega t pasos después de la primera pesa γᵗ. Al número γ, entre 0 y 1, se lo llama <b>factor de descuento</b> (<i>discount factor</i>). Con γ = 0 solo cuenta el premio inmediato. Como el primer paso no se descuenta, el premio del paso 20 pesa γ¹⁹, que vale 0,135 con γ = 0,9 y 0,826 con γ = 0,99.</p>
       <div class="eq">Gₜ = rₜ + γ rₜ₊₁ + γ² rₜ₊₂ + …</div>
       <div class="aviso mide">
         <h3>Esto hoy se mide</h3>
@@ -133,7 +133,7 @@
     <div class="texto">
       <div class="paso">Paso 4</div>
       <h2>El feed, otra vez</h2>
-      <p>En la clase 1 el feed elegía por el clic de ahora, que en el idioma de esta clase es un feed con γ ≈ 0. En este modelo de juguete, el contenido gancho da 6,0 clics el primer día y el útil 3,0, pero el gancho baja la satisfacción del usuario y el útil la sube. En los 5000 usuarios simulados del notebook, el día 30 vuelve el 0,0 % con gancho y el 44,8 % con útil, que en 90 días junta 112,0 clics contra 32,0. El feed pasa a elegir útil recién cuando γ supera 0,924, sin que cambie nada en el usuario.</p>
+      <p>En la clase 1 el feed elegía por el clic de ahora, que en el idioma de esta clase es un feed con γ ≈ 0. En este modelo de juguete, el contenido gancho da 6,0 clics el primer día y el útil 3,0, pero el gancho baja la satisfacción del usuario y el útil la sube. Cada regla fija, «siempre gancho» o «siempre útil», es un MRP, y el feed compara sus retornos para elegir una sola vez. En los 5000 usuarios simulados del notebook, el día 30 vuelve el 0,0 % con gancho y el 44,8 % con útil, pero el feed pasa a elegir útil recién cuando γ supera 0,924.</p>
       <div class="eq">G = Σₜ γᵗ · E[ clicsₜ ]</div>
       <p class="nota pregunta">¿Quién elige el γ de un feed? ¿Qué γ elegirías vos, y cómo se lo explicarías a quien lo usa?</p>
     </div>
@@ -539,7 +539,7 @@
     $("mc1000").onclick = () => { lanzar(1000); dibujar(); };
     $("mcCero").onclick = () => { reset(desde); dibujar(); };
     cv.addEventListener("pointerdown", e => { const s = casillaDe(T, e); if (s !== undefined) { reset(s); lanzar(100); dibujar(); } });
-    reset(env.start); lanzar(1000);
+    reset(env.start); lanzar(5000);
     dibujar();
     return { dibujar: () => { T.medir(); dibujar(); } };
   });
