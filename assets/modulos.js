@@ -789,5 +789,83 @@ window.MODULOS = {
         "La regla tipo UCB tiene un promedio y una bonificación que crece si se probó poco, está aplicada a las opciones del registro y dice qué elegiría mañana y por qué."
       ]
     }
+  },
+
+  "9": {
+    objetivos: [
+      "Distinguir observación de estado y explicar por qué la cueva con solo bigotes es un POMDP que pide memoria.",
+      "Generar texto con n-gramas de letras y explicar su límite: nunca recuerdan más de n − 1 letras y con n grande copian.",
+      "Describir una red recurrente (hₜ = tanh(W_hh hₜ₋₁ + W_xh xₜ + b)) y comparar un agente con memoria (GRU) contra uno sin memoria.",
+      "Explicar por qué un modelo de lenguaje es esta misma idea a escala: un estado que resume lo leído para predecir lo que sigue."
+    ],
+    tiempo: { pagina: 35, notebook: 90 },
+    previos: ["8", "3"],
+    requisitos: ["De la clase 2, la diferencia entre historia y estado; de la clase 3, la cadena de Markov.", "De la clase 8, la red como función: entra un vector, sale una predicción, y se entrena ajustando sus pesos."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "En el modo difícil solo sentís las cuatro paredes vecinas con los bigotes. En la cueva chica, las 60 casillas dan apenas 12 lecturas distintas. ¿Por qué eso rompe el supuesto de Markov con el que veníamos trabajando?",
+        opciones: [
+          { texto: "Porque los bigotes a veces fallan: una misma casilla puede dar lecturas distintas y el agente no se puede fiar de lo que siente.", explicacion: "No: los bigotes no fallan, cada casilla da siempre la misma lectura. El problema es al revés: muchas casillas distintas dan la misma lectura." },
+          { texto: "Porque 12 lecturas son pocas para aprender: jugando más partidas, el agente terminaría sabiendo qué hacer con cada una.", explicacion: "No: más partidas no ayudan. Con la misma lectura, un agente sin memoria hace siempre lo mismo, y en unos pasillos conviene subir y en otros bajar." },
+          { texto: "Casillas que se sienten igual piden flechas distintas: la lectura de ahora no alcanza para decidir y hace falta un resumen del camino.", explicacion: "Correcto. La observación no es el estado: es un POMDP. Con la historia, en el recorrido del notebook las casillas posibles bajan de 15 a 7, 2, 2 y 1." },
+          { texto: "Porque la cueva cambia mientras el agente camina, y la casilla en la que está ya no alcanza para prever adónde lo lleva cada acción.", explicacion: "No: la cueva y sus reglas no cambian. Si el agente supiera su casilla, Markov seguiría valiendo; lo que falla es que solo ve una pista de ella." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O2",
+        pregunta: "Con el diario de la cueva (5420 letras), un n-grama con n = 8 genera texto con el 36 % copiado tal cual. En un tramo que la tabla no vio, el menor error es con n = 3 (1,93 nats por letra) y con n = 8 sube a 2,97. ¿Qué límite muestran estas cifras?",
+        opciones: [
+          { texto: "Con n grande cada contexto se vio casi una sola vez y la tabla copia en vez de generalizar; y con cualquier n, nunca recuerda más de n − 1 letras.", explicacion: "Correcto. Por eso el error sube después de n = 3. Y aunque sobrara texto, cerrar un paréntesis abierto hace veinte letras pediría una tabla con un renglón por cada cadena de veinte letras." },
+          { texto: "Ninguno grave: n = 8 copia el 36 % porque aprendió bien el corpus, y para generar texto el error en el tramo no visto no importa.", explicacion: "No: copiar no es predecir. En el tramo que no vio, n = 8 se equivoca más (2,97) que n = 3 (1,93): no sabe qué hacer con un contexto nuevo." },
+          { texto: "El n-grama recuerda todo el texto anterior pero le da menos peso a las letras viejas; con n = 3 ese peso cae más despacio y por eso predice mejor.", explicacion: "No: no hay pesos que caigan. El n-grama mira exactamente las últimas n − 1 letras y nada más viejo: es una cadena de Markov con ese estado." },
+          { texto: "Es solo un problema de corpus chico: con mucho más texto, un n-grama largo cerraría paréntesis abiertos hace veinte letras sin copiar nada.", explicacion: "No del todo: más texto bajaría la copia, pero el límite de memoria no se va. Para un paréntesis de hace veinte letras haría falta n = 21 y un renglón por cada cadena de veinte letras." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O3",
+        pregunta: "La red de letras lleva un estado hₜ de 32 números, con hₜ = tanh(W_hh hₜ₋₁ + W_xh xₜ + b) y las mismas tablas en todos los pasos. En la red entrenada, sobre 42 letras, la primera mueve el estado final 5,5 · 10⁻⁴ de lo que lo mueve la última. ¿Qué guarda hₜ?",
+        opciones: [
+          { texto: "Una copia de las últimas 32 letras, una por número: por eso la primera de 42 letras ya salió del estado y pesa casi cero.", explicacion: "No: los números del estado no tienen letras asignadas (leer la dimensión 17 no dice nada), y la primera letra sigue pesando, solo que muy poco." },
+          { texto: "El texto entero sin pérdida: como las tablas W son las mismas en todos los pasos, ninguna letra se borra y todas pesan igual en la predicción.", explicacion: "No: que la regla no cambie no quiere decir que se conserve todo. El estado tiene tamaño fijo y el efecto de cada letra se achica paso a paso." },
+          { texto: "Solo la próxima letra ya elegida: hₜ es la salida de la red, y lo que leyó antes se descarta en cuanto hace la predicción.", explicacion: "No: la predicción sale de hₜ con otra tabla (W_hy) y un softmax, y hₜ pasa al paso siguiente: ese es el lazo." },
+          { texto: "Un resumen de tamaño fijo de lo leído, que cada letra actualiza; lo viejo se va borrando: es el gradiente que se desvanece.", explicacion: "Correcto. La letra de hace 10 pasos todavía pesa 1,4 · 10⁻¹; la primera de 42, casi nada. Por eso la GRU agrega una perilla que decide cuánto conservar del estado viejo." }
+        ],
+        correcta: 3
+      },
+      {
+        objetivo: "O3",
+        pregunta: "En la cueva grande, dos redes que sienten solo los bigotes y su última acción aprenden por imitación a copiar a un experto. La red común (sin memoria) sale desde 88 de las 154 casillas (57 %) y la GRU, desde las 154. ¿Qué explica la diferencia?",
+        opciones: [
+          { texto: "La GRU vio más partidas del experto; con los mismos datos, la red común también saldría desde las 154 casillas.", explicacion: "No: las dos se entrenan con las mismas partidas del experto y la misma entrada. Lo que cambia es que una lleva estado y la otra no." },
+          { texto: "Con la misma lectura y la misma última acción, la red común decide siempre igual y se traba; la GRU lleva en hₜ un resumen del camino.", explicacion: "Correcto. Una sonda lineal lee la casilla real del estado de la GRU en el 8 % de los casos al arrancar, el 54 % a los 5 pasos y el 71 % a los 10: aprendió algo parecido al estado de creencia." },
+          { texto: "La red común recibe solo los bigotes, sin la última acción; si se la diéramos, ya tendría memoria y saldría igual que la GRU.", explicacion: "No: las dos reciben los 4 bigotes y la última acción. Esa acción ya es memoria de un paso, y en la cueva grande no alcanza." },
+          { texto: "La GRU aprendió con RL (una DRQN) y la red común por imitación: el RL le enseñó a explorar, y por eso encuentra la salida desde todas partes.", explicacion: "No: las dos aprendieron por imitación (behavior cloning). La DRQN existe, pero necesita más partidas de las que entran en una clase en CPU." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O4",
+        pregunta: "La red de letras tiene 3558 pesos y Qwen2.5-0.5B, el modelo que se usa como política desde la clase 13, 494 millones. Más allá de la escala, ¿qué tienen en común?",
+        opciones: [
+          { texto: "Poco: Qwen no predice lo que sigue, sino que busca la respuesta en una tabla con los textos que vio, como un n-grama gigante.", explicacion: "No: un modelo de lenguaje predice el próximo token a partir de lo leído, como la red predice la próxima letra. Copiar de una tabla es lo que hace el n-grama de n grande." },
+          { texto: "Son la misma red recurrente en otro tamaño: Qwen pasa un estado hₜ de token en token por el mismo lazo, solo que con más números.", explicacion: "No del todo: la pregunta es la misma, pero los modelos actuales cambian el lazo por atención, que en cada paso mira a la vez todo lo anterior." },
+          { texto: "Los dos predicen lo que sigue con un resumen de lo leído; Qwen lo hace con tokens, mucho más texto y atención en vez del lazo.", explicacion: "Correcto. P(xₜ₊₁ | x₁, …, xₜ) es la misma pregunta. La atención no depende de que el gradiente sobreviva cien pasos, a cambio de mirar todo cada vez." },
+          { texto: "Los dos miran solo una cantidad fija de letras anteriores, como un n-grama, y la escala lo único que hace es agrandar esa cantidad.", explicacion: "No: eso es el n-grama, una cadena de Markov con las últimas n − 1 letras. La red recurrente lleva un resumen de todo lo leído, y la atención mira a la vez todas las letras anteriores." }
+        ],
+        correcta: 2
+      }
+    ],
+    actividad: {
+      titulo: "Un cuaderno para la cueva",
+      consigna: "Imaginá que entrás a la cueva con solo bigotes: en cada paso sentís si hay pared arriba, a la derecha, abajo y a la izquierda, y nada más. Te dan un cuaderno de cinco líneas y no podés escribir el camino entero. Decidí qué anotar en esas líneas, y cómo actualizarlo en cada paso, para saber dónde estás y salir: ¿las últimas lecturas, los giros, cuántos pasos llevás en un pasillo, las esquinas que pasaste? Probalo con un recorrido de la página (por ejemplo, el que arranca en (8, 10) y camina ← ← ↑ ↑) y contá si tu cuaderno distingue casillas que se sienten igual. Después comparalo con lo que guarda hₜ: un resumen de tamaño fijo que cada lectura actualiza y donde lo viejo se va borrando. ¿Qué tiene tu cuaderno que el estado no, y al revés? Cerralo con la oración de «Para enseñarlo»: cuando lo que ves no alcanza para saber dónde estás, hay que llevar un resumen de lo que pasó. Publicalo en Discussions; otra persona te devuelve con la rúbrica.",
+      rubrica: [
+        "El cuaderno entra en cinco líneas, dice qué se anota y cómo se actualiza en cada paso, y no es el camino entero copiado.",
+        "Se prueba con un recorrido concreto y se muestra que el cuaderno distingue al menos un par de casillas que con solo la lectura de ahora se sienten igual (o se explica por qué falla).",
+        "Se compara con hₜ: tamaño fijo, actualización con cada lectura y qué se olvida, y se dice en qué se parece y en qué no a lo que hace la GRU del agente."
+      ]
+    }
   }
 };
