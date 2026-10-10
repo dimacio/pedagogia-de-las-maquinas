@@ -867,5 +867,83 @@ window.MODULOS = {
         "Se compara con hₜ: tamaño fijo, actualización con cada lectura y qué se olvida, y se dice en qué se parece y en qué no a lo que hace la GRU del agente."
       ]
     }
+  },
+
+  "10": {
+    objetivos: [
+      "Entrenar una política imitando partidas grabadas (clonación de comportamiento) y explicar por qué es aprendizaje supervisado.",
+      "Explicar los errores compuestos de la imitación y cómo DAgger los corrige pidiendo la acción del experto donde el agente se equivocó.",
+      "Explicar qué es RL offline y por qué el cambio de distribución hace sobreestimar acciones que nunca aparecen en los registros.",
+      "Comparar imitar y RL offline según la calidad de los registros: solo partidas de experto o partidas mezcladas."
+    ],
+    tiempo: { pagina: 35, notebook: 75 },
+    previos: ["6", "9"],
+    requisitos: ["De la clase 6, Q-learning: la tabla Q, la regla de actualización y que es off-policy.", "De la clase 9, la idea de que un modelo aprende copiando lo que vio (imitar texto)."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "En el conjunto 0, la copia aprende de los 451 pares (casilla, acción) de 20 partidas del experto: en cada casilla elige la flecha que él más apretó, sin mirar la recompensa. ¿Por qué esto es aprendizaje supervisado?",
+        opciones: [
+          { texto: "Porque el experto mira jugar a la copia y la corrige cada vez que se equivoca, como un profesor.", explicacion: "No: eso se parece más a DAgger. En la clonación de comportamiento el experto ya no está; solo quedan sus registros, y la copia no juega mientras aprende." },
+          { texto: "Son pares con respuesta: la casilla es la entrada y la flecha del experto, la etiqueta a predecir.", explicacion: "Correcto. No hace falta saber cuánto paga la salida: π(s) = argmaxₐ N(s,a). ALVINN hizo lo mismo con una cámara como entrada y el volante del conductor como etiqueta." },
+          { texto: "Usa la recompensa de los registros: copia solo las flechas de las partidas que llegaron a la salida.", explicacion: "No: la copia no mira la recompensa, cuenta flechas. Quedarse con las partidas de mayor retorno es otra variante, filtrar, que aparece en el paso 7." },
+          { texto: "Aplica Q-learning a los registros, y cada actualización tiene un objetivo, r + γ maxₐ′ Q(s′,a′), que hace de etiqueta.", explicacion: "No: eso es RL offline, el paso 5. La copia no estima valores; cuenta cuántas veces apretó el experto cada flecha en cada casilla." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O2",
+        pregunta: "La copia aprendió de partidas grabadas con slip 0,1 y en sus 22 casillas con ejemplos hace lo mismo que el experto. Con slip 0,3 sale con 0,911 contra 1,000 del experto, y pasa en promedio 16,1 pasos en casillas sin ejemplos contra 2,2. ¿Qué explica la diferencia?",
+        opciones: [
+          { texto: "Como clasificador se equivoca en algunas casillas con ejemplos, y esos errores chicos se van sumando a lo largo de la partida.", explicacion: "No: en las 22 casillas con ejemplos no tiene ni un error. El problema no está en los datos, sino afuera de ellos." },
+          { texto: "Con slip 0,3 la copia se resbala más seguido que el experto, así que pisa casillas sin ejemplos muchas más veces.", explicacion: "No: los dos pisan alguna casilla sin ejemplos con la misma probabilidad, 0,289. Hasta ese momento la copia es idéntica al experto; lo que cambia es qué hace después." },
+          { texto: "Es efecto del slip y no de la copia: en una cueva tan resbalosa cualquier política sale menos, también el experto.", explicacion: "No: el experto sale siempre (1,000) con slip 0,1, 0,2, 0,3 y 0,4, porque sabe volver desde donde se resbala." },
+          { texto: "Un resbalón la lleva adonde el experto nunca estuvo; en esas 37 casillas sin ejemplos aprieta ↑ y se aleja más.", explicacion: "Correcto. Un error trae el siguiente: errores compuestos. El efecto depende de ↑: si en esas casillas tirara un dado, saldría con 0,990." }
+        ],
+        correcta: 3
+      },
+      {
+        objetivo: "O2",
+        pregunta: "Con slip 0,3, DAgger lleva a la copia de 0,911 a 1,000 en la ronda 4. ¿Qué hace en cada ronda?",
+        opciones: [
+          { texto: "Juega con la copia, le pide al experto la flecha de cada casilla que pisó, suma esos pares y vuelve a copiar.", explicacion: "Correcto. El experto no juega, solo etiqueta donde la copia se desvió. En esta cueva, sumar partidas del experto grabadas con slip 0,3 llega igual a 1,000 en la ronda 4 y pide menos etiquetas (unas 450 por ronda contra 650 a 760)." },
+          { texto: "Graba más partidas enteras del experto en la cueva de slip 0,1 y las suma a los registros de la ronda anterior.", explicacion: "No: eso llega a 0,981 en la ronda 5. Con slip 0,1 el experto casi no se resbala y no visita las casillas donde la copia se pierde." },
+          { texto: "Le da recompensa a la copia en las casillas sin ejemplos para que aprenda con Q-learning a volver al camino.", explicacion: "No: DAgger no usa la recompensa. Sigue siendo imitación, con más etiquetas del experto justo en las casillas a las que llega la copia." },
+          { texto: "Cambia el ↑ de las casillas sin ejemplos por un dado, y así la copia termina encontrando la salida por azar.", explicacion: "No: esa es la variante del dado, que con slip 0,3 sale con 0,990. DAgger llega a 1,000 porque esas casillas pasan a tener la flecha del experto." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O3",
+        pregunta: "Q-learning offline sobre partidas del experto, con la tabla arrancando en 1: en todas sus casillas con ejemplos la política quiere una flecha que nadie grabó, cree que S vale 1,0 y en realidad vale 0,0. ¿Por qué pasa?",
+        opciones: [
+          { texto: "El experto se equivoca en algunas casillas, y Q-learning offline aprende también esos errores de los registros.", explicacion: "No: el experto juega siempre la flecha óptima. Con los mismos registros y la tabla en 0, Q-learning offline vale 0,782, igual que imitar." },
+          { texto: "Faltan pasadas: con más de 60 por las transiciones, las flechas no grabadas terminarían bajando a su valor real.", explicacion: "No: una flecha que no aparece en los registros no se actualiza nunca, por más pasadas que se hagan. Offline no hay forma de probarla." },
+          { texto: "Las flechas que nunca aparecen nunca se corrigen y siguen en 1; el máximo las prefiere a la grabada, y el error se contagia.", explicacion: "Correcto. En S la flecha del experto baja a 0,99 y las otras tres siguen en 1: es el cambio de distribución. Con la tabla en 0 eso no pasa, y métodos como CQL o IQL desconfían de lo que no está en los datos." },
+          { texto: "Con partidas de experto el retorno siempre es alto, y Q-learning le asigna ese valor a las cuatro flechas de cada casilla.", explicacion: "No: Q-learning actualiza solo los pares que aparecen. Las flechas no grabadas valen 1 porque así arrancó la tabla, no por el retorno del experto." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O4",
+        pregunta: "Con 20 partidas mezcladas (ε = 0,8), imitar vale 0,543, filtrar (imitar las 5 de mayor retorno) 0,262 y RL offline 0,803, más que la mejor partida grabada (0,557). Con una mezcla de jugadores de distinto ε, filtrar vale 0,762. ¿Qué se lee?",
+        opciones: [
+          { texto: "RL offline gana porque, además de usar los registros, juega partidas nuevas y así descubre el camino.", explicacion: "No: no juega ninguna. Hace 152 040 actualizaciones sobre las transiciones grabadas, con 0 partidas jugadas." },
+          { texto: "Imitar copia también el azar; filtrar sirve si hay partidas buenas para elegir, y RL offline usa la recompensa y cose tramos.", explicacion: "Correcto. Con ε = 0,8 hasta las 5 mejores son casi al azar; en la mezcla de jugadores son de quien juega casi como el experto. RL offline le gana a la mejor partida en 10 de 10 conjuntos (stitching)." },
+          { texto: "Con ε = 0,8 filtrar falla por quedarse con pocos pares, y en la mezcla de jugadores mejora solo porque hay más partidas.", explicacion: "No: los dos conjuntos tienen 20 partidas. Lo que cambia es la calidad de las mejores: con ε = 0,8 también son casi al azar." },
+          { texto: "Con registros mezclados conviene imitar todo, porque la flecha más frecuente promedia los errores y queda cerca del experto.", explicacion: "No: imitar vale 0,543, y en algunos conjuntos 0, porque en alguna casilla gana por azar una flecha equivocada y la copia queda yendo y viniendo." }
+        ],
+        correcta: 1
+      }
+    ],
+    actividad: {
+      titulo: "Aprender mirando",
+      consigna: "Elegí algo que aprendiste mirando a alguien: cocinar una receta, manejar, armar un mate, atender un local. Contá qué copiabas (qué hacía esa persona en cada situación) y describí una situación concreta en la que la copia no supo qué hacer porque quien te enseñaba nunca estuvo ahí: la salsa que se cortó, el auto que patinó en una curva que nunca tomaron juntos, el cliente que pidió algo raro. Contá qué hiciste y si ese primer error te llevó a otro, como los errores compuestos de la cueva. Después diseñá cómo lo resolverías con DAgger: en qué momentos practicarías solo, qué le preguntarías a la persona experta y sobre qué situaciones, y cómo sumarías esas respuestas a lo que ya sabías. Decí también por qué no alcanzaría con mirarla más veces hacer lo de siempre. Cerralo con la oración de «Para enseñarlo»: copiar al que sabe funciona mientras estés donde él estuvo; cuando te desviás, necesitás que alguien te diga qué hacer ahí. Publicalo en Discussions; otra persona te devuelve con la rúbrica.",
+      rubrica: [
+        "Se nombra algo concreto aprendido mirando y una situación en la que la copia no supo qué hacer porque la persona experta nunca estuvo ahí; se dice si un error llevó a otro.",
+        "El plan con DAgger dice cuándo se practica solo, qué se le pregunta a la persona experta y sobre qué situaciones, y cómo se suman esas respuestas a lo aprendido.",
+        "Se explica por qué mirar más veces lo de siempre no alcanza: las situaciones nuevas aparecen cuando uno se desvía, no cuando copia bien."
+      ]
+    }
   }
 };
