@@ -41,6 +41,12 @@
   /* advertencia */
   .aviso { background: var(--rock); border: 1px solid var(--rock-2); border-left: 3px solid var(--ember); border-radius: 3px; padding: 12px 14px; display: grid; gap: 8px; }
   .aviso h3 { font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--ember); letter-spacing: .05em; text-transform: uppercase; }
+  /* recuadro de evidencia (dentro de la idea 2) */
+  .aviso.mide { border-left-color: var(--sonar); }
+  .aviso.mide h3 { color: var(--sonar); }
+  /* cómo se cursa: fuera de los bloques que enseñan, con el mismo ritmo */
+  .cursada { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; padding-block: 28px; border-top: 1px solid var(--rock-2); }
+  .cursada .texto { min-width: 0; }
   /* llamado a jugar */
   .llamado { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; align-items: center; padding: 22px; margin-block: 28px;
     background: var(--rock); border: 1px solid var(--rock-2); border-left: 3px solid var(--exit); border-radius: 4px; }
@@ -83,7 +89,7 @@
   </section>
 
   <!-- Bloque 1: Freire -->
-  <section class="bloque" id="freire">
+  <section class="bloque" id="freire" data-objetivos="O1">
     <div class="stage">
       <div class="seg" role="group" aria-label="Dos formas de aprender" id="segFreire">
         <button aria-pressed="true" data-m="feed">El feed: te depositan</button>
@@ -108,16 +114,35 @@
     <div class="texto">
       <div class="paso">Idea 1 · Educación problematizadora</div>
       <h2>No te depositan RL: lo construís</h2>
-      <p>Paulo Freire, en <i>Pedagogía del oprimido</i> (escrita en 1968, publicada en 1970), llama <b>educación bancaria</b> a la que deposita contenidos en un alumno pasivo, como quien llena una cuenta. Le opone la <b>educación problematizadora</b>: se parte de un problema real, se aprende actuando y reflexionando sobre él (praxis) y en diálogo con otros.</p>
-      <p>Pasá de una pestaña a la otra. En el feed todo llega solo y elegido para el próximo clic: es un agente con γ ≈ 0, que no mira más allá del instante. En la cueva nadie te da el mapa: lo que sabés de las paredes lo sabés porque las tocaste.</p>
+      <p>Paulo Freire, en <i>Pedagogía del oprimido</i> (1970), llama <b>educación bancaria</b> a la que deposita contenidos en un alumno pasivo, como el feed de la primera pestaña. Le opone la <b>educación problematizadora</b>, que parte de un problema real y aprende actuando, reflexionando sobre lo hecho (praxis) y en diálogo con otros.</p>
+      <p>En la cueva nadie te da el mapa, así que lo que sabés de las paredes lo sabés porque las tocaste.</p>
       <blockquote class="cita">Nadie educa a nadie, nadie se educa solo: nos educamos entre nosotros, mediatizados por el mundo.<small>Freire, <i>Pedagogía del oprimido</i>, cap. 2 (paráfrasis).</small></blockquote>
-      <p>En este curso no vas a recibir RL. Le vas a enseñar a una máquina a salir de la cueva, y en ese camino vas a entender cómo aprende.</p>
+      <p>Por eso en este curso no vas a recibir RL, sino que vas a enseñarle a una máquina a salir de la cueva.</p>
       <p class="nota pregunta">Después de dos minutos en cada pestaña: ¿de cuál te acordás más, y por qué?</p>
     </div>
   </section>
 
-  <!-- Bloque 2: Foucault -->
-  <section class="bloque" id="foucault">
+  <!-- Bloque 2: el feed mira solo el próximo clic -->
+  <section class="bloque" id="proximo-clic" data-objetivos="O2">
+    <div class="stage">
+      <div class="lz"><canvas id="cvClic" aria-label="Las tarjetas candidatas del feed, cada una con el clic que da ahora y lo que deja para después; el feed elige por el clic de ahora y otro elige sumando lo que viene después, con lo que junta cada uno"></canvas></div>
+      <div class="chips"><span><i style="background:var(--ember)"></i>clic ahora</span><span><i style="background:var(--lamp)"></i>lo que deja para después</span><span><i style="background:transparent; border:2px solid var(--ember)"></i>elige el feed</span><span><i style="background:transparent; border:2px dashed var(--chalk)"></i>elige sumando después</span></div>
+      <div class="row"><button class="btn primary" id="bClic">Siguiente tarjeta</button><button class="btn" id="bClic10">Diez más</button><button class="btn" id="bClicDe0">De nuevo</button></div>
+      <div class="hud" id="hudClic"></div>
+      <p class="cap">Tarjetas como las del feed de arriba, abiertas por dentro, más tres que ese feed nunca muestra: una clase, tu amiga y cerrar la app. En cada vuelta hay cuatro candidatas; los puntajes de 0 a 10 son de juguete, para ver la forma de la decisión y no para medir un feed real.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">El feed por dentro</div>
+      <h2>Un feed que mira solo el próximo clic</h2>
+      <p>Volvé al feed y mirá cómo elige un feed así por dentro: de las candidatas se queda con la que tiene más chances de que hagas clic ahora, y lo que pase después no entra en la cuenta.</p>
+      <p>La segunda fila de barras es alguien que elige sumando también lo que cada tarjeta deja para más tarde: junta menos clics, pero le quedan lo aprendido, la charla con alguien y el resto del día. Eso es lo que pierde un agente que decide solo por la recompensa inmediata: todo lo que llega tarde.</p>
+      <p>En la clase 3 esto tiene nombre: el descuento γ, y acá vale casi 0.</p>
+      <p class="nota pregunta">Si este feed sumara lo que pasa después, ¿le convendría mostrarte la tarjeta «Cerrar app»?</p>
+    </div>
+  </section>
+
+  <!-- Bloque 3: Foucault -->
+  <section class="bloque" id="foucault" data-objetivos="O3">
     <div class="stage">
       <div class="lz"><canvas id="cvDia" aria-label="Dos días simulados hora por hora: el que sale de tu función de recompensa y el que sale de la recompensa de una plataforma, con lo que cada uno junta"></canvas></div>
       <div class="chips" id="chipsDia"></div>
@@ -129,21 +154,25 @@
       </div>
       <div class="row"><button class="btn" id="bPlat">Usar la de la plataforma</button><button class="btn" id="bMia">Volver a una propia</button></div>
       <div class="hud" id="hudDia"></div>
+      <p class="cap">Modelo de juguete: dieciséis horas y energía de 0 a 4; para tus pesos, la página calcula la mejor política hora por hora. Repetir una actividad rinde la mitad, salvo el scroll, que no satura porque siempre trae algo nuevo.</p>
     </div>
     <div class="texto">
       <div class="paso">Idea 2 · Cuidado de sí</div>
       <h2>¿Qué te premia?</h2>
-      <p>En su curso <i>La hermenéutica del sujeto</i> (Collège de France, 1981–1982), Michel Foucault recupera la <i>epimeleia heautou</i>, el <b>cuidado de sí</b>. Sostiene que en la Antigüedad el «conócete a ti mismo» (<i>gnothi seauton</i>) era una parte de ese cuidado, y que la modernidad invirtió la relación: dejó el conocimiento de sí como acceso a la verdad, separado del trabajo sobre uno mismo.</p>
-      <p>En RL, el agente hace lo que su recompensa le pide. Los sliders son tu función de recompensa para un día; la página calcula la mejor política hora por hora. La segunda franja es el día de alguien que solo cobra estímulo inmediato, que es lo que mide una plataforma.</p>
+      <p>En su curso <i>La hermenéutica del sujeto</i> (Collège de France, 1981–1982), Michel Foucault recupera la <i>epimeleia heautou</i>, el <b>cuidado de sí</b>. En la Antigüedad, el «conócete a ti mismo» (<i>gnothi seauton</i>) era solo una parte de ese cuidado, y la modernidad lo separó del trabajo sobre uno mismo.</p>
+      <p>Los sliders son tu función de recompensa para un día, y la segunda franja es el día de quien solo cobra estímulo inmediato, la recompensa de una plataforma.</p>
       <div class="eq">r = w₁·estímulo + w₂·aprender + w₃·otros + w₄·cuerpo</div>
-      <p>En esta lectura, cuidarse no es conocerse más: es poder ver y elegir los pesos, en lugar de aceptar los que pone otro.</p>
-      <p class="small muted">Es un modelo de juguete: dieciséis horas, energía de 0 a 4, repetir una actividad rinde la mitad salvo el scroll, que no satura porque siempre trae algo nuevo.</p>
+      <p>En esta lectura, cuidarse no es conocerse más, sino poder ver y elegir los pesos en lugar de aceptar los que pone otro.</p>
+      <div class="aviso mide">
+        <h3>Esto hoy se mide</h3>
+        <p>La pregunta de Foucault no se responde con un experimento, pero hoy hay estudios que la acompañan. En <i>Future You</i> (Pataranutaporn et al., IEEE Frontiers in Education 2024), una sola charla con un yo futuro generado por IA bajó la ansiedad y subió la continuidad con el propio yo futuro, en un estudio preregistrado con 344 personas de 18 a 30 años. En un estudio de cuatro semanas con 981 personas (Fang et al., 2025, preprint en arXiv con coautores de OpenAI), quienes usaron más el chatbot por su cuenta reportaron más soledad y más dependencia emocional. Las condiciones que asignaron los investigadores no tuvieron un efecto significativo, y como ese uso intenso lo eligió cada persona, es una asociación y no prueba causa.</p>
+      </div>
       <p class="nota pregunta">¿Con qué pesos tu día se parece al de la plataforma? ¿Quién eligió esos pesos?</p>
     </div>
   </section>
 
-  <!-- Bloque 3: Dawkins -->
-  <section class="bloque" id="dawkins">
+  <!-- Bloque 4: Dawkins -->
+  <section class="bloque" id="dawkins" data-objetivos="O4">
     <div class="stage">
       <div class="lz"><canvas id="cvMeme" aria-label="La cueva grande como una comunidad: cada casilla es una persona y el curso se propaga de una a otra; tocá una casilla para sembrarlo ahí"></canvas></div>
       <div class="hud" id="hudMeme"></div>
@@ -156,10 +185,10 @@
     <div class="texto">
       <div class="paso">Idea 3 · El curso como meme</div>
       <h2>Enseñar a enseñar</h2>
-      <p>En el capítulo 11 de <i>El gen egoísta</i> (1976), Richard Dawkins propone que las ideas también son replicadores: se copian de una mente a otra. Las que duran tienen <b>fidelidad</b> (se copian bien), <b>fecundidad</b> (se copian mucho) y <b>longevidad</b> (cada copia dura).</p>
-      <p>Cada casilla es una persona. Tocá una para que aprenda el curso y mirá si la luz cruza la cueva o se apaga en un pasillo. Por eso cada clase cierra con un bloque «Para enseñarlo» y una actividad entre pares: son la fecundidad y la fidelidad del curso.</p>
+      <p>En el capítulo 11 de <i>El gen egoísta</i> (1976), Richard Dawkins propone que las ideas también son replicadores que se copian de una mente a otra, y que duran las que tienen <b>fidelidad</b> (se copian bien), <b>fecundidad</b> (se copian mucho) y <b>longevidad</b> (cada copia dura).</p>
+      <p>Cada casilla es una persona: tocá una para que aprenda el curso y mirá si la luz cruza la cueva o se apaga en un pasillo.</p>
       <div class="eq">R ≈ fecundidad × fidelidad × longevidad</div>
-      <p>La campaña de difusión del curso es, además, el ejemplo resuelto del proyecto final: <a href="../difusion/estrategia.html">cómo se propaga este curso</a>.</p>
+      <p>Por eso cada clase cierra con un bloque «Para enseñarlo» y una actividad entre pares: son la fecundidad y la fidelidad del curso. La campaña de difusión es, además, el ejemplo resuelto del proyecto final: <a href="../difusion/estrategia.html">cómo se propaga este curso</a>.</p>
       <p class="nota pregunta">Con R menor que 1 la luz se apaga. ¿Cuál de las tres perillas depende de cómo está escrito el material y cuál de vos?</p>
     </div>
   </section>
@@ -185,10 +214,10 @@
   </section>
 
   <!-- Cómo se cursa -->
-  <section class="bloque full" id="cursada">
+  <section class="cursada" id="cursada" aria-labelledby="tCursada">
     <div class="texto" style="display:grid; gap:14px">
       <div class="paso">Cómo se cursa</div>
-      <h2>Dieciséis clases, cuatro unidades, dos vías</h2>
+      <h2 id="tCursada">Dieciséis clases, cuatro unidades, dos vías</h2>
       <div class="seg" role="group" aria-label="Vía" id="segVia" style="max-width:420px">
         <button aria-pressed="true" data-v="visual">Vía visual (sin código)</button>
         <button aria-pressed="false" data-v="codigo">Vía con código</button>
@@ -211,7 +240,7 @@
   </section>
 
   <!-- Para enseñarlo -->
-  <section class="bloque full" id="ensenar">
+  <section class="bloque full" id="ensenar" data-objetivos="O1 O3">
     <div class="texto prose">
       <div class="paso">Para enseñarlo</div>
       <h2>Cómo contar esta clase</h2>
@@ -230,7 +259,9 @@
     { texto: "Foucault, M. (2001). La hermenéutica del sujeto. Curso en el Collège de France, 1981–1982. Clase del 6 de enero de 1982.", url: "" },
     { texto: "Dawkins, R. (1976). El gen egoísta, cap. 11: «Memes: los nuevos replicadores».", url: "" },
     { texto: "Schultz, W., Dayan, P. y Montague, P. R. (1997). A neural substrate of prediction and reward. Science 275, 1593–1599.", url: "https://doi.org/10.1126/science.275.5306.1593" },
-    { texto: "Sutton y Barto (2018), Reinforcement Learning: An Introduction, cap. 1.", url: "http://incompleteideas.net/book/the-book-2nd.html" }
+    { texto: "Sutton y Barto (2018), Reinforcement Learning: An Introduction, cap. 1.", url: "http://incompleteideas.net/book/the-book-2nd.html" },
+    { texto: "Pataranutaporn, P. et al. (2024). Future You: A Conversation with an AI-Generated Future Self Reduces Anxiety, Negative Emotions, and Increases Future Self-Continuity. IEEE Frontiers in Education Conference (FIE).", url: "https://doi.org/10.1109/FIE61694.2024.10893443" },
+    { texto: "Fang, C. M. et al. (2025). How AI and Human Behaviors Shape Psychosocial Effects of Extended Chatbot Use: A Longitudinal Randomized Controlled Study. arXiv:2503.17473 (preprint).", url: "https://arxiv.org/abs/2503.17473" }
   ] });
 
   const COL = Cueva.COL();
@@ -276,8 +307,7 @@
       ctx.setLineDash([]);
       ctx.fillStyle = COL.muted; ctx.font = `12px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "top";
       ctx.fillText("vos", sx + sz / 2, sy + sz + 6);
-      ctx.fillText("γ ≈ 0", (sx + sz + px) / 2, h / 2 + 34);
-      hud.innerHTML = `<span>tarjetas depositadas <b>${depositadas}</b></span><span>decisiones tuyas <b>0</b></span><span>elegidas para <b>el próximo clic</b></span>`;
+      hud.innerHTML = `<span>tarjetas depositadas <b>${depositadas}</b></span><span>decisiones tuyas <b>0</b></span><span>elegidas por <b>otro</b></span>`;
     }
     let sprImg = null;
     function SPRITE() {
@@ -337,7 +367,83 @@
     return { dibujar: () => modo === "feed" ? dibujarFeed() : dibujarCueva() };
   })();
 
-  // ================= Bloque 2: Foucault — ¿qué te premia? =================
+  // ================= Bloque 2: el feed mira solo el próximo clic =================
+  const clic = (() => {
+    const cv = $("cvClic"), aj = Cueva.lienzo(cv, 236), hud = $("hudClic");
+    // [nombre, color, clic ahora (0-10), lo que deja para después (0-10)]: puntajes de juguete
+    const POOL = [
+      ["Clip de 15 s", COL.ember, 8, 0], ["¡No vas a creer…!", COL.lamp, 9, 0], ["Top 5", COL.sonar, 7, 1], ["Meme", "#b48ad8", 7, 1],
+      ["Noticia", COL.chalk, 5, 3], ["Una clase", COL.exit, 3, 7], ["Tu amiga", "#f08fb0", 3, 8], ["Cerrar app", COL.muted, 0, 9]
+    ];
+    const N = 4;
+    let rnd, vuelta, cands, iFeed, iOtro, tot;
+    function nuevas() {
+      const idx = POOL.map((_, i) => i);
+      for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+      const ruido = () => Math.floor(rnd() * 3) - 1, lim = x => Math.max(0, Math.min(10, x));
+      cands = idx.slice(0, N).map(i => ({ n: POOL[i][0], c: POOL[i][1], ahora: lim(POOL[i][2] + ruido()), despues: lim(POOL[i][3] + ruido()) }));
+      const arg = f => cands.reduce((b, x, i) => f(x) > f(cands[b]) ? i : b, 0);
+      iFeed = arg(x => x.ahora);                 // solo el clic de ahora
+      iOtro = arg(x => x.ahora + x.despues);     // el clic y lo que deja para después
+    }
+    function avanzar() {
+      vuelta++;
+      tot.feed[0] += cands[iFeed].ahora; tot.feed[1] += cands[iFeed].despues;
+      tot.otro[0] += cands[iOtro].ahora; tot.otro[1] += cands[iOtro].despues;
+      nuevas();
+    }
+    function reiniciar() { rnd = Cueva.rng(11); vuelta = 0; tot = { feed: [0, 0], otro: [0, 0] }; nuevas(); for (let i = 0; i < 6; i++) avanzar(); }
+    function dibujar() {
+      const { w, h, ctx } = aj();
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      const x0 = 6, gap = 6, cw = (w - 2 * x0 - gap * (N - 1)) / N, y0 = 24, ch = 78, fs = cw < 95 ? 10 : 12;
+      ctx.fillStyle = COL.muted; ctx.font = `12px ${MONO}`; ctx.textAlign = "left"; ctx.textBaseline = "top";
+      ctx.fillText(`candidatas para la tarjeta ${vuelta + 1}`, x0, 4);
+      cands.forEach((k, i) => {
+        const x = x0 + i * (cw + gap);
+        rrect(ctx, x, y0, cw, ch, 5); ctx.fillStyle = COL.rock2; ctx.fill();
+        ctx.fillStyle = k.c; ctx.fillRect(x, y0, 4, ch);
+        ctx.fillStyle = COL.ink; ctx.font = `600 ${fs}px ${MONO}`; ctx.textBaseline = "top";
+        if (ctx.measureText(k.n).width <= cw - 12 || !k.n.includes(" ")) ctx.fillText(k.n, x + 9, y0 + 8);
+        else {                                       // nombre largo: dos renglones
+          const ps = k.n.split(" "), cortes = ps.slice(1).map((_, j) => [ps.slice(0, j + 1).join(" "), ps.slice(j + 1).join(" ")]);
+          const [l1, l2] = cortes.reduce((m, c) => Math.max(...c.map(t => ctx.measureText(t).width)) < Math.max(...m.map(t => ctx.measureText(t).width)) ? c : m);
+          ctx.fillText(l1, x + 9, y0 + 4); ctx.fillText(l2, x + 9, y0 + 5 + fs);
+        }
+        const bw = cw - 18;
+        [[k.ahora, COL.ember, 32], [k.despues, COL.lamp, 52]].forEach(([v, c, dy]) => {
+          ctx.fillStyle = COL.rock3; ctx.fillRect(x + 9, y0 + dy, bw, 10);
+          ctx.fillStyle = c; ctx.fillRect(x + 9, y0 + dy, bw * v / 10, 10);
+        });
+        ctx.lineWidth = 2;
+        if (i === iFeed) { rrect(ctx, x - 1, y0 - 1, cw + 2, ch + 2, 6); ctx.strokeStyle = COL.ember; ctx.stroke(); }
+        if (i === iOtro) { ctx.setLineDash([5, 4]); rrect(ctx, x + 3, y0 + 3, cw - 6, ch - 6, 4); ctx.strokeStyle = COL.chalk; ctx.stroke(); ctx.setLineDash([]); }
+        const et = i === iFeed && i === iOtro ? ["los dos", COL.ink] : i === iFeed ? ["feed", COL.ember] : i === iOtro ? ["después", COL.chalk] : null;
+        if (et) { ctx.fillStyle = et[1]; ctx.font = `${fs}px ${MONO}`; ctx.textAlign = "center"; ctx.fillText(et[0], x + cw / 2, y0 + ch + 6); ctx.textAlign = "left"; }
+      });
+      // lo que juntó cada uno hasta ahora
+      const max = Math.max(1, tot.feed[0], tot.feed[1], tot.otro[0], tot.otro[1]);
+      const filas = [["el feed: solo el clic de ahora", tot.feed], ["sumando lo que deja para después", tot.otro]];
+      filas.forEach(([t, v], j) => {
+        const y = y0 + ch + 30 + j * 50;
+        ctx.fillStyle = COL.muted; ctx.font = `12px ${MONO}`; ctx.textBaseline = "top"; ctx.fillText(t, x0, y);
+        const bw = w - 2 * x0 - 34;
+        [[v[0], COL.ember], [v[1], COL.lamp]].forEach(([n, c], k) => {
+          const yy = y + 17 + k * 13;
+          ctx.fillStyle = c; ctx.fillRect(x0, yy, Math.max(1, bw * n / max), 10);
+          ctx.fillStyle = COL.ink; ctx.font = `11px ${MONO}`; ctx.fillText(String(n), x0 + Math.max(1, bw * n / max) + 5, yy - 1);
+        });
+      });
+      hud.innerHTML = `<span>tarjetas mostradas <b>${vuelta}</b> (puntos de juguete)</span><span>el feed: clics <b>${tot.feed[0]}</b>, después <b>${tot.feed[1]}</b></span><span>sumando después: clics <b>${tot.otro[0]}</b>, después <b>${tot.otro[1]}</b></span>`;
+    }
+    $("bClic").addEventListener("click", () => { avanzar(); dibujar(); });
+    $("bClic10").addEventListener("click", () => { for (let i = 0; i < 10; i++) avanzar(); dibujar(); });
+    $("bClicDe0").addEventListener("click", () => { reiniciar(); dibujar(); });
+    reiniciar(); dibujar();
+    return { dibujar };
+  })();
+
+  // ================= Bloque 3: Foucault — ¿qué te premia? =================
   const dia = (() => {
     const cv = $("cvDia"), aj = Cueva.lienzo(cv, 230), hud = $("hudDia");
     // actividades: [nombre, color, vector (estímulo, aprender, otros, cuerpo), Δenergía, satura]
@@ -416,7 +522,7 @@
     return { dibujar };
   })();
 
-  // ================= Bloque 3: Dawkins — el curso se propaga por la cueva =================
+  // ================= Bloque 4: Dawkins — el curso se propaga por la cueva =================
   const meme = (() => {
     const env = Cueva.makeEnv(Cueva.MAPS.grande), cv = $("cvMeme"), T = Cueva.tablero(cv, env, { maxCell: 26 }), hud = $("hudMeme");
     // vecinos a distancia ≤ 2 por los pasillos (a quién le puede enseñar cada persona)
@@ -514,7 +620,7 @@
     pintar();
   })();
 
-  let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { freire.dibujar(); dia.dibujar(); meme.dibujar(); }, 80); });
+  let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { freire.dibujar(); clic.dibujar(); dia.dibujar(); meme.dibujar(); }, 80); });
 })();
 </script>
 </body>

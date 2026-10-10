@@ -14,6 +14,9 @@ Formato: una sección por versión (SemVer sobre el curso, ver `fabrica/CONVENCI
 ### Cambiado
 - Estructura de 16 clases en cuatro unidades (`build/PLAN-16-clases.md`); clases 3–16 en preparación; material de la v1 en
   `build/v1/` y `specs/v1/`.
+- Clase 1: spine, página y cuestionario rediseñados. B1 (Freire) y B2 (el feed que mira solo el próximo clic, figura nueva) separados;
+  γ solo como adelanto de la clase 3; B3 y B4 más cortos; recuadro «Esto hoy se mide» con Cyborg Psychology (F6, F7); Q2 sin γ y Q5
+  sobre el recuadro. README: Cyborg Psychology como evidencia contemporánea.
 
 ### Aviso
 - El progreso de los cuestionarios guardado en el navegador vuelve a cero (los ids cambian de significado).

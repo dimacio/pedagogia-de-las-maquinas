@@ -10,7 +10,9 @@ La clase 1 (`clases/01-introduccion.html`) es el marco desde el que se lee todo 
 
 - **Aprender actuando** (Paulo Freire, *Pedagogía del oprimido*, 1970): frente a la educación bancaria, que deposita contenidos en un alumno pasivo, la problematizadora aprende actuando y reflexionando, en diálogo. Acá no se recibe RL: se le enseña a una máquina.
 - **Elegir la propia recompensa** (Michel Foucault, *La hermenéutica del sujeto*, curso de 1981–1982): el cuidado de sí, leído como la pregunta central del RL, quién define la recompensa.
-- **Enseñar a enseñar** (Richard Dawkins, *El gen egoísta*, 1976, cap. 11): el curso es un meme que vive si se copia con fidelidad, fecundidad y longevidad. La clase 12 cierra con el proyecto final y la difusión del curso como ejemplo resuelto.
+- **Enseñar a enseñar** (Richard Dawkins, *El gen egoísta*, 1976, cap. 11): el curso es un meme que vive si se copia con fidelidad, fecundidad y longevidad. La clase 16 cierra con el proyecto final y la difusión del curso como ejemplo resuelto.
+
+Como evidencia contemporánea, no como cuarta idea, el curso suma la línea de *Cyborg Psychology* de Pat Pataranutaporn (MIT Media Lab), que estudia con experimentos si la IA aumenta o disminuye nuestras capacidades: complementa las preguntas de Freire y Foucault con datos y con sus límites (ver `fabrica/marco-filosofico.md`).
 
 ## Para quién
 
