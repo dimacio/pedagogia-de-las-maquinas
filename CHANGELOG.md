@@ -22,6 +22,7 @@ Formato: una sección por versión (SemVer sobre el curso, ver `fabrica/CONVENCI
   tutor partido en planteo y trampa, recompensa de mejora calculada en el notebook; referencias con la numeración de 16 clases.
 - Chequeos: no recorren `.venv` ni `.superpowers` como sitio.
 - Clase 3 (nueva): cadena de Markov → MRP → retorno y γ → valor → Bellman, sin acciones; recuadro Future You en B3.
+- Clase 4 (nueva): MDP, Q, mejora de política, iteración de política y de valor, piso resbaloso, robot de reciclaje.
 
 ### Aviso
 - El progreso de los cuestionarios guardado en el navegador vuelve a cero (los ids cambian de significado).
