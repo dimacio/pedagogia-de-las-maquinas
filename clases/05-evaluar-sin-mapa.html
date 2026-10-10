@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Evaluar sin mapa · RL a ciegas</title>
+<meta name="description" content="Clase 5: sin P ni R, el valor de una política se estima jugando. Monte Carlo de primera visita, el promedio incremental, TD(0), el error δ y la dopamina, sesgo y varianza, y la equivalencia de certeza en la cueva a ciegas.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .lz { min-width: 0; }
+  .seg { flex-wrap: wrap; }
+  .seg button { min-width: 0; }
+  .cap { font-size: 13px; color: var(--muted); }
+  .cap b { color: var(--ink); }
+  .duo { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+  .duo > div { min-width: 0; display: grid; gap: 6px; align-content: start; }
+  .duo h3 { font-family: var(--mono); font-size: 12.5px; font-weight: 400; color: var(--muted); }
+  .duo h3 b { color: var(--ink); font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+  .chips span { display: inline-flex; align-items: center; gap: 6px; }
+  .chips i { width: 14px; height: 3px; display: inline-block; border-radius: 1px; }
+  /* la cuenta de una actualización */
+  .cuenta { font-family: var(--mono); font-size: 13px; line-height: 1.6; background: var(--rock); border: 1px solid var(--rock-2); border-radius: 3px;
+    padding: 8px 10px; overflow-x: auto; white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .cuenta b { color: var(--ink); font-weight: 600; }
+  .cuenta .v { color: var(--lamp); }
+  .cuenta .d { color: var(--sonar); }
+  .hat { font-family: var(--body); }
+  /* tabla de cifras del notebook */
+  .tabla.rms table { font-size: 13px; }
+  .tabla.rms td.num.sel { color: var(--lamp); }
+  @media (max-width: 560px) { .tabla.rms table { font-size: 12px; } .tabla.rms th, .tabla.rms td { padding: 6px 5px; } }
+  /* recuadro de evidencia (como en las clases 1 y 3) */
+  .aviso { background: var(--rock); border: 1px solid var(--rock-2); border-left: 3px solid var(--ember); border-radius: 3px; padding: 12px 14px; display: grid; gap: 8px; }
+  .aviso h3 { font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--ember); letter-spacing: .05em; text-transform: uppercase; }
+  .aviso.mide { border-left-color: var(--sonar); }
+  .aviso.mide h3 { color: var(--sonar); }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase 5</div>
+    <h1>Evaluar sin <span class="g">mapa</span></h1>
+    <p class="thesis">Sin P ni R, cuánto vale cada casilla se aprende jugando, ya sea esperando a ver cómo termina la partida o corrigiendo en cada paso lo que se esperaba.</p>
+  </section>
+
+  <!-- B1: sin mapa, solo partidas -->
+  <section class="bloque" id="b-partidas" data-objetivos="O1">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Política que juega" id="segPol">
+        <button aria-pressed="true" data-e="0.7">Flechas con ε = 0,7</button>
+        <button aria-pressed="false" data-e="1">El dado (ε = 1)</button>
+      </div>
+      <div class="duo">
+        <div><h3>lo que ve <b>el agente</b></h3><div class="lz"><canvas id="cvVe" aria-label="Lo que ve el agente: solo las paredes que tocó, en gris claro, y su recorrido"></canvas></div></div>
+        <div><h3>lo que sabemos <b>nosotros</b></h3><div class="lz"><canvas id="cvMapa" aria-label="El mapa entero con el valor verdadero de la política y sus flechas, y el mismo recorrido"></canvas></div></div>
+      </div>
+      <div class="row"><button class="btn primary" id="otraPartida">Otra partida</button></div>
+      <div class="cuenta" id="expB1" aria-live="polite"></div>
+      <div class="hud" id="hudB1"></div>
+      <p class="cap">Partidas desde S simuladas en el navegador (otra semilla que el notebook). Las medianas son de las 5000 partidas del notebook. El valor verdadero se calcula con el mapa, que el agente no tiene, solo para comparar.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 1</div>
+      <h2>Sin mapa, solo partidas</h2>
+      <p>Sin mapa, el agente no conoce P ni R y lo único que tiene son sus partidas (<i>episodes</i>), listas de experiencias (s, a, r, s′). Hoy no elige nada nuevo, sino que evalúa una política dada, las flechas óptimas de la clase 4 con ε = 0,7, es decir, con un 70 % de pasos al azar. No usamos el dado de la clase 3 porque desde S sus partidas duran una mediana de 1036 pasos, mientras que con ε = 0,7 la mediana baja a 69. Desde el paso 2, cada partida empieza en una casilla al azar para que todas reciban visitas.</p>
+      <div class="eq">(s₀,a₀,r₀,s₁), (s₁,a₁,r₁,s₂), …</div>
+      <p class="nota pregunta">Con ε = 0,7, ¿con qué probabilidad da el paso que marca la flecha? Ojo, que el dado también puede elegirla.</p>
+    </div>
+  </section>
+
+  <!-- B2: Monte Carlo -->
+  <section class="bloque" id="b-mc" data-objetivos="O1">
+    <div class="stage">
+      <div class="duo">
+        <div><h3>V verdadero <b>(con mapa)</b></h3><div class="lz"><canvas id="cvVv" aria-label="Mapa de calor del valor verdadero de la política, con S, el cruce y la casilla cerca de la salida marcadas"></canvas></div></div>
+        <div><h3>Monte Carlo, <b id="tMC">300 partidas</b></h3><div class="lz"><canvas id="cvVmc" aria-label="Mapa de calor del valor estimado por Monte Carlo, con la misma escala; en negro las casillas sin visitas"></canvas></div></div>
+      </div>
+      <div class="legend"><span id="legMClo"></span><span class="bar" id="legMC"></span><span id="legMChi"></span></div>
+      <div class="lz"><canvas id="cvMCg" aria-label="El valor estimado de S, del cruce y de la casilla cerca de la salida, partida a partida, con su valor verdadero punteado"></canvas></div>
+      <div class="chips"><span><i style="background:var(--ember)"></i>S</span><span><i style="background:var(--lamp)"></i>cruce (5,6)</span><span><i style="background:var(--exit)"></i>cerca (8,10)</span><span>punteada: V verdadero</span></div>
+      <div class="row"><button class="btn primary" id="mc1">+1 partida</button><button class="btn" id="mc50">+50 partidas</button><button class="btn" id="mcCero">Desde cero</button></div>
+      <div class="hud" id="hudMC"></div>
+      <p class="cap">Partidas simuladas en el navegador con inicio al azar (otra semilla que el notebook). Con «+1 partida» se ve su recorrido y, con borde ámbar, las casillas que corrigió.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 2</div>
+      <h2>Monte Carlo: promediar lo que pasó</h2>
+      <p><b>Monte Carlo</b> (MC) espera a que termine la partida y calcula, para cada casilla visitada, el retorno G desde la primera vez que la pisó (<i>first-visit</i>). El valor estimado de una casilla es el promedio de esos retornos sobre todas las partidas jugadas, sin mirar P ni R. En el notebook, después de 300 partidas el cruce suma 132 visitas y su estimación de 0,7276 queda cerca del verdadero 0,7099. S recibe solo 14 visitas y queda más lejos, con 0,5467 contra 0,5004.</p>
+      <div class="eq">V(s) ≈ (G₁ + G₂ + … + Gₙ) / n</div>
+      <p class="nota pregunta">Cada partida empieza en una casilla al azar. ¿Por qué el cruce recibe muchas más visitas que S?</p>
+    </div>
+  </section>
+
+  <!-- B3: promedio incremental -->
+  <section class="bloque" id="b-inc" data-objetivos="O1">
+    <div class="stage">
+      <div class="lz"><canvas id="cvInc" aria-label="Los retornos desde el cruce como puntos grises y tres promedios incrementales: con alfa igual a 1 sobre n, con el alfa fijo elegido y el valor verdadero punteado"></canvas></div>
+      <div class="chips"><span><i style="background:var(--muted); height:6px; width:6px; border-radius:3px"></i>retorno G de cada visita</span><span><i style="background:var(--ink)"></i>α = 1/n</span><span><i style="background:var(--lamp)"></i>α fijo</span><span>punteada: V verdadero</span></div>
+      <div class="ctl">
+        <label for="slAlfa"><span>α fijo</span> <output id="outAlfa"></output></label>
+        <input type="range" id="slAlfa" min="0.02" max="0.5" step="0.01" value="0.1">
+      </div>
+      <div class="row"><button class="btn" data-a="0.1">α = 0,1</button><button class="btn" data-a="0.3">α = 0,3</button></div>
+      <div class="hud" id="hudInc"></div>
+      <p class="cap">Los retornos desde el cruce de las 300 partidas con que arranca el paso 2, simuladas en el navegador. El temblor es el desvío del estimado en las últimas 50 visitas.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 3</div>
+      <h2>Promediar sin guardar todo</h2>
+      <p>Para promediar no hace falta guardar todos los retornos. Alcanza con corregir el valor viejo una fracción α de la sorpresa G − V, que es el <b>promedio incremental</b> (<i>incremental mean</i>). Con α = 1/n, donde n cuenta las visitas, da exactamente el promedio común, 0,727555 en el cruce del notebook. Con un <b>paso</b> (<i>step size</i>) α fijo, el estimado pesa más lo reciente y nunca deja de temblar, con un desvío en las últimas 50 visitas de 0,0032 para 1/n, 0,0233 para α = 0,1 y 0,0444 para α = 0,3.</p>
+      <div class="eq">V ← V + α (G − V)</div>
+      <p class="nota pregunta">Si la salida se mudara a otra casilla a mitad del juego, ¿cuál de los promedios se daría cuenta antes?</p>
+    </div>
+  </section>
+
+  <!-- B4: TD -->
+  <section class="bloque" id="b-td" data-objetivos="O2">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Desde dónde arranca TD" id="segTD">
+        <button aria-pressed="true" data-m="200">Después de 200 partidas</button>
+        <button aria-pressed="false" data-m="cero">Desde V = 0</button>
+      </div>
+      <div class="lz"><canvas id="cvTD" aria-label="Mapa de calor del valor de TD, el recorrido de la partida actual, la casilla corregida en ámbar y la siguiente en celeste"></canvas></div>
+      <div class="legend"><span>V = 0 (negro)</span><span class="bar" id="legTD"></span><span>1</span></div>
+      <div class="cuenta" id="cuentaTD" aria-live="polite"></div>
+      <div class="row"><button class="btn primary" id="tdPaso">Un paso</button><button class="btn" id="tdFin">Terminar la partida</button><button class="btn" id="tdOtra">Otra partida</button></div>
+      <div class="hud" id="hudTD"></div>
+      <p class="cap">TD con α = 0,1, simulado en el navegador (otra semilla que el notebook). En el notebook, desde V = 0, la primera partida cambia 22 casillas con Monte Carlo y 1 sola con TD, la última antes de la salida.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 4</div>
+      <h2>TD: corregir en cada paso</h2>
+      <p>La <b>diferencia temporal</b> (<i>temporal difference</i>, TD) no espera el final de la partida y corrige V(s) después de cada paso. Su objetivo es r + γV(s′), el premio del paso más lo que ya cree que vale la casilla adonde llegó. Apoyarse así en otra estimación se llama <i>bootstrapping</i>. En el notebook, después de 200 partidas con α = 0,1, el paso (5,6) → (5,7) con r = 0 tiene V(s) = 0,4507 y V(s′) = 0,5671, así que el objetivo es 0,5614 y V(s) sube a 0,4618.</p>
+      <div class="eq">V(s) ← V(s) + α [r + γV(s′) − V(s)]</div>
+      <p class="nota pregunta">Pasá a «Desde V = 0» y terminá la partida. ¿Por qué TD corrige una sola casilla?</p>
+    </div>
+  </section>
+
+  <!-- B5: el error δ y la dopamina -->
+  <section class="bloque" id="b-delta" data-objetivos="O2">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué sabe el agente" id="segDelta">
+        <button aria-pressed="true" data-c="0">Sin saber nada</button>
+        <button aria-pressed="false" data-c="1">Después de aprender</button>
+        <button aria-pressed="false" data-c="2">La salida no paga</button>
+      </div>
+      <div class="lz"><canvas id="cvDelta" aria-label="Barras con el error delta de cada paso de una partida desde S: verdes si es positivo, rojas si es negativo"></canvas></div>
+      <div class="row"><button class="btn" id="deltaOtra">Otra partida</button></div>
+      <div class="hud" id="hudDelta"></div>
+      <p class="cap">Una misma partida desde S, mirada con tres V distintos, sin corregir nada. «Después de aprender» es TD con α = 0,1 tras 3000 partidas, simulado en el navegador (otra semilla que el notebook).</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 5</div>
+      <h2>El error de TD y la dopamina</h2>
+      <p>La corrección de TD tiene nombre propio, el <b>error de diferencia temporal</b> (<i>TD error</i>) δ. Es la sorpresa, lo que pasó (el premio más lo que ahora se espera) menos lo que se esperaba antes. En una misma partida del notebook, el δ del último paso vale +1,000 sin saber nada, +0,032 después de aprender y −0,968 si la salida no paga. Una vez aprendido, el premio que llega casi no sorprende, pero el que falta da una sorpresa negativa justo cuando tenía que llegar.</p>
+      <div class="eq">δ = r + γV(s′) − V(s)</div>
+      <div class="aviso mide">
+        <h3>Esto se midió</h3>
+        <p>Schultz, Dayan y Montague (1997) mostraron que ciertas neuronas de dopamina de monos responden como un <b>error de predicción de recompensa</b> (<i>reward prediction error</i>), la conexión que anunciamos en la clase 1. Se disparan con un jugo inesperado, pasan a dispararse con la señal que lo anuncia cuando el mono aprende y bajan de su nivel normal si el jugo anunciado no llega, como en las tres vistas de la figura. Es un modelo de una señal neuronal medida en el laboratorio, no una explicación de la conducta ni de la adicción.</p>
+      </div>
+      <p class="nota pregunta">Si después de aprender la salida pagara +2 en vez de +1, ¿qué δ verías en el último paso?</p>
+    </div>
+  </section>
+
+  <!-- B6: sesgo y varianza -->
+  <section class="bloque" id="b-sesgo" data-objetivos="O3">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué mirar" id="segVista">
+        <button aria-pressed="true" data-v="rms">Error en las 59 casillas</button>
+        <button aria-pressed="false" data-v="cruce">El cruce, 10 semillas</button>
+      </div>
+      <div class="seg" role="group" aria-label="Paso alfa" id="segAlfa">
+        <button aria-pressed="false" data-a="0.03">α = 0,03</button>
+        <button aria-pressed="true" data-a="0.1">α = 0,1</button>
+        <button aria-pressed="false" data-a="0.3">α = 0,3</button>
+      </div>
+      <div class="lz"><canvas id="cvSV" aria-label="Error RMS contra partidas jugadas, en escala logarítmica, para Monte Carlo con alfa 1 sobre n, Monte Carlo con alfa fijo y TD con el mismo alfa; o el valor del cruce en 10 semillas"></canvas></div>
+      <div class="chips" id="chipsSV"></div>
+      <div class="tabla rms">
+        <table>
+          <thead><tr><th>RMS (notebook) · N =</th><th>10</th><th>100</th><th>300</th><th>1000</th><th>3000</th></tr></thead>
+          <tbody id="tbRMS"></tbody>
+        </table>
+      </div>
+      <div class="hud" id="hudSV"></div>
+      <p class="cap">Curvas simuladas en el navegador como en el notebook (10 semillas, 3000 partidas con inicio al azar, los tres métodos ven las mismas partidas), con banda de ± 1 desvío. La tabla es la del notebook. Error RMS: raíz del promedio de los errores al cuadrado en las 59 casillas. Es una intuición, sin demostración.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 6</div>
+      <h2>Sesgo y varianza</h2>
+      <p>El <b>sesgo</b> (<i>bias</i>) es errar siempre para el mismo lado, mientras que la <b>varianza</b> (<i>variance</i>) es temblar de partida en partida. Con α = 0,1, TD empieza sesgado porque se apoya en valores que arrancaron en 0, con las 10 semillas del cruce por debajo del verdadero (sesgo de −0,61 a las 100 partidas y de −0,17 a las 300). Con el mismo α fijo, TD tiembla menos que Monte Carlo una vez que llega a su piso, con un desvío en el cruce de 0,0100 contra 0,0272. Aun así, Monte Carlo con α = 1/n no tiene sesgo y su paso se achica solo, así que en esta cueva es el más preciso de los incrementales, con un error RMS (<i>root mean square</i>) de 0,0055 a las 3000 partidas contra 0,0127 de TD con α = 0,1.</p>
+      <div class="eq">error cuadrático = sesgo² + varianza</div>
+      <p class="nota pregunta">Si las partidas duraran mil pasos, como con el dado, ¿cuál de los dos temblaría más? ¿Por qué?</p>
+    </div>
+  </section>
+
+  <!-- B7: equivalencia de certeza -->
+  <section class="bloque" id="b-certeza" data-objetivos="O4">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Cuántas partidas" id="segCE">
+        <button aria-pressed="false" data-n="30">30 partidas</button>
+        <button aria-pressed="true" data-n="300">300 partidas</button>
+        <button aria-pressed="false" data-n="3000">3000 partidas</button>
+      </div>
+      <div class="lz"><canvas id="cvCE" aria-label="Mapa de calor del valor de la equivalencia de certeza, con la casilla elegida y sus destinos marcados con la probabilidad contada"></canvas></div>
+      <div class="lz"><canvas id="cvCEb" aria-label="Barras con la fila de P verdadera, en gris, y la fila de P estimada contando, en verde, para la casilla elegida"></canvas></div>
+      <div class="hud" id="hudCE"></div>
+      <p class="cap">Las mismas partidas del paso 2, contadas y resueltas en el navegador como en el notebook. Tocá una casilla para ver su fila de P̂.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 7</div>
+      <h2>Armar el mapa con lo jugado</h2>
+      <p>La <b>equivalencia de certeza</b> (<i>certainty equivalence</i>) usa las partidas para armar el mapa y después resuelve Bellman como en las clases 3 y 4, como si ese mapa fuera el verdadero. Cuenta cuántas veces pasó de s a s′ para estimar P̂ y promedia el premio cobrado al salir de s para estimar R̂. Con las mismas 300 partidas del notebook da V̂(S) = 0,5029 y un error RMS de 0,0101, contra 0,0169 de Monte Carlo. Usa mejor los datos, con 0,0027 a las 3000 partidas contra 0,0055 de Monte Carlo y 0,0127 de TD, pero hay que guardar una tabla de 60 × 60 y resolver un sistema.</p>
+      <div class="eq"><span class="hat">V̂</span> = (I − γ<span class="hat">P̂</span>)⁻¹ <span class="hat">R̂</span></div>
+      <p class="nota pregunta">Si la cueva tuviera un millón de casillas, ¿qué parte de la equivalencia de certeza dejaría de ser posible?</p>
+    </div>
+  </section>
+
+  <!-- B8: Para enseñarlo -->
+  <section class="bloque full" id="b-ensenar" data-objetivos="O1 O2">
+    <div class="texto prose">
+      <div class="paso">Para enseñarlo</div>
+      <h2>Cómo contar esta clase en una oración</h2>
+      <p>"Monte Carlo espera a ver cómo termina; TD corrige en cada paso con lo que esperaba del paso siguiente."</p>
+      <p class="nota pregunta">Pregunta para hacerle a quien te escucha: para estimar cuánto tardás en volver a tu casa, ¿esperás a llegar o corregís en cada esquina según lo que te falta?</p>
+      <p><b>Ejercicio de 5 minutos:</b> dibujen en el pizarrón un pasillo de cuatro casillas, A, B, C y D, con la salida después de D. Escriban V = 0 en todas y pidan a una persona que camine de A a la salida. La mitad de la clase corrige con Monte Carlo al final (cada casilla recibe G = 1) mientras la otra mitad corrige con TD en cada paso, con α = 0,5 y sin descuento para que las cuentas sean fáciles. Repitan tres pasadas y comparen cuándo le llega valor a A con cada método.</p>
+      <p class="small muted">Adelanto: hoy evaluamos una política que nos dieron. Para elegir mejores acciones sin mapa viene la clase 6, controlar sin mapa, con SARSA y Q-learning.</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(async () => {
+  // cada figura se arma en su propia tarea, para no trabar el navegador al cargar
+  const tarea = f => new Promise(r => setTimeout(() => r(f()), 0));
+  Cueva.pagina("5", { lecturas: [
+    { texto: "Sutton y Barto (2018), Reinforcement Learning: An Introduction, 2.ª ed., cap. 5 (5.1 predicción Monte Carlo) y cap. 6 (6.1–6.3 predicción TD, sus ventajas y el entrenamiento por lotes)", url: "http://incompleteideas.net/book/the-book-2nd.html" },
+    { texto: "Stanford CS234 (Brunskill), clase 3: evaluación de políticas sin modelo (Monte Carlo, TD, equivalencia de certeza, sesgo y varianza)", url: "https://web.stanford.edu/class/cs234/" },
+    { texto: "Schultz, Dayan y Montague (1997), A neural substrate of prediction and reward, Science 275, 1593–1599", url: "https://doi.org/10.1126/science.275.5306.1593" }
+  ] });
+
+  const env = Cueva.makeEnv(Cueva.MAPS.chica), n = env.nS, GOAL = env.goal, START = env.start;
+  const COL = Cueva.COL(), MONO = COL.mono || "monospace", AR = Cueva.ARROW;
+  const PARED = "#2c3346", GAMMA = 0.99, EPS = 0.7;
+  const reducir = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = id => document.getElementById(id);
+  const coma = s => String(s).replace(".", ",").replace("-", "−");
+  const fmt = (x, d = 3) => coma(x.toFixed(d));
+  const fmtS = (x, d = 4) => (x >= 0 ? "+" : "") + fmt(x, d);
+  const rc = s => `(${env.free[s][0]},${env.free[s][1]})`;
+  const nom = s => s === START ? "S" : s === GOAL ? "salida" : rc(s);
+  const marcar = (sel, attr, v) => document.querySelectorAll(sel).forEach(b => b.setAttribute("aria-pressed", b.dataset[attr] === v));
+  const casillaDe = (T, e) => { const [r, c] = T.celdaEn(e); return env.idx[r + "," + c]; };
+  const CRUCE = env.idx["5,6"], CERCA = env.idx["8,10"];
+  const NOMETA = Array.from({ length: n }, (_, s) => s).filter(s => s !== GOAL);
+
+  // ---------- el mapa (solo para la política dada y la respuesta correcta; el agente no lo usa) ----------
+  const NXT = Array.from({ length: n }, (_, s) => [0, 1, 2, 3].map(a => s === GOAL ? GOAL : env.move(s, a)[0]));
+  const RSA = (s, a) => (s !== GOAL && NXT[s][a] === GOAL ? 1 : 0);
+  // las flechas óptimas de la clase 4: iteración de valor y la acción de mayor Q (la primera si empatan)
+  const FL = (() => {
+    let V = new Float64Array(n), NV;
+    for (let k = 0; k < 10000; k++) {
+      NV = new Float64Array(n); let d = 0;
+      for (let s = 0; s < n; s++) { if (s === GOAL) continue; let b = -Infinity; for (let a = 0; a < 4; a++) b = Math.max(b, RSA(s, a) + GAMMA * V[NXT[s][a]]); NV[s] = b; d = Math.max(d, Math.abs(b - V[s])); }
+      if (d < 1e-12) break; V = NV;
+    }
+    return Array.from({ length: n }, (_, s) => { let b = 0, bq = -Infinity; for (let a = 0; a < 4; a++) { const q = RSA(s, a) + GAMMA * NV[NXT[s][a]]; if (q > bq) { bq = q; b = a; } } return b; });
+  })();
+  // sistema lineal (I − γP) V = R por eliminación gaussiana; filas: lista de [s', prob]
+  function resolver(filas, R) {
+    const A = Array.from({ length: n }, (_, i) => { const f = new Float64Array(n + 1); f[i] = 1; for (const [j, p] of filas[i]) f[j] -= GAMMA * p; f[n] = R[i]; return f; });
+    for (let c = 0; c < n; c++) {
+      let piv = c; for (let i = c + 1; i < n; i++) if (Math.abs(A[i][c]) > Math.abs(A[piv][c])) piv = i;
+      [A[c], A[piv]] = [A[piv], A[c]];
+      for (let i = 0; i < n; i++) if (i !== c && A[i][c] !== 0) { const f = A[i][c] / A[c][c]; for (let j = c; j <= n; j++) A[i][j] -= f * A[c][j]; }
+    }
+    return Float64Array.from({ length: n }, (_, i) => A[i][n] / A[i][i]);
+  }
+  // P^π y R^π de las flechas con ε: el dado elige cualquiera de las 4 con ε/4, la flecha suma 1 − ε
+  function cadena(eps) {
+    const filas = [], R = new Float64Array(n);
+    for (let s = 0; s < n; s++) {
+      if (s === GOAL) { filas.push([[GOAL, 1]]); continue; }
+      const m = new Map();
+      for (let a = 0; a < 4; a++) { const p = eps / 4 + (a === FL[s] ? 1 - eps : 0); m.set(NXT[s][a], (m.get(NXT[s][a]) || 0) + p); R[s] += p * RSA(s, a); }
+      filas.push([...m.entries()]);
+    }
+    return { filas, R };
+  }
+  const CAD = cadena(EPS), VV = resolver(CAD.filas, CAD.R), V_DADO = (() => { const c = cadena(1); return resolver(c.filas, c.R); })();
+  const VLO = Math.min(...NOMETA.map(s => VV[s])), VHI = Math.max(...NOMETA.map(s => VV[s]));
+  const rms = V => Math.sqrt(NOMETA.reduce((t, s) => t + (V[s] - VV[s]) ** 2, 0) / NOMETA.length);
+
+  // ---------- jugar: lo único que tiene el agente ----------
+  // una partida hasta la salida: S[t] y A[t] de cada paso; el destino del paso t es S[t+1] (o la salida al final); r = +1 solo al entrar
+  function jugar(u, inicio, eps = EPS, lim = 40000) {
+    const S = [], A = []; let s = inicio;
+    for (let t = 0; t < lim && s !== GOAL; t++) { const a = u() < eps ? Math.floor(u() * 4) : FL[s]; S.push(s); A.push(a); s = NXT[s][a]; }
+    return { S, A, fin: s === GOAL };
+  }
+  const destino = (p, t) => t + 1 < p.S.length ? p.S[t + 1] : (p.fin ? GOAL : p.S[t]);
+  const premio = (p, t) => (p.fin && t === p.S.length - 1 ? 1 : 0);
+  const inicioAzar = u => { const s = Math.floor(u() * (n - 1)); return s < GOAL ? s : s + 1; };
+  // retorno desde la primera visita a cada casilla: se recorre de atrás para adelante y queda la visita más temprana
+  function primeraVisita(p) { const m = new Map(); let G = 0; for (let t = p.S.length - 1; t >= 0; t--) { G = premio(p, t) + GAMMA * G; m.set(p.S[t], G); } return m; }
+  function mcActualizar(V, N, p, alfa = null) { for (const [s, G] of primeraVisita(p)) { N[s]++; V[s] += (alfa === null ? 1 / N[s] : alfa) * (G - V[s]); } }
+  function tdPartida(V, p, alfa) { for (let t = 0; t < p.S.length; t++) { const s = p.S[t]; V[s] += alfa * (premio(p, t) + GAMMA * V[destino(p, t)] - V[s]); } }
+  // una fuente de partidas con inicio al azar, reproducible: la usan los pasos 2, 3 y 7
+  function fuente(semilla) { const u = Cueva.rng(semilla), lista = []; return { get(i) { while (lista.length <= i) lista.push(jugar(u, inicioAzar(u))); return lista[i]; } }; }
+  const SEM = 2025, COMUN = fuente(SEM);
+
+  // ---------- utilidades de dibujo ----------
+  function rotulo(T, s, txt, color = COL.ink, escala = .34) {
+    if (!txt) return;
+    const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s];
+    ctx.font = `600 ${Math.max(8, Math.round(cell * escala))}px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.85)"; ctx.strokeText(txt, c * cell + cell / 2, r * cell + cell / 2 + 1);
+    ctx.fillStyle = color; ctx.fillText(txt, c * cell + cell / 2, r * cell + cell / 2 + 1);
+  }
+  function borde(T, s, color, ancho = 2, inset = 1.5) {
+    const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s];
+    ctx.strokeStyle = color; ctx.lineWidth = ancho; ctx.strokeRect(c * cell + inset, r * cell + inset, cell - 2 * inset, cell - 2 * inset);
+  }
+  // mapa de calor lineal entre lo y hi; las casillas sin valor (NaN) quedan negras
+  function calor(T, V, lo = VLO, hi = VHI, negroEnCero = false) {
+    for (const s of NOMETA) { const v = V[s]; if (!isFinite(v) || (negroEnCero && v === 0)) continue; const [r, c] = env.free[s]; T.casilla(r, c, Cueva.rampa("valor", (v - lo) / ((hi - lo) || 1))); }
+  }
+  // un gráfico con ejes: devuelve X, Y y el contexto (x o y en escala log si se pide)
+  function ejes(cv, alto, { x0, x1, y0, y1, xlog = false, ylog = false, ticksX = [], ticksY = [], fx = coma, fy = coma, tituloX = "", tituloY = "" }) {
+    const { w, h, ctx } = Cueva.lienzo(cv, alto)();
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    const m = { l: 48, r: 12, t: 22, b: 30 };
+    const gx = xlog ? Math.log10 : v => v, gy = ylog ? Math.log10 : v => v;
+    const X = v => m.l + (gx(v) - gx(x0)) / (gx(x1) - gx(x0)) * (w - m.l - m.r);
+    const Y = v => h - m.b - (gy(v) - gy(y0)) / (gy(y1) - gy(y0)) * (h - m.t - m.b);
+    ctx.font = `11px ${MONO}`; ctx.strokeStyle = "rgba(141,147,163,.18)"; ctx.lineWidth = 1; ctx.fillStyle = COL.muted;
+    for (const t of ticksY) { const y = Math.round(Y(t)) + .5; ctx.beginPath(); ctx.moveTo(m.l, y); ctx.lineTo(w - m.r, y); ctx.stroke(); ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(fy(t), m.l - 5, y); }
+    for (const t of ticksX) { const x = Math.round(X(t)) + .5; ctx.beginPath(); ctx.moveTo(x, m.t); ctx.lineTo(x, h - m.b); ctx.stroke(); ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(fx(t), x, h - m.b + 5); }
+    ctx.textAlign = "right"; ctx.textBaseline = "top"; ctx.fillText(tituloX, w - m.r, h - 12);
+    ctx.textAlign = "left"; ctx.fillText(tituloY, 4, 4);
+    const recortar = () => { ctx.save(); ctx.beginPath(); ctx.rect(m.l, m.t - 2, w - m.l - m.r, h - m.t - m.b + 4); ctx.clip(); };
+    return { ctx, w, h, m, X, Y, recortar };
+  }
+  function linea(ctx, xs, ys, X, Y, color, ancho = 1.6, alfa = 1, guiones = null) {
+    ctx.strokeStyle = color; ctx.lineWidth = ancho; ctx.globalAlpha = alfa; ctx.lineJoin = "round"; if (guiones) ctx.setLineDash(guiones);
+    ctx.beginPath(); for (let i = 0; i < xs.length; i++) { const x = X(xs[i]), y = Y(ys[i]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+  }
+  const horizontal = (g, v, color = COL.ink) => { const { ctx, m, w, Y } = g; ctx.setLineDash([5, 4]); ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.globalAlpha = .8; ctx.beginPath(); ctx.moveTo(m.l, Y(v) + .5); ctx.lineTo(w - m.r, Y(v) + .5); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; };
+
+  // =====================================================================
+  // B1. Sin mapa, solo partidas
+  // =====================================================================
+  const b1 = await tarea(() => {
+    const T0 = Cueva.tablero($("cvVe"), env, { maxCell: 30 }), T1 = Cueva.tablero($("cvMapa"), env, { maxCell: 30 }), hud = $("hudB1"), exp = $("expB1");
+    const u = Cueva.rng(7);
+    let eps = EPS, p = null, prog = 1, raf = 0;
+    const nuevo = () => { p = jugar(u, START, eps); };
+    function dibujar() {
+      const T = p.S.length, k = Math.max(1, Math.round(T * prog));
+      const camino = [p.S[0]]; for (let t = 0; t < k; t++) camino.push(destino(p, t));
+      const toc = new Set();
+      for (let t = 0; t < k; t++) if (destino(p, t) === p.S[t]) { const [r, c] = env.free[p.S[t]], [dr, dc] = Cueva.DR[p.A[t]]; toc.add((r + dr) + "," + (c + dc)); }
+      const fin = camino[camino.length - 1], dir = p.A[k - 1];
+      T0.fondo("#000").tocadas(toc);
+      T0.trayecto(camino, "rgba(242,179,90,.45)", .1);
+      if (fin === GOAL) T0.salida(); T0.sprite(fin, dir, k % 2);
+      T1.fondo("#000").paredes(PARED); calor(T1, eps === EPS ? VV : V_DADO.map(v => Math.log10(Math.max(v, 1e-9))), eps === EPS ? VLO : Math.log10(Math.min(...NOMETA.map(s => V_DADO[s]))), eps === EPS ? VHI : Math.log10(Math.max(...NOMETA.map(s => V_DADO[s]))));
+      for (const s of NOMETA) if (s !== START) T1.texto(s, AR[FL[s]], "rgba(11,13,18,.45)", .42);
+      T1.salida(); T1.trayecto(camino, "rgba(232,230,223,.45)", .08); rotulo(T1, START, "S", COL.ink, .4);
+      const ex = t => `s = ${nom(p.S[t])}, a = ${AR[p.A[t]]}, r = <b>${premio(p, t)}</b>, s′ = ${nom(destino(p, t))}${destino(p, t) === p.S[t] ? " (chocó)" : ""}`;
+      exp.innerHTML = `${ex(0)}<br>${ex(1)}<br>${ex(2)}<br>… ${T - 4} pasos más …<br>${ex(T - 1)}`;
+      const sim = `esta partida: <b>${T}</b> pasos${p.fin ? "" : " (cortada)"}${prog < 1 ? " …" : ""}`;
+      hud.innerHTML = `<span>${sim}</span><span>paredes tocadas <b>${toc.size}</b></span>` +
+        (eps === EPS ? `<span>mediana del notebook: <b>69</b> pasos</span><span>V verdadero(S) <b>0,5004</b></span>`
+                     : `<span>mediana del notebook: <b>1036</b> pasos</span><span>V verdadero(S) <b>0,0136</b> (mapa en escala log)</span>`);
+    }
+    function animar() {
+      cancelAnimationFrame(raf);
+      if (reducir) { prog = 1; dibujar(); return; }
+      prog = 0; const t0 = performance.now(), dur = Math.min(2600, 400 + p.S.length * 12);
+      const paso = now => { prog = Math.min(1, (now - t0) / dur); dibujar(); if (prog < 1) raf = requestAnimationFrame(paso); };
+      raf = requestAnimationFrame(paso);
+    }
+    $("otraPartida").onclick = () => { nuevo(); animar(); };
+    document.querySelectorAll("#segPol button").forEach(b => b.onclick = () => { eps = +b.dataset.e; marcar("#segPol button", "e", b.dataset.e); nuevo(); animar(); });
+    nuevo(); dibujar();
+    return { dibujar: () => { T0.medir(); T1.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B2. Monte Carlo de primera visita
+  // =====================================================================
+  const b2 = await tarea(() => {
+    const T0 = Cueva.tablero($("cvVv"), env, { maxCell: 30 }), T1 = Cueva.tablero($("cvVmc"), env, { maxCell: 30 }), hud = $("hudMC"), cv = $("cvMCg");
+    $("legMC").style.background = Cueva.gradienteCSS("valor"); $("legMClo").textContent = fmt(VLO, 2); $("legMChi").textContent = fmt(VHI, 2);
+    const SEG = [[START, COL.ember], [CRUCE, COL.lamp], [CERCA, COL.exit]];
+    let src, k, V, N, hist, ultima = null, tocadas = new Set(), semilla = SEM;
+    function reset(s) { semilla = s; src = s === SEM ? COMUN : fuente(s); k = 0; V = new Float64Array(n); N = new Uint32Array(n); hist = SEG.map(() => []); ultima = null; tocadas = new Set(); }
+    function jugarN(m) {
+      for (let i = 0; i < m; i++) {
+        const p = src.get(k++); mcActualizar(V, N, p);
+        SEG.forEach(([s], j) => hist[j].push(N[s] ? V[s] : NaN));
+        ultima = p; tocadas = new Set(p.S);
+      }
+    }
+    function dibujar() {
+      T0.fondo("#000").paredes(PARED); calor(T0, VV); T0.salida();
+      T1.fondo("#000").paredes(PARED); calor(T1, Array.from(V, (v, s) => N[s] ? v : NaN)); T1.salida();
+      if (ultima && k <= 1000) { T1.trayecto([...ultima.S, destino(ultima, ultima.S.length - 1)], "rgba(94,200,216,.55)", .08); }
+      if (ultima) for (const s of tocadas) borde(T1, s, "rgba(242,179,90,.8)", 1.5, 2);
+      for (const T of [T0, T1]) { SEG.forEach(([s, c]) => borde(T, s, c, 2.5)); rotulo(T, START, "S", COL.ink, .4); }
+      $("tMC").textContent = `${k} partida${k === 1 ? "" : "s"}`;
+      // el estimado de las tres casillas, partida a partida
+      const xmax = Math.max(10, k);
+      const g = ejes(cv, 190, { x0: 0, x1: xmax, y0: .3, y1: 1.05, ticksY: [.4, .6, .8, 1], ticksX: [0, Math.round(xmax / 2), xmax], fy: v => coma(v.toFixed(1)), tituloX: "partidas →", tituloY: "V estimado" });
+      g.recortar();
+      SEG.forEach(([s, c], j) => {
+        horizontal(g, VV[s], c);
+        const xs = [], ys = []; hist[j].forEach((v, i) => { if (isFinite(v)) { xs.push(i + 1); ys.push(v); } });
+        if (xs.length) linea(g.ctx, xs, ys, g.X, g.Y, c, 1.6);
+      });
+      g.ctx.restore();
+      hud.innerHTML = `<span>partidas <b>${k}</b> (simuladas)</span>` + SEG.map(([s]) => `<span>${s === START ? "S" : s === CRUCE ? "cruce" : "cerca"}: <b>${N[s] ? fmt(V[s], 4) : "–"}</b> (${N[s]} visitas, verdadero ${fmt(VV[s], 4)})</span>`).join("") +
+        `<span>error RMS <b>${fmt(rms(Array.from(V, (v, s) => N[s] ? v : 0)), 4)}</b></span>`;
+    }
+    $("mc1").onclick = () => { jugarN(1); dibujar(); };
+    $("mc50").onclick = () => { jugarN(50); dibujar(); };
+    $("mcCero").onclick = () => { reset(semilla + 1); dibujar(); };
+    reset(SEM); jugarN(300); dibujar();
+    return { dibujar: () => { T0.medir(); T1.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B3. Promedio incremental con los retornos del cruce
+  // =====================================================================
+  const b3 = await tarea(() => {
+    const cv = $("cvInc"), sl = $("slAlfa"), out = $("outAlfa"), hud = $("hudInc");
+    const G = []; for (let i = 0; i < 300; i++) { const m = primeraVisita(COMUN.get(i)); if (m.has(CRUCE)) G.push(m.get(CRUCE)); }
+    const inc = alfa => { let V = 0; return G.map((g, i) => (V += (alfa === null ? 1 / (i + 1) : alfa) * (g - V))); };
+    const desvio = a => { const t = a.slice(-50), m = t.reduce((x, y) => x + y, 0) / t.length; return Math.sqrt(t.reduce((x, y) => x + (y - m) ** 2, 0) / t.length); };
+    const I1 = inc(null), comun = G.reduce((x, y) => x + y, 0) / G.length;
+    function dibujar() {
+      const alfa = +sl.value, IA = inc(alfa); out.textContent = fmt(alfa, 2);
+      const N = G.length, xs = G.map((_, i) => i + 1);
+      const g = ejes(cv, 230, { x0: 0, x1: N + 1, y0: .3, y1: 1, ticksY: [.4, .6, .8, 1], ticksX: [1, Math.round(N / 2), N], fy: v => coma(v.toFixed(1)), tituloX: "visita n al cruce →", tituloY: "V(cruce)" });
+      const ctx = g.ctx; g.recortar();
+      ctx.fillStyle = "rgba(141,147,163,.7)"; G.forEach((v, i) => { ctx.beginPath(); ctx.arc(g.X(i + 1), g.Y(v), 2, 0, 7); ctx.fill(); });
+      horizontal(g, VV[CRUCE]);
+      linea(ctx, xs, IA, g.X, g.Y, COL.lamp, 1.8);
+      linea(ctx, xs, I1, g.X, g.Y, COL.ink, 2);
+      ctx.restore();
+      hud.innerHTML = `<span>retornos <b>${N}</b> (simulados)</span><span>promedio común <b>${fmt(comun, 6)}</b> = α = 1/n <b>${fmt(I1[N - 1], 6)}</b></span>` +
+        `<span>α = ${fmt(alfa, 2)}: <b>${fmt(IA[N - 1], 4)}</b></span><span>temblor: 1/n <b>${fmt(desvio(I1), 4)}</b>, α fijo <b>${fmt(desvio(IA), 4)}</b></span>`;
+    }
+    sl.oninput = dibujar;
+    document.querySelectorAll("#b-inc [data-a]").forEach(b => b.onclick = () => { sl.value = b.dataset.a; dibujar(); });
+    dibujar();
+    return { dibujar };
+  });
+
+  // =====================================================================
+  // B4. TD(0) paso a paso dentro de una partida
+  // =====================================================================
+  const b4 = await tarea(() => {
+    const ALFA = 0.1, cv = $("cvTD"), cuenta = $("cuentaTD"), hud = $("hudTD"), T = Cueva.tablero(cv, env, { maxCell: 40 });
+    $("legTD").style.background = Cueva.gradienteCSS("valor");
+    const u = Cueva.rng(31);
+    const V200 = new Float64Array(n); for (let i = 0; i < 200; i++) tdPartida(V200, jugar(u, inicioAzar(u)), ALFA);
+    let modo = "200", V, V0, p, t, ult = null;
+    function otra() {
+      V = modo === "200" ? Float64Array.from(V200) : new Float64Array(n); V0 = Float64Array.from(V);
+      p = jugar(u, modo === "200" ? CRUCE : START); t = 0; ult = null; paso();
+    }
+    function paso() {
+      if (t >= p.S.length) return;
+      const s = p.S[t], s2 = destino(p, t), r = premio(p, t), vs = V[s], vs2 = V[s2], obj = r + GAMMA * vs2, d = obj - vs;
+      V[s] = vs + ALFA * d; ult = { t, s, a: p.A[t], s2, r, vs, vs2, obj, d, nuevo: V[s] }; t++;
+    }
+    function dibujar() {
+      T.fondo("#000").paredes(PARED); calor(T, V, 0, 1, true); T.salida();
+      const camino = [p.S[0]]; for (let i = 0; i < t; i++) camino.push(destino(p, i));
+      T.trayecto(camino, "rgba(232,230,223,.35)", .08);
+      const cambiadas = NOMETA.filter(s => V[s] !== V0[s]);
+      if (modo === "cero") for (const s of cambiadas) borde(T, s, COL.exit, 2, 2.5);
+      if (ult) { borde(T, ult.s, COL.lamp, 2.5); if (ult.s2 !== GOAL) borde(T, ult.s2, COL.sonar, 2.5); }
+      if (t < p.S.length) T.sprite(p.S[t], p.A[t], t % 2);
+      rotulo(T, START, "S", COL.ink, .38);
+      if (ult) {
+        const x = ult;
+        cuenta.innerHTML = `paso ${x.t + 1}: s = <b>${nom(x.s)}</b>, a = ${AR[x.a]}, r = <b>${x.r}</b>, s′ = <b>${nom(x.s2)}</b><br>` +
+          `objetivo = ${x.r} + 0,99 · <span class="v">${fmt(x.vs2, 4)}</span> = <b>${fmt(x.obj, 4)}</b><br>` +
+          `δ = ${fmt(x.obj, 4)} − <span class="v">${fmt(x.vs, 4)}</span> = <span class="d">${fmtS(x.d)}</span><br>` +
+          `V(s) ← ${fmt(x.vs, 4)} + 0,1 · <span class="d">${fmtS(x.d)}</span> = <b>${fmt(x.nuevo, 4)}</b>`;
+      }
+      const termino = t >= p.S.length;
+      hud.innerHTML = `<span>paso <b>${t}</b> de ${p.S.length}${termino ? " (llegó)" : ""}</span>` +
+        (modo === "cero" ? `<span>TD cambió <b>${cambiadas.length}</b> casilla${cambiadas.length === 1 ? "" : "s"}</span>${termino ? `<span>Monte Carlo habría cambiado <b>${new Set(p.S).size}</b></span>` : ""}`
+                         : `<span>V(S) <b>${fmt(V[START], 4)}</b> (verdadero ${fmt(VV[START], 4)})</span><span>V(cruce) <b>${fmt(V[CRUCE], 4)}</b> (verdadero ${fmt(VV[CRUCE], 4)})</span>`);
+    }
+    $("tdPaso").onclick = () => { paso(); dibujar(); };
+    $("tdFin").onclick = () => { while (t < p.S.length) paso(); dibujar(); };
+    $("tdOtra").onclick = () => { otra(); dibujar(); };
+    document.querySelectorAll("#segTD button").forEach(b => b.onclick = () => { modo = b.dataset.m; marcar("#segTD button", "m", modo); otra(); dibujar(); });
+    otra(); dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B5. El error δ a lo largo de una partida
+  // =====================================================================
+  const b5 = await tarea(() => {
+    const cv = $("cvDelta"), hud = $("hudDelta"), u = Cueva.rng(53);
+    const VA = new Float64Array(n); for (let i = 0; i < 3000; i++) tdPartida(VA, jugar(u, inicioAzar(u)), 0.1);
+    const CEROS = new Float64Array(n);
+    let caso = 0, p = jugar(u, START);
+    const deltas = () => p.S.map((s, t) => (caso === 2 ? 0 : premio(p, t)) + GAMMA * (caso === 0 ? CEROS : VA)[destino(p, t)] - (caso === 0 ? CEROS : VA)[s]);
+    function dibujar() {
+      const d = deltas(), N = d.length;
+      const g = ejes(cv, 220, { x0: -.5, x1: N - .5, y0: -1.05, y1: 1.05, ticksY: [-1, -.5, 0, .5, 1], ticksX: [0, N - 1], fy: v => (v > 0 ? "+" : "") + coma(String(v)), tituloX: "paso t →", tituloY: "δ" });
+      const ctx = g.ctx, bw = Math.max(1, (g.X(1) - g.X(0)) * .75);
+      for (let i = 0; i < N; i++) { ctx.fillStyle = d[i] >= 0 ? COL.exit : COL.ember; const y0 = g.Y(0), y1 = g.Y(d[i]); ctx.fillRect(g.X(i) - bw / 2, Math.min(y0, y1), bw, Math.max(1, Math.abs(y1 - y0))); }
+      const ult = d[N - 1], resto = Math.max(...d.slice(0, -1).map(Math.abs));
+      ctx.font = `600 12px ${MONO}`; ctx.fillStyle = COL.ink; ctx.textAlign = "right"; ctx.textBaseline = ult >= 0 ? "bottom" : "top";
+      ctx.fillText(`último: ${fmtS(ult, 3)}`, g.X(N - 1) - 6, g.Y(ult) + (ult >= 0 ? -2 : 2));
+      hud.innerHTML = `<span>partida de <b>${N}</b> pasos (simulada)</span><span>δ del último paso <b>${fmtS(ult, 3)}</b></span><span>|δ| más grande en los demás <b>${fmt(resto, 3)}</b></span>`;
+    }
+    document.querySelectorAll("#segDelta button").forEach(b => b.onclick = () => { caso = +b.dataset.c; marcar("#segDelta button", "c", b.dataset.c); dibujar(); });
+    $("deltaOtra").onclick = () => { p = jugar(u, START); dibujar(); };
+    dibujar();
+    return { dibujar };
+  });
+
+  // =====================================================================
+  // B6. Sesgo y varianza: Monte Carlo contra TD, 10 semillas, 3000 partidas
+  // =====================================================================
+  const ALFAS = [0.03, 0.1, 0.3], NP = 3000, SEMILLAS = 10;
+  const MET = ["MC 1/n", ...ALFAS.map(a => "MC " + a), ...ALFAS.map(a => "TD " + a)];
+  const ERR = Object.fromEntries(MET.map(k => [k, []])), TRZ = Object.fromEntries(MET.map(k => [k, []]));
+  for (let sem = 0; sem < SEMILLAS; sem++) await tarea(() => {
+    const u = Cueva.rng(1000 + sem);
+    const V = Object.fromEntries(MET.map(k => [k, new Float64Array(n)])), N = Object.fromEntries(MET.map(k => [k, new Uint32Array(n)]));
+    const e = Object.fromEntries(MET.map(k => [k, new Float32Array(NP)])), tr = Object.fromEntries(MET.map(k => [k, new Float32Array(NP)]));
+    for (let i = 0; i < NP; i++) {
+      const p = jugar(u, inicioAzar(u)), pv = primeraVisita(p);
+      for (const k of MET) {
+        if (k.startsWith("TD")) tdPartida(V[k], p, +k.slice(3));
+        else { const a = k === "MC 1/n" ? null : +k.slice(3), Vk = V[k], Nk = N[k]; for (const [s, G] of pv) { Nk[s]++; Vk[s] += (a === null ? 1 / Nk[s] : a) * (G - Vk[s]); } }
+        e[k][i] = rms(V[k]); tr[k][i] = V[k][CRUCE];
+      }
+    }
+    for (const k of MET) { ERR[k].push(e[k]); TRZ[k].push(tr[k]); }
+  });
+  const NB_RMS = {   // la tabla de la celda 34 del notebook (promedio de 10 semillas)
+    "MC 1/n": [0.3111, 0.0428, 0.0208, 0.0093, 0.0055],
+    "MC 0.03": [0.6666, 0.4261, 0.2348, 0.0684, 0.0149], "MC 0.1": [0.5738, 0.2361, 0.0774, 0.0241, 0.0233], "MC 0.3": [0.4328, 0.1033, 0.0436, 0.0447, 0.0436],
+    "TD 0.03": [0.7139, 0.6693, 0.5947, 0.4237, 0.1798], "TD 0.1": [0.7016, 0.5860, 0.4250, 0.1544, 0.0127], "TD 0.3": [0.6736, 0.4349, 0.1925, 0.0285, 0.0280]
+  };
+  const b6 = await tarea(() => {
+    const cv = $("cvSV"), hud = $("hudSV"), chips = $("chipsSV"), tb = $("tbRMS");
+    let vista = "rms", alfa = 0.1;
+    const media = (arrs, i) => arrs.reduce((t, a) => t + a[i], 0) / arrs.length;
+    const desv = (arrs, i, m) => Math.sqrt(arrs.reduce((t, a) => t + (a[i] - m) ** 2, 0) / arrs.length);
+    function banda(g, arrs, color, guiones = null) {
+      const ctx = g.ctx, xs = [], m = [], lo = [], hi = [];
+      for (let i = 0; i < NP; i++) { const mm = media(arrs, i), sd = desv(arrs, i, mm); xs.push(i + 1); m.push(mm); lo.push(Math.max(mm - sd, 1e-3)); hi.push(mm + sd); }
+      ctx.fillStyle = color; ctx.globalAlpha = .16; ctx.beginPath();
+      xs.forEach((x, i) => { const px = g.X(x), py = g.Y(hi[i]); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); });
+      for (let i = xs.length - 1; i >= 0; i--) ctx.lineTo(g.X(xs[i]), g.Y(lo[i]));
+      ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+      linea(ctx, xs, m, g.X, g.Y, color, 1.8, 1, guiones);
+      return m;
+    }
+    const kMC = () => "MC " + alfa, kTD = () => "TD " + alfa, A = () => fmt(alfa, alfa < .1 ? 2 : 1);
+    function dibujar() {
+      const xs = Array.from({ length: NP }, (_, i) => i + 1);
+      if (vista === "rms") {
+        const g = ejes(cv, 260, { x0: 1, x1: NP, y0: 2e-3, y1: 1.2, xlog: true, ylog: true, ticksX: [1, 10, 100, 1000, 3000], ticksY: [.003, .01, .03, .1, .3, 1], fx: v => String(v), fy: v => coma(String(v)), tituloX: "partidas (log) →", tituloY: "error RMS (log)" });
+        g.recortar();
+        const m1 = banda(g, ERR["MC 1/n"], COL.muted, [4, 3]), mM = banda(g, ERR[kMC()], COL.lamp), mT = banda(g, ERR[kTD()], COL.sonar);
+        g.ctx.restore();
+        chips.innerHTML = `<span><i style="background:var(--muted)"></i>MC, α = 1/n</span><span><i style="background:var(--lamp)"></i>MC, α = ${A()}</span><span><i style="background:var(--sonar)"></i>TD, α = ${A()}</span>`;
+        const piso = arrs => arrs.reduce((t, a) => t + a.slice(2000).reduce((x, y) => x + y, 0) / (NP - 2000), 0) / arrs.length;
+        hud.innerHTML = `<span>a las 3000 partidas (simulado): MC 1/n <b>${fmt(m1[NP - 1], 4)}</b>, MC <b>${fmt(mM[NP - 1], 4)}</b>, TD <b>${fmt(mT[NP - 1], 4)}</b></span>` +
+          `<span>piso (partidas 2001–3000): MC <b>${fmt(piso(ERR[kMC()]), 4)}</b>, TD <b>${fmt(piso(ERR[kTD()]), 4)}</b></span>`;
+      } else {
+        const g = ejes(cv, 260, { x0: 1, x1: NP, y0: 0, y1: 1, xlog: true, ticksX: [1, 10, 100, 1000, 3000], ticksY: [0, .25, .5, .75, 1], fx: v => String(v), fy: v => coma(String(v)), tituloX: "partidas (log) →", tituloY: "V(cruce) estimado" });
+        g.recortar();
+        for (const tr of TRZ[kMC()]) linea(g.ctx, xs, tr, g.X, g.Y, COL.lamp, 1, .5);
+        for (const tr of TRZ[kTD()]) linea(g.ctx, xs, tr, g.X, g.Y, COL.sonar, 1, .55);
+        horizontal(g, VV[CRUCE]);
+        g.ctx.restore();
+        chips.innerHTML = `<span><i style="background:var(--lamp)"></i>MC, α = ${A()}</span><span><i style="background:var(--sonar)"></i>TD, α = ${A()}</span><span>punteada: V verdadero ${fmt(VV[CRUCE], 4)}</span>`;
+        const debajo = (k, i) => TRZ[k].filter(a => a[i] < VV[CRUCE]).length;
+        const sesgo = (k, i) => TRZ[k].reduce((t, a) => t + a[i], 0) / SEMILLAS - VV[CRUCE];
+        const temblor = k => TRZ[k].reduce((t, a) => { const x = a.slice(2000), m = x.reduce((p, q) => p + q, 0) / x.length; return t + Math.sqrt(x.reduce((p, q) => p + (q - m) ** 2, 0) / x.length); }, 0) / SEMILLAS;
+        hud.innerHTML = [99, 299].map(i => `<span>N = ${i + 1}: semillas por debajo MC <b>${debajo(kMC(), i)}</b>, TD <b>${debajo(kTD(), i)}</b> · sesgo TD <b>${fmtS(sesgo(kTD(), i), 2)}</b></span>`).join("") +
+          `<span>temblor final (simulado): MC <b>${fmt(temblor(kMC()), 4)}</b>, TD <b>${fmt(temblor(kTD()), 4)}</b></span>`;
+      }
+      tb.innerHTML = ["MC 1/n", kMC(), kTD()].map(k => `<tr><td>${k.replace("1/n", "α = 1/n").replace(/ (0\.\d+)$/, (_, a) => `, α = ${coma(a)}`)}</td>${NB_RMS[k].map(v => `<td class="num">${fmt(v, 4)}</td>`).join("")}</tr>`).join("");
+    }
+    document.querySelectorAll("#segVista button").forEach(b => b.onclick = () => { vista = b.dataset.v; marcar("#segVista button", "v", vista); dibujar(); });
+    document.querySelectorAll("#segAlfa button").forEach(b => b.onclick = () => { alfa = +b.dataset.a; marcar("#segAlfa button", "a", b.dataset.a); dibujar(); });
+    dibujar();
+    return { dibujar };
+  });
+
+  // =====================================================================
+  // B7. Equivalencia de certeza: contar, estimar y resolver Bellman
+  // =====================================================================
+  const b7 = await tarea(() => {
+    const cv = $("cvCE"), cvb = $("cvCEb"), hud = $("hudCE"), T = Cueva.tablero(cv, env, { maxCell: 40 });
+    const MARCAS = [30, 300, 3000], EST = {};
+    const cuentas = Array.from({ length: n }, () => new Map()), sale = new Uint32Array(n), prem = new Float64Array(n);
+    const Vmc = new Float64Array(n), Nmc = new Uint32Array(n);
+    for (let i = 0; i < 3000; i++) {
+      const p = COMUN.get(i); mcActualizar(Vmc, Nmc, p);
+      for (let t = 0; t < p.S.length; t++) { const s = p.S[t], s2 = destino(p, t); cuentas[s].set(s2, (cuentas[s].get(s2) || 0) + 1); sale[s]++; prem[s] += premio(p, t); }
+      if (MARCAS.includes(i + 1)) {
+        const filas = cuentas.map((m, s) => sale[s] ? [...m.entries()].map(([j, c]) => [j, c / sale[s]]) : []);
+        const R = Float64Array.from(prem, (x, s) => sale[s] ? x / sale[s] : 0);
+        EST[i + 1] = { filas, V: resolver(filas, R), rmsMC: rms(Vmc) };
+      }
+    }
+    let N = 300, sel = CRUCE;
+    function dibujar() {
+      const E = EST[N], fila = new Map(E.filas[sel]), verd = new Map(CAD.filas[sel]);
+      T.fondo("#000").paredes(PARED); calor(T, E.V); T.salida();
+      for (const [j] of E.filas[sel]) if (j !== sel) borde(T, j, COL.exit, 2, 2);
+      borde(T, sel, COL.lamp, 2.5);
+      if (T.cell >= 28) for (const [j, p] of E.filas[sel]) rotulo(T, j, fmt(p, 2), j === sel ? COL.lamp : COL.ink, .3);
+      if (sel !== START) rotulo(T, START, "S", COL.ink, .38);
+      // barras: fila verdadera contra fila contada
+      const dest = [...new Set([...verd.keys(), ...fila.keys()])].sort((a, b) => a - b);
+      const { w, h, ctx } = Cueva.lienzo(cvb, 150)();
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      const m = { l: 10, r: 10, t: 22, b: 22 }, bw = (w - m.l - m.r) / Math.max(1, dest.length), Y = v => h - m.b - v * (h - m.t - m.b);
+      ctx.font = `11px ${MONO}`; ctx.fillStyle = COL.muted; ctx.textAlign = "left"; ctx.textBaseline = "top";
+      ctx.fillText(sel === GOAL ? "la salida no tiene fila: ahí termina la partida" : `fila de ${nom(sel)}: gris P verdadero, verde P contado${E.filas[sel].length ? "" : " (sin visitas)"}`, m.l, 4);
+      dest.forEach((j, i) => {
+        const x = m.l + i * bw, ww = Math.min(26, bw * .32);
+        ctx.fillStyle = "rgba(141,147,163,.75)"; ctx.fillRect(x + bw / 2 - ww - 1, Y(verd.get(j) || 0), ww, Y(0) - Y(verd.get(j) || 0));
+        ctx.fillStyle = COL.exit; ctx.fillRect(x + bw / 2 + 1, Y(fila.get(j) || 0), ww, Y(0) - Y(fila.get(j) || 0));
+        ctx.fillStyle = COL.ink; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(nom(j), x + bw / 2, h - m.b + 5);
+        ctx.textBaseline = "bottom"; ctx.fillStyle = COL.exit; ctx.fillText(fmt(fila.get(j) || 0, 2), x + bw / 2 + 1 + ww / 2, Y(fila.get(j) || 0) - 2);
+      });
+      hud.innerHTML = `<span><span class="hat">V̂</span>(S) <b>${fmt(E.V[START], 4)}</b> (verdadero ${fmt(VV[START], 4)})</span><span><span class="hat">V̂</span>(cruce) <b>${fmt(E.V[CRUCE], 4)}</b> (verdadero ${fmt(VV[CRUCE], 4)})</span>` +
+        `<span>error RMS con ${N} partidas (simuladas): certeza <b>${fmt(rms(E.V), 4)}</b>, Monte Carlo <b>${fmt(E.rmsMC, 4)}</b></span>`;
+    }
+    document.querySelectorAll("#segCE button").forEach(b => b.onclick = () => { N = +b.dataset.n; marcar("#segCE button", "n", b.dataset.n); dibujar(); });
+    cv.addEventListener("pointerdown", e => { const s = casillaDe(T, e); if (s !== undefined) { sel = s; dibujar(); } });
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  let tRes = 0;
+  addEventListener("resize", () => { clearTimeout(tRes); tRes = setTimeout(() => { for (const f of [b1, b2, b3, b4, b5, b6, b7]) f.dibujar(); }, 120); });
+})();
+</script>
+</body>
+</html>
