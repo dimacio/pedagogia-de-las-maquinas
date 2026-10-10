@@ -17,6 +17,8 @@ Formato: una sección por versión (SemVer sobre el curso, ver `fabrica/CONVENCI
 - Clase 1: spine, página y cuestionario rediseñados. B1 (Freire) y B2 (el feed que mira solo el próximo clic, figura nueva) separados;
   γ solo como adelanto de la clase 3; B3 y B4 más cortos; recuadro «Esto hoy se mide» con Cyborg Psychology (F6, F7); Q2 sin γ y Q5
   sobre el recuadro. README: Cyborg Psychology como evidencia contemporánea.
+- Clase 2: spine rediseñado (B1 «por qué RL» con los cuatro ingredientes, política como bloque propio, objetivo E[Σr] separado del ciclo,
+  bigotes solo como adelanto de la clase 9, tutor partido en planteo y trampa).
 
 ### Aviso
 - El progreso de los cuestionarios guardado en el navegador vuelve a cero (los ids cambian de significado).
