@@ -389,6 +389,7 @@ ts = [0, 5, 20, 100, 400, 1000]
 plot_row(env, [log10_seguro(historia[t]) for t in ts],
          [f"t = {t}   P(salió) = {historia[t, env.goal]:.2f}" for t in ts],
          cmap="magma", clim=(-4, 0), size=4.2, ncols=3)
+print("P(salió):", "  ".join(f"t={t}: {historia[t, env.goal]:.2f}" for t in ts))
 t_mitad = int(np.argmax(historia[:, env.goal] >= 0.5))
 print(f"La mitad de la nube llegó a la salida en el paso {t_mitad} (el camino más corto tiene 20 pasos).")
 """))
