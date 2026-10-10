@@ -9,5 +9,5 @@ Formato: `fecha · clase · decisión — por qué — qué cuesta si está mal`
 
 ## Registro
 
-- 2026-10-10 · general · Las preguntas de política (merge propio, decidir y registrar) quedaron sin respuesta; se usan los defaults recomendados — el autor pidió más autonomía — si prefería PR abiertos, hay que revisar los merges en orden.
+- 2026-10-10 · general · El autor eligió: mergear yo cada clase cuando el revisor aprueba, y ante decisiones suyas decidir lo más conservador dentro del plan y registrarlo acá.
 - 2026-10-10 · 3 · Spine de la clase 3 escrito sin aprobación explícita del texto final (el autor aprobó la propuesta con «dale») — consistente con el pedido — ninguno.

@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cuánto pesa el futuro · RL a ciegas</title>
+<meta name="description" content="Clase 3: el caminante al azar como cadena de Markov, el proceso de recompensa de Markov, el retorno con descuento γ, el feed miope, el valor como retorno esperado y la ecuación de Bellman resuelta desde V = 0, en la cueva a ciegas.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .lz { min-width: 0; }
+  .seg { flex-wrap: wrap; }
+  .seg button { min-width: 0; }
+  .cap { font-size: 13px; color: var(--muted); }
+  .cap b { color: var(--ink); }
+  canvas:focus-visible { outline: 2px solid var(--exit); outline-offset: 2px; }
+  .btn[aria-pressed="true"] { border-color: var(--lamp); color: var(--lamp); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+  .chips span { display: inline-flex; align-items: center; gap: 6px; }
+  .chips i { width: 11px; height: 11px; display: inline-block; border-radius: 2px; }
+  /* la cuenta de Bellman de una casilla */
+  .cuenta { font-family: var(--mono); font-size: 13px; line-height: 1.6; background: var(--rock); border: 1px solid var(--rock-2); border-radius: 3px;
+    padding: 8px 10px; overflow-x: auto; white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .cuenta b { color: var(--ink); font-weight: 600; }
+  .cuenta .v { color: var(--lamp); }
+  /* recuadro de evidencia (como en la clase 1) */
+  .aviso { background: var(--rock); border: 1px solid var(--rock-2); border-left: 3px solid var(--ember); border-radius: 3px; padding: 12px 14px; display: grid; gap: 8px; }
+  .aviso h3 { font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--ember); letter-spacing: .05em; text-transform: uppercase; }
+  .aviso.mide { border-left-color: var(--sonar); }
+  .aviso.mide h3 { color: var(--sonar); }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase 3</div>
+    <h1>Cuánto pesa el <span class="g">futuro</span></h1>
+    <p class="thesis">Un caminante que no elige nada alcanza para preguntar cuánto vale hoy un premio que llega en 20 pasos, o en 200.</p>
+  </section>
+
+  <!-- B1: el caminante sin memoria -->
+  <section class="bloque" id="b-cadena" data-objetivos="O1">
+    <div class="stage">
+      <div class="lz"><canvas id="cvNube" aria-label="La cueva con la nube de probabilidad del caminante al azar en el paso t; al tocar una casilla se marca su fila de P sobre la cueva"></canvas></div>
+      <div class="legend"><span>p &lt; 10⁻⁴</span><span class="bar" id="legNube"></span><span>p = 1 (escala log)</span></div>
+      <div class="ctl">
+        <label for="slNube"><span>Paso <i>t</i></span> <output id="outNube"></output></label>
+        <input type="range" id="slNube" min="0" max="1200" step="1" value="60">
+      </div>
+      <div class="row"><button class="btn primary" id="nubePlay">Animar</button><button class="btn" id="nubeReset">Volver a t = 0</button></div>
+      <div class="lz"><canvas id="cvP" aria-label="La matriz de transición P de 60 por 60 con la fila de la casilla tocada marcada en verde"></canvas></div>
+      <div class="hud" id="hudNube"></div>
+      <p class="cap">La nube se calcula en el navegador con la misma P del notebook, así que en t = 400 marca P(salió) = 0,14 y en t = 1000, 0,49. Tocá la cueva o una fila de la matriz para elegir la casilla.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 1</div>
+      <h2>El caminante sin memoria</h2>
+      <p>En cada paso, un caminante tira un dado de cuatro caras y va hacia donde salió, salvo que choque contra una pared y se quede donde está. Como adónde va depende solo de la casilla en la que está, el caminante es una <b>cadena de Markov</b> (<i>Markov chain</i>), sin acciones ni recompensas. Tocá una casilla para ver su fila de la <b>matriz de transición</b> P, que en S da 0,50 para quedarse y 0,25 para cada vecina. Aunque el camino más corto tiene 20 pasos, la mitad de la nube de probabilidad llega a la salida recién en el paso 1022.</p>
+      <div class="eq">P[s, s'] = p(sₜ₊₁ = s' | sₜ = s)</div>
+      <p class="nota pregunta">¿En qué casillas la fila de P tiene el número más grande sobre la diagonal, la de quedarse? Buscalas en la cueva antes de tocar.</p>
+    </div>
+  </section>
+
+  <!-- B2: el MRP -->
+  <section class="bloque" id="b-mrp" data-objetivos="O1">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué mostrar" id="segR">
+        <button aria-pressed="true" data-m="premio">El premio</button>
+        <button aria-pressed="false" data-m="R">R(s) en cada casilla</button>
+      </div>
+      <div class="lz"><canvas id="cvR" aria-label="La cueva con el premio de +1 al entrar a la salida y el mapa de R(s): 0,25 en las dos casillas pegadas a la salida y 0 en el resto"></canvas></div>
+      <div class="hud" id="hudR"></div>
+      <p class="cap">Tocá una casilla para ver su R(s).</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 2</div>
+      <h2>Ponerle un premio a la cadena</h2>
+      <p>Una cadena con recompensa, en la que el caminante sigue sin elegir nada, es un <b>proceso de recompensa de Markov</b> (<i>Markov reward process</i>, MRP). En la cueva, el paso que entra a la salida paga +1 y todos los demás pagan 0. R(s) es el premio que se espera cobrar en el próximo paso desde s, que vale 0,25 en (7,12) y en (8,11) porque ahí una de las cuatro caras del dado entra a la salida. La caminata termina al llegar, por eso en la tabla la salida se queda quieta y no paga nada más.</p>
+      <div class="eq">R(s) = E[ rₜ | sₜ = s ]</div>
+      <p class="nota pregunta">Casi todas las casillas tienen R = 0. ¿Quiere decir que estar en S no vale nada?</p>
+    </div>
+  </section>
+
+  <!-- B3: retorno y descuento -->
+  <section class="bloque" id="b-gamma" data-objetivos="O2">
+    <div class="stage">
+      <div class="lz"><canvas id="cvGamma" aria-label="Barras del peso gamma a la t de un premio que llega t pasos más adelante, con el premio del paso 20 y el del paso 200 en verde"></canvas></div>
+      <div class="ctl">
+        <label for="slGamma"><span>Descuento γ</span> <output id="outGamma"></output></label>
+        <input type="range" id="slGamma" min="0" max="0.999" step="0.001" value="0.9">
+      </div>
+      <div class="row">
+        <button class="btn" data-g="0">γ = 0</button><button class="btn" data-g="0.5">γ = 0,5</button><button class="btn" data-g="0.9">γ = 0,9</button><button class="btn" data-g="0.99">γ = 0,99</button>
+      </div>
+      <div class="seg" role="group" aria-label="Hasta qué paso mirar" id="segHor">
+        <button aria-pressed="true" data-h="40">Hasta 40 pasos</button>
+        <button aria-pressed="false" data-h="200">Hasta 200 pasos</button>
+      </div>
+      <div class="hud" id="hudGamma"></div>
+      <p class="cap">Cada barra es el peso γᵗ de un premio que llega t pasos más adelante. En verde, el del paso 20 (t = 19) y el del paso 200 (t = 199).</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 3</div>
+      <h2>Cuánto pesa el futuro</h2>
+      <p>El <b>retorno</b> (<i>return</i>) Gₜ suma las recompensas que vienen, cada una multiplicada por γ elevado a los pasos que tarda en llegar. Al número γ, entre 0 y 1, se lo llama <b>factor de descuento</b> (<i>discount factor</i>). Con γ = 0 solo cuenta el premio inmediato. Como el primer paso no se descuenta, el premio del paso 20 pesa γ¹⁹, que vale 0,135 con γ = 0,9 y 0,826 con γ = 0,99.</p>
+      <div class="eq">Gₜ = rₜ + γ rₜ₊₁ + γ² rₜ₊₂ + …</div>
+      <div class="aviso mide">
+        <h3>Esto hoy se mide</h3>
+        <p>En <i>Future You</i> (Pataranutaporn et al., 2024), una sola charla con un yo futuro generado por IA bajó la ansiedad y subió la continuidad con el propio yo futuro, en un estudio preregistrado con 344 personas de 18 a 30 años. El estudio mide cómo se sienten las personas respecto de su futuro, no cómo deciden entre algo ahora y algo después. Leer esa charla como una forma de acercar el yo futuro, como si subiera el γ, es una lectura de este curso y no un resultado del estudio.</p>
+      </div>
+      <p class="nota pregunta">Con γ = 0,99, ¿cuánto pesa hoy un premio que llega en el paso 200? Pensalo antes de pasar a «Hasta 200 pasos».</p>
+    </div>
+  </section>
+
+  <!-- B4: el feed, otra vez -->
+  <section class="bloque" id="b-feed" data-objetivos="O2">
+    <div class="stage">
+      <div class="lz"><canvas id="cvFeed" aria-label="Arriba, el porcentaje de usuarios que siguen volviendo día por día con contenido gancho y con contenido útil; abajo, el retorno descontado de cada regla según gamma, con el punto de cruce"></canvas></div>
+      <div class="chips"><span><i style="background:var(--ember)"></i>siempre gancho</span><span><i style="background:var(--exit)"></i>siempre útil</span><span><i style="background:transparent; border:2px solid var(--ink)"></i>la que elige el feed</span></div>
+      <div class="ctl">
+        <label for="slFeed"><span>γ del feed</span> <output id="outFeed"></output></label>
+        <input type="range" id="slFeed" min="0" max="0.99" step="0.005" value="0">
+      </div>
+      <div class="row">
+        <button class="btn" data-gf="0">γ = 0</button><button class="btn" data-gf="0.9">γ = 0,9</button><button class="btn" data-gf="0.95">γ = 0,95</button><button class="btn" data-gf="0.99">γ = 0,99</button>
+      </div>
+      <div class="hud" id="hudFeed"></div>
+      <p class="cap">Modelo de juguete: los números son inventados para mostrar la idea y no describen ninguna plataforma real. Las curvas son valores esperados, calculados en el navegador con el mismo modelo del notebook.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 4</div>
+      <h2>El feed, otra vez</h2>
+      <p>En la clase 1 el feed elegía por el clic de ahora, que en el idioma de esta clase es un feed con γ ≈ 0. En este modelo de juguete, el contenido gancho da 6,0 clics el primer día y el útil 3,0, pero el gancho baja la satisfacción del usuario y el útil la sube. En los 5000 usuarios simulados del notebook, el día 30 vuelve el 0,0 % con gancho y el 44,8 % con útil, que en 90 días junta 112,0 clics contra 32,0. El feed pasa a elegir útil recién cuando γ supera 0,924, sin que cambie nada en el usuario.</p>
+      <div class="eq">G = Σₜ γᵗ · E[ clicsₜ ]</div>
+      <p class="nota pregunta">¿Quién elige el γ de un feed? ¿Qué γ elegirías vos, y cómo se lo explicarías a quien lo usa?</p>
+    </div>
+  </section>
+
+  <!-- B5: el valor como promedio -->
+  <section class="bloque" id="b-valor" data-objetivos="O3">
+    <div class="stage">
+      <div class="lz"><canvas id="cvMC" aria-label="La cueva con la casilla de partida marcada y la última caminata al azar dibujada"></canvas></div>
+      <div class="lz"><canvas id="cvMCg" aria-label="El promedio del retorno de las caminatas según cuántas se lanzaron, con el valor de Bellman como línea punteada"></canvas></div>
+      <div class="row"><button class="btn primary" id="mc100">+100 caminatas</button><button class="btn" id="mc1000">+1000 caminatas</button><button class="btn" id="mcCero">Desde cero</button></div>
+      <div class="hud" id="hudMC"></div>
+      <p class="cap">Caminatas simuladas en el navegador (otra semilla que el notebook), cortadas a los 3000 pasos como en el notebook, con γ = 0,99. La línea punteada es V(s) calculado con la ecuación del paso 6. Tocá la cueva para arrancar desde otra casilla.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 5</div>
+      <h2>El valor: el retorno que esperás</h2>
+      <p>Cada caminata desde una casilla da un retorno distinto, porque a veces llega rápido y casi siempre tarda muchísimo. El <b>valor</b> (<i>value</i>) V(s) es el retorno que se espera en promedio al arrancar en s. Con γ = 0,99, el promedio de 20 000 caminatas del notebook da V(S) = 0,01357 ± 0,00062. Por el supuesto de Markov, el valor depende de la casilla y no del camino por el que se llegó a ella.</p>
+      <div class="eq">V(s) = E[ Gₜ | sₜ = s ]</div>
+      <p class="nota pregunta">Tocá una casilla pegada a la salida. ¿Por qué su valor es tanto más grande que el de S, si el premio es el mismo +1?</p>
+    </div>
+  </section>
+
+  <!-- B6: la ecuación de Bellman -->
+  <section class="bloque" id="b-bellman" data-objetivos="O3">
+    <div class="stage">
+      <div class="lz"><canvas id="cvB" tabindex="0" aria-label="Mapa de calor del valor de cada casilla en escala logarítmica; al tocar una casilla se marcan los lugares adonde puede ir con su probabilidad"></canvas></div>
+      <div class="legend"><span id="legBlo"></span><span class="bar" id="legB"></span><span id="legBhi"></span><span>(escala log)</span></div>
+      <div class="cuenta" id="cuentaB" aria-live="polite"></div>
+      <p class="cap">Valores calculados en el navegador resolviendo el sistema lineal, como en el notebook (γ = 0,99). Tocá una casilla.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 6</div>
+      <h2>La ecuación de Bellman</h2>
+      <p>Si se separa el premio de ahora de todo lo que viene después, el valor de una casilla es el premio esperado ahora más γ por el valor promedio de adonde puede ir. Esa igualdad vale en todas las casillas a la vez y se llama <b>ecuación de Bellman</b> (<i>Bellman equation</i>) del MRP. Tocá una casilla para ver la cuenta con su fila de P y el valor de sus vecinas. En la nivelación 0c esto se resolvió como un sistema lineal, V = (I − γP)⁻¹R, que con γ = 0,99 da V(S) = 0,0136.</p>
+      <div class="eq">V = R + γ P V</div>
+      <p class="nota pregunta">Tocá (7,12), al lado de la salida. ¿Qué parte de su 0,786 es premio de ahora y qué parte es futuro?</p>
+    </div>
+  </section>
+
+  <!-- B7: el valor se derrama -->
+  <section class="bloque" id="b-derrama" data-objetivos="O4">
+    <div class="stage">
+      <div class="lz"><canvas id="cvIt" aria-label="Mapa de calor del valor en la vuelta k de la iteración desde V = 0, en escala logarítmica: el valor nace al lado de la salida y se derrama hacia atrás"></canvas></div>
+      <div class="legend"><span>V = 0 (negro) · 10⁻¹⁴</span><span class="bar" id="legIt"></span><span>1 (escala log)</span></div>
+      <div class="ctl">
+        <label for="slIt"><span>Vuelta <i>k</i></span> <output id="outIt"></output></label>
+        <input type="range" id="slIt" min="0" max="100" step="1" value="0">
+      </div>
+      <div class="row"><button class="btn primary" id="itPlay">Animar</button><button class="btn" id="itMas">+1 vuelta</button><button class="btn" id="itCero">Volver a V = 0</button></div>
+      <div class="hud" id="hudIt"></div>
+      <p class="cap">Iteración calculada en el navegador con la misma regla y la misma tolerancia que el notebook (γ = 0,99). El deslizador avanza en escala logarítmica. Tocá una casilla para ver su número.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 7</div>
+      <h2>El valor se derrama</h2>
+      <p>Otra forma de resolver la ecuación es arrancar con V = 0 en todas las casillas y usarla como regla, vuelta tras vuelta. En la vuelta k tienen valor justo las casillas que están a k pasos o menos de la salida, así que el valor nace al lado de la salida y se derrama hacia atrás. S está a 20 pasos y recibe su primer valor en la vuelta 20, tan chico que en el mapa casi no se ve. La iteración converge en 1906 vueltas al mismo V(S) = 0,0136 que la solución directa.</p>
+      <div class="eq">Vₖ₊₁ = R + γ P Vₖ</div>
+      <p class="nota pregunta">Si γ fuera 0,9 en vez de 0,99, ¿en qué vuelta le llegaría valor a S? ¿Qué cambiaría entonces?</p>
+    </div>
+  </section>
+
+  <!-- B8: Para enseñarlo -->
+  <section class="bloque full" id="b-ensenar" data-objetivos="O3 O4">
+    <div class="texto prose">
+      <div class="paso">Para enseñarlo</div>
+      <h2>Cómo contar esta clase en una oración</h2>
+      <p>"Lo que vale estar acá es lo que gano ahora más lo que vale, un poco descontado, el lugar adonde voy a parar."</p>
+      <p class="nota pregunta">Pregunta para hacerle a quien te escucha: si un premio te llega en 20 pasos, ¿cuánto vale hoy para vos? ¿Y si llega en 200?</p>
+      <p><b>Ejercicio de 5 minutos:</b> dibujen en el pizarrón un pasillo de cuatro casillas con la salida en una punta y un caminante que tira una moneda para ir a la izquierda o a la derecha. Escriban V = 0 en todas y, vuelta por vuelta, reemplacen cada casilla por el premio esperado ahora más 0,9 por el promedio de lo que valían sus dos destinos en la vuelta anterior.</p>
+      <p class="small muted">Adelanto: si el caminante pudiera elegir la dirección en vez de tirar el dado, la cadena pasaría a tener acciones, que es lo que vemos en la clase 4, planificar con mapa.</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(async () => {
+  // cada figura se arma en su propia tarea, para no trabar el navegador al cargar
+  const tarea = f => new Promise(r => setTimeout(() => r(f()), 0));
+  Cueva.pagina("3", { lecturas: [
+    { texto: "Sutton y Barto (2018), Reinforcement Learning: An Introduction, 2.ª ed., cap. 3 (3.3 retornos y episodios, 3.5 funciones de valor y ecuación de Bellman)", url: "http://incompleteideas.net/book/the-book-2nd.html" },
+    { texto: "Stanford CS234 (Brunskill), clase 1: procesos de Markov y de recompensa de Markov, retorno, descuento y ecuación de Bellman", url: "https://web.stanford.edu/class/cs234/" },
+    { texto: "Pataranutaporn, P. et al. (2024). Future You: A Conversation with an AI-Generated Future Self Reduces Anxiety, Negative Emotions, and Increases Future Self-Continuity. IEEE Frontiers in Education Conference (FIE).", url: "https://doi.org/10.1109/FIE61694.2024.10893443" }
+  ] });
+
+  const env = Cueva.makeEnv(Cueva.MAPS.chica), n = env.nS, GOAL = env.goal;
+  const COL = Cueva.COL();
+  const MONO = COL.mono || "monospace";
+  const PARED = "#2c3346";
+  const reducir = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = id => document.getElementById(id);
+  const coma = s => s.replace(".", ",");
+  const fmt = (x, d = 3) => coma(x.toFixed(d));
+  const fmtV = (x, d = 3) => x === 0 ? "0" : Math.abs(x) < 1e-3 ? coma(x.toExponential(1)) : fmt(x, d);
+  const rc = s => `(${env.free[s][0]},${env.free[s][1]})`;
+  const marcar = (sel, attr, v) => document.querySelectorAll(sel).forEach(b => b.setAttribute("aria-pressed", b.dataset[attr] === v));
+
+  // ---------- la cadena del caminante (igual que cadena_azar del notebook) ----------
+  // NXT[s][cara] = casilla adonde lleva esa cara del dado; la salida es absorbente
+  const NXT = Array.from({ length: n }, (_, s) => [0, 1, 2, 3].map(a => s === GOAL ? GOAL : env.move(s, a)[0]));
+  const P = Array.from({ length: n }, () => new Float64Array(n));
+  const R = new Float64Array(n);
+  for (let s = 0; s < n; s++) {
+    if (s === GOAL) { P[s][s] = 1; continue; }
+    for (const s2 of NXT[s]) { P[s][s2] += .25; if (s2 === GOAL) R[s] += .25; }
+  }
+  const FILAS = P.map(f => { const l = []; f.forEach((p, j) => { if (p > 0) l.push([j, p]); }); return l; });   // P sin ceros
+  const GAMMA = 0.99;
+
+  // V = (I − γP)⁻¹ R por eliminación gaussiana (como np.linalg.solve en el notebook)
+  function resolver(gamma) {
+    const A = Array.from({ length: n }, (_, i) => { const f = new Float64Array(n + 1); for (let j = 0; j < n; j++) f[j] = (i === j ? 1 : 0) - gamma * P[i][j]; f[n] = R[i]; return f; });
+    for (let c = 0; c < n; c++) {
+      let piv = c; for (let i = c + 1; i < n; i++) if (Math.abs(A[i][c]) > Math.abs(A[piv][c])) piv = i;
+      [A[c], A[piv]] = [A[piv], A[c]];
+      for (let i = 0; i < n; i++) if (i !== c && A[i][c] !== 0) { const f = A[i][c] / A[c][c]; for (let j = c; j <= n; j++) A[i][j] -= f * A[c][j]; }
+    }
+    return Float64Array.from({ length: n }, (_, i) => A[i][n] / A[i][i]);
+  }
+  const V = resolver(GAMMA);
+
+  // ---------- utilidades de dibujo ----------
+  function rotulo(T, s, txt, color = COL.ink, escala = .34) {
+    if (!txt) return;
+    const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s];
+    ctx.font = `600 ${Math.max(8, Math.round(cell * escala))}px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.85)"; ctx.strokeText(txt, c * cell + cell / 2, r * cell + cell / 2 + 1);
+    ctx.fillStyle = color; ctx.fillText(txt, c * cell + cell / 2, r * cell + cell / 2 + 1);
+  }
+  function borde(T, s, color, ancho = 2, inset = 1.5) {
+    const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s];
+    ctx.strokeStyle = color; ctx.lineWidth = ancho; ctx.strokeRect(c * cell + inset, r * cell + inset, cell - 2 * inset, cell - 2 * inset);
+  }
+  // probabilidad sobre una casilla: solo si entra (en pantallas chicas queda en el hud)
+  const probTxt = (T, p) => T.cell >= 30 ? fmt(p, 2) : "";
+  const casillaDe = (T, e) => { const [r, c] = T.celdaEn(e); return env.idx[r + "," + c]; };
+
+  // =====================================================================
+  // B1. La nube de probabilidad y la fila de P
+  // =====================================================================
+  const nube = await tarea(() => {
+    const cv = $("cvNube"), cvP = $("cvP"), hud = $("hudNube"), sl = $("slNube"), out = $("outNube"), btn = $("nubePlay");
+    $("legNube").style.background = Cueva.gradienteCSS("visitas");
+    const T = Cueva.tablero(cv, env, { maxCell: 40 });
+    const TMAX = +sl.max;
+    // p_{t+1} = p_t P, desde S (todo exacto, sin azar)
+    const hist = [new Float64Array(n)]; hist[0][env.start] = 1;
+    for (let t = 0; t < TMAX; t++) { const p = hist[t], q = new Float64Array(n); for (let i = 0; i < n; i++) if (p[i]) for (const [j, pr] of FILAS[i]) q[j] += p[i] * pr; hist.push(q); }
+    let ceros = 0; for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) if (P[i][j] === 0) ceros++;
+    let sel = env.start, raf = 0, ult = 0, acc = 0, mk = 3;
+    function dibujar() {
+      const t = +sl.value, p = hist[t]; out.textContent = t;
+      T.fondo("#000").paredes(PARED);
+      for (let s = 0; s < n; s++) if (s !== GOAL && p[s] >= 1e-4) { const [r, c] = env.free[s]; T.casilla(r, c, Cueva.rampa("visitas", (Math.log10(p[s]) + 4) / 4), 1); }
+      T.salida();
+      // la fila de P de la casilla elegida, sobre la cueva
+      for (const [j, pr] of FILAS[sel]) { if (j !== sel) borde(T, j, COL.lamp, 2, 2); rotulo(T, j, probTxt(T, pr), j === sel ? COL.lamp : COL.ink, T.cell >= 30 ? .3 : .5); }
+      borde(T, sel, COL.lamp, 2.5, 1.5);
+      // la matriz P
+      const { w, h, ctx } = Cueva.lienzo(cvP, 200)();
+      mk = Math.max(2, Math.min(3, Math.floor((h - 18) / n))); const lado = mk * n;
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = "#14182a"; ctx.fillRect(0, 0, lado, lado);
+      for (let i = 0; i < n; i++) for (const [j, pr] of FILAS[i]) { ctx.fillStyle = Cueva.rampa("valor", .25 + .75 * pr); ctx.fillRect(j * mk, i * mk, mk, mk); }
+      ctx.strokeStyle = COL.exit; ctx.lineWidth = 1.5; ctx.strokeRect(-.5, sel * mk - 1, lado + 1, mk + 2);
+      ctx.font = `11px ${MONO}`; ctx.fillStyle = COL.muted; ctx.textAlign = "left"; ctx.textBaseline = "top";
+      ctx.fillText(`P (${n} × ${n})`, 0, lado + 4);
+      const xt = lado + 14;
+      if (w - xt > 150) {
+        const lineas = ["fila = casilla de partida", "columna = casilla de llegada", `ceros: ${coma((100 * ceros / (n * n)).toFixed(1))} %`, "", `fila verde: ${sel === env.start ? "S " : ""}${rc(sel)}`];
+        lineas.forEach((l, k) => { ctx.fillStyle = k === 4 ? COL.exit : COL.muted; ctx.fillText(l, xt, 4 + k * 16); });
+        ctx.fillStyle = COL.ink;
+        FILAS[sel].forEach(([j, pr], k) => ctx.fillText(`→ ${rc(j)}${j === sel ? " (se queda)" : j === GOAL ? " (salida)" : ""}: ${fmt(pr, 2)}`, xt, 4 + (5 + k) * 16));
+      }
+      const fila = FILAS[sel].map(([j, pr]) => `${rc(j)} <b>${fmt(pr, 2)}</b>`).join(" · ");
+      hud.innerHTML = `<span>t <b>${t}</b></span><span>P(salió) <b>${fmt(p[GOAL], 2)}</b></span><span>fila de ${rc(sel)}: ${fila}</span>`;
+    }
+    function play(on) {
+      cancelAnimationFrame(raf); raf = 0; btn.textContent = on ? "Pausa" : "Animar"; if (!on) return;
+      if (+sl.value >= TMAX) sl.value = 0; ult = 0; acc = 0;
+      const paso = now => { const dt = ult ? now - ult : 0; ult = now; acc += dt;
+        if (acc > 50) { acc = 0; const t = +sl.value; sl.value = Math.min(TMAX, t + (t < 60 ? 1 : t < 300 ? 3 : 8)); dibujar(); }
+        if (+sl.value < TMAX) raf = requestAnimationFrame(paso); else { raf = 0; btn.textContent = "Animar"; } };
+      raf = requestAnimationFrame(paso);
+    }
+    btn.onclick = () => play(!raf);
+    $("nubeReset").onclick = () => { play(false); sl.value = 0; dibujar(); };
+    sl.oninput = dibujar;
+    cv.addEventListener("pointerdown", e => { const s = casillaDe(T, e); if (s !== undefined) { sel = s; dibujar(); } });
+    cvP.addEventListener("pointerdown", e => { const b = cvP.getBoundingClientRect(); const i = Math.floor((e.clientY - b.top) / mk); if (i >= 0 && i < n && e.clientX - b.left < mk * n) { sel = i; dibujar(); } });
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B2. El MRP: el premio y R(s)
+  // =====================================================================
+  const mrp = await tarea(() => {
+    const cv = $("cvR"), hud = $("hudR");
+    const T = Cueva.tablero(cv, env, { maxCell: 40 });
+    let modo = "premio", sel = FILAS.findIndex((f, s) => R[s] > 0);
+    function dibujar() {
+      T.fondo("#000").paredes(PARED);
+      if (modo === "premio") {
+        for (let s = 0; s < n; s++) if (s !== GOAL && R[s] > 0) {   // flechas que entran a la salida
+          const ctx = T.ctx, cell = T.cell, [r, c] = env.free[s], [gr, gc] = env.free[GOAL];
+          ctx.strokeStyle = "rgba(61,220,132,.8)"; ctx.lineWidth = Math.max(2, cell * .1); ctx.lineCap = "round";
+          ctx.beginPath(); ctx.moveTo(c * cell + cell / 2, r * cell + cell / 2); ctx.lineTo((c + .7 * (gc - c)) * cell + cell / 2, (r + .7 * (gr - r)) * cell + cell / 2); ctx.stroke();
+        }
+        T.salida();
+        for (let s = 0; s < n; s++) if (s !== GOAL) rotulo(T, s, "0", "rgba(141,147,163,.6)", .3);
+        rotulo(T, GOAL, "+1", "#0b0d12", .4);
+      } else {
+        for (let s = 0; s < n; s++) if (s !== GOAL) {
+          const [r, c] = env.free[s];
+          if (R[s] > 0) T.casilla(r, c, Cueva.rampa("valor", .7), 1);
+          rotulo(T, s, R[s] > 0 ? probTxt(T, R[s]) : "0", R[s] > 0 ? COL.ink : "rgba(141,147,163,.6)", .3);
+        }
+        T.salida(); rotulo(T, GOAL, "fin", "#0b0d12", .3);
+      }
+      borde(T, sel, COL.sonar, 2.5);
+      const caras = NXT[sel].filter(s2 => s2 === GOAL).length;
+      hud.innerHTML = sel === GOAL
+        ? `<span>la salida: la caminata <b>terminó</b></span><span>R <b>0</b></span><span>P[salida, salida] <b>1</b></span>`
+        : `<span>casilla <b>${rc(sel)}${sel === env.start ? " (S)" : ""}</b></span><span>caras que entran a la salida <b>${caras} de 4</b></span><span>R(s) <b>${caras ? fmt(R[sel], 2) : "0"}</b></span>`;
+    }
+    function setModo(m) { modo = m; marcar("#segR button", "m", m); dibujar(); }
+    document.querySelectorAll("#segR button").forEach(b => b.onclick = () => setModo(b.dataset.m));
+    cv.addEventListener("pointerdown", e => { const s = casillaDe(T, e); if (s !== undefined) { sel = s; dibujar(); } });
+    setModo("premio");
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B3. Las barras γᵗ
+  // =====================================================================
+  const gamma = await tarea(() => {
+    const cv = $("cvGamma"), sl = $("slGamma"), out = $("outGamma"), hud = $("hudGamma");
+    let hor = 40;
+    const peso = (g, t) => t === 0 ? 1 : g ** t;
+    function dibujar() {
+      const g = +sl.value; out.textContent = coma(String(g));
+      const { w, h, ctx } = Cueva.lienzo(cv, 220)();
+      const m = { l: 34, r: 10, t: 22, b: 24 }, N = hor + 1, bw = (w - m.l - m.r) / N;
+      const Y = y => h - m.b - y * (h - m.t - m.b), X = t => m.l + t * bw;
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      ctx.font = `11px ${MONO}`; ctx.strokeStyle = "rgba(141,147,163,.16)"; ctx.lineWidth = 1;
+      for (const y of [0, .25, .5, .75, 1]) { ctx.beginPath(); ctx.moveTo(m.l, Y(y) + .5); ctx.lineTo(w - m.r, Y(y) + .5); ctx.stroke(); ctx.fillStyle = COL.muted; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(coma(String(y)), m.l - 5, Y(y)); }
+      const marcas = [19, 199].filter(t => t <= hor);
+      for (let t = 0; t < N; t++) {
+        const v = peso(g, t), esMarca = marcas.includes(t);
+        ctx.fillStyle = esMarca ? COL.exit : COL.lamp; ctx.globalAlpha = esMarca ? 1 : .8;
+        const x = X(t) + (bw > 4 ? 1 : 0), ww = Math.max(1, bw - (bw > 4 ? 2 : 0));
+        ctx.fillRect(x, Y(v), ww, Y(0) - Y(v));
+        if (esMarca) { ctx.globalAlpha = .35; ctx.fillRect(x, m.t, ww, Y(0) - m.t); }
+      }
+      ctx.globalAlpha = 1; ctx.fillStyle = COL.muted; ctx.textAlign = "center"; ctx.textBaseline = "top";
+      const pasoEje = hor === 40 ? 10 : 50;
+      for (let t = 0; t <= hor - pasoEje / 2; t += pasoEje) ctx.fillText(t, X(t) + bw / 2, h - m.b + 6);
+      ctx.textAlign = "right"; ctx.fillText("t →", w - m.r, h - m.b + 6);
+      ctx.fillStyle = COL.exit; ctx.textBaseline = "top";
+      for (const t of marcas) {
+        const x = X(t) + bw / 2, txt = `paso ${t + 1}: ${fmtV(peso(g, t))}`;
+        ctx.textAlign = x > w * .6 ? "right" : "left"; ctx.fillText(txt, x + (x > w * .6 ? -4 : 4), 4);
+      }
+      hud.innerHTML = `<span>γ <b>${coma(String(g))}</b></span><span>premio del paso 20: γ¹⁹ = <b>${fmtV(peso(g, 19))}</b></span><span>del paso 200: γ¹⁹⁹ = <b>${fmtV(peso(g, 199))}</b></span>`;
+    }
+    sl.oninput = dibujar;
+    document.querySelectorAll("#b-gamma [data-g]").forEach(b => b.onclick = () => { sl.value = b.dataset.g; dibujar(); });
+    document.querySelectorAll("#segHor button").forEach(b => b.onclick = () => { hor = +b.dataset.h; marcar("#segHor button", "h", b.dataset.h); dibujar(); });
+    dibujar();
+    return { dibujar };
+  });
+
+  // =====================================================================
+  // B4. El feed de juguete (mismo modelo que el notebook, en valores esperados)
+  // =====================================================================
+  const feed = await tarea(() => {
+    const NSAT = 11, SAT0 = 5, CLICS = { gancho: 6.0, util: 3.0 }, PCAMBIO = 0.6, FUERA = NSAT, DIAS = 3000;
+    const volver = s => 0.75 + 0.24 * s / (NSAT - 1);
+    function cadena(regla) {
+      const paso = regla === "gancho" ? -1 : 1, Pf = Array.from({ length: NSAT + 1 }, () => new Float64Array(NSAT + 1)), Rf = new Float64Array(NSAT + 1);
+      for (let s = 0; s < NSAT; s++) {
+        Rf[s] = CLICS[regla];
+        for (const [s2, p] of [[Math.min(NSAT - 1, Math.max(0, s + paso)), PCAMBIO], [s, 1 - PCAMBIO]]) { Pf[s][s2] += p * volver(s2); Pf[s][FUERA] += p * (1 - volver(s2)); }
+      }
+      Pf[FUERA][FUERA] = 1;
+      return { Pf, Rf };
+    }
+    const CURVAS = {};
+    for (const regla of ["gancho", "util"]) {
+      const { Pf, Rf } = cadena(regla); let p = new Float64Array(NSAT + 1); p[SAT0] = 1;
+      const clics = [], activos = [];
+      for (let t = 0; t < DIAS; t++) {
+        let c = 0; for (let s = 0; s <= NSAT; s++) c += p[s] * Rf[s]; clics.push(c); activos.push(1 - p[FUERA]);
+        const q = new Float64Array(NSAT + 1); for (let s = 0; s <= NSAT; s++) if (p[s]) for (let s2 = 0; s2 <= NSAT; s2++) q[s2] += p[s] * Pf[s][s2]; p = q;
+      }
+      CURVAS[regla] = { clics, activos };
+    }
+    const retorno = (regla, g) => { const c = CURVAS[regla].clics; let G = 0, w = 1; for (let t = 0; t < DIAS; t++) { G += w * c[t]; w *= g; if (w === 0) break; } return G; };
+    // cruce por bisección (como retorno_vs_gamma del notebook)
+    let lo = 0, hi = 0.99; for (let k = 0; k < 50; k++) { const m = (lo + hi) / 2; if (retorno("util", m) < retorno("gancho", m)) lo = m; else hi = m; }
+    const CRUCE = (lo + hi) / 2;
+    const GS = Array.from({ length: 100 }, (_, i) => 0.99 * i / 99);
+    const GG = { gancho: GS.map(g => retorno("gancho", g)), util: GS.map(g => retorno("util", g)) };
+    const colR = { gancho: COL.ember, util: COL.exit }, nomR = { gancho: "gancho", util: "útil" };
+    const cv = $("cvFeed"), sl = $("slFeed"), out = $("outFeed"), hud = $("hudFeed");
+    function dibujar() {
+      const g = +sl.value; out.textContent = coma(String(g));
+      const Gg = retorno("gancho", g), Gu = retorno("util", g), elige = Gu > Gg ? "util" : "gancho";
+      const { w, h, ctx } = Cueva.lienzo(cv, 330)();
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      const m = { l: 40, r: 10 };
+      ctx.font = `11px ${MONO}`; ctx.textBaseline = "middle";
+      // panel 1: % de usuarios que siguen volviendo, 90 días
+      const p1 = { t: 24, b: 130 }, D = 90, X1 = d => m.l + d / (D - 1) * (w - m.l - m.r), Y1 = v => p1.b - v * (p1.b - p1.t);
+      ctx.fillStyle = COL.ink; ctx.textAlign = "left"; ctx.font = `600 12px ${MONO}`; ctx.fillText("% de usuarios que siguen volviendo", m.l, 10);
+      ctx.font = `11px ${MONO}`;
+      ctx.strokeStyle = "rgba(141,147,163,.16)"; ctx.lineWidth = 1;
+      for (const v of [0, .5, 1]) { ctx.beginPath(); ctx.moveTo(m.l, Y1(v) + .5); ctx.lineTo(w - m.r, Y1(v) + .5); ctx.stroke(); ctx.fillStyle = COL.muted; ctx.textAlign = "right"; ctx.fillText(`${v * 100}`, m.l - 5, Y1(v)); }
+      for (const regla of ["gancho", "util"]) {
+        const a = CURVAS[regla].activos, es = regla === elige;
+        ctx.strokeStyle = colR[regla]; ctx.globalAlpha = es ? 1 : .35; ctx.lineWidth = es ? 3 : 1.5; ctx.beginPath();
+        for (let d = 0; d < D; d++) { const x = X1(d), y = Y1(a[d]); d ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+      }
+      ctx.globalAlpha = 1; ctx.fillStyle = COL.muted; ctx.textAlign = "center"; ctx.textBaseline = "top";
+      for (const d of [0, 30, 60, 89]) ctx.fillText(d === 89 ? "día 90" : `día ${d + 1}`, Math.min(w - m.r - 20, Math.max(m.l + 16, X1(d))), p1.b + 4);
+      // panel 2: retorno G según γ (escala log)
+      const p2 = { t: 190, b: h - 24 }, lmin = Math.log10(2), lmax = Math.log10(400);
+      const X2 = gg => m.l + gg / 0.99 * (w - m.l - m.r), Y2 = v => p2.b - (Math.log10(v) - lmin) / (lmax - lmin) * (p2.b - p2.t);
+      ctx.fillStyle = COL.ink; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.font = `600 12px ${MONO}`; ctx.fillText("retorno G de cada regla según γ (escala log)", m.l, p2.t - 22);
+      ctx.font = `11px ${MONO}`;
+      for (const v of [3, 10, 30, 100, 300]) { ctx.strokeStyle = "rgba(141,147,163,.16)"; ctx.beginPath(); ctx.moveTo(m.l, Y2(v) + .5); ctx.lineTo(w - m.r, Y2(v) + .5); ctx.stroke(); ctx.fillStyle = COL.muted; ctx.textAlign = "right"; ctx.fillText(v, m.l - 5, Y2(v)); }
+      for (const regla of ["gancho", "util"]) {
+        ctx.strokeStyle = colR[regla]; ctx.lineWidth = 2; ctx.beginPath();
+        GS.forEach((gg, i) => { const x = X2(gg), y = Math.max(p2.t - 6, Y2(GG[regla][i])); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+      }
+      ctx.setLineDash([4, 4]); ctx.strokeStyle = COL.muted; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X2(CRUCE) + .5, p2.t - 6); ctx.lineTo(X2(CRUCE) + .5, p2.b); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = COL.muted; ctx.textAlign = "right"; ctx.textBaseline = "top"; ctx.fillText(`cruce ≈ ${fmt(CRUCE, 3)}`, X2(CRUCE) - 4, p2.t - 4);
+      ctx.strokeStyle = COL.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X2(g) + .5, p2.t - 6); ctx.lineTo(X2(g) + .5, p2.b); ctx.stroke();
+      for (const [regla, G] of [["gancho", Gg], ["util", Gu]]) {
+        ctx.fillStyle = colR[regla]; ctx.beginPath(); ctx.arc(X2(g), Y2(G), regla === elige ? 6 : 4, 0, 7); ctx.fill();
+        if (regla === elige) { ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.stroke(); }
+      }
+      ctx.fillStyle = COL.muted; ctx.textAlign = "center"; ctx.textBaseline = "top";
+      for (const gg of [0, .5, .99]) ctx.fillText(coma(String(gg)), Math.min(w - m.r - 12, X2(gg)), p2.b + 5);
+      ctx.textAlign = "left"; ctx.fillText("γ", m.l - 30, p2.b + 5);
+      hud.innerHTML = `<span>γ <b>${coma(String(g))}</b></span><span>G(gancho) <b>${fmt(Gg, 2)}</b></span><span>G(útil) <b>${fmt(Gu, 2)}</b></span><span>el feed elige <b style="color:${colR[elige]}">${nomR[elige]}</b></span>`;
+    }
+    sl.oninput = dibujar;
+    document.querySelectorAll("#b-feed [data-gf]").forEach(b => b.onclick = () => { sl.value = b.dataset.gf; dibujar(); });
+    dibujar();
+    return { dibujar };
+  });
+
+  // =====================================================================
+  // B5. El valor como promedio de muchas caminatas (simulado en el navegador)
+  // =====================================================================
+  const valor = await tarea(() => {
+    const cv = $("cvMC"), cvg = $("cvMCg"), hud = $("hudMC");
+    const T = Cueva.tablero(cv, env, { maxCell: 40 });
+    const MAXP = 3000;
+    const u = Cueva.rng(2024);
+    let desde = env.start, Gs = [], medias = [], suma = 0, suma2 = 0, ultimo = [env.start], ultT = -1;
+    function caminata(guardar) {
+      let s = desde; const cam = guardar ? [s] : null;
+      for (let t = 1; t <= MAXP; t++) { s = NXT[s][Math.floor(u() * 4)]; if (guardar) cam.push(s); if (s === GOAL) return { T: t, cam }; }
+      return { T: -1, cam };
+    }
+    function lanzar(k) {
+      for (let i = 0; i < k; i++) {
+        const ult = i === k - 1, r = desde === GOAL ? { T: 0, cam: [GOAL] } : caminata(ult);
+        const G = r.T > 0 ? GAMMA ** (r.T - 1) : 0;
+        Gs.push(G); suma += G; suma2 += G * G; medias.push(suma / Gs.length);
+        if (ult) { ultimo = r.cam; ultT = r.T; }
+      }
+    }
+    function reset(s) { desde = s; Gs = []; medias = []; suma = 0; suma2 = 0; ultimo = [s]; ultT = -1; }
+    function dibujar() {
+      T.fondo("#000").paredes(PARED).salida();
+      T.trayecto(ultimo, "rgba(242,179,90,.35)", .08);
+      borde(T, desde, COL.lamp, 2.5); rotulo(T, env.start, "S", COL.ink, .38);
+      const N = Gs.length, med = N ? suma / N : 0, ee = N > 1 ? Math.sqrt(Math.max(0, suma2 / N - med * med) / N) : 0, Vs = V[desde];
+      // promedio acumulado contra n (escala log)
+      const { w, h, ctx } = Cueva.lienzo(cvg, 170)();
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      const m = { l: 48, r: 10, t: 22, b: 22 }, NX = Math.max(10, N), y0 = Math.max(Vs * 3, 0.03), yMax = Math.min(1, y0 < .1 ? Math.ceil(y0 * 100) / 100 : Math.ceil(y0 * 10) / 10);
+      const X = k => m.l + Math.log10(k) / Math.log10(NX) * (w - m.l - m.r), Y = v => h - m.b - Math.min(1.04, v / yMax) * (h - m.t - m.b);
+      ctx.font = `11px ${MONO}`; ctx.strokeStyle = "rgba(141,147,163,.16)"; ctx.lineWidth = 1; ctx.textBaseline = "middle";
+      for (const f of [0, .5, 1]) { const v = f * yMax; ctx.beginPath(); ctx.moveTo(m.l, Y(v) + .5); ctx.lineTo(w - m.r, Y(v) + .5); ctx.stroke(); ctx.fillStyle = COL.muted; ctx.textAlign = "right"; ctx.fillText(fmt(v, yMax < .1 ? 3 : 2), m.l - 5, Y(v)); }
+      ctx.textAlign = "center"; ctx.textBaseline = "top";
+      for (let k = 1; k <= NX; k *= 10) ctx.fillText(k >= 1000 ? `${k / 1000}k` : k, Math.min(w - m.r - 10, X(k)), h - m.b + 5);
+      ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(w < 480 ? "promedio de G (caminatas en escala log)" : "promedio de G según la cantidad de caminatas (escala log)", m.l, 0);
+      ctx.setLineDash([5, 4]); ctx.strokeStyle = COL.ink; ctx.beginPath(); ctx.moveTo(m.l, Y(Vs) + .5); ctx.lineTo(w - m.r, Y(Vs) + .5); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = COL.ink; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillText(`V${rc(desde)} de Bellman = ${fmtV(Vs, 4)}`, m.l + 4, Y(Vs) - 3);
+      if (N) { ctx.strokeStyle = COL.lamp; ctx.lineWidth = 2; ctx.beginPath(); medias.forEach((v, i) => { const x = X(i + 1), y = Y(v); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke(); }
+      hud.innerHTML = `<span>desde <b>${rc(desde)}${desde === env.start ? " (S)" : ""}</b></span><span>caminatas <b>${N}</b></span>` +
+        `<span>promedio de G <b>${N ? fmtV(med, 4) : "–"}</b>${N > 1 ? ` ± ${fmtV(2 * ee, 4)}` : ""}</span>` +
+        `<span>última: ${ultT > 0 ? `llegó en <b>${ultT}</b> pasos, G = <b>${fmtV(GAMMA ** (ultT - 1), 4)}</b>` : ultT === 0 ? "<b>ya está en la salida</b>" : N ? "<b>no llegó</b> en 3000 pasos, G = 0" : "–"}</span><span>(simulado en el navegador)</span>`;
+    }
+    $("mc100").onclick = () => { lanzar(100); dibujar(); };
+    $("mc1000").onclick = () => { lanzar(1000); dibujar(); };
+    $("mcCero").onclick = () => { reset(desde); dibujar(); };
+    cv.addEventListener("pointerdown", e => { const s = casillaDe(T, e); if (s !== undefined) { reset(s); lanzar(100); dibujar(); } });
+    reset(env.start); lanzar(1000);
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B6. La ecuación de Bellman, casilla por casilla
+  // =====================================================================
+  const bellman = await tarea(() => {
+    const cv = $("cvB"), cuenta = $("cuentaB");
+    const T = Cueva.tablero(cv, env, { maxCell: 40 });
+    const L = Array.from(V, v => v > 0 ? Math.log10(v) : -Infinity);
+    const vals = L.filter((_, s) => s !== GOAL), LO = Math.min(...vals), HI = Math.max(...vals);
+    $("legB").style.background = Cueva.gradienteCSS("valor");
+    $("legBlo").textContent = fmt(10 ** LO, 4); $("legBhi").textContent = fmt(10 ** HI, 3);
+    let sel = env.start;
+    const f5 = v => fmt(v, 5);
+    function dibujar() {
+      T.fondo("#000").paredes(PARED).valores(L, { lo: LO, hi: HI }).salida();
+      if (!FILAS[sel].some(([j]) => j === env.start)) rotulo(T, env.start, "S", COL.ink, .38);
+      for (const [j, pr] of FILAS[sel]) { if (j !== sel) borde(T, j, COL.sonar, 2, 2); }
+      borde(T, sel, COL.lamp, 2.5, 1.5);
+      for (const [j, pr] of FILAS[sel]) rotulo(T, j, probTxt(T, pr), j === sel ? COL.lamp : COL.ink, T.cell >= 30 ? .3 : .5);
+      if (sel === GOAL) {
+        cuenta.innerHTML = `<b>V(salida) = 0</b>: la caminata terminó y ya no queda nada por cobrar.`;
+        return;
+      }
+      const nom = `V${rc(sel)}`, terms = FILAS[sel].map(([j, pr]) => `${fmt(pr, 2)}·<span class="v">${f5(V[j])}</span>`).join(" + ");
+      let suma = 0; for (const [j, pr] of FILAS[sel]) suma += pr * V[j];
+      cuenta.innerHTML = `<b>${nom}</b> = R + γ · Σ P · V(adonde va)<br>` +
+        `= <b>${fmt(R[sel], 2)}</b> + 0,99 · ( ${terms} )<br>` +
+        `= ${fmt(R[sel], 2)} + ${f5(GAMMA * suma)} = <b>${f5(R[sel] + GAMMA * suma)}</b>`;
+    }
+    const elegir = e => { const s = casillaDe(T, e); if (s !== undefined) { sel = s; dibujar(); } };
+    cv.addEventListener("pointerdown", elegir);
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B7. Iterar desde V = 0: el valor se derrama
+  // =====================================================================
+  const derrama = await tarea(() => {
+    // V_{k+1} = R + γ P V_k hasta que el cambio máximo de una vuelta sea < 1e-12 (como iterar del notebook)
+    const hist = [new Float64Array(n)];
+    for (let k = 0; k < 200000; k++) {
+      const Vk = hist[hist.length - 1], NV = new Float64Array(n); let d = 0;
+      for (let s = 0; s < n; s++) { let v = R[s]; for (const [j, pr] of FILAS[s]) v += GAMMA * pr * Vk[j]; NV[s] = v; d = Math.max(d, Math.abs(v - Vk[s])); }
+      hist.push(NV); if (d < 1e-12) break;
+    }
+    const K = hist.length - 1;
+    const llega = hist.findIndex(h => h[env.start] > 0);
+    const cv = $("cvIt"), sl = $("slIt"), out = $("outIt"), hud = $("hudIt"), btn = $("itPlay");
+    $("legIt").style.background = Cueva.gradienteCSS("valor");
+    const T = Cueva.tablero(cv, env, { maxCell: 40 });
+    const kDe = x => Math.round((K + 1) ** (x / 100) - 1), xDe = k => Math.round(100 * Math.log(k + 1) / Math.log(K + 1));
+    let k = 20, sel = env.start, raf = 0;
+    sl.value = xDe(k);
+    function dibujar() {
+      const Vk = hist[k]; out.textContent = k;
+      T.fondo("#000").paredes(PARED);
+      for (let s = 0; s < n; s++) if (s !== GOAL && Vk[s] > 0) { const [r, c] = env.free[s]; T.casilla(r, c, Cueva.rampa("valor", (Math.log10(Vk[s]) + 14) / 14)); }
+      T.salida(); rotulo(T, env.start, "S", COL.ink, .38); borde(T, sel, COL.sonar, 2);
+      const con = Vk.filter((v, s) => v > 0 && s !== GOAL).length;
+      hud.innerHTML = `<span>vuelta <b>${k}</b> de ${K}</span><span>casillas con valor <b>${con}</b>/${n - 1}</span><span>V<sub>k</sub>(S) <b>${fmtV(Vk[env.start], 4)}</b></span>` +
+        (sel !== env.start ? `<span>V<sub>k</sub>${rc(sel)} <b>${fmtV(Vk[sel], 4)}</b></span>` : "") + `<span>S recibe valor en la vuelta <b>${llega}</b></span>`;
+    }
+    function play(on) {
+      cancelAnimationFrame(raf); raf = 0; btn.textContent = on ? "Pausa" : "Animar"; if (!on) return;
+      if (k >= K) k = 0; let ult = 0, acc = 0;
+      const paso = now => { const dt = ult ? now - ult : 0; ult = now; acc += dt;
+        if (acc > 120) { acc = 0; k = k < 30 ? k + 1 : Math.min(K, Math.ceil(k * 1.1)); sl.value = xDe(k); dibujar(); }
+        if (k < K) raf = requestAnimationFrame(paso); else { raf = 0; btn.textContent = "Animar"; } };
+      raf = requestAnimationFrame(paso);
+    }
+    btn.onclick = () => play(!raf);
+    sl.oninput = () => { k = kDe(+sl.value); dibujar(); };
+    $("itMas").onclick = () => { k = Math.min(K, k + 1); sl.value = xDe(k); dibujar(); };
+    $("itCero").onclick = () => { play(false); k = 0; sl.value = 0; dibujar(); };
+    cv.addEventListener("pointerdown", e => { const s = casillaDe(T, e); if (s !== undefined) { sel = s; dibujar(); } });
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); }, K, llega };
+  });
+
+  let tRes = 0;
+  addEventListener("resize", () => { clearTimeout(tRes); tRes = setTimeout(() => { for (const f of [nube, mrp, gamma, feed, valor, bellman, derrama]) f.dibujar(); }, 120); });
+})();
+</script>
+</body>
+</html>
