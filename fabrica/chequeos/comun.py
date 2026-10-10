@@ -15,7 +15,7 @@ CHEQUEOS = Path(__file__).resolve().parent
 REPORTES = RAIZ / "fabrica" / "reportes"
 
 # Carpetas que no se publican (ni se chequean como sitio).
-NO_PUBLICADO = {"build", "fabrica", "node_modules", ".git", ".github", "specs"}
+NO_PUBLICADO = {"build", "fabrica", "node_modules", ".git", ".github", "specs", ".venv", ".superpowers"}
 # Páginas publicadas que no son para leer en pantalla (fuentes de las imágenes de difusión, 1080 px fijos).
 NO_RENDER = ("difusion/posts/src/",)
 
