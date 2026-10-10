@@ -362,7 +362,7 @@ window.MODULOS = {
         opciones: [
           { texto: "Sí: el conteo crece en cada paso igual que la historia, así que la resume entera.", explicacion: "No: que crezcan juntos no lo vuelve un resumen. Dos historias con el mismo conteo pueden dejar al agente en lugares distintos." },
           { texto: "Sí, siempre que no choque, porque cada paso sin chocar lo acerca a la salida.", explicacion: "No: sin chocar también se puede ir y volver por los mismos pasillos, como el agente al azar. El conteo no dice dónde está." },
-          { texto: "No: con el mismo conteo puede estar en casillas distintas, que llevan a otros lados.", explicacion: "Correcto. Después de 6 pasos, la historia A está en (3,3) y seis pasos hacia abajo desde S dejan en (7,1); con el mismo conteo y la misma acción, la próxima casilla cambia. El conteo no cumple el supuesto de Markov." },
+          { texto: "No: con el mismo conteo puede estar en casillas distintas, y la misma acción lo lleva a lugares distintos.", explicacion: "Correcto. Después de 6 pasos, la historia A está en (3,3) y seis pasos hacia abajo desde S dejan en (7,1); con el mismo conteo y la misma acción, la próxima casilla cambia. El conteo no cumple el supuesto de Markov." },
           { texto: "No, porque el supuesto de Markov pide guardar la historia completa, no un solo número.", explicacion: "No: es al revés. Markov dice que un resumen (en la cueva, la casilla) alcanza y que el resto de la historia ya no importa." }
         ],
         correcta: 2
