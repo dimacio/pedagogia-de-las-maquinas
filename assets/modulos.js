@@ -555,5 +555,83 @@ window.MODULOS = {
         "Se dice qué parámetro (una probabilidad, una recompensa o γ) haría cambiar la política, y hacia cuál."
       ]
     }
+  },
+
+  "5": {
+    objetivos: [
+      "Estimar el valor de una política jugando, con Monte Carlo (promedio de retornos de partidas), sin conocer P ni R, y actualizarlo de forma incremental.",
+      "Aplicar a mano una actualización de TD(0), explicar el error de diferencia temporal δ y relacionarlo con el error de predicción de recompensa de la dopamina.",
+      "Comparar Monte Carlo y TD por cuándo actualizan y por sesgo y varianza, como intuición sobre la cueva.",
+      "Explicar la equivalencia de certeza: armar P y R con lo jugado y resolver Bellman como en las clases 3 y 4."
+    ],
+    tiempo: { pagina: 35, notebook: 75 },
+    previos: ["4"],
+    requisitos: ["Haber hecho la clase 3: el valor V como retorno esperado y la ecuación de Bellman.", "De la clase 4, las flechas de la política óptima: acá se evalúan con un 70 % de pasos al azar."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "Sin mapa, tres partidas que pasaron por el cruce (5,6) dieron, desde su primera visita, retornos de 0,587, 0,914 y 0,362, en ese orden. ¿Cuánto estima Monte Carlo para V(cruce)?",
+        opciones: [
+          { texto: "0,638: el punto medio entre el retorno más bajo (0,362) y el más alto (0,914).", explicacion: "No: Monte Carlo promedia todos los retornos, no solo los extremos. El 0,587 también cuenta." },
+          { texto: "0,362: el promedio incremental reemplaza el valor viejo por el retorno de la última partida.", explicacion: "No: eso sería α = 1. El incremental corrige solo una fracción α de la sorpresa G − V; con α = 1/n, la última partida pesa un tercio." },
+          { texto: "0,621: el promedio de los tres, lo mismo que da el incremental V ← V + (1/n)(G − V).", explicacion: "Correcto. (0,587 + 0,914 + 0,362) / 3 = 0,621. Con α = 1/n el incremental pasa por 0,587, 0,751 y 0,621: es la misma cuenta, sin guardar los retornos." },
+          { texto: "0,166: el incremental con α = 0,1 desde V = 0, que es el que corrige de a una partida.", explicacion: "No: esa cuenta da 0,166, pero no es el promedio. Con α fijo y pocas partidas el valor sigue pegado al 0 del que arrancó." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O2",
+        pregunta: "TD(0) con α = 0,1 y γ = 0,99 ve un paso del cruce a (5,7) con r = 0. Antes del paso, V(cruce) = 0,4507 y V(5,7) = 0,5671. ¿Cuánto vale δ y cómo queda V(cruce)?",
+        opciones: [
+          { texto: "δ = 0 + 0,99 · 0,5671 − 0,4507 = +0,1107, y V(cruce) pasa a 0,4507 + 0,1 · 0,1107 = 0,4618.", explicacion: "Correcto. El objetivo r + γV(s′) = 0,5614 queda arriba de lo esperado: el paso salió mejor y V sube una décima parte de la sorpresa." },
+          { texto: "δ = 0,5671 − 0,4507 = +0,1164, y V(cruce) pasa a 0,4623: con r = 0 no hace falta el γ.", explicacion: "No: γ descuenta el valor de la casilla siguiente aunque el premio sea 0. El objetivo es 0,99 · 0,5671 = 0,5614, no 0,5671." },
+          { texto: "δ = +0,1107, y V(cruce) pasa directamente al objetivo r + γV(s′) = 0,5614.", explicacion: "No: eso sería α = 1. Con α = 0,1 se corrige una décima parte de δ, y V queda en 0,4618." },
+          { texto: "Nada todavía: con r = 0 no hay información, y V(cruce) se corrige recién cuando termine la partida.", explicacion: "No: eso es Monte Carlo. TD corrige después de cada paso, usando lo que ya cree que vale (5,7), aunque no haya premio." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O2",
+        pregunta: "En el notebook, el agente que ya aprendió juega una partida en la que la salida no paga: el δ del último paso da −0,968. ¿Qué tiene que ver esto con la dopamina?",
+        opciones: [
+          { texto: "Que el cerebro hace TD(0): las neuronas de dopamina guardan una tabla con el valor de cada lugar.", explicacion: "No: el recuadro marca ese límite. Que una señal se parezca a δ no quiere decir que el cerebro haga TD(0), y el cerebro no es una tabla de casillas." },
+          { texto: "Que el curso demuestra que la dopamina causa la adicción: cada δ positivo empuja a repetir la conducta que lo produjo.", explicacion: "No: es un modelo de una señal neuronal medida en laboratorio, no una explicación de la conducta, del placer ni de la adicción." },
+          { texto: "Que la dopamina mide el placer del premio: sube cuanto más grande es el jugo, esté anunciado o no.", explicacion: "No: si fuera placer, un premio anunciado la activaría igual. Pero, como δ, deja de responder al jugo cuando una señal lo anuncia (en el notebook, δ del último paso pasa de +1 a +0,032)." },
+          { texto: "Que se parece a Schultz, Dayan y Montague (1997): si el jugo anunciado no llega, esas neuronas caen debajo de lo normal.", explicacion: "Correcto. δ es la sorpresa, lo que pasó menos lo que se esperaba. Con su límite: es un modelo de una señal neuronal, no una explicación de la conducta ni de la adicción." }
+        ],
+        correcta: 3
+      },
+      {
+        objetivo: "O3",
+        pregunta: "En la cueva, Monte Carlo y TD ven las mismas partidas. ¿Qué describe mejor lo que se midió en el notebook?",
+        opciones: [
+          { texto: "TD siempre gana: como corrige en cada paso, con cualquier cantidad de partidas tiene menos error que Monte Carlo, sea con α fijo o con 1/n.", explicacion: "No: a las 100 partidas TD con α = 0,1 tenía un error RMS de 0,5860, contra 0,0428 de Monte Carlo con 1/n. Corregir antes no es corregir mejor." },
+          { texto: "MC espera al final y TD corrige en cada paso; TD arranca con sesgo y tiembla menos, pero acá ganó MC con 1/n.", explicacion: "Correcto. Con α = 0,1, a las 100 partidas las 10 semillas de TD estaban por debajo en el cruce; al final TD temblaba 0,0100 contra 0,0272. MC con 1/n terminó en 0,0055." },
+          { texto: "Monte Carlo tiene sesgo, porque espera a que la partida termine, y TD no, porque usa el premio de cada paso.", explicacion: "No: está al revés. El sesgo es de TD, que se apoya en sus propias estimaciones (al principio, 0). El retorno de Monte Carlo es una muestra sin sesgo, pero tiembla más." },
+          { texto: "Los dos corrigen en cada paso; la única diferencia es que Monte Carlo usa α = 1/n y TD un α fijo.", explicacion: "No: Monte Carlo necesita el retorno G, que se conoce al terminar la partida. Y también puede usar un α fijo: el notebook lo prueba con 0,03, 0,1 y 0,3." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O4",
+        pregunta: "Con las mismas 300 partidas, la equivalencia de certeza tuvo un error RMS de 0,0101 y Monte Carlo, de 0,0169. ¿Qué hace la equivalencia de certeza y por qué le fue mejor?",
+        opciones: [
+          { texto: "Promedia los retornos como Monte Carlo, pero con un α más chico, así que tiembla menos al final.", explicacion: "No: no promedia retornos. Arma un mapa con lo jugado y resuelve Bellman, como en las clases 3 y 4." },
+          { texto: "Usa la P y la R verdaderas de la cueva para corregir lo jugado, como hicimos para calcular el valor de referencia.", explicacion: "No: el agente nunca mira env.P ni env.R. Estima P̂ y R̂ contando; por eso sus filas tienen ruido (error máximo de P̂, 0,165)." },
+          { texto: "Cuenta transiciones y premios, estima P̂ y R̂, y resuelve Bellman; cada casilla aprovecha lo visto en sus vecinas.", explicacion: "Correcto. Cada paso jugado informa una fila de P̂ y Bellman combina todas. El precio: guardar una tabla de 60 × 60 y resolver un sistema cada vez." },
+          { texto: "Cuenta transiciones y resuelve Bellman, y conviene siempre, también con millones de estados, porque usa todos los datos.", explicacion: "No: con millones de estados la tabla P̂ no entra en memoria y el sistema no se puede resolver. Monte Carlo y TD guardan un número por casilla." }
+        ],
+        correcta: 2
+      }
+    ],
+    actividad: {
+      titulo: "Predecir y corregir",
+      consigna: "Durante una semana, predecí cada día algo cotidiano que se pueda medir: cuánto tarda un trayecto, cuánto cuesta una compra, cuántas páginas leés. Anotá la predicción, lo que pasó y el δ del día (lo que pasó menos lo que esperabas), y corregí la predicción del día siguiente con un α que elijas: V ← V + α · δ. Al final, compará con lo que habría dado esperar al último día y promediar toda la semana (Monte Carlo), y contá qué convenía en tu caso. Cerralo con la oración de «Para enseñarlo»: Monte Carlo espera a ver cómo termina; TD corrige en cada paso con lo que esperaba del paso siguiente. Publicalo en Discussions; otra persona te devuelve con la rúbrica.",
+      rubrica: [
+        "Hay una tabla de los siete días con predicción, resultado, δ (con su signo) y predicción corregida, y las cuentas con el α elegido están bien.",
+        "El α está justificado (cuánto cambia de un día a otro lo que se predice) y se dice qué habría pasado con un α más grande o más chico.",
+        "Se compara corregir cada día con esperar al final de la semana, y la conclusión usa cuándo actualiza cada método y cuánto tiembla la predicción."
+      ]
+    }
   }
 };
