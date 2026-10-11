@@ -807,7 +807,7 @@ window.MODULOS = {
         pregunta: "En el notebook, una red sin capas ocultas con entrada one-hot (60 números en 0 salvo un 1 en la casilla) tiene 240 parámetros, tantos como números tiene la tabla Q. Entrenadas con las mismas 20 000 transiciones, la diferencia máxima entre las dos es 0. ¿Por qué?",
         opciones: [
           { texto: "Con 240 parámetros la red tiene la capacidad justa para copiar Q*, así que cualquier entrada que le diéramos terminaría en la misma tabla.", explicacion: "No: no importa cuántos parámetros hay sino a qué casillas toca cada uno. La red con coordenadas tiene 4612 y, aun con el Q* correcto de las 59 casillas, acierta la flecha en el 71 %." },
-          { texto: "Con el one-hot cada peso es de una sola casilla y flecha: un paso de gradiente toca 1 de los 240 pesos y repite la regla de Q-learning.", explicacion: "Correcto. Con la transición de (8,11) a la salida solo W[→, 58] tiene gradiente y queda en 0,50, igual que la tabla. Por eso tampoco generaliza: lo que aprende en una casilla no le dice nada a la de al lado." },
+          { texto: "Con el one-hot cada peso es de una sola casilla y flecha: un paso de gradiente toca 1 de los 240 pesos y repite la regla de Q-learning.", explicacion: "Correcto. Con la transición de (8,11) a la salida solo W[→,(8,11)] tiene gradiente y queda en 0,50, igual que la tabla. Por eso tampoco generaliza: lo que aprende en una casilla no le dice nada a la de al lado." },
           { texto: "Las dos llegan a Q* por caminos distintos: la red mueve todos sus pesos en cada paso, pero al final converge al mismo punto que la tabla.", explicacion: "No: no hay caminos distintos, son idénticas paso a paso, porque el gradiente es 0 salvo en un peso. Mover casi todos los pesos en cada paso es lo que hace la red de seis entradas." },
           { texto: "La red generaliza entre casillas vecinas y la tabla no, pero con 20 000 transiciones se visitan todas y esa ventaja deja de notarse.", explicacion: "No: la red one-hot no generaliza nada, porque cada casilla prende un número distinto y ninguna se parece a otra. Empieza a generalizar cuando la entrada son las coordenadas." }
         ],
@@ -837,7 +837,7 @@ window.MODULOS = {
       },
       {
         objetivo: "O3",
-        pregunta: "Sin trucos, la red llega a creer que una casilla vale 128,83, cuando ninguna puede pasar de 1. Con solo memoria de repetición (las últimas 10 000 transiciones, lotes al azar de 256), el Q más alto llega a 13,63 y, en la semilla 0, la política sale desde el 0 %. ¿Qué hace la memoria?",
+        pregunta: "Sin trucos, la red llega a creer que una casilla vale 128,83, cuando ninguna puede pasar de 1. Con solo memoria de repetición (las últimas 10 000 transiciones, repasadas en lotes al azar), el Q más alto llega a 13,63 y, en la semilla 0, la política sale desde el 0 %. ¿Qué hace la memoria?",
         opciones: [
           { texto: "Guarda las partidas que llegaron a la salida y las repite más seguido que las otras, para que la red aprenda primero lo que dio premio.", explicacion: "No: los lotes se toman al azar de las últimas 10 000 transiciones, sin preferir las que dieron premio. Lo que importa es que mezclan partidas distintas." },
           { texto: "Deja quieto el objetivo: como las transiciones guardadas son viejas, el objetivo que se calcula con ellas ya no cambia en cada paso.", explicacion: "No: el objetivo se sigue calculando con la red que se mueve; viejas son las transiciones, no la red. Por eso, solo con memoria, los valores se disparan al principio." },
@@ -915,7 +915,7 @@ window.MODULOS = {
       },
       {
         objetivo: "O3",
-        pregunta: "En la cueva grande, dos redes que sienten solo los bigotes y su última acción aprenden por imitación a copiar a un experto. La red común (sin memoria) sale desde 88 de las 154 casillas (57 %) y la GRU, desde las 154. ¿Qué explica la diferencia?",
+        pregunta: "En la cueva grande, dos redes que sienten solo los bigotes y su última acción aprenden por imitación a copiar a un experto. La red común (sin memoria) sale desde 88 de las 154 casillas de partida (57 %; todas menos la salida) y la GRU, desde las 154. ¿Qué explica la diferencia?",
         opciones: [
           { texto: "La GRU vio más partidas del experto; con los mismos datos, la red común también saldría desde las 154 casillas.", explicacion: "No: las dos se entrenan con las mismas partidas del experto y la misma entrada. Lo que cambia es que una lleva estado y la otra no." },
           { texto: "Con la misma lectura y la misma última acción, la red común decide siempre igual y se traba; la GRU lleva en hₜ un resumen del camino.", explicacion: "Correcto. Una sonda lineal lee la casilla real del estado de la GRU en el 8 % de los casos al arrancar, el 54 % a los 5 pasos y el 71 % a los 10: aprendió algo parecido al estado de creencia." },
