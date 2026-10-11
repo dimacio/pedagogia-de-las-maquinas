@@ -30,7 +30,7 @@ En la clase 6 el agente guardaba lo que sabía en una tabla $Q(s, a)$: 60 casill
 
 Y un ejercicio: sacar la red objetivo o la memoria y mirar qué pasa.
 
-> Cómo usar este notebook: ejecutar las celdas en orden (Colab: *Entorno de ejecución → Ejecutar todas*). Usa PyTorch en CPU y tarda alrededor de dos minutos.
+> Cómo usar este notebook: ejecutar las celdas en orden (Colab: *Entorno de ejecución → Ejecutar todas*). Usa PyTorch en CPU y tarda alrededor de cuatro minutos.
 """))
 
 cells.append(md(r"""
@@ -611,6 +611,7 @@ ax.set_xlabel("paso de gradiente"); ax.set_ylabel("w"); ax.set_title("Un peso qu
 ax.legend(frameon=False)
 plt.tight_layout(); plt.show()
 
+print(f"factor por paso: 1 + α(2γ − 1) = 1 + 0,1 · (2 · {GAMMA} − 1) = {1 + 0.1 * (2 * GAMMA - 1):.3f}")
 print("solo A → B, primeros pasos (α = 0,1):")
 w = 0.1
 for k in range(3):
@@ -712,7 +713,7 @@ Cada ingrediente arregla una parte, y hacen falta los dos:
 - **Sin trucos**, los valores se disparan a cientos.
 - **Solo red objetivo**: el objetivo quieto frena la explosión, pero la red sigue aprendiendo de lo último que vivió y los valores suben despacio por encima de 1; la política no sale.
 - **Solo memoria**: los lotes mezclados ayudan, pero el objetivo se mueve con cada paso: los valores se disparan al principio y después bajan, sin llegar a una política que salga.
-- **DQN, con las dos**: el error baja a centésimas, el Q más grande queda cerca de 1 y, al final, la política sale desde casi todas las casillas. (Casi: justo desde S, en el paso 10 000, no sale. Lo miramos en el paso 2.)
+- **DQN, con las dos**: el error baja a milésimas (0,0080), el Q más grande queda cerca de 1 y, al final, la política sale desde casi todas las casillas. (Casi: justo desde S, en el paso 10 000, no sale. Lo miramos en el paso 2.)
 
 Al principio, incluso DQN cree que algunas casillas valen un poco más de 1: el $\max$ del objetivo elige justo las flechas que la red sobreestimó. Esa **sobreestimación** es la que atacan variantes como *Double DQN*, que no vemos en este curso.
 
@@ -740,9 +741,11 @@ if len(camino) > 100:
         print(f"   {env.free[c]}: la red elige {ACTION_NAMES[int(Q_dqn[c].argmax())]}   "
               f"Q de la red: " + "  ".join(f"{ACTION_NAMES[b]} {Q_dqn[c, b]:.4f}" for b in range(env.nA))
               + f"   óptima: {', '.join(ACTION_NAMES[b] for b in np.flatnonzero(opt[c]))}")
+c61 = env.free.index((6, 1))
+print(f"en (6, 1), Q(↑) − Q(↓) = {Q_dqn[c61, 0] - Q_dqn[c61, 2]:.6f}   (sin redondear)")
 """))
 cells.append(md(r"""
-La red nunca vio el mapa ni a $V^*$: solo coordenadas, bigotes y recompensas. Su mapa de valores se parece al verdadero y la mayoría de sus flechas son óptimas. Pero alcanza con una flecha equivocada en el lugar justo: en (6, 1) la red elige ↑ en vez de ↓ por una diferencia de una diezmilésima, y el camino desde S (y desde toda la columna de la izquierda) queda yendo y viniendo entre (5, 1) y (6, 1). Es lo de la sección 4: en esta cueva, un error chico en el valor alcanza para cambiar una flecha. Y es una foto de un solo momento de una sola semilla, que es lo que discute la sección siguiente.
+La red nunca vio el mapa ni a $V^*$: solo coordenadas, bigotes y recompensas. Su mapa de valores se parece al verdadero y la mayoría de sus flechas son óptimas. Pero alcanza con una flecha equivocada en el lugar justo: en (6, 1) la red elige ↑ en vez de ↓ por menos de una diezmilésima (0,000092), y el camino desde S (y desde toda la columna de la izquierda) queda yendo y viniendo entre (5, 1) y (6, 1). Es lo de la sección 4: en esta cueva, un error chico en el valor alcanza para cambiar una flecha. Y es una foto de un solo momento de una sola semilla, que es lo que discute la sección siguiente.
 """))
 
 # ======================================================================= 7
@@ -867,4 +870,4 @@ cells.append(md(r"""
 Nuestra red miraba una casilla por vez, con sus coordenadas. El jugador a ciegas no las tiene: si solo siente los bigotes, dos lugares distintos se sienten igual. Cuando lo que se ve no alcanza para saber dónde se está, la red necesita memoria: en la clase 9, **redes recurrentes**, las mismas que leen texto palabra por palabra.
 """))
 
-save(cells, "08-de-la-tabla-a-la-red.ipynb")
+save(cells, "08-de-la-tabla-a-la-red.ipynb", lento=True)

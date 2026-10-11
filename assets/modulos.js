@@ -826,7 +826,7 @@ window.MODULOS = {
       },
       {
         objetivo: "O3",
-        pregunta: "En la cueva, la misma red (6 → 64 → 64 → 4) aprende Q con cuatro variantes. Solo con red objetivo, el Q más alto llega a 3,25 y la política sale desde el 0 % de las casillas; con red objetivo y memoria (DQN), desde el 97 %. ¿Para qué sirve la red objetivo?",
+        pregunta: "En la cueva, la misma red (6 → 64 → 64 → 4) aprende Q con cuatro variantes. En la semilla 0, solo con red objetivo, el Q más alto llega a 3,25 y la política sale desde el 0 % de las casillas; con red objetivo y memoria (DQN), desde el 97 %. ¿Para qué sirve la red objetivo?",
         opciones: [
           { texto: "Congela el objetivo: una copia puesta al día cada 40 pasos calcula r + γ max Q y la red lo puede alcanzar. Frena la explosión, pero sola no alcanza.", explicacion: "Correcto. Sin trucos el Q más alto llega a 128,83; con red objetivo, a 3,25. Pero la red sigue aprendiendo de lo último que vivió, y hace falta la memoria para que la política salga." },
           { texto: "Guarda la mejor versión de la red hasta el momento y la usa para elegir las flechas, así la política no empeora mientras la otra sigue aprendiendo.", explicacion: "No: la copia calcula el objetivo, no elige las acciones, y se pone al día cada 40 pasos sea mejor o peor. Las flechas las elige la red que aprende, con ε-greedy." },
@@ -841,7 +841,7 @@ window.MODULOS = {
         opciones: [
           { texto: "Guarda las partidas que llegaron a la salida y las repite más seguido que las otras, para que la red aprenda primero lo que dio premio.", explicacion: "No: los lotes se toman al azar de las últimas 10 000 transiciones, sin preferir las que dieron premio. Lo que importa es que mezclan partidas distintas." },
           { texto: "Deja quieto el objetivo: como las transiciones guardadas son viejas, el objetivo que se calcula con ellas ya no cambia en cada paso.", explicacion: "No: el objetivo se sigue calculando con la red que se mueve; viejas son las transiciones, no la red. Por eso, solo con memoria, los valores se disparan al principio." },
-          { texto: "La red aprende de lotes que mezclan partidas en vez de los últimos pasos, casi iguales; eso frena mucho, pero el objetivo se sigue moviendo.", explicacion: "Correcto. Es el ejemplo del peso solo: con A → B crece hasta 27,30, y mezclado con B → salida se asienta en 0,5862. Sin red objetivo, el objetivo se mueve con cada paso y la política no sale." },
+          { texto: "La red aprende de lotes que mezclan partidas en vez de los últimos pasos, casi iguales; eso frena mucho, pero el objetivo se sigue moviendo.", explicacion: "Correcto. Es el ejemplo del peso solo: con A → B llega a 27,30 en 60 pasos y sigue creciendo, y mezclado con B → salida se asienta en 0,5862. Sin red objetivo, el objetivo se mueve con cada paso y la política no sale." },
           { texto: "Le da a la red más experiencia que la que juntó el agente sin trucos, y con más experiencia una red ya no puede sobreestimar los valores.", explicacion: "No: las dos variantes juegan los mismos 10 000 pasos y la memoria reusa esas transiciones. Y con memoria sola el Q más alto igual llega a 13,63, muy por encima de 1." }
         ],
         correcta: 2

@@ -56,7 +56,7 @@
     <div class="texto">
       <div class="paso">Paso 1</div>
       <h2>La tabla es una imagen</h2>
-      <p>La cueva chica tiene 60 casillas y 4 flechas, así que la tabla Q es una matriz de 60 × 4 = 240 números que se puede mirar como una imagen. Cada fila de la matriz es una casilla de la cueva, partida en cuatro triángulos, uno por flecha. Leída como función, la tabla recibe una casilla y devuelve sus cuatro valores, como en S, donde Q* vale 0,8179 hacia ↑, 0,8262 hacia →, 0,8097 hacia ↓ y 0,8179 hacia ←, con V*(S) = 0,8262. Con γ = 0,99 y un solo premio de +1, todos los valores quedan entre 0,82 y 1, así que las flechas de una casilla se diferencian en un 1 o un 2 %.</p>
+      <p>La cueva chica tiene 60 casillas y 4 flechas, así que la tabla Q es una matriz de 60 × 4 = 240 números que se puede mirar como una imagen. Cada fila de la matriz es una casilla de la cueva, partida en cuatro triángulos, uno por flecha. Leída como función, la tabla recibe una casilla y devuelve sus cuatro valores, como en S, donde Q* vale 0,8179 hacia ↑, 0,8262 hacia →, 0,8097 hacia ↓ y 0,8179 hacia ←, con V*(S) = 0,8262. Con γ = 0,99 y un solo premio de +1, todos los V* quedan entre 0,82 y 1, así que las flechas de una casilla se diferencian en un 1 o un 2 %.</p>
       <div class="eq">Q : s ↦ (Q↑, Q→, Q↓, Q←)</div>
       <p class="nota pregunta">En un juego de Atari cada pantalla distinta es un estado. ¿Cuántas filas tendría su matriz? ¿Cuántas vería alguna vez el agente?</p>
     </div>
@@ -87,7 +87,7 @@
     <div class="texto">
       <div class="paso">Paso 2</div>
       <h2>Una red que equivale a la tabla</h2>
-      <p>Reemplazar la tabla por una función Q<sub>θ</sub> con parámetros θ, como una red neuronal, se llama aproximación de funciones (<i>function approximation</i>). Con la entrada one-hot (<i>one-hot</i>), 60 números en 0 salvo un 1 en la casilla, una red sin capas ocultas es una matriz W de 4 × 60 con 240 parámetros, uno por cada número de la tabla. En el notebook, un paso de gradiente con la transición de (8,11) a la salida toca 1 de los 240 pesos, que queda en W = 0,50 igual que la tabla, mientras que con las mismas 20&nbsp;000 transiciones las dos terminan con una diferencia máxima de 0. Una red con capas ocultas, como la de seis números que entran y cuatro que salen, en cambio comparte cada peso entre todas las casillas.</p>
+      <p>Reemplazar la tabla por una función Q<sub>θ</sub> con parámetros θ, como una red neuronal, se llama aproximación de funciones (<i>function approximation</i>). Con la entrada <i>one-hot</i>, 60 números en 0 salvo un 1 en la casilla, una red sin capas ocultas es una matriz W de 4 × 60 con 240 parámetros, uno por cada número de la tabla. En el notebook, un paso de gradiente con la transición de (8,11) a la salida toca 1 de los 240 pesos, que queda en W = 0,50 igual que la tabla, mientras que con las mismas 20&nbsp;000 transiciones las dos terminan idénticas. Una red con otra entrada, como la de seis números que entran y cuatro que salen, en cambio comparte cada peso entre todas las casillas.</p>
       <div class="eq">W[a,s] ← W[a,s] + α (y − W[a,s])</div>
       <p class="nota pregunta">Con la red de seis entradas, apretá «Un paso de gradiente». ¿Por qué ahora cambian casi todos los pesos y no uno solo?</p>
     </div>
@@ -165,7 +165,7 @@
     <div class="texto">
       <div class="paso">Paso 5</div>
       <h2>El objetivo que se mueve</h2>
-      <p>Hasta acá la red copiaba un Q* correcto, pero en RL el objetivo r + γ max Q(s′,a′) lo calcula la misma red, así que cada paso de gradiente mueve también el objetivo. En el ejemplo más chico, con un solo peso w, Q(A) = w, Q(B) = 2w y la transición de A a B con premio 0, el peso pasa de 0,1 a 27,30 en 60 pasos con α = 0,1. Sutton y Barto llaman tríada mortal (<i>deadly triad</i>) a la combinación de aproximación de funciones, objetivo que usa la propia estimación (<i>bootstrapping</i>) y aprendizaje off-policy, porque juntas pueden hacer diverger el aprendizaje. En la cueva, Q-learning con una red y sin trucos llega a creer que una casilla vale 128,83 cuando ninguna puede pasar de 1, mientras su política sale solo desde el 3 % de las casillas.</p>
+      <p>Hasta acá la red copiaba un Q* correcto, pero en RL el objetivo r + γ max Q(s′,a′) lo calcula la misma red, así que cada paso de gradiente mueve también el objetivo. En el ejemplo más chico (una variante de un ejemplo de Sutton y Barto), con un solo peso w, Q(A) = w, Q(B) = 2w y la transición de A a B con premio 0, el peso pasa de 0,1 a 27,30 en 60 pasos con α = 0,1. Sutton y Barto llaman tríada mortal (<i>deadly triad</i>) a la combinación de aproximación de funciones, objetivo que usa la propia estimación (<i>bootstrapping</i>) y aprendizaje off-policy, porque juntas pueden hacer diverger el aprendizaje. En la cueva, Q-learning con una red y sin trucos llega a creer que una casilla vale 128,83 cuando ninguna puede pasar de 1, mientras su política sale solo desde el 3 % de las casillas.</p>
       <div class="eq">w ← (1 + α(2γ − 1)) w = 1,098 w</div>
       <p class="nota pregunta">Si la red ve también la transición de B a la salida, con premio 1, el peso se frena. ¿Por qué mezclar transiciones ayuda?</p>
     </div>
@@ -198,9 +198,9 @@
     <div class="texto">
       <div class="paso">Paso 6</div>
       <h2>DQN: memoria de repetición y red objetivo</h2>
-      <p>DQN (<i>Deep Q-Network</i>), la receta con la que Mnih et al. (2015) jugaron a Atari desde la pantalla, es Q-learning con una red, un ε que baja de 1 a 0,1 y dos ingredientes contra el objetivo que se mueve. La memoria de repetición (<i>experience replay</i>) guarda las últimas 10&nbsp;000 transiciones y aprende de lotes tomados al azar, que mezclan partidas en vez de repetir los últimos pasos. La red objetivo (<i>target network</i>) es una copia congelada que calcula el objetivo y se pone al día cada 40 pasos, para que la red pueda alcanzarlo. En el notebook, con los dos ingredientes el Q más alto no pasa de 1,16, el error final baja a 0,0080 y la política sale desde el 97 % de las casillas, aunque no desde S, porque en (6,1) la red prefiere ↑ a ↓ por 0,0001.</p>
-      <div class="eq parte"><span class="nw">objetivo = r + γ maxₐ′ Q<sub>θ̄</sub>(s′,a′)</span> <span class="nw">θ̄ = copia de θ cada 40 pasos</span></div>
-      <p class="nota pregunta">Con solo uno de los dos ingredientes la política no sale desde ninguna casilla. ¿Qué problema arregla cada uno?</p>
+      <p>DQN (<i>Deep Q-Network</i>), la receta con la que Mnih et al. (2015) jugaron a Atari desde la pantalla, es Q-learning con una red, un ε que baja de 1 a 0,1 y dos ingredientes contra el objetivo que se mueve. La memoria de repetición (<i>experience replay</i>) guarda las transiciones (en el notebook, las últimas 10&nbsp;000) y aprende de lotes tomados al azar, que mezclan partidas en vez de repetir los últimos pasos. La red objetivo (<i>target network</i>) θ̄ es una copia congelada de la red θ que calcula el objetivo y se pone al día cada tanto (en el notebook, cada 40 pasos), para que la red pueda alcanzarlo. En el notebook, con los dos ingredientes el Q más alto no pasa de 1,16, el error final baja a 0,0080 y la política sale desde el 97 % de las casillas (promedio final), aunque en el paso 10&nbsp;000 no sale desde S, porque en (6,1) la red prefiere ↑ a ↓ por menos de una diezmilésima.</p>
+      <div class="eq">objetivo = r + γ maxₐ′ Q<sub>θ̄</sub>(s′,a′)</div>
+      <p class="nota pregunta">Con la semilla 0, con solo uno de los dos ingredientes la política no sale desde ninguna casilla. ¿Qué problema arregla cada uno?</p>
     </div>
   </section>
 
