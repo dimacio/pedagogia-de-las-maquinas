@@ -98,7 +98,7 @@
     <div class="texto">
       <div class="paso">Paso 2</div>
       <h2>El mismo bucle, otro entorno</h2>
-      <p>Cambiemos la cueva por una biblioteca de seis documentos. Un agente que investiga (<i>deep search</i>) piensa, pide buscar(palabras) o responder(texto) y recibe como observación el documento encontrado. El molde es el mismo que en la cueva con otras herramientas y otras observaciones. En el notebook acierta 1 de 3 preguntas, porque con ReAct encuentra «ICLR de 2023», lo escribe en su pensamiento y después responde «Todo correcto.».</p>
+      <p>Cambiemos la cueva por una biblioteca de seis documentos. Un agente que investiga (<i>deep search</i>) piensa, pide buscar(palabras) o responder(texto) y recibe como observación el documento encontrado. El molde es el mismo que en la cueva con otras herramientas y otras observaciones. En el notebook acierta 1 de 3 preguntas; en la de ReAct encuentra «ICLR de 2023», lo escribe en su pensamiento y después responde «Todo correcto.».</p>
       <div class="eq">acción ∈ { buscar(palabras), responder(texto) }</div>
       <p class="nota pregunta">En la cueva la partida termina al salir. ¿Qué acción termina la partida en la biblioteca y quién decide si valió +1?</p>
     </div>
@@ -150,7 +150,7 @@
     <div class="texto">
       <div class="paso">Paso 4</div>
       <h2>La ventana de contexto es el estado</h2>
-      <p>Lo único que el modelo sabe en cada llamada es el texto de su ventana de contexto (<i>context window</i>). Si se le pregunta solo «¿Cuál es mi nombre?», responde que se llama Qwen, mientras que con la conversación anterior en la ventana dice «Ana». En la cueva, «avancé» no dice dónde quedó, así que sin la posición el agente vuelve a chocar contra paredes que ya tocó, como en el POMDP de la clase 9. Escribir la posición en la ventana no alcanzó, porque con la semilla 2 choca 27 veces seguidas contra la misma pared mientras cada observación le repite «fila 1, columna 1».</p>
+      <p>Lo único que el modelo sabe en cada llamada es el texto de su ventana de contexto (<i>context window</i>). Si se le pregunta solo «¿Cuál es mi nombre?», responde que se llama Qwen, mientras que con la conversación anterior en la ventana dice «Ana». En la cueva, «avancé» no dice dónde quedó, así que sin la posición el agente vuelve a chocar contra paredes que ya tocó, como en el POMDP de la clase 9. Escribir la posición en la ventana no alcanzó, porque con la semilla 2 choca 28 veces seguidas contra la misma pared mientras cada observación le repite «fila 1, columna 1».</p>
       <div class="eq">estado del agente = texto de la ventana</div>
       <p class="nota pregunta">Si la posición ya está en la ventana y el modelo igual choca, ¿le falta información o le falta haber aprendido a usarla?</p>
     </div>
@@ -194,12 +194,12 @@
           <tbody id="tb6"></tbody>
         </table></div>
       </div>
-      <p class="cap">Ocho respuestas por cuenta, del notebook (sección 6), con temperatura 0,7, cortadas en 100 caracteres. Las dos recompensas son reglas de juguete del notebook. La tabla muestra la probabilidad que el mismo Qwen2.5-0.5B le da a contestar «Sí» frente a «No».</p>
+      <p class="cap">Ocho respuestas por cuenta, del notebook (sección 6), con temperatura 0,7, cortadas en 100 caracteres. Las dos recompensas son reglas de juguete del notebook. La tabla muestra la probabilidad que el mismo Qwen2.5-0.5B le da a contestar «Sí» frente a «No»: casi la misma para lo correcto y lo incorrecto, así que como juez no distingue.</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 6</div>
       <h2>Una recompensa que se puede engañar</h2>
-      <p>Si la recompensa premia que la respuesta guste, empuja a darle la razón al usuario, lo que se llama complacencia (<i>sycophancy</i>, Sharma et al., 2023). Con la pregunta neutra, las 24 respuestas del modelo dan el resultado correcto. Cuando el usuario afirma, seguro, un resultado equivocado, 23 de 24 le dan la razón y solo 10 dan el correcto. Reforzar las que cobran «gusta» sería reforzar un 61 % de respuestas que no dan el resultado correcto, que es la trampa de la recompensa de la clase 2 con texto (Amodei et al., 2016).</p>
+      <p>Si la recompensa premia que la respuesta guste, empuja a darle la razón al usuario, lo que se llama complacencia (<i>sycophancy</i>, Sharma et al., 2023). Con la pregunta neutra, las 24 respuestas del modelo dan el resultado correcto. Cuando el usuario afirma, seguro, un resultado equivocado, 23 de 24 le dan la razón y solo 10 dan el correcto. Reforzar las que cobran «gusta» sería reforzar un 61 % de respuestas que no cobran «verdad», que es la trampa de la recompensa de la clase 2 con texto (Amodei et al., 2016).</p>
       <div class="eq parte"><span class="nw">r<sub>gusta</sub> = 1 si la respuesta</span> <span class="nw">arranca dándole la razón</span></div>
       <p class="nota pregunta">Cambiá a «reforzar verdad». ¿Qué respuestas se quedan afuera en 63 − 28 y qué aprendería un agente con esa recompensa?</p>
     </div>
@@ -218,7 +218,7 @@
     <div class="texto">
       <div class="paso">Paso 7</div>
       <h2>Por qué el modelo chico juega peor</h2>
-      <p>Con el mismo límite de 30 pasos, el agente ReAct recorre en promedio 3 casillas distintas, menos que uno que elige al azar (6,2). Q-learning (clase 6), que no escribe ni piensa en voz alta, sale en 20 pasos por el camino más corto. Al modelo le falta una memoria que arme un mapa con lo que ya vio y le falta una recompensa, porque sus pesos no cambian y la partida 100 sería tan mala como la primera. Un modelo más grande seguiría mejor el formato, aunque los agentes de lenguaje que funcionan agregan memoria explícita y se entrenan con RL sobre partidas de agente.</p>
+      <p>Con el mismo límite de 30 pasos, el agente ReAct recorre en promedio 3 casillas distintas, menos que uno que elige al azar (6,2), porque en dos de las tres partidas la mayoría de los pasos ni siquiera fueron una acción válida. Q-learning (clase 6), que no escribe ni piensa en voz alta, sale en 20 pasos por el camino más corto. Al modelo le falta una memoria que arme un mapa con lo que ya vio y le falta una recompensa, porque sus pesos no cambian y la partida 100 sería tan mala como la primera. Un modelo más grande seguiría mejor el formato, aunque los agentes de lenguaje que funcionan agregan memoria explícita y se entrenan con RL sobre partidas de agente.</p>
       <p class="nota pregunta">Q-learning practicó 300 partidas con recompensa y el modelo ninguna. ¿Qué tendría que pasar para que la partida 100 del agente ReAct fuera mejor que la primera?</p>
     </div>
   </section>
@@ -314,7 +314,7 @@
         ["No lo sé de memoria; busco en la biblioteca.", "buscar(parámetros cuenca modelos)", "[qwen] El agente de lenguaje de esta clase es Qwen2.5-0.5B-Instruct, un modelo abierto de unos 500 millones de parámetros. Como evaluador el curso usa Qwen2.5-1.5B-Instruct.", null],
         ["El modelo Qwen2.5-1.5B-Instruct tiene aproximadamente 500 millones de parámetros.", "responder(Tiene aproximadamente 500 millones de parámetros.)", null, "Tiene aproximadamente 500 millones de parámetros."]] }
     ],
-    // celda 30: pedidos de prueba del arnés (los tres últimos los escribió el modelo en la celda 32)
+    // celda 30: pedidos de prueba del arnés (los dos siguientes los escribió el modelo en la celda 32; «10 * 14» lo agregamos)
     pedidos: [
       ["válido", "<tool_call>{\"name\": \"buscar\", \"arguments\": {\"consulta\": \"AlphaGo\"}}</tool_call>"],
       ["JSON roto", "<tool_call>{\"name\": \"buscar\", \"arguments\": {\"consulta\": \"AlphaGo\"</tool_call>"],

@@ -1294,12 +1294,12 @@ window.MODULOS = {
       },
       {
         objetivo: "O2",
-        pregunta: "Si se le pregunta solo «¿Cuál es mi nombre?», Qwen responde que se llama Qwen; con la conversación anterior en la ventana dice «Ana». En la cueva, con la posición escrita en cada observación, la semilla 2 choca 27 veces seguidas contra la misma pared mientras cada observación le repite «fila 1, columna 1». ¿Qué muestran los dos casos juntos?",
+        pregunta: "Si se le pregunta solo «¿Cuál es mi nombre?», Qwen responde que se llama Qwen; con la conversación anterior en la ventana dice «Ana». En la cueva, con la posición escrita en cada observación, la semilla 2 choca 28 veces seguidas contra la misma pared mientras cada observación le repite «fila 1, columna 1». ¿Qué muestran los dos casos juntos?",
         opciones: [
-          { texto: "Que el estado del agente es el texto de su ventana: sin la historia no sabe el nombre; pero tener la posición en la ventana no alcanza si el modelo no aprendió a usarla.", explicacion: "Correcto. Lo que no entra en la ventana no existe para el modelo, como en el POMDP de la clase 9. Y con la posición en la ventana el promedio de choques no bajó: pasó de 6,0 a 9,7 en las tres semillas." },
+          { texto: "Que el estado del agente es el texto de su ventana: sin la historia no sabe el nombre; pero tener la posición en la ventana no alcanza si el modelo no aprendió a usarla.", explicacion: "Correcto. Lo que no entra en la ventana no existe para el modelo, como en el POMDP de la clase 9. Y con la posición en la ventana ninguna de las tres partidas salió: tres semillas no alcanzan para decir que empeora, pero sí que el dato solo no basta." },
           { texto: "Que el modelo recuerda entre llamadas solo lo importante, como un nombre, y se olvida de lo que considera un detalle, como la posición.", explicacion: "No: entre llamadas no recuerda nada. Dice «Ana» solo cuando la conversación anterior vuelve a entrar en la ventana; sin ella, contesta «Qwen»." },
           { texto: "Que la ventana se llenó: con la posición en cada observación el texto supera lo que entra y el modelo deja de ver las primeras líneas.", explicacion: "No: ninguna de las seis partidas pasó de 1882 tokens en la ventana y Qwen2.5 admite unos 32 mil. La información estaba en la ventana; lo que faltó fue usarla." },
-          { texto: "Que agregar la posición resuelve el problema de la cueva: las 27 repeticiones de la semilla 2 son mala suerte y con más partidas desaparecerían.", explicacion: "No: con la posición ninguna de las tres partidas salió y el promedio de choques repetidos subió de 3,7 a 9,0. Darle el dato no le enseña a usarlo." }
+          { texto: "Que agregar la posición resuelve el problema de la cueva: los 28 choques seguidos de la semilla 2 son mala suerte y con más partidas desaparecerían.", explicacion: "No: con la posición ninguna de las tres partidas salió. Con tres semillas no se puede asegurar qué pasaría con más partidas, pero darle el dato no le enseñó a usarlo." }
         ],
         correcta: 0
       },
