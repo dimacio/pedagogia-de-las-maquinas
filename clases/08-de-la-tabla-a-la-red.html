@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>De la tabla a la red · RL a ciegas</title>
+<meta name="description" content="Clase 8: la tabla Q como imagen y como función, una red one-hot que equivale a la tabla, generalizar con coordenadas y cuándo engaña junto a una pared, el objetivo que se mueve y la tríada mortal, DQN con memoria de repetición y red objetivo, y cómo comparar agentes con varias semillas.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .lz { min-width: 0; }
+  .seg { flex-wrap: wrap; }
+  .seg button { min-width: 0; }
+  .cap { font-size: 13px; color: var(--muted); }
+  .cap b { color: var(--ink); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+  .chips span { display: inline-flex; align-items: center; gap: 6px; }
+  .chips i { width: 14px; height: 3px; display: inline-block; border-radius: 1px; }
+  .chips i.cuad { width: 10px; height: 10px; border-radius: 2px; }
+  /* la tabla como imagen: matriz al lado de la cueva */
+  .par { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; }
+  .par > div { min-width: 0; display: grid; gap: 4px; justify-items: start; }
+  .par h3 { font-family: var(--mono); font-size: 12px; font-weight: 400; color: var(--muted); }
+  .par h3 b { color: var(--ink); font-weight: 600; }
+  /* las fórmulas largas se parten en un punto elegido */
+  .eq.parte { white-space: normal; }
+  .eq .nw { white-space: nowrap; margin-right: 1.2em; }
+  /* tablas de cifras del notebook */
+  .tabla.nb table { font-size: 13px; }
+  .tabla.nb tr.sel td { color: var(--lamp); }
+  .tabla.nb tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--lamp); }
+  @media (max-width: 560px) { .tabla.nb table { font-size: 12px; } .tabla.nb th, .tabla.nb td { padding: 6px 5px; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase 8</div>
+    <h1>De la tabla a la <span class="g">red</span></h1>
+    <p class="thesis">Cuando no hay tabla posible, una red calcula Q a partir de una descripción de la casilla. Comparte lo aprendido entre casillas parecidas, para bien y para mal.</p>
+  </section>
+
+  <!-- B1: la tabla es una imagen -->
+  <section class="bloque" id="b-imagen" data-objetivos="O1">
+    <div class="stage">
+      <div class="par">
+        <div><h3>la tabla, <b>60 × 4</b></h3><canvas id="cvMat" aria-label="La tabla Q* como imagen de 60 filas por 4 columnas, una fila por casilla y una columna por flecha; la fila elegida tiene borde verde"></canvas></div>
+        <div><h3>la misma tabla, <b>sobre la cueva</b></h3><div class="lz" style="width:100%"><canvas id="cvTri" aria-label="La cueva con cada casilla partida en cuatro triángulos, uno por flecha, coloreados según Q*"></canvas></div></div>
+      </div>
+      <div class="legend"><span id="legTablaLo"></span><span class="bar" id="legTabla"></span><span>1</span></div>
+      <div class="hud" id="hudTabla"></div>
+      <p class="cap">Q* calculado en el navegador por iteración de valor (γ = 0,99), como en la clase 4, con el mapa. Pasá el puntero o tocá una fila de la matriz o una casilla de la cueva.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 1</div>
+      <h2>La tabla es una imagen</h2>
+      <p>La cueva chica tiene 60 casillas y 4 flechas, así que la tabla Q es una matriz de 60 × 4 = 240 números que se puede mirar como una imagen. Cada fila de la matriz es una casilla de la cueva, partida en cuatro triángulos, uno por flecha. Leída como función, la tabla recibe una casilla y devuelve sus cuatro valores, como en S, donde Q* vale 0,8179 hacia ↑, 0,8262 hacia →, 0,8097 hacia ↓ y 0,8179 hacia ←, con V*(S) = 0,8262. Con γ = 0,99 y un solo premio de +1, todos los V* quedan entre 0,82 y 1, así que las flechas de una casilla se diferencian en un 1 o un 2 %.</p>
+      <div class="eq">Q : s ↦ (Q↑, Q→, Q↓, Q←)</div>
+      <p class="nota pregunta">En un juego de Atari cada pantalla distinta es un estado. ¿Cuántas filas tendría su matriz? ¿Cuántas vería alguna vez el agente?</p>
+    </div>
+  </section>
+
+  <!-- B2: una red que equivale a la tabla -->
+  <section class="bloque" id="b-onehot" data-objetivos="O1">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué red mirar" id="segRed">
+        <button aria-pressed="true" data-m="onehot">One-hot: 60 entran, 4 salen</button>
+        <button aria-pressed="false" data-m="mlp">6 entran, 4 salen</button>
+      </div>
+      <div class="lz"><canvas id="cvRedCueva" aria-label="La cueva coloreada con el valor que sabe la red en cada casilla; la casilla de entrada tiene borde verde. Tocá otra para cambiar la entrada"></canvas></div>
+      <div class="lz"><canvas id="cvRed" aria-label="Diagrama de la red: la entrada, los pesos y las cuatro salidas para la casilla elegida"></canvas></div>
+      <div class="row" id="ctlOnehot">
+        <button class="btn primary" id="rPaso">Un paso de gradiente</button>
+        <button class="btn" id="r20k">20 000 transiciones</button>
+        <button class="btn" id="rCero">Pesos en 0</button>
+      </div>
+      <div class="row" id="ctlMlp" hidden>
+        <button class="btn primary" id="rEnt">Entrenar</button>
+        <button class="btn" id="rPasoM">Un paso de gradiente</button>
+        <button class="btn" id="rNueva">Pesos nuevos</button>
+      </div>
+      <div class="hud" id="hudRed"></div>
+      <p class="cap" id="capRed"></p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 2</div>
+      <h2>Una red que equivale a la tabla</h2>
+      <p>Reemplazar la tabla por una función Q<sub>θ</sub> con parámetros θ, como una red neuronal, se llama aproximación de funciones (<i>function approximation</i>). Con la entrada <i>one-hot</i>, 60 números en 0 salvo un 1 en la casilla, una red sin capas ocultas es una matriz W de 4 × 60 con 240 parámetros, uno por cada número de la tabla. En el notebook, un paso de gradiente con la transición de (8,11) a la salida toca 1 de los 240 pesos, que queda en W = 0,50 igual que la tabla, mientras que con las mismas 20&nbsp;000 transiciones las dos terminan idénticas. Una red con otra entrada, como la de seis números que entran y cuatro que salen, en cambio comparte cada peso entre todas las casillas.</p>
+      <div class="eq">W[a,s] ← W[a,s] + α (y − W[a,s])</div>
+      <p class="nota pregunta">Con la red de seis entradas, apretá «Un paso de gradiente». ¿Por qué ahora cambian casi todos los pesos y no uno solo?</p>
+    </div>
+  </section>
+
+  <!-- B3: generalizar -->
+  <section class="bloque" id="b-generalizar" data-objetivos="O2">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué mirar" id="segGen">
+        <button aria-pressed="false" data-g="visitas">Visitas</button>
+        <button aria-pressed="false" data-g="tabla">Tabla</button>
+        <button aria-pressed="false" data-g="promedio">Promedio</button>
+        <button aria-pressed="true" data-g="red">Red con coordenadas</button>
+      </div>
+      <div class="lz"><canvas id="cvGen" aria-label="La cueva con las visitas de un agente, o el valor que estima cada método; las casillas con menos de 10 visitas tienen borde rojo"></canvas></div>
+      <div class="legend"><span id="legGenLo"></span><span class="bar" id="legGen"></span><span id="legGenHi"></span></div>
+      <div class="hud" id="hudGen"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>notebook, 11 casillas con &lt; 10 visitas</th><th>error medio |V − V*|</th></tr></thead>
+          <tbody id="tbGen"></tbody>
+        </table>
+      </div>
+      <p class="cap">Visitas y valores del notebook: un agente de Q-learning jugó 100 partidas desde S (ε = 0,1, α = 0,2). Después, cada método recibe el Q* correcto de las 48 casillas vistas y estima las otras. Tocá una casilla para ver sus números.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 3</div>
+      <h2>Generalizar: saber algo de donde casi no estuvo</h2>
+      <p>Un agente que jugó 100 partidas desde S con Q-learning dejó 11 casillas con menos de 10 visitas, las de alrededor de la salida y el rincón de arriba a la derecha. Para mirar solo la generalización (<i>generalization</i>), en el notebook cada método recibe el Q* correcto de las casillas vistas, como en una regresión, sin aprendizaje por refuerzo. La red con coordenadas recibe solo la fila y la columna (2 → 64 → 64 → 4, con 4612 parámetros), así que casillas cercanas comparten pesos y lo aprendido en las vistas se contagia a sus vecinas. En esas 11 casillas, la tabla se equivoca en 0,9681, adivinar el promedio en 0,0687 y la red con coordenadas en 0,0106.</p>
+      <div class="eq">x<sub>s</sub> = (fila / 9, columna / 13)</div>
+      <p class="nota pregunta">La red tiene 4612 parámetros y la tabla 240. ¿Dónde está la ventaja, si la red es más grande?</p>
+    </div>
+  </section>
+
+  <!-- B4: cuando generalizar engaña -->
+  <section class="bloque" id="b-pared" data-objetivos="O2">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué entrada recibe la red" id="segPared">
+        <button aria-pressed="true" data-p="xy">Coordenadas</button>
+        <button aria-pressed="false" data-p="bg">Coordenadas + bigotes</button>
+      </div>
+      <div class="lz"><canvas id="cvPared" aria-label="La cueva con la flecha que elige la red en cada casilla: fondo verde si es óptima, rojo si no; círculos en las casillas (7,6) y (7,8)"></canvas></div>
+      <div class="chips"><span><i class="cuad" style="background:#1d3b2c"></i>flecha óptima</span><span><i class="cuad" style="background:#5a2626"></i>flecha equivocada</span><span><i class="cuad" style="border:2px solid var(--sonar)"></i>(7,6) y (7,8)</span></div>
+      <div class="hud" id="hudPared"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>notebook</th><th>V*</th><th>max Q de la red</th><th>elige</th></tr></thead>
+          <tbody id="tbPared"></tbody>
+        </table>
+      </div>
+      <p class="cap">Redes del notebook (2 → 64 → 64 → 4 y 6 → 64 → 64 → 4), entrenadas con el Q* correcto de las 59 casillas. Los bigotes valen 1 si hay pared pegada. Tocá una casilla para ver sus cuatro Q.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 4</div>
+      <h2>Cuando generalizar engaña</h2>
+      <p>Las casillas (7,6) y (7,8) están a dos columnas con una pared en el medio, así que para la red con coordenadas son casi la misma entrada, aunque una está a 11 pasos de la salida y la otra a 5. Aun entrenada con el Q* correcto de las 59 casillas, la red suaviza el salto y estima 0,9064 para (7,6) y 0,9528 para (7,8), contra 0,9044 y 0,9606 de verdad. En (7,6) elige →, contra la pared, porque desde ahí ir a la derecha se parece a estar en (7,8), que vale más. Con coordenadas acierta la flecha en el 71 % de las casillas, que pasa al 97 % si se le suman cuatro bigotes que valen 1 cuando hay pared pegada.</p>
+      <div class="eq">V*(7,8) − V*(7,6) = 0,0562</div>
+      <p class="nota pregunta">La tabla nunca se equivoca así junto a una pared. ¿Qué le falta a la tabla que a la red le sobra?</p>
+    </div>
+  </section>
+
+  <!-- B5: el objetivo que se mueve -->
+  <section class="bloque" id="b-objetivo" data-objetivos="O3">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué mirar" id="segObj">
+        <button aria-pressed="true" data-o="peso">Un peso</button>
+        <button aria-pressed="false" data-o="cueva">La cueva, sin trucos</button>
+      </div>
+      <div class="lz"><canvas id="cvObj" aria-label="Gráfico en escala logarítmica: el peso w paso a paso, o el Q más grande de la red en la cueva; la línea punteada marca 1"></canvas></div>
+      <div class="chips" id="chipsObj"></div>
+      <div class="row"><button class="btn primary" id="objVer">Paso a paso</button></div>
+      <div class="hud" id="hudObj"></div>
+      <p class="cap" id="capObj"></p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 5</div>
+      <h2>El objetivo que se mueve</h2>
+      <p>Hasta acá la red copiaba un Q* correcto, pero en RL el objetivo r + γ max Q(s′,a′) lo calcula la misma red, así que cada paso de gradiente mueve también el objetivo. En el ejemplo más chico (una variante de un ejemplo de Sutton y Barto), con un solo peso w, Q(A) = w, Q(B) = 2w y la transición de A a B con premio 0, el peso pasa de 0,1 a 27,30 en 60 pasos con α = 0,1. Sutton y Barto llaman tríada mortal (<i>deadly triad</i>) a la combinación de aproximación de funciones, objetivo que usa la propia estimación (<i>bootstrapping</i>) y aprendizaje off-policy, porque juntas pueden hacer diverger el aprendizaje. En la cueva, Q-learning con una red y sin trucos llega a creer que una casilla vale 128,83 cuando ninguna puede pasar de 1, mientras su política sale solo desde el 3 % de las casillas.</p>
+      <div class="eq">w ← (1 + α(2γ − 1)) w = 1,098 w</div>
+      <p class="nota pregunta">Si la red ve también la transición de B a la salida, con premio 1, el peso se frena. ¿Por qué mezclar transiciones ayuda?</p>
+    </div>
+  </section>
+
+  <!-- B6: DQN -->
+  <section class="bloque" id="b-dqn" data-objetivos="O3">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué curva mirar" id="segDqn">
+        <button aria-pressed="true" data-d="sale">% de casillas desde las que sale</button>
+        <button aria-pressed="false" data-d="error">Error |max Q − V*|</button>
+      </div>
+      <div class="lz"><canvas id="cvDqn" aria-label="Curvas de aprendizaje de cuatro variantes: sin trucos, solo red objetivo, solo memoria y DQN"></canvas></div>
+      <div class="chips"><span><i style="background:var(--ember)"></i>sin trucos</span><span><i style="background:var(--lamp)"></i>solo red objetivo</span><span><i style="background:#c58fd6"></i>solo memoria</span><span><i style="background:var(--sonar)"></i>DQN (las dos)</span></div>
+      <div class="lz"><canvas id="cvDqnCueva" aria-label="La cueva con el valor y la flecha que aprendió DQN; en rojo, el camino desde S, que queda yendo y viniendo entre (5,1) y (6,1)"></canvas></div>
+      <div class="hud" id="hudDqn"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>notebook, semilla 0</th><th>Q más alto</th><th>error final</th><th>sale desde</th></tr></thead>
+          <tbody>
+            <tr><td>sin trucos</td><td class="num">128,83</td><td class="num">3,1573</td><td class="num">3 %</td></tr>
+            <tr><td>solo red objetivo</td><td class="num">3,25</td><td class="num">1,7634</td><td class="num">0 %</td></tr>
+            <tr><td>solo memoria</td><td class="num">13,63</td><td class="num">0,1570</td><td class="num">0 %</td></tr>
+            <tr class="sel"><td>DQN (las dos)</td><td class="num">1,16</td><td class="num">0,0080</td><td class="num">97 %</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">Curvas, tabla y mapa del notebook: la misma red 6 → 64 → 64 → 4, 10&nbsp;000 pasos, un paso de gradiente cada 4 y partidas que empiezan en una casilla al azar. «Final» es el promedio de las últimas 4 mediciones. Tocá una casilla del mapa para ver los Q de la red.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 6</div>
+      <h2>DQN: memoria de repetición y red objetivo</h2>
+      <p>DQN (<i>Deep Q-Network</i>), la receta con la que Mnih et al. (2015) jugaron a Atari desde la pantalla, es Q-learning con una red, un ε que baja de 1 a 0,1 y dos ingredientes contra el objetivo que se mueve. La memoria de repetición (<i>experience replay</i>) guarda las transiciones (en el notebook, las últimas 10&nbsp;000) y aprende de lotes tomados al azar, que mezclan partidas en vez de repetir los últimos pasos. La red objetivo (<i>target network</i>) θ̄ es una copia congelada de la red θ que calcula el objetivo y se pone al día cada tanto (en el notebook, cada 40 pasos), para que la red pueda alcanzarlo. En el notebook, con los dos ingredientes el Q más alto no pasa de 1,16, el error final baja a 0,0080 y la política sale desde el 97 % de las casillas (promedio final), aunque en el paso 10&nbsp;000 no sale desde S, porque en (6,1) la red prefiere ↑ a ↓ por menos de una diezmilésima.</p>
+      <div class="eq">objetivo = r + γ maxₐ′ Q<sub>θ̄</sub>(s′,a′)</div>
+      <p class="nota pregunta">Con la semilla 0, con solo uno de los dos ingredientes la política no sale desde ninguna casilla. ¿Qué problema arregla cada uno?</p>
+    </div>
+  </section>
+
+  <!-- B7: comparar de forma justa -->
+  <section class="bloque" id="b-semillas" data-objetivos="O4">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Cómo mirar las semillas" id="segSem">
+        <button aria-pressed="true" data-v="banda">Promedio ± desvío</button>
+        <button aria-pressed="false" data-v="cada">Cada semilla</button>
+      </div>
+      <div class="lz"><canvas id="cvSem" aria-label="Porcentaje de casillas desde las que sale la política a lo largo de 10 000 pasos, para Q-learning con red sin trucos y para DQN, con 5 semillas cada uno; un punto marca la semilla 0 en el paso 5000"></canvas></div>
+      <div class="chips"><span><i style="background:var(--ember)"></i>sin trucos</span><span><i style="background:var(--sonar)"></i>DQN</span><span><i style="background:var(--lamp)"></i>DQN, semilla 0</span></div>
+      <div class="hud" id="hudSem"></div>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>notebook, sale desde (final)</th><th>5 semillas</th><th>por semilla</th></tr></thead>
+          <tbody>
+            <tr><td>sin trucos</td><td class="num">1 % ± 1 %</td><td class="num">3, 1, 1, 0, 0 %</td></tr>
+            <tr class="sel"><td>DQN</td><td class="num">94 % ± 5 %</td><td class="num">97, 96, 84, 96, 95 %</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">Curvas del notebook: semillas 0 a 4 de cada método, la banda es el promedio ± un desvío. La línea ámbar es la semilla 0, la de los pasos 5 y 6.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 7</div>
+      <h2>Comparar agentes de forma justa</h2>
+      <p>Todo lo anterior salió de una sola semilla (<i>random seed</i>), que fija los pesos iniciales, el orden de las partidas y las flechas de exploración. Con 5 semillas, DQN termina saliendo desde el 94 % ± 5 % de las casillas (97, 96, 84, 96 y 95 %) y sin trucos desde el 1 % ± 1 %. La semilla 0 sale desde el 100 % de las casillas en el paso 5000, cuando el promedio de las cinco en ese paso es 68 % ± 36 %. Por eso Machado et al. (2018) piden varias semillas, la curva entera con su dispersión y azar en el entorno, como las acciones pegajosas de la clase 7, para que ningún agente gane memorizando.</p>
+      <div class="eq">resultado = promedio ± desvío entre semillas</div>
+      <p class="nota pregunta">Un artículo dice que su agente supera a DQN y muestra la curva de una sola corrida. ¿Qué le pedirías antes de creerle?</p>
+    </div>
+  </section>
+
+  <!-- B8: Para enseñarlo -->
+  <section class="bloque full" id="b-ensenar" data-objetivos="O1 O2">
+    <div class="texto prose">
+      <div class="paso">Para enseñarlo</div>
+      <h2>Cómo contar esta clase en una oración</h2>
+      <p>"Una red es una tabla que comparte números entre casillas: aprende más rápido de lo que no vio, y por eso también se equivoca en lo que no vio."</p>
+      <p class="nota pregunta">Pregunta para hacerle a quien te escucha: si en tu cuadra el colectivo pasa cada 10 minutos, ¿qué esperás en la cuadra de al lado? ¿Y del otro lado de una autopista sin puentes?</p>
+      <p><b>Ejercicio de 5 minutos:</b> impriman la cueva chica y denle a cada persona tres casillas con su V* escrito. Sin ver las demás, cada una estima V* en una casilla en blanco cercana a partir de las que conoce. Después comparan con el valor verdadero y repiten con una casilla vecina del otro lado de una pared. En la primera acaban de generalizar como una red, mientras que en la segunda se equivocan como ella.</p>
+      <p class="small muted">Adelanto: la red mira una casilla por vez, con sus coordenadas. Con solo los bigotes, dos lugares distintos se sienten igual y hace falta memoria. Viene la clase 9, redes recurrentes.</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(async () => {
+  // cada figura se arma en su propia tarea, para no trabar el navegador al cargar
+  const tarea = f => new Promise(r => setTimeout(() => r(f()), 0));
+  Cueva.pagina("8", { lecturas: [
+    { texto: "Mnih et al. (2015), Human-level control through deep reinforcement learning, Nature 518, 529–533", url: "https://doi.org/10.1038/nature14236" },
+    { texto: "Sutton y Barto (2018), Reinforcement Learning: An Introduction, 2.ª ed., cap. 9 (aproximación de funciones) y 11.3 (la tríada mortal)", url: "http://incompleteideas.net/book/the-book-2nd.html" },
+    { texto: "Stanford CS234 (Brunskill), clase 4, segunda mitad: aproximación de funciones y DQN; CS224R, clase 6: Q-learning profundo", url: "https://web.stanford.edu/class/cs234/" },
+    { texto: "Machado et al. (2018), Revisiting the Arcade Learning Environment, Journal of Artificial Intelligence Research 61, 523–562", url: "https://doi.org/10.1613/jair.5699" }
+  ] });
+
+  const env = Cueva.makeEnv(Cueva.MAPS.chica), n = env.nS, GOAL = env.goal, START = env.start;
+  const COL = Cueva.COL(), MONO = COL.mono || "monospace", AR = Cueva.ARROW;
+  const PARED = "#2c3346", GAMMA = 0.99;
+  const reducir = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = id => document.getElementById(id);
+  const coma = s => String(s).replace(".", ",").replace("-", "−");
+  const fmt = (x, d = 4) => coma(x.toFixed(d));
+  const pct = x => Math.round(100 * x) + " %";
+  const miles = x => String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  const rc = s => `(${env.free[s][0]},${env.free[s][1]})`;
+  const nom = s => s === START ? "S" : rc(s);
+  const marcar = (sel, attr, v) => document.querySelectorAll(sel).forEach(b => b.setAttribute("aria-pressed", b.dataset[attr] === v));
+  const casillaDe = (T, e) => { const [r, c] = T.celdaEn(e); return env.idx[r + "," + c]; };
+  const NOMETA = Array.from({ length: n }, (_, s) => s).filter(s => s !== GOAL);
+  const argmax = q => { let b = 0; for (let a = 1; a < q.length; a++) if (q[a] > q[b]) b = a; return b; };   // la primera si empatan, como numpy
+  const S_ = (r, c) => env.idx[r + "," + c];
+
+  // ---------- el mapa (solo para la respuesta correcta Q*) ----------
+  const NXT = Array.from({ length: n }, (_, s) => [0, 1, 2, 3].map(a => s === GOAL ? GOAL : env.move(s, a)[0]));
+  const RSA = (s, a) => (s !== GOAL && NXT[s][a] === GOAL ? 1 : 0);
+  const { QS, VS } = (() => {
+    let V = new Float64Array(n);
+    for (let k = 0; k < 20000; k++) {
+      const NV = new Float64Array(n); let d = 0;
+      for (const s of NOMETA) { let b = -Infinity; for (let a = 0; a < 4; a++) b = Math.max(b, RSA(s, a) + GAMMA * V[NXT[s][a]]); NV[s] = b; d = Math.max(d, Math.abs(b - V[s])); }
+      V = NV; if (d < 1e-13) break;
+    }
+    const Q = Array.from({ length: n }, (_, s) => [0, 1, 2, 3].map(a => s === GOAL ? 0 : RSA(s, a) + GAMMA * V[NXT[s][a]]));
+    return { QS: Q, VS: V };
+  })();
+  const OPT = (s, a) => Math.abs(QS[s][a] - VS[s]) < 1e-9;
+  const VLO = Math.min(...NOMETA.map(s => VS[s])) - 0.01;   // como CLIM en el notebook
+
+  // ---------- cifras del notebook (re-ejecutando sus celdas con la semilla 0) ----------
+  const NB = {"visitas":[449,574,432,402,531,289,293,35,5,2,1,564,463,90,31,32,682,646,614,522,569,391,518,12,40,604,616,328,578,5,686,496,154,283,519,530,646,0,0,730,638,551,536,0,0,656,391,389,640,439,233,409,0,0,540,247,53,16,0,0],"Q_xy":[[0.8118,0.8144,0.8156,0.8129],[0.8213,0.8251,0.825,0.8184],[0.833,0.8363,0.8358,0.8262],[0.8447,0.8489,0.8476,0.8361],[0.871,0.8786,0.8775,0.8659],[0.8858,0.8952,0.894,0.8831],[0.8946,0.9044,0.9043,0.8947],[0.8993,0.9083,0.911,0.9035],[0.9061,0.9138,0.9184,0.9141],[0.9142,0.92,0.9271,0.9252],[0.9248,0.9273,0.9384,0.9371],[0.8154,0.8186,0.8217,0.8177],[0.8535,0.8605,0.8608,0.8509],[0.8834,0.893,0.8915,0.8816],[0.9141,0.9197,0.9286,0.926],[0.9211,0.9254,0.9361,0.9368],[0.8185,0.823,0.8265,0.8216],[0.8578,0.8652,0.8668,0.8622],[0.8709,0.8797,0.8787,0.8725],[0.8946,0.9032,0.9011,0.8935],[0.9015,0.908,0.9069,0.8986],[0.9071,0.9128,0.914,0.9066],[0.9115,0.9166,0.9207,0.9152],[0.9201,0.9242,0.9342,0.9323],[0.9251,0.9285,0.9411,0.9415],[0.8237,0.8302,0.8331,0.8284],[0.8657,0.8752,0.8744,0.8709],[0.915,0.9186,0.9201,0.9145],[0.9193,0.9224,0.9269,0.9231],[0.9276,0.9306,0.9418,0.9412],[0.8304,0.8386,0.8393,0.8349],[0.8729,0.8843,0.8812,0.8784],[0.8861,0.8955,0.8917,0.888],[0.8986,0.9052,0.9012,0.8966],[0.9099,0.9136,0.9114,0.9071],[0.9168,0.9193,0.9189,0.9145],[0.9229,0.9244,0.9262,0.9224],[0.9367,0.9416,0.9543,0.9537],[0.9455,0.9526,0.9645,0.9627],[0.8371,0.847,0.8456,0.8415],[0.9109,0.9139,0.9108,0.9069],[0.9303,0.9314,0.9348,0.932],[0.9368,0.9404,0.9465,0.9446],[0.9538,0.9622,0.9681,0.9647],[0.9646,0.974,0.977,0.9699],[0.8425,0.8536,0.8501,0.8461],[0.855,0.8639,0.8598,0.8549],[0.8675,0.8742,0.8694,0.8636],[0.88,0.8845,0.879,0.8723],[0.8925,0.8949,0.8886,0.8811],[0.9069,0.9091,0.9048,0.8996],[0.9445,0.9497,0.9513,0.9492],[0.9723,0.9833,0.9799,0.9714],[0.9842,0.9957,0.9901,0.9777],[0.8645,0.8687,0.863,0.8557],[0.9485,0.9598,0.9554,0.9493],[0.9681,0.9793,0.9729,0.9658],[0.9805,0.9928,0.9832,0.9732],[0.992,1.005,0.993,0.9792],[1.0039,1.0173,1.0032,0.9855]],"Q_xy_todo":[[0.8137,0.8159,0.8186,0.8155],[0.8218,0.8249,0.8257,0.8184],[0.8304,0.8357,0.8339,0.8239],[0.8425,0.8487,0.8453,0.8334],[0.8718,0.8795,0.8761,0.8659],[0.8879,0.8964,0.8919,0.8827],[0.8999,0.9052,0.9011,0.8913],[0.9041,0.9081,0.908,0.8983],[0.908,0.9118,0.9162,0.9072],[0.9119,0.9154,0.9243,0.916],[0.9158,0.9191,0.9325,0.9249],[0.8163,0.8188,0.8233,0.8184],[0.853,0.8615,0.8606,0.8515],[0.8846,0.8946,0.891,0.8832],[0.9165,0.9198,0.9307,0.9241],[0.9215,0.9249,0.9397,0.9336],[0.8179,0.8211,0.827,0.8205],[0.8575,0.8651,0.8683,0.8644],[0.8683,0.8792,0.8778,0.8723],[0.8956,0.9051,0.9013,0.8954],[0.9032,0.9084,0.9051,0.8978],[0.9086,0.9124,0.9123,0.9051],[0.9131,0.9167,0.9209,0.9146],[0.9234,0.927,0.9389,0.9336],[0.9318,0.9364,0.9501,0.9433],[0.8234,0.8288,0.8333,0.8276],[0.8654,0.8754,0.8754,0.8723],[0.9143,0.9179,0.9196,0.9146],[0.9188,0.9223,0.9282,0.9241],[0.9351,0.9405,0.9507,0.9446],[0.8301,0.8378,0.8394,0.8346],[0.8726,0.885,0.8819,0.8798],[0.8867,0.8972,0.8934,0.8903],[0.8988,0.9065,0.9029,0.8992],[0.9084,0.9118,0.9093,0.9049],[0.9148,0.9175,0.9172,0.913],[0.9199,0.9235,0.927,0.924],[0.9497,0.958,0.9651,0.958],[0.9611,0.9714,0.979,0.9702],[0.8368,0.8469,0.8455,0.8416],[0.9112,0.9121,0.9094,0.9048],[0.9303,0.9353,0.9379,0.9349],[0.9416,0.9487,0.9518,0.9471],[0.9639,0.9751,0.9789,0.9707],[0.9717,0.9846,0.9876,0.9758],[0.8434,0.8558,0.8515,0.8484],[0.8555,0.8651,0.8604,0.8559],[0.8675,0.8743,0.8693,0.8634],[0.8796,0.8836,0.8781,0.8708],[0.8917,0.8929,0.887,0.8783],[0.9053,0.9064,0.9034,0.8975],[0.9449,0.9528,0.9523,0.9484],[0.9734,0.987,0.9859,0.974],[0.9811,0.9965,0.9946,0.9791],[0.864,0.8675,0.8616,0.8537],[0.9531,0.9644,0.9596,0.9531],[0.9671,0.9796,0.9753,0.9668],[0.9751,0.9893,0.9842,0.9721],[0.9828,0.9988,0.9929,0.9772],[0.9906,1.0083,1.0016,0.9824]],"Q_bg":[[0.8195,0.8198,0.818,0.8156],[0.829,0.8376,0.8281,0.82],[0.8402,0.8489,0.8396,0.8313],[0.842,0.8434,0.8475,0.8381],[0.8813,0.8831,0.8896,0.8833],[0.885,0.894,0.8854,0.8764],[0.8962,0.9052,0.8969,0.8876],[0.9074,0.9165,0.9084,0.8989],[0.9186,0.9278,0.9198,0.9102],[0.9291,0.9219,0.9363,0.9191],[0.9133,0.9112,0.9231,0.922],[0.8113,0.8108,0.8207,0.8114],[0.8511,0.8602,0.8684,0.86],[0.8749,0.8836,0.8932,0.8848],[0.9226,0.9226,0.9413,0.9317],[0.9131,0.9213,0.9348,0.9312],[0.813,0.815,0.8243,0.8157],[0.8638,0.8696,0.8656,0.8649],[0.8539,0.8604,0.8612,0.8677],[0.8915,0.9089,0.9006,0.8993],[0.8995,0.9083,0.9003,0.8907],[0.9075,0.9051,0.9106,0.8992],[0.9058,0.9066,0.9153,0.9065],[0.9314,0.9352,0.9509,0.9411],[0.9229,0.9361,0.9312,0.944],[0.8198,0.8236,0.8331,0.8249],[0.8567,0.8673,0.8695,0.864],[0.9143,0.9159,0.9282,0.9197],[0.9044,0.9108,0.9099,0.9175],[0.9445,0.9515,0.9617,0.9541],[0.8299,0.8357,0.8434,0.8363],[0.8693,0.8852,0.8781,0.8789],[0.8787,0.8875,0.8787,0.8697],[0.8917,0.9001,0.8922,0.8825],[0.9025,0.9051,0.9008,0.8932],[0.9141,0.9227,0.9151,0.905],[0.9222,0.9307,0.941,0.9219],[0.9496,0.9623,0.9703,0.961],[0.9675,0.9689,0.9782,0.9634],[0.8413,0.8489,0.8542,0.8483],[0.9052,0.9092,0.9124,0.9092],[0.9312,0.9404,0.9496,0.9403],[0.9327,0.9305,0.9334,0.9406],[0.9604,0.9759,0.9817,0.9718],[0.9705,0.9814,0.9907,0.9727],[0.8457,0.8636,0.8539,0.8596],[0.8617,0.8723,0.8599,0.8539],[0.8799,0.8858,0.8731,0.8702],[0.8876,0.8976,0.887,0.8794],[0.9006,0.9102,0.9005,0.8921],[0.9028,0.8945,0.8987,0.8919],[0.9448,0.946,0.9498,0.9457],[0.9712,0.9894,0.9931,0.9826],[0.9814,0.9917,0.9983,0.9787],[0.8679,0.8623,0.8597,0.8586],[0.9521,0.9702,0.9621,0.9557],[0.968,0.977,0.9664,0.9577],[0.9844,0.9939,0.9825,0.9736],[0.98,0.9999,0.99,0.9806],[0.9963,0.997,0.9971,0.9823]],"Q_dqn":[[0.799,0.808,0.8145,0.8037],[0.8097,0.8163,0.8091,0.8108],[0.8162,0.8232,0.8159,0.8162],[0.8242,0.8197,0.8267,0.814],[0.854,0.8679,0.8617,0.849],[0.8693,0.8777,0.8656,0.8551],[0.8858,0.8928,0.8818,0.8693],[0.9021,0.9064,0.8993,0.8852],[0.9183,0.9197,0.917,0.9015],[0.9176,0.9089,0.9243,0.9158],[0.9176,0.9077,0.9248,0.9111],[0.8039,0.8156,0.8238,0.812],[0.8236,0.8271,0.8386,0.8276],[0.8532,0.8506,0.8653,0.8549],[0.9186,0.9219,0.9367,0.9261],[0.9176,0.9271,0.9337,0.9275],[0.816,0.8231,0.8323,0.8211],[0.8339,0.8338,0.8415,0.8407],[0.831,0.8303,0.8149,0.8321],[0.879,0.9063,0.8918,0.9055],[0.8939,0.9056,0.8922,0.8823],[0.8962,0.901,0.8924,0.8862],[0.8946,0.8879,0.9005,0.885],[0.9328,0.9436,0.9506,0.9383],[0.9291,0.9351,0.9387,0.9429],[0.8305,0.8339,0.842,0.8325],[0.8455,0.8443,0.8513,0.8441],[0.8968,0.9029,0.9244,0.9106],[0.8971,0.9004,0.8998,0.909],[0.9545,0.9407,0.9584,0.9467],[0.8452,0.845,0.8509,0.8436],[0.8573,0.8814,0.8688,0.8732],[0.8763,0.8919,0.8755,0.8667],[0.8879,0.9041,0.8887,0.8803],[0.9034,0.9174,0.8949,0.8887],[0.9146,0.9264,0.9149,0.9062],[0.9171,0.9228,0.9354,0.9162],[0.9512,0.9654,0.9678,0.9561],[0.9557,0.9499,0.9728,0.9487],[0.86,0.8562,0.8599,0.8546],[0.9078,0.8925,0.8905,0.8911],[0.92,0.9279,0.9474,0.933],[0.9273,0.924,0.9265,0.933],[0.9609,0.9764,0.9767,0.966],[0.9631,0.9754,0.9864,0.9651],[0.8513,0.8616,0.8557,0.8551],[0.8647,0.8689,0.8588,0.8492],[0.8742,0.877,0.8654,0.8664],[0.8816,0.8838,0.879,0.8702],[0.8904,0.8926,0.8895,0.881],[0.8998,0.891,0.8892,0.8823],[0.9519,0.9497,0.9578,0.9443],[0.9737,0.9895,0.9878,0.9777],[0.9748,0.9881,1.0002,0.9748],[0.8722,0.8621,0.8593,0.8579],[0.947,0.9703,0.9621,0.9591],[0.9663,0.9783,0.9679,0.957],[0.9844,0.9929,0.9838,0.9733],[0.9817,0.9993,0.9919,0.9829],[1.0069,0.9861,1.0019,0.9962]],"paso":[250,500,750,1000,1250,1500,1750,2000,2250,2500,2750,3000,3250,3500,3750,4000,4250,4500,4750,5000,5250,5500,5750,6000,6250,6500,6750,7000,7250,7500,7750,8000,8250,8500,8750,9000,9250,9500,9750,10000],"pol":{"Q_xy":[2,1,1,1,1,1,1,2,2,2,2,2,2,1,2,3,2,2,1,1,1,2,2,2,3,2,1,2,2,2,2,1,1,1,1,1,2,2,2,1,1,2,2,2,2,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1],"Q_xy_todo":[2,2,1,1,1,1,1,1,2,2,2,2,1,1,2,2,2,2,1,1,1,1,2,2,2,2,2,2,2,2,2,1,1,1,1,1,2,2,2,1,1,2,2,2,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"Q_bg":[1,1,1,2,2,1,1,1,1,2,2,2,2,2,2,2,2,1,3,1,1,2,2,2,3,2,2,2,3,2,2,1,1,1,1,1,2,2,2,2,2,2,3,2,2,1,1,1,1,1,0,2,2,2,0,1,1,1,1,2],"Q_dqn":[2,1,1,2,1,1,1,1,1,2,2,2,2,2,2,2,2,2,3,1,1,1,2,2,3,2,2,2,3,2,2,1,1,1,1,1,2,2,2,0,0,2,3,2,2,1,1,1,1,1,0,2,1,2,0,1,1,1,1,0]},"var":{"sin trucos":{"error":[0.0911,5.9736,21.6317,36.9457,49.0041,83.7005,89.6761,79.9011,101.1808,92.9521,84.2266,76.7289,65.919,57.5553,49.6825,45.5562,41.7148,38.4301,34.5701,30.1303,26.9186,24.1982,21.9049,18.8345,15.5845,13.6841,9.9168,8.5954,6.9612,5.1962,5.2033,6.3582,5.9005,4.6561,3.8666,3.7428,3.7921,2.6913,2.7034,3.4422],"sale":[0.0,0.1356,0.0508,0.0,0.0,0.0508,0.0508,0.0,0.0,0.0508,0.0,0.0,0.0,0.0,0.0,0.0,0.0508,0.0,0.0,0.0508,0.0339,0.0,0.0,0.0339,0.0,0.0339,0.0,0.0508,0.0,0.0,0.0,0.0,0.0,0.0,0.0508,0.0,0.0508,0.0,0.0,0.0508],"max_q":[1.2102,8.9286,28.4786,46.2167,62.3117,105.0679,114.5611,100.6514,128.8313,115.6677,104.5709,94.049,80.3502,70.105,60.3326,56.153,51.7202,48.1858,43.7366,38.6722,35.3202,31.8337,28.592,25.2773,21.2327,19.2244,15.2225,13.8466,12.1455,10.2031,10.2956,11.272,10.6505,9.2384,8.5482,8.3289,8.2237,6.9052,6.9367,7.4852]},"solo red objetivo":{"error":[0.5447,0.144,0.0509,0.3946,0.6529,0.8313,1.0282,1.3392,1.3213,1.3232,1.3084,1.3443,1.3946,1.4781,1.4753,1.4709,1.3988,1.443,1.313,1.2935,1.3005,1.198,1.1352,0.9822,0.9788,0.9905,1.0308,0.9426,0.9293,0.9853,1.0236,1.3034,1.3438,1.5121,1.4101,1.4032,1.5285,1.8179,1.7321,1.9752],"sale":[0.0508,0.0339,0.0508,0.3051,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.1695,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"max_q":[0.507,1.0086,1.156,1.5938,1.7903,1.9787,2.2957,2.5308,2.5916,2.579,2.5502,2.5039,2.5695,2.7151,2.6607,2.613,2.6641,2.5936,2.5517,2.5375,2.435,2.3795,2.2783,2.1361,2.0866,2.1491,2.1884,2.0584,2.1002,2.1055,2.1401,2.5609,2.5418,2.7532,2.6351,2.6901,2.8235,3.2304,3.0024,3.2539]},"solo memoria":{"error":[0.8081,0.8158,1.1613,7.861,11.5101,7.6582,4.4538,3.5815,2.4746,2.2577,2.1089,1.7357,1.4889,1.2731,1.1047,0.7899,0.6783,0.4516,0.2867,0.2978,0.2898,0.3292,0.2756,0.12,0.0962,0.0503,0.0761,0.1303,0.1088,0.1963,0.1974,0.2516,0.169,0.1589,0.1777,0.2002,0.1441,0.1865,0.1746,0.1228],"sale":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"max_q":[0.1654,0.1598,2.5067,10.0073,13.6255,9.2502,5.6201,4.7006,3.6257,3.4024,3.2728,2.8468,2.5811,2.3565,2.1733,1.8024,1.7221,1.5427,1.4141,1.4138,1.434,1.4443,1.3759,1.2319,1.1723,1.0524,1.0121,0.9711,0.9797,0.9013,0.8849,0.8155,0.8473,0.8572,0.8485,0.8135,0.8709,0.8309,0.8455,0.8999]},"DQN (las dos)":{"error":[0.8081,0.8158,0.5278,0.2821,0.2211,0.2008,0.1509,0.1245,0.0907,0.0689,0.0562,0.0474,0.0409,0.0268,0.0221,0.027,0.0344,0.0389,0.0369,0.0361,0.032,0.0308,0.0296,0.0306,0.0285,0.0248,0.0207,0.021,0.0184,0.0126,0.0111,0.0104,0.0106,0.0123,0.0091,0.0088,0.0085,0.0077,0.007,0.0089],"sale":[0.0,0.0,0.2034,0.1695,0.2034,0.661,0.5424,0.4576,0.0508,0.0,0.0,0.0,0.0,0.0,0.661,0.2881,0.7797,0.9492,0.8644,1.0,1.0,0.661,0.8983,0.9322,1.0,0.9153,1.0,0.7458,0.8814,0.9153,0.7627,0.7966,1.0,1.0,1.0,1.0,1.0,1.0,1.0,0.8983],"max_q":[0.1654,0.1598,0.5881,0.8626,0.9828,1.0158,1.0804,1.102,1.1513,1.1606,1.1395,1.1138,1.0806,1.0442,1.0146,0.9922,0.9847,1.0005,1.0063,1.0049,1.0044,1.0072,1.0023,1.0056,1.0072,1.0052,0.9995,0.9991,0.9998,1.0032,1.0011,0.995,0.9998,0.9975,1.0053,1.0018,0.9984,0.9978,1.0034,1.0002]}},"sem":{"sin trucos":[{"error":[0.0911,5.9736,21.6317,36.9457,49.0041,83.7005,89.6761,79.9011,101.1808,92.9521,84.2266,76.7289,65.919,57.5553,49.6825,45.5562,41.7148,38.4301,34.5701,30.1303,26.9186,24.1982,21.9049,18.8345,15.5845,13.6841,9.9168,8.5954,6.9612,5.1962,5.2033,6.3582,5.9005,4.6561,3.8666,3.7428,3.7921,2.6913,2.7034,3.4422],"sale":[0.0,0.1356,0.0508,0.0,0.0,0.0508,0.0508,0.0,0.0,0.0508,0.0,0.0,0.0,0.0,0.0,0.0,0.0508,0.0,0.0,0.0508,0.0339,0.0,0.0,0.0339,0.0,0.0339,0.0,0.0508,0.0,0.0,0.0,0.0,0.0,0.0,0.0508,0.0,0.0508,0.0,0.0,0.0508]},{"error":[0.2169,2.844,15.5117,25.7462,36.9622,81.1317,229.6687,275.5024,274.7639,238.7498,225.3392,235.6666,211.032,186.1375,171.6969,156.6591,140.7247,131.7924,123.638,114.7952,109.5002,103.3291,96.6733,90.6094,83.9593,74.1265,68.4349,64.6053,60.8347,57.1593,54.2158,48.8795,43.6178,38.8074,36.066,33.6606,31.424,29.1757,27.2283,25.6543],"sale":[0.0508,0.0,0.0,0.0508,0.0,0.0,0.0678,0.0508,0.0508,0.0508,0.0508,0.0508,0.0,0.0678,0.0,0.0,0.0,0.0678,0.0508,0.0,0.0678,0.0,0.0678,0.0678,0.0508,0.0,0.0,0.0,0.0678,0.0,0.0678,0.0,0.0678,0.0169,0.0,0.0678,0.0,0.0,0.0508,0.0]},{"error":[0.0696,4.3585,17.7702,35.9081,41.4167,50.5034,73.4991,82.4335,86.8948,123.0988,127.5199,131.3652,127.9947,113.5478,96.8288,84.8467,74.5372,69.2731,62.8289,57.7663,51.3943,48.2035,45.3105,42.6836,39.9263,37.4327,34.7246,32.6308,30.7332,29.1588,27.9174,27.0131,25.4798,24.3815,23.2491,22.2022,21.1767,20.0988,19.3849,18.5749],"sale":[0.0,0.0508,0.0508,0.0,0.0508,0.0,0.0,0.0,0.0508,0.0,0.0,0.0,0.0,0.0508,0.0678,0.0508,0.0,0.0,0.0,0.0,0.0,0.0,0.0678,0.1017,0.0,0.1017,0.0847,0.0,0.0,0.1186,0.1186,0.0508,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0508]},{"error":[0.1769,3.007,15.7706,20.0465,20.9413,24.1114,25.842,23.6193,22.7255,20.4618,19.196,14.5919,12.6139,11.2988,9.7785,8.4302,7.0347,6.2838,5.2591,4.2518,3.5045,2.7717,2.2276,2.0176,1.6391,1.4635,1.0476,0.8567,0.9792,1.0494,0.971,0.8863,0.4228,0.4281,0.3272,0.4813,1.1098,1.0906,0.9052,0.8458],"sale":[0.0,0.0508,0.0508,0.0,0.0,0.0508,0.0,0.0,0.0,0.0,0.0508,0.0,0.1695,0.0,0.0,0.0,0.1186,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0678,0.0,0.0,0.0847,0.0678,0.0,0.0,0.0,0.0]},{"error":[0.0739,2.2561,9.884,25.3179,40.4195,41.2596,68.7445,108.9537,135.0639,122.9032,106.5759,100.8349,71.4248,62.7828,57.2121,52.422,47.5092,43.3705,39.0305,35.1092,32.1334,27.7498,22.4387,16.8668,12.1216,9.3133,8.3745,7.6502,6.1554,5.9304,5.6285,4.1562,3.9577,3.5518,3.3421,3.7555,2.8694,1.9405,1.9705,2.2565],"sale":[0.0508,0.0508,0.0,0.0678,0.0508,0.0508,0.0678,0.0678,0.0,0.0,0.0678,0.0,0.0508,0.0,0.0,0.0169,0.0169,0.0,0.0,0.0,0.0678,0.0,0.0,0.0678,0.0,0.0,0.0678,0.0,0.0,0.1186,0.0678,0.0508,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]}],"DQN (las dos)":[{"error":[0.8081,0.8158,0.5278,0.2821,0.2211,0.2008,0.1509,0.1245,0.0907,0.0689,0.0562,0.0474,0.0409,0.0268,0.0221,0.027,0.0344,0.0389,0.0369,0.0361,0.032,0.0308,0.0296,0.0306,0.0285,0.0248,0.0207,0.021,0.0184,0.0126,0.0111,0.0104,0.0106,0.0123,0.0091,0.0088,0.0085,0.0077,0.007,0.0089],"sale":[0.0,0.0,0.2034,0.1695,0.2034,0.661,0.5424,0.4576,0.0508,0.0,0.0,0.0,0.0,0.0,0.661,0.2881,0.7797,0.9492,0.8644,1.0,1.0,0.661,0.8983,0.9322,1.0,0.9153,1.0,0.7458,0.8814,0.9153,0.7627,0.7966,1.0,1.0,1.0,1.0,1.0,1.0,1.0,0.8983]},{"error":[0.8503,0.849,0.6158,0.4873,0.4338,0.3643,0.2627,0.2232,0.1791,0.1093,0.0818,0.0717,0.0781,0.0706,0.0604,0.0438,0.0254,0.0199,0.0267,0.0298,0.0301,0.0262,0.0212,0.0174,0.0143,0.0131,0.0122,0.0121,0.0119,0.01,0.0082,0.0079,0.0098,0.0111,0.008,0.0077,0.0066,0.0054,0.0068,0.0059],"sale":[0.0,0.0,0.0847,0.1695,0.5254,0.5254,0.5763,0.3559,0.0508,0.2542,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.8983,0.9492,1.0,1.0,0.9492,0.8983,0.8305,0.8475,1.0,1.0,1.0,1.0,0.8983,0.8983,0.8983,1.0,0.8136,0.9661,0.8983,1.0,0.9492,1.0]},{"error":[0.7913,0.7915,0.5709,0.446,0.392,0.3414,0.282,0.2275,0.1849,0.1444,0.1255,0.1231,0.1465,0.2037,0.2056,0.2302,0.2128,0.1942,0.1683,0.1395,0.1014,0.0526,0.0229,0.0178,0.0239,0.0408,0.0436,0.0501,0.0514,0.0537,0.0508,0.0499,0.0461,0.0401,0.0328,0.0277,0.0237,0.0203,0.0165,0.0196],"sale":[0.0,0.0,0.1525,0.4237,0.5085,0.5593,0.3729,0.0339,0.0508,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0339,0.3898,0.339,0.661,0.5085,0.7797,0.8983,0.0508,0.8983,0.8983,0.3559,0.9492,0.0847,1.0,0.661,1.0,0.8983,0.7966]},{"error":[0.7415,0.7467,0.4987,0.4029,0.3422,0.2862,0.1833,0.1481,0.1156,0.0764,0.0761,0.0865,0.0997,0.087,0.059,0.0394,0.0143,0.0151,0.0274,0.0319,0.037,0.0407,0.0406,0.0407,0.0438,0.0381,0.0356,0.0331,0.0303,0.0246,0.0225,0.0189,0.0147,0.0138,0.0115,0.0109,0.0108,0.0095,0.0087,0.0097],"sale":[0.0508,0.0508,0.0508,0.0678,0.322,0.5085,0.661,0.5763,0.0508,0.0339,0.0339,0.0,0.0,0.0,0.0,0.0,0.5932,0.3559,0.661,0.7119,0.7797,0.8475,0.8475,0.8644,0.339,0.7288,0.9661,1.0,0.7119,0.2712,0.7966,0.8814,1.0,0.5932,0.7966,0.8814,0.8814,1.0,1.0,0.9661]},{"error":[0.7829,0.7718,0.5286,0.3427,0.2232,0.1755,0.1403,0.1133,0.0866,0.0567,0.0503,0.048,0.0376,0.0211,0.0263,0.0331,0.0335,0.0391,0.0404,0.0387,0.0345,0.0337,0.0278,0.0263,0.0232,0.0211,0.0184,0.0147,0.013,0.0104,0.0095,0.009,0.0082,0.0094,0.0091,0.0089,0.0075,0.0073,0.0071,0.0072],"sale":[0.0508,0.0508,0.2373,0.2034,0.2034,0.2542,0.5424,0.678,0.5763,0.2712,0.0169,0.0,0.0,0.0,0.4576,0.5085,0.6102,0.4915,0.7458,0.7288,0.8814,0.8644,0.8814,0.8814,0.8814,0.8136,0.7797,1.0,0.7119,1.0,0.9661,1.0,0.9831,0.8644,0.9661,1.0,0.8814,1.0,0.9492,0.9661]}]}};
+
+  // un gráfico con ejes
+  function ejes(cv, alto, { x0, x1, y0, y1, ticksX = [], ticksY = [], fx = coma, fy = coma, tituloX = "", tituloY = "", m = { l: 44, r: 26, t: 22, b: 30 } }) {
+    const { w, h, ctx } = Cueva.lienzo(cv, alto)();
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    const X = v => m.l + (v - x0) / (x1 - x0) * (w - m.l - m.r);
+    const Y = v => h - m.b - (v - y0) / (y1 - y0) * (h - m.t - m.b);
+    ctx.font = `11px ${MONO}`; ctx.strokeStyle = "rgba(141,147,163,.18)"; ctx.lineWidth = 1; ctx.fillStyle = COL.muted;
+    for (const t of ticksY) { const y = Math.round(Y(t)) + .5; ctx.beginPath(); ctx.moveTo(m.l, y); ctx.lineTo(w - m.r, y); ctx.stroke(); ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(fy(t), m.l - 5, y); }
+    for (const t of ticksX) { const x = Math.round(X(t)) + .5; ctx.beginPath(); ctx.moveTo(x, m.t); ctx.lineTo(x, h - m.b); ctx.stroke(); ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(fx(t), x, h - m.b + 5); }
+    ctx.textAlign = "right"; ctx.textBaseline = "top"; ctx.fillText(tituloX, w - m.r, h - 12);
+    ctx.textAlign = "left"; ctx.fillText(tituloY, 4, 4);
+    return { ctx, w, h, m, X, Y };
+  }
+  const linea = (g, xs, ys, color, ancho = 2, guion = null) => {
+    const { ctx, X, Y } = g; ctx.strokeStyle = color; ctx.lineWidth = ancho; if (guion) ctx.setLineDash(guion);
+    ctx.beginPath(); xs.forEach((x, i) => i ? ctx.lineTo(X(x), Y(ys[i])) : ctx.moveTo(X(x), Y(ys[i]))); ctx.stroke(); ctx.setLineDash([]);
+  };
+  const log10 = v => Math.log10(Math.max(v, 1e-6));
+  const fLog = v => { const p = Math.pow(10, v); return p >= 1 ? miles(p) : coma(String(+p.toPrecision(1))); };
+
+  // la cueva pintada con un valor por casilla
+  function pintarV(T, V, lo, hi) {
+    T.fondo("#000").paredes(PARED);
+    for (const s of NOMETA) { const [r, c] = env.free[s]; T.casilla(r, c, Cueva.rampa("valor", (V[s] - lo) / ((hi - lo) || 1))); }
+    T.salida();
+  }
+  function borde(T, s, color, ancho = 2, inset = 1) { const [r, c] = env.free[s], cell = T.cell, ctx = T.ctx; ctx.strokeStyle = color; ctx.lineWidth = ancho; ctx.strokeRect(c * cell + inset, r * cell + inset, cell - 2 * inset, cell - 2 * inset); }
+  function circulo(T, s, color) { const [r, c] = env.free[s], cell = T.cell, ctx = T.ctx; ctx.strokeStyle = color; ctx.lineWidth = Math.max(2, cell * .09); ctx.beginPath(); ctx.arc(c * cell + cell / 2, r * cell + cell / 2, cell * .46, 0, 7); ctx.stroke(); }
+  const flechasCon = (T, pol, color, sombra = true) => {
+    for (const s of NOMETA) {
+      const [r, c] = env.free[s], cell = T.cell, ctx = T.ctx;
+      ctx.font = `600 ${Math.round(cell * .5)}px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      if (sombra) { ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.8)"; ctx.strokeText(AR[pol[s]], c * cell + cell / 2, r * cell + cell / 2 + 1); }
+      ctx.fillStyle = typeof color === "function" ? color(s) : color; ctx.fillText(AR[pol[s]], c * cell + cell / 2, r * cell + cell / 2 + 1);
+    }
+  };
+  const cuatroQ = q => q.map((v, a) => `${AR[a]} ${fmt(v)}`).join("  ");
+
+  // =====================================================================
+  // B1. La tabla es una imagen
+  // =====================================================================
+  const b1 = await tarea(() => {
+    const cvM = $("cvMat"), T = Cueva.tablero($("cvTri"), env, { maxCell: 30, minCell: 10 }), hud = $("hudTabla");
+    const qlo = Math.min(...NOMETA.flatMap(s => QS[s]));
+    const color = q => Cueva.rampa("valor", (q - qlo) / (1 - qlo));
+    $("legTabla").style.background = Cueva.gradienteCSS("valor"); $("legTablaLo").textContent = fmt(qlo, 2);
+    let sel = START, FH = 4; const CW = 15, CAB = 16, ML = 18;
+    function dibujar() {
+      const ctx = T.ctx, cell = T.cell;
+      T.fondo("#000").paredes(PARED);
+      for (let s = 0; s < n; s++) {
+        const [r, c] = env.free[s], x = c * cell, y = r * cell, cx = x + cell / 2, cy = y + cell / 2;
+        const esq = [[x, y], [x + cell, y], [x + cell, y + cell], [x, y + cell]];
+        for (let a = 0; a < 4; a++) { const p = esq[a], q = esq[(a + 1) % 4]; ctx.fillStyle = s === GOAL ? COL.exit : color(QS[s][a]); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.closePath(); ctx.fill(); }
+        ctx.strokeStyle = "rgba(0,0,0,.55)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + cell, y + cell); ctx.moveTo(x + cell, y); ctx.lineTo(x, y + cell); ctx.stroke();
+      }
+      borde(T, sel, COL.exit, 2.5);
+      // la matriz: una fila por casilla, una columna por flecha
+      FH = Math.max(3, Math.min(7, Math.floor(cell * env.H / n)));
+      const dpr = window.devicePixelRatio || 1, W = ML + 4 * CW, H = CAB + n * FH;
+      cvM.width = W * dpr; cvM.height = H * dpr; cvM.style.width = W + "px"; cvM.style.height = H + "px";
+      const m = cvM.getContext("2d"); m.setTransform(dpr, 0, 0, dpr, 0, 0); m.fillStyle = "#000"; m.fillRect(0, 0, W, H);
+      m.font = `600 11px ${MONO}`; m.textAlign = "center"; m.textBaseline = "middle"; m.fillStyle = COL.muted;
+      for (let a = 0; a < 4; a++) m.fillText(AR[a], ML + a * CW + CW / 2, CAB / 2);
+      for (let s = 0; s < n; s++) for (let a = 0; a < 4; a++) { m.fillStyle = s === GOAL ? COL.exit : color(QS[s][a]); m.fillRect(ML + a * CW, CAB + s * FH, CW, FH); }
+      m.textAlign = "right"; m.fillStyle = COL.ink; m.fillText("S", ML - 4, CAB + START * FH + FH / 2);
+      m.fillStyle = COL.exit; m.fillText("G", ML - 4, CAB + GOAL * FH + FH / 2);
+      m.strokeStyle = COL.exit; m.lineWidth = 2; m.strokeRect(ML - 1, CAB + sel * FH - 1, 4 * CW + 2, FH + 2);
+      const q = QS[sel];
+      hud.innerHTML = `<span>fila <b>${sel}</b> de la matriz = casilla <b>${nom(sel)}</b></span>` +
+        (sel === GOAL ? `<span>la salida: la partida termina, su fila vale 0</span>` : `<span>Q* = ${q.map((v, a) => `${AR[a]} <b>${fmt(v)}</b>`).join(" ")}</span><span>V* = max = <b>${fmt(VS[sel])}</b></span>`);
+    }
+    const elegir = s => { if (s !== undefined && s !== sel) { sel = s; dibujar(); } };
+    const filaDe = e => { const b = cvM.getBoundingClientRect(); const s = Math.floor((e.clientY - b.top - CAB) / FH); return s >= 0 && s < n ? s : undefined; };
+    cvM.addEventListener("pointermove", e => elegir(filaDe(e)));
+    cvM.addEventListener("pointerdown", e => elegir(filaDe(e)));
+    $("cvTri").addEventListener("pointermove", e => elegir(casillaDe(T, e)));
+    $("cvTri").addEventListener("pointerdown", e => elegir(casillaDe(T, e)));
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B2. Una red que equivale a la tabla (one-hot) y una red de 6 entradas entrenada en el navegador
+  // =====================================================================
+  // perceptrón multicapa a mano: 6 → 32 → 32 → 4, Adam
+  const OBS6 = Array.from({ length: n }, (_, s) => { const [r, c] = env.free[s]; return Float64Array.from([r / (env.H - 1), c / (env.W - 1), ...Cueva.DR.map(([dr, dc]) => env.isWall(r + dr, c + dc) ? 1 : 0)]); });
+  const TAM = [6, 32, 32, 4];
+  function crearRed(seed) {
+    const R = Cueva.rng(seed * 7 + 3), L = [];
+    for (let i = 0; i < TAM.length - 1; i++) {
+      const a = TAM[i], m = TAM[i + 1], lim = 1 / Math.sqrt(a), W = new Float64Array(a * m), b = new Float64Array(m);
+      for (let k = 0; k < W.length; k++) W[k] = (R() * 2 - 1) * lim; for (let k = 0; k < m; k++) b[k] = (R() * 2 - 1) * lim;
+      L.push({ n: a, m, W, b, gW: new Float64Array(a * m), gb: new Float64Array(m), mW: new Float64Array(a * m), vW: new Float64Array(a * m), mb: new Float64Array(m), vb: new Float64Array(m) });
+    }
+    return { L, t: 0, a: TAM.map(k => new Float64Array(k)), g: TAM.map(k => new Float64Array(k)), epoca: 0, perdida: null };
+  }
+  const NPAR = (() => { let p = 0; for (let i = 0; i < TAM.length - 1; i++) p += TAM[i] * TAM[i + 1] + TAM[i + 1]; return p; })();
+  function fwd(net, x) {
+    net.a[0].set(x);
+    for (let i = 0; i < net.L.length; i++) {
+      const l = net.L[i], ai = net.a[i], ao = net.a[i + 1], ult = i === net.L.length - 1;
+      for (let j = 0; j < l.m; j++) { let s = l.b[j]; const o = j * l.n; for (let k = 0; k < l.n; k++) s += l.W[o + k] * ai[k]; ao[j] = !ult && s < 0 ? 0 : s; }
+    }
+    return net.a[net.L.length];
+  }
+  function bwd(net, gout) {
+    net.g[net.L.length].set(gout);
+    for (let i = net.L.length - 1; i >= 0; i--) {
+      const l = net.L[i], x = net.a[i], g = net.g[i + 1], gin = net.g[i]; gin.fill(0);
+      for (let j = 0; j < l.m; j++) { const gj = g[j]; if (gj === 0) continue; l.gb[j] += gj; const o = j * l.n; for (let k = 0; k < l.n; k++) { l.gW[o + k] += gj * x[k]; gin[k] += gj * l.W[o + k]; } }
+      if (i > 0) for (let k = 0; k < l.n; k++) if (x[k] <= 0) gin[k] = 0;
+    }
+  }
+  function adam(net, lr, bs) {
+    net.t++; const b1 = 0.9, b2 = 0.999, c1 = 1 - Math.pow(b1, net.t), c2 = 1 - Math.pow(b2, net.t);
+    for (const l of net.L) for (const [p, gr, m, v] of [[l.W, l.gW, l.mW, l.vW], [l.b, l.gb, l.mb, l.vb]])
+      for (let k = 0; k < p.length; k++) { const g = gr[k] / bs; m[k] = b1 * m[k] + (1 - b1) * g; v[k] = b2 * v[k] + (1 - b2) * g * g; p[k] -= lr * (m[k] / c1) / (Math.sqrt(v[k] / c2) + 1e-8); gr[k] = 0; }
+  }
+  const g4 = new Float64Array(4);
+  function epocaRegresion(net) {   // una época de regresión sobre Q* en las 59 casillas
+    let loss = 0;
+    for (const s of NOMETA) { const q = fwd(net, OBS6[s]); for (let a = 0; a < 4; a++) { g4[a] = q[a] - QS[s][a]; loss += g4[a] * g4[a]; } bwd(net, g4); }
+    adam(net, net.epoca < 2000 ? 0.005 : 0.002, NOMETA.length); net.epoca++; net.perdida = loss / (4 * NOMETA.length);
+  }
+  const qRed = net => Array.from({ length: n }, (_, s) => Array.from(fwd(net, OBS6[s])));
+
+  const b2 = await tarea(() => {
+    const T = Cueva.tablero($("cvRedCueva"), env, { maxCell: 22, minCell: 8 }), cv = $("cvRed"), hud = $("hudRed"), cap = $("capRed");
+    const ALFA = 0.5, EPOCAS = 3000;
+    let modo = "onehot", sel = S_(8, 11), Wm = new Float64Array(4 * n), Qt = new Float64Array(4 * n), ult = null, nota = "", u = Cueva.rng(2026);
+    let red = crearRed(1), semRed = 1, entrenando = false, raf = 0, cambio = null;
+    const W = (a, s) => Wm[a * n + s];
+    // un paso de Q-learning en la tabla y un paso de gradiente en la red one-hot, con la misma transición
+    function paso(s, a) {
+      const s2 = NXT[s][a], fin = s2 === GOAL, r = fin ? 1 : 0;
+      // red: Q_θ(s) = W x_s, pérdida ½ (Q_θ(s,a) − y)², gradiente en los 240 pesos
+      let y = r; if (!fin) { let mx = -Infinity; for (let b = 0; b < 4; b++) { let q = 0; for (let j = 0; j < n; j++) q += Wm[b * n + j] * (j === s2 ? 1 : 0); mx = Math.max(mx, q); } y = r + GAMMA * mx; }
+      let qa = 0; for (let j = 0; j < n; j++) qa += Wm[a * n + j] * (j === s ? 1 : 0);
+      let tocados = 0; const grad = new Float64Array(4 * n);
+      for (let b = 0; b < 4; b++) for (let j = 0; j < n; j++) { const gr = b === a ? (qa - y) * (j === s ? 1 : 0) : 0; grad[b * n + j] = gr; if (gr !== 0) tocados++; }
+      for (let k = 0; k < 4 * n; k++) Wm[k] -= ALFA * grad[k];
+      // tabla: Q(s,a) ← Q(s,a) + α (y − Q(s,a))
+      const yt = fin ? r : r + GAMMA * Math.max(Qt[s2], Qt[n + s2], Qt[2 * n + s2], Qt[3 * n + s2]);
+      Qt[a * n + s] += ALFA * (yt - Qt[a * n + s]);
+      return { s, a, s2, r, tocados };
+    }
+    const difMax = () => { let d = 0; for (let k = 0; k < 4 * n; k++) d = Math.max(d, Math.abs(Wm[k] - Qt[k])); return d; };
+    const alAzar = () => { let s = Math.floor(u() * (n - 1)); if (s >= GOAL) s++; return [s, Math.floor(u() * 4)]; };
+    function cero() { Wm.fill(0); Qt.fill(0); ult = null; }
+
+    function dibujarOneHot() {
+      const V = Array.from({ length: n }, (_, s) => Math.max(W(0, s), W(1, s), W(2, s), W(3, s)));
+      pintarV(T, V, 0, 1); T.entrada(); borde(T, sel, COL.exit, 2.5);
+      const { w, h, ctx } = Cueva.lienzo(cv, 176)();
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      const ml = 22, mr = 4, cw = (w - ml - mr) / n, y0 = 18, y1 = 52, fh = 16;
+      ctx.font = `11px ${MONO}`; ctx.fillStyle = COL.muted; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+      ctx.fillText(`x = one-hot de ${nom(sel)}: 60 números, un solo 1`, ml, y0 - 5);
+      for (let s = 0; s < n; s++) { ctx.fillStyle = s === sel ? COL.lamp : "#1e2331"; ctx.fillRect(ml + s * cw + .4, y0, Math.max(1, cw - .8), 12); }
+      ctx.fillStyle = COL.muted; ctx.fillText("W: 4 × 60 = 240 pesos", ml, y1 - 5);
+      ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.font = `600 11px ${MONO}`;
+      for (let a = 0; a < 4; a++) {
+        ctx.fillStyle = COL.muted; ctx.fillText(AR[a], ml - 5, y1 + a * fh + fh / 2);
+        for (let s = 0; s < n; s++) { ctx.fillStyle = Cueva.rampa("valor", W(a, s)); ctx.fillRect(ml + s * cw, y1 + a * fh, Math.ceil(cw), fh - 1); }
+      }
+      ctx.strokeStyle = COL.exit; ctx.lineWidth = 2; ctx.strokeRect(ml + sel * cw - 1, y0 - 2, cw + 2, y1 + 4 * fh - y0 + 3);
+      if (ult) { ctx.strokeStyle = COL.ember; ctx.lineWidth = 2; ctx.strokeRect(ml + ult.s * cw - 2, y1 + ult.a * fh - 2, cw + 4, fh + 3); }
+      const yq = y1 + 4 * fh + 22;
+      ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.font = `11px ${MONO}`; ctx.fillStyle = COL.muted;
+      ctx.fillText(`salida Q = W · x = la columna de ${nom(sel)}:`, ml, yq);
+      ctx.font = `600 12px ${MONO}`; ctx.fillStyle = COL.ink;
+      ctx.fillText([0, 1, 2, 3].map(a => `${AR[a]} ${fmt(W(a, sel), 2)}`).join("   "), ml, yq + 20);
+      ctx.font = `11px ${MONO}`; ctx.fillStyle = COL.muted; ctx.fillText("borde rojo: el último peso que cambió", ml, yq + 42);
+      hud.innerHTML = nota;
+      cap.textContent = "Simulado en el navegador: cada paso usa una transición de un paso, desde una casilla y con una flecha al azar (α = 0,5). La tabla aprende con la misma transición, en paralelo. Tocá una casilla para cambiar la entrada.";
+    }
+    function dibujarMlp() {
+      const Q = qRed(red), V = Q.map(q => Math.max(...q)), pol = Q.map(argmax);
+      pintarV(T, V, VLO, 1); flechasCon(T, pol, s => OPT(s, pol[s]) ? COL.ink : COL.ember); borde(T, sel, COL.exit, 2.5);
+      const q = Array.from(fwd(red, OBS6[sel])), acts = red.a.map(x => Array.from(x));
+      const { w, h, ctx } = Cueva.lienzo(cv, Math.max(260, Math.min(360, Math.round(cv.parentElement.clientWidth * .6))))();
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      const ml = w < 500 ? 34 : 70, mr = w < 500 ? 62 : 82;
+      const xs = TAM.map((_, i) => ml + (w - ml - mr) * i / (TAM.length - 1));
+      const ys = TAM.map(k => Array.from({ length: k }, (_, j) => 12 + (h - 24) * (j + .5) / k));
+      let wmax = 0; red.L.forEach(l => { for (const v of l.W) wmax = Math.max(wmax, Math.abs(v)); });
+      red.L.forEach((l, i) => {
+        for (let j = 0; j < l.m; j++) for (let k = 0; k < l.n; k++) {
+          const v = l.W[j * l.n + k], t = Math.abs(v) / wmax; if (t < .05) continue;
+          ctx.strokeStyle = v > 0 ? `rgba(242,179,90,${.06 + .55 * t})` : `rgba(94,200,216,${.06 + .55 * t})`; ctx.lineWidth = .3 + 2.2 * t;
+          ctx.beginPath(); ctx.moveTo(xs[i], ys[i][k]); ctx.lineTo(xs[i + 1], ys[i + 1][j]); ctx.stroke();
+        }
+      });
+      acts.forEach((a, i) => {
+        const amax = Math.max(1e-9, ...a.map(Math.abs)), rad = TAM[i] > 10 ? Math.max(2.5, Math.min(5, (h - 24) / TAM[i] / 2.4)) : 7;
+        a.forEach((v, j) => {
+          const t = i === 0 ? v : Math.abs(v) / amax;
+          ctx.fillStyle = i === TAM.length - 1 ? Cueva.rampa("valor", (v - VLO) / (1 - VLO)) : `rgba(232,230,223,${.12 + .88 * Math.min(1, t)})`;
+          ctx.strokeStyle = COL.muted; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(xs[i], ys[i][j], rad, 0, 7); ctx.fill(); ctx.stroke();
+        });
+      });
+      const NOM6 = w < 500 ? ["fila", "col", "↑", "→", "↓", "←"] : ["fila", "columna", "pared ↑", "pared →", "pared ↓", "pared ←"];
+      ctx.font = `11px ${MONO}`; ctx.textBaseline = "middle"; ctx.textAlign = "right"; ctx.fillStyle = COL.muted;
+      NOM6.forEach((t, j) => ctx.fillText(t, xs[0] - 10, ys[0][j]));
+      ctx.textAlign = "left"; const ba = argmax(q);
+      q.forEach((v, j) => { ctx.fillStyle = j === ba ? COL.exit : COL.ink; ctx.fillText(`${AR[j]} ${fmt(v, 3)}`, xs[3] + 10, ys[3][j]); });
+      const ok = NOMETA.filter(s => OPT(s, pol[s])).length;
+      hud.innerHTML = `<span>simulado: época <b>${red.epoca}</b> de ${EPOCAS}</span><span>pérdida <b>${red.perdida === null ? "—" : coma(red.perdida.toExponential(1))}</b></span><span>flechas óptimas <b>${pct(ok / NOMETA.length)}</b></span>` +
+        (cambio ? `<span style="color:var(--lamp)">un paso de gradiente con ${nom(cambio.s)} movió <b style="color:var(--lamp)">${miles(cambio.k)}</b> de ${miles(NPAR)} pesos</span>` : "");
+      cap.textContent = `Simulado en el navegador: una red 6 → 32 → 32 → 4 (${miles(NPAR)} parámetros, más chica que la del notebook) aprende por regresión el Q* correcto de las 59 casillas, como el notebook en las secciones 3 y 4. Las líneas son los pesos (ámbar, positivos; celeste, negativos). Flechas rojas en la cueva: no óptimas. Tocá una casilla para cambiar la entrada.`;
+    }
+    const dibujar = () => modo === "onehot" ? dibujarOneHot() : dibujarMlp();
+    function pararEnt() { cancelAnimationFrame(raf); entrenando = false; $("rEnt").textContent = red.epoca >= EPOCAS ? "Entrenada" : "Entrenar"; }
+    function entrenar() {
+      if (red.epoca >= EPOCAS) { red = crearRed(++semRed); }
+      cambio = null;
+      if (reducir) { while (red.epoca < EPOCAS) epocaRegresion(red); pararEnt(); dibujar(); return; }
+      entrenando = true; $("rEnt").textContent = "Pausa";
+      const cuadro = () => { const t0 = performance.now(); while (performance.now() - t0 < 12 && red.epoca < EPOCAS) epocaRegresion(red); dibujar(); if (red.epoca >= EPOCAS || !entrenando) pararEnt(); else raf = requestAnimationFrame(cuadro); };
+      raf = requestAnimationFrame(cuadro);
+    }
+    // un paso de gradiente (descenso simple) con la casilla elegida: ¿cuántos pesos se mueven?
+    function pasoMlp() {
+      pararEnt();
+      for (const l of red.L) { l.gW.fill(0); l.gb.fill(0); }
+      const q = fwd(red, OBS6[sel]); for (let a = 0; a < 4; a++) g4[a] = q[a] - QS[sel][a]; bwd(red, g4);
+      let k = 0; for (const l of red.L) { for (let i = 0; i < l.W.length; i++) { if (l.gW[i] !== 0) k++; l.W[i] -= 0.01 * l.gW[i]; l.gW[i] = 0; } for (let i = 0; i < l.b.length; i++) { if (l.gb[i] !== 0) k++; l.b[i] -= 0.01 * l.gb[i]; l.gb[i] = 0; } }
+      cambio = { s: sel, k }; dibujar();
+    }
+    document.querySelectorAll("#segRed button").forEach(b => b.onclick = () => {
+      modo = b.dataset.m; marcar("#segRed button", "m", modo);
+      $("ctlOnehot").hidden = modo !== "onehot"; $("ctlMlp").hidden = modo !== "mlp";
+      if (modo === "onehot") pararEnt();
+      dibujar();
+      if (modo === "mlp" && red.epoca === 0) entrenar();
+    });
+    $("rPaso").onclick = () => {
+      const [s, a] = alAzar(); ult = paso(s, a); sel = s;
+      nota = `<span>simulado: ${nom(s)} con ${AR[a]} → ${ult.s2 === GOAL ? "la salida" : nom(ult.s2)}, r = ${ult.r}</span><span>pesos que cambiaron <b>${ult.tocados}</b> de 240</span><span>W[${AR[a]},${nom(s)}] = <b>${fmt(W(a, s), 2)}</b>, la tabla: <b>${fmt(Qt[a * n + s], 2)}</b></span>`;
+      dibujar();
+    };
+    $("r20k").onclick = () => {
+      cero(); for (let i = 0; i < 20000; i++) { const [s, a] = alAzar(); paso(s, a); }
+      let err = 0, ok = 0; for (const s of NOMETA) { const q = [0, 1, 2, 3].map(a => W(a, s)); for (let a = 0; a < 4; a++) err = Math.max(err, Math.abs(q[a] - QS[s][a])); if (OPT(s, argmax(q))) ok++; }
+      nota = `<span>simulado: 20&nbsp;000 transiciones al azar</span><span>diferencia máxima entre tabla y red <b>${difMax() === 0 ? "0" : coma(difMax().toExponential(1))}</b></span><span>error máximo contra Q* <b>${fmt(err)}</b></span><span>flechas óptimas <b>${pct(ok / NOMETA.length)}</b></span>`;
+      dibujar();
+    };
+    $("rCero").onclick = () => { cero(); nota = `<span>pesos en 0: la red no sabe nada, como una tabla vacía</span>`; dibujar(); };
+    $("rEnt").onclick = () => { if (entrenando) { pararEnt(); dibujar(); } else entrenar(); };
+    $("rPasoM").onclick = pasoMlp;
+    $("rNueva").onclick = () => { pararEnt(); red = crearRed(++semRed); cambio = null; $("rEnt").textContent = "Entrenar"; dibujar(); };
+    $("cvRedCueva").addEventListener("pointerdown", e => { const s = casillaDe(T, e); if (s !== undefined) { sel = s; if (modo === "onehot") ult = null; dibujar(); } });
+    // al cargar: el paso de gradiente del notebook, de (8,11) a la salida con →
+    cero(); ult = paso(S_(8, 11), 1);
+    nota = `<span>el paso del notebook: (8,11) con → entra a la salida, r = 1</span><span>pesos que cambiaron <b>${ult.tocados}</b> de 240</span><span>W[→,(8,11)] = 0 − 0,5 · (0 − 1) = <b>${fmt(W(1, ult.s), 2)}</b>, la tabla: <b>${fmt(Qt[n + ult.s], 2)}</b></span>`;
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B3. Generalizar (notebook, celdas 19 y 21)
+  // =====================================================================
+  const VIS = NB.visitas, POCO = NOMETA.filter(s => VIS[s] < 10), VISTAS = NOMETA.filter(s => VIS[s] >= 10);
+  const b3 = await tarea(() => {
+    const T = Cueva.tablero($("cvGen"), env, { maxCell: 30, minCell: 10 }), hud = $("hudGen");
+    const promVistas = VISTAS.reduce((x, s) => x + VS[s], 0) / VISTAS.length;
+    const VXY = NB.Q_xy.map(q => Math.max(...q));
+    const MET = {
+      tabla: { V: VS.map((v, s) => VIS[s] >= 10 ? v : 0), nombre: "tabla" },
+      promedio: { V: VS.map((v, s) => VIS[s] >= 10 ? v : promVistas), nombre: "adivinar el promedio" },
+      red: { V: VXY, nombre: "red con coordenadas" }
+    };
+    const err = k => POCO.reduce((x, s) => x + Math.abs(MET[k].V[s] - VS[s]), 0) / POCO.length;
+    const lmax = Math.log10(1 + Math.max(...NOMETA.map(s => VIS[s])));
+    let modo = "red", sel = S_(5, 11);
+    function dibujar() {
+      if (modo === "visitas") {
+        T.fondo("#000").paredes(PARED);
+        for (const s of NOMETA) if (VIS[s] > 0) { const [r, c] = env.free[s]; T.casilla(r, c, Cueva.rampa("visitas", .12 + .88 * Math.log10(1 + VIS[s]) / lmax)); }
+        T.salida();
+        $("legGen").style.background = Cueva.gradienteCSS("visitas"); $("legGenLo").textContent = "nunca"; $("legGenHi").textContent = miles(Math.max(...VIS)) + " visitas (log)";
+      } else {
+        pintarV(T, MET[modo].V, VLO, 1);
+        if (modo === "red") flechasCon(T, NB.pol.Q_xy, COL.ink);
+        $("legGen").style.background = Cueva.gradienteCSS("valor"); $("legGenLo").textContent = fmt(VLO, 2) + " o menos"; $("legGenHi").textContent = "1";
+      }
+      for (const s of POCO) borde(T, s, COL.ember, 1.5, 1.5);
+      T.entrada(); borde(T, sel, COL.exit, 2.5);
+      hud.innerHTML = `<span>notebook: casilla <b>${nom(sel)}</b></span><span>visitas <b>${VIS[sel]}</b></span>` + (sel === GOAL ? "<span>la salida</span>" :
+        `<span>V* <b>${fmt(VS[sel])}</b></span><span>tabla <b>${fmt(MET.tabla.V[sel])}</b></span><span>promedio <b>${fmt(MET.promedio.V[sel])}</b></span><span>red <b>${fmt(VXY[sel])}</b></span>`);
+      $("tbGen").innerHTML = ["tabla", "promedio", "red"].map(k => `<tr${k === modo ? ' class="sel"' : ""}><td>${MET[k].nombre}</td><td class="num">${fmt(err(k))}</td></tr>`).join("");
+    }
+    document.querySelectorAll("#segGen button").forEach(b => b.onclick = () => { modo = b.dataset.g; marcar("#segGen button", "g", modo); dibujar(); });
+    $("cvGen").addEventListener("pointerdown", e => { const s = casillaDe(T, e); if (s !== undefined) { sel = s; dibujar(); } });
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B4. Cuando generalizar engaña (notebook, celdas 26 y 28)
+  // =====================================================================
+  const b4 = await tarea(() => {
+    const T = Cueva.tablero($("cvPared"), env, { maxCell: 30, minCell: 10 }), hud = $("hudPared");
+    const IZQ = S_(7, 6), DER = S_(7, 8);
+    const RED = { xy: { Q: NB.Q_xy_todo, pol: NB.pol.Q_xy_todo, nombre: "coordenadas" }, bg: { Q: NB.Q_bg, pol: NB.pol.Q_bg, nombre: "coordenadas + bigotes" } };
+    let modo = "xy", sel = IZQ;
+    function bigotes(s) {
+      const [r, c] = env.free[s], cell = T.cell, ctx = T.ctx, cx = c * cell + cell / 2, cy = r * cell + cell / 2;
+      ctx.strokeStyle = COL.lamp; ctx.lineWidth = Math.max(2, cell * .08);
+      Cueva.DR.forEach(([dr, dc]) => { if (env.isWall(r + dr, c + dc)) { ctx.beginPath(); ctx.moveTo(cx + dc * cell * .2, cy + dr * cell * .2); ctx.lineTo(cx + dc * cell * .62, cy + dr * cell * .62); ctx.stroke(); } });
+    }
+    function dibujar() {
+      const R = RED[modo];
+      T.fondo("#000").paredes(PARED);
+      for (const s of NOMETA) { const [r, c] = env.free[s]; T.casilla(r, c, OPT(s, R.pol[s]) ? "#1d3b2c" : "#5a2626", 1); }
+      T.salida();
+      flechasCon(T, R.pol, s => OPT(s, R.pol[s]) ? COL.ink : "#ffb4ad");
+      circulo(T, IZQ, COL.sonar); circulo(T, DER, COL.sonar);
+      if (modo === "bg") bigotes(sel);
+      borde(T, sel, COL.exit, 2.5);
+      const ok = NOMETA.filter(s => OPT(s, R.pol[s])).length, q = R.Q[sel];
+      hud.innerHTML = `<span>notebook, ${R.nombre}: flechas óptimas <b>${pct(ok / NOMETA.length)}</b></span>` + (sel === GOAL ? "<span>la salida</span>" :
+        `<span>${nom(sel)}, Q*: ${QS[sel].map((v, a) => `${AR[a]} <b>${fmt(v)}</b>`).join(" ")}</span><span>red: ${q.map((v, a) => `${AR[a]} <b${a === R.pol[sel] ? ` style="color:${OPT(sel, a) ? "var(--exit)" : "var(--ember)"}"` : ""}>${fmt(v)}</b>`).join(" ")}</span>`);
+      $("tbPared").innerHTML = [IZQ, DER].map(s => `<tr${s === sel ? ' class="sel"' : ""}><td>${rc(s)}, ${R.nombre}</td><td class="num">${fmt(VS[s])}</td><td class="num">${fmt(Math.max(...R.Q[s]))}</td><td class="num">${AR[R.pol[s]]} ${OPT(s, R.pol[s]) ? "(óptima)" : "(no)"}</td></tr>`).join("");
+    }
+    document.querySelectorAll("#segPared button").forEach(b => b.onclick = () => { modo = b.dataset.p; marcar("#segPared button", "p", modo); dibujar(); });
+    $("cvPared").addEventListener("pointerdown", e => { const s = casillaDe(T, e); if (s !== undefined) { sel = s; dibujar(); } });
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B5. El objetivo que se mueve (notebook, celdas 31 y 33)
+  // =====================================================================
+  function unPeso(trans, pasos = 60, alfa = 0.1, w = 0.1) {   // como un_peso del notebook
+    const h = [w];
+    for (let k = 0; k < pasos; k++) { const [x, xs, r, fin] = trans[k % trans.length]; const y = fin ? r : r + GAMMA * w * xs; w = w + alfa * (y - w * x) * x; h.push(w); }
+    return h;
+  }
+  const W_SOLO = unPeso([[1, 2, 0, false]]), W_MEZCLA = unPeso([[1, 2, 0, false], [2, 0, 1, true]]);
+  const PASO = NB.paso;
+  const b5 = await tarea(() => {
+    const cv = $("cvObj"), hud = $("hudObj");
+    let modo = "peso", k = 60, raf = 0;
+    function dibujar() {
+      if (modo === "peso") {
+        $("chipsObj").innerHTML = `<span><i style="background:var(--ember)"></i>solo A → B</span><span><i style="background:var(--sonar)"></i>A → B y B → salida, alternadas</span>`;
+        const g = ejes(cv, 230, { x0: 0, x1: 60, y0: -1.2, y1: 1.6, ticksX: [0, 20, 40, 60], ticksY: [-1, 0, 1], fx: String, fy: fLog, tituloX: "paso de gradiente →", tituloY: "w (escala log)" });
+        const xs = Array.from({ length: k + 1 }, (_, i) => i);
+        linea(g, xs, W_MEZCLA.slice(0, k + 1).map(log10), COL.sonar);
+        linea(g, xs, W_SOLO.slice(0, k + 1).map(log10), COL.ember);
+        hud.innerHTML = `<span>calculado en el navegador, igual que el notebook (α = 0,1, γ = 0,99)</span><span>paso <b>${k}</b></span><span>solo A → B: w = <b>${fmt(W_SOLO[k], 2)}</b></span><span>alternadas: w = <b>${fmt(W_MEZCLA[k], 4)}</b></span>`;
+        $("capObj").textContent = "Dos casillas: A entra a la red como el número 1 y B como el 2, con un solo peso w. El objetivo de Q(A) es γ · Q(B) = 2γw, calculado con el mismo w. Con la transición de B a la salida (premio 1) mezclada, el peso se asienta en 0,5862.";
+      } else {
+        $("chipsObj").innerHTML = `<span><i style="background:var(--ember)"></i>el Q más grande de la red</span><span>guiones: 1, el Q verdadero más grande</span>`;
+        const mq = NB.var["sin trucos"].max_q, kk = Math.max(1, Math.round(k / 60 * mq.length));
+        const g = ejes(cv, 230, { x0: 0, x1: 10000, y0: -0.4, y1: 2.5, ticksX: [0, 2500, 5000, 7500, 10000], ticksY: [0, 1, 2], fx: miles, fy: fLog, tituloX: "paso →", tituloY: "Q más grande (escala log)" });
+        linea(g, [0, 10000], [0, 0], COL.muted, 1, [5, 4]);
+        linea(g, PASO.slice(0, kk), mq.slice(0, kk).map(log10), COL.ember);
+        const ip = mq.indexOf(Math.max(...mq));
+        hud.innerHTML = `<span>notebook, semilla 0, sin trucos</span><span>paso <b>${miles(PASO[kk - 1])}</b>: Q más grande <b>${fmt(mq[kk - 1], 2)}</b></span><span>pico <b>${fmt(mq[ip], 2)}</b> en el paso ${miles(PASO[ip])}</span><span>sale desde el <b>3 %</b> de las casillas al final</span>`;
+        $("capObj").textContent = "Curva del notebook: Q-learning con la red 6 → 64 → 64 → 4, un paso de gradiente cada 4 pasos con las últimas 4 transiciones y el objetivo calculado con la misma red. Se mide cada 250 pasos, sin explorar.";
+      }
+    }
+    function parar() { cancelAnimationFrame(raf); raf = 0; $("objVer").textContent = "Paso a paso"; }
+    $("objVer").onclick = () => {
+      if (raf) { parar(); return; }
+      if (reducir) { k = 60; dibujar(); return; }
+      k = 0; $("objVer").textContent = "Pausa"; let t = 0;
+      const f = () => { t++; if (t % 3 === 0) k++; dibujar(); if (k < 60) raf = requestAnimationFrame(f); else parar(); };
+      raf = requestAnimationFrame(f);
+    };
+    document.querySelectorAll("#segObj button").forEach(b => b.onclick = () => { parar(); modo = b.dataset.o; marcar("#segObj button", "o", modo); k = 60; dibujar(); });
+    dibujar();
+    return { dibujar };
+  });
+
+  // =====================================================================
+  // B6. DQN (notebook, celdas 36 y 38)
+  // =====================================================================
+  const VARS = [["sin trucos", COL.ember], ["solo red objetivo", COL.lamp], ["solo memoria", "#c58fd6"], ["DQN (las dos)", COL.sonar]];
+  const b6 = await tarea(() => {
+    const cv = $("cvDqn"), T = Cueva.tablero($("cvDqnCueva"), env, { maxCell: 30, minCell: 10 }), hud = $("hudDqn");
+    const QD = NB.Q_dqn, POL = NB.pol.Q_dqn, VD = QD.map(q => Math.max(...q));
+    const cam = Cueva.camino(env, POL, 100);
+    let modo = "sale", sel = S_(6, 1);
+    function dibujar() {
+      let g;
+      if (modo === "sale") {
+        g = ejes(cv, 220, { x0: 0, x1: 10000, y0: 0, y1: 100, ticksX: [0, 2500, 5000, 7500, 10000], ticksY: [0, 25, 50, 75, 100], fx: miles, fy: v => v + " %", tituloX: "paso →", tituloY: "% de casillas desde las que sale" });
+        for (const [k, c] of VARS) linea(g, PASO, NB.var[k].sale.map(v => 100 * v), c, k.startsWith("DQN") ? 2.5 : 1.6);
+      } else {
+        const todos = VARS.flatMap(([k]) => NB.var[k].error), lo = Math.floor(log10(Math.min(...todos))), hi = Math.ceil(log10(Math.max(...todos)));
+        const ty = []; for (let t = lo; t <= hi; t++) ty.push(t);
+        g = ejes(cv, 220, { x0: 0, x1: 10000, y0: lo, y1: hi, ticksX: [0, 2500, 5000, 7500, 10000], ticksY: ty, fx: miles, fy: fLog, tituloX: "paso →", tituloY: "error medio |max Q − V*| (log)" });
+        for (const [k, c] of VARS) linea(g, PASO, NB.var[k].error.map(log10), c, k.startsWith("DQN") ? 2.5 : 1.6);
+      }
+      pintarV(T, VD, VLO, 1); flechasCon(T, POL, s => OPT(s, POL[s]) ? COL.ink : COL.ember);
+      T.trayecto(cam, "rgba(224,100,90,.85)", .1); T.entrada(); borde(T, sel, COL.exit, 2.5);
+      const q = QD[sel];
+      hud.innerHTML = `<span>notebook, DQN al paso 10&nbsp;000</span><span>camino desde S: <b style="color:var(--ember)">no sale</b>, va y viene entre (5,1) y (6,1)</span>` + (sel === GOAL ? "" :
+        `<span>${nom(sel)}, red: ${q.map((v, a) => `${AR[a]} <b${a === POL[sel] ? ` style="color:${OPT(sel, a) ? "var(--exit)" : "var(--ember)"}"` : ""}>${fmt(v)}</b>`).join(" ")}</span><span>óptima: <b>${[0, 1, 2, 3].filter(a => OPT(sel, a)).map(a => AR[a]).join(" ")}</b></span>`);
+    }
+    document.querySelectorAll("#segDqn button").forEach(b => b.onclick = () => { modo = b.dataset.d; marcar("#segDqn button", "d", modo); dibujar(); });
+    $("cvDqnCueva").addEventListener("pointerdown", e => { const s = casillaDe(T, e); if (s !== undefined) { sel = s; dibujar(); } });
+    dibujar();
+    return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B7. Varias semillas (notebook, celdas 41 y 43)
+  // =====================================================================
+  const b7 = await tarea(() => {
+    const cv = $("cvSem"), hud = $("hudSem");
+    const stats = rs => { const P = PASO.length, m = [], sd = []; for (let i = 0; i < P; i++) { const v = rs.map(r => 100 * r.sale[i]), mu = v.reduce((a, b) => a + b, 0) / v.length; m.push(mu); sd.push(Math.sqrt(v.reduce((a, b) => a + (b - mu) ** 2, 0) / v.length)); } return { m, sd }; };
+    const ST = { sin: stats(NB.sem["sin trucos"]), dqn: stats(NB.sem["DQN (las dos)"]) };
+    const D0 = NB.sem["DQN (las dos)"][0].sale.map(v => 100 * v), K5 = PASO.indexOf(5000);
+    let modo = "banda";
+    function dibujar() {
+      const g = ejes(cv, 240, { x0: 0, x1: 10000, y0: 0, y1: 105, ticksX: [0, 2500, 5000, 7500, 10000], ticksY: [0, 25, 50, 75, 100], fx: miles, fy: v => v + " %", tituloX: "paso →", tituloY: "% de casillas desde las que sale" });
+      const { ctx, X, Y } = g;
+      const banda = ({ m, sd }, fill) => { ctx.fillStyle = fill; ctx.beginPath(); PASO.forEach((x, i) => { const y = Y(Math.min(100, m[i] + sd[i])); i ? ctx.lineTo(X(x), y) : ctx.moveTo(X(x), y); }); for (let i = PASO.length - 1; i >= 0; i--) ctx.lineTo(X(PASO[i]), Y(Math.max(0, m[i] - sd[i]))); ctx.closePath(); ctx.fill(); };
+      if (modo === "banda") {
+        banda(ST.sin, "rgba(224,100,90,.18)"); banda(ST.dqn, "rgba(94,200,216,.18)");
+        linea(g, PASO, ST.sin.m, COL.ember); linea(g, PASO, ST.dqn.m, COL.sonar);
+      } else {
+        for (const r of NB.sem["sin trucos"]) linea(g, PASO, r.sale.map(v => 100 * v), "rgba(224,100,90,.7)", 1.2);
+        for (const r of NB.sem["DQN (las dos)"]) linea(g, PASO, r.sale.map(v => 100 * v), "rgba(94,200,216,.75)", 1.2);
+      }
+      linea(g, PASO, D0, COL.lamp, 1.6, [5, 3]);
+      linea(g, [5000, 5000], [0, 105], "rgba(232,230,223,.35)", 1, [3, 3]);
+      ctx.fillStyle = COL.lamp; ctx.beginPath(); ctx.arc(X(5000), Y(D0[K5]), 5, 0, 7); ctx.fill();
+      hud.innerHTML = `<span>notebook, paso 5000: semilla 0 <b style="color:var(--lamp)">${Math.round(D0[K5])} %</b></span><span>promedio de 5 <b>${Math.round(ST.dqn.m[K5])} % ± ${Math.round(ST.dqn.sd[K5])} %</b></span><span>${modo === "banda" ? "banda: promedio ± 1 desvío" : "una línea por semilla"}</span>`;
+    }
+    document.querySelectorAll("#segSem button").forEach(b => b.onclick = () => { modo = b.dataset.v; marcar("#segSem button", "v", modo); dibujar(); });
+    dibujar();
+    return { dibujar };
+  });
+
+  Cueva.alCargarSprites(() => { b2.dibujar(); });
+  let tRes = 0;
+  addEventListener("resize", () => { clearTimeout(tRes); tRes = setTimeout(() => { for (const f of [b1, b2, b3, b4, b5, b6, b7]) f.dibujar(); }, 120); });
+})();
+</script>
+</body>
+</html>

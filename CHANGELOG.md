@@ -26,6 +26,7 @@ Formato: una sección por versión (SemVer sobre el curso, ver `fabrica/CONVENCI
 - Clase 5 (nueva): Monte Carlo, promedio incremental, TD(0), el error δ y la dopamina, sesgo y varianza, equivalencia de certeza.
 - Clase 6 (nueva): por qué Q y no V sin mapa, ε-greedy, SARSA, Q-learning, on-policy contra off-policy, mapa de visitas.
 - Clase 7 (nueva): bandits, regret, UCB, optimismo y conteos, Go-Explore, acciones pegajosas (Machado et al., 2018).
+- Clase 8 (nueva): Q como matriz y función, red one-hot = tabla, generalizar y cuándo engaña, el objetivo que se mueve, DQN, comparar con varias semillas (Machado et al., 2018).
 - Clase 9: redes recurrentes desde la v1 7 sin la cadena de Markov (bigotes, n-gramas, red con un lazo, agente con memoria, puente al modelo de lenguaje); recuadro de falsas memorias.
 - Clase 10 (nueva): clonación de comportamiento, errores compuestos, DAgger, RL offline, cambio de distribución, imitar o mejorar.
 - Clase 11 (nueva): políticas con softmax, REINFORCE como imitación ponderada, línea de base, actor-crítico, recorte de PPO.

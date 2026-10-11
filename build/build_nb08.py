@@ -1,892 +1,873 @@
-"""Arma notebooks/08-aplicaciones.ipynb (Clase 8 — Aplicaciones)."""
+"""Arma notebooks/08-de-la-tabla-a-la-red.ipynb (Clase 8 — De la tabla a la red: aproximación y DQN). Spine: specs/8.md.
+
+Q como matriz y como función -> red one-hot = tabla (con números) -> generalizar con coordenadas (casillas poco visitadas)
+-> vecinas separadas por una pared -> Q-learning con red: el objetivo se mueve -> DQN chico: memoria de repetición y red
+objetivo -> varias semillas y curvas con dispersión. (El builder viejo de la clase 8, «aplicaciones», está archivado en
+build/v1/builders/build_nb08.py; el material de la red one-hot y la generalización viene de build/v1/builders/build_nb06.py.)
+"""
 from _nbutil import md, code, writefile_cell, save
 
 cells = []
 
 cells.append(md(r"""
-# Clase 8 — Aplicaciones: de la cueva al mundo
+# Clase 8 — De la tabla a la red: aproximación y DQN
 
-**RL a ciegas** · mini curso de aprendizaje por refuerzo · vía profunda
+**RL a ciegas** · curso de aprendizaje por refuerzo (*reinforcement learning*, RL) · vía profunda
 
-Durante cinco clases el agente aprendió a salir de una cueva. Hoy cambiamos la cueva por problemas reales y vemos que **la receta es siempre la misma**: definir estados, acciones y recompensa, y dejar que un algoritmo encuentre la política.
+Basado en Sutton & Barto, cap. 9 (aproximación de funciones) y 11.3 (la tríada mortal), en Stanford CS234 (Brunskill), clase 4 (segunda mitad), y CS224R, clase 6, en Mnih et al. (2015) para DQN y en Machado et al. (2018) para comparar agentes.
 
-1. **Marketing digital**: qué anuncio mostrar (bandit multi-brazo, el MDP de un solo paso).
-2. **El tutor de IA, versión 2**: el MDP que diseñaron ustedes en la clase 2.
-3. **Robótica**: el robot de limpieza que decide si trabajar o ir a cargar batería.
-4. **Investigación documental tipo *deep search***: ¿seguir buscando o responder ya?
-5. **RLHF**: cómo se entrena ChatGPT con RL.
-6. **Proyecto final**: su propio MDP.
+**La pregunta de hoy:** si cada pantalla de un videojuego es un estado distinto, ¿cómo cabe la tabla $Q$? ¿Y qué se gana y qué se pierde al reemplazarla por una red?
 
-> Ejecutar las celdas en orden. Tarda menos de un minuto en CPU.
+En la clase 6 el agente guardaba lo que sabía en una tabla $Q(s, a)$: 60 casillas × 4 flechas. En la clase 7 vimos que en Atari esa tabla no tiene dónde caber. Hoy la reemplazamos por una **red neuronal** que recibe una descripción de la casilla y devuelve los cuatro valores. Vamos a ver:
+
+1. **$Q$ como matriz y como función**: la tabla es una imagen.
+2. **Una red con entrada *one-hot* es la tabla**: lo comprobamos con números.
+3. **Generalizar**: con coordenadas, la red estima valores en casillas que casi no visitó.
+4. **Cuando generalizar engaña**: dos vecinas separadas por una pared.
+5. **Q-learning con red**: el objetivo se mueve, y los valores se disparan.
+6. **DQN**: memoria de repetición y red objetivo, con y sin cada una.
+7. **Comparar de forma justa**: varias semillas y curvas con dispersión.
+
+Y un ejercicio: sacar la red objetivo o la memoria y mirar qué pasa.
+
+> Cómo usar este notebook: ejecutar las celdas en orden (Colab: *Entorno de ejecución → Ejecutar todas*). Usa PyTorch en CPU y tarda alrededor de cuatro minutos.
 """))
 
 cells.append(md(r"""
 ## Preparación
 
-La primera celda escribe `cave_env.py` (la cueva del curso) para que el notebook funcione solo, también en Colab.
+La primera celda escribe el archivo `cave_env.py` con **la cueva** de todo el curso. Así el notebook funciona solo, también en Colab. No hace falta leerla.
 """))
 cells.append(writefile_cell())
+
 cells.append(md(r"""
-Imports y semilla fija para que todos veamos los mismos resultados.
+Importamos la cueva, NumPy, Matplotlib y **PyTorch** (en Colab ya viene instalado), y fijamos las convenciones de las clases 3 a 6: **+1 al entrar a la salida**, la salida es absorbente y vale 0, el primer paso no se descuenta y $\gamma = 0{,}99$. Las partidas duran como mucho 200 pasos.
 """))
 cells.append(code(r"""
+import time
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
+import torch.nn as nn
 from cave_env import CaveEnv, ACTION_NAMES
 
+T0 = time.time()
 SEMILLA = 0
 np.random.seed(SEMILLA)
+torch.manual_seed(SEMILLA)
+torch.set_num_threads(1)      # con redes tan chicas, un solo hilo es más rápido
+GAMMA = 0.99
+env = CaveEnv(max_steps=200)
 """))
+
 cells.append(md(r"""
-**Herramientas** (celda plegada): funciones de simulación y de dibujo. No hace falta leerla, solo ejecutarla.
+La celda siguiente define las **herramientas**: la respuesta correcta con el mapa, la red, el DQN y los dibujos. Está plegada: no hace falta leerla, solo ejecutarla.
+
+Como en la clase 6, el agente que aprende (`dqn`) solo usa `env.reset` y `env.step`. El mapa (`env.P`, `env.R`) lo usa `iteracion_de_valor`, que calcula la respuesta correcta para comparar.
 """))
 cells.append(code(r'''
 # @title Herramientas (no hace falta leer esto)
 # Herramientas: no hace falta leer esto
-import matplotlib.patches as mpatches
-from matplotlib.colors import ListedColormap
-from functools import lru_cache
-import pandas as pd
+import matplotlib.patheffects as pe
 
 COLORES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
 plt.rcParams.update({
     "figure.dpi": 100, "axes.spines.top": False, "axes.spines.right": False,
-    "axes.grid": True, "grid.color": "#e6e6e6", "grid.linewidth": 0.8, "axes.axisbelow": True,
-    "axes.edgecolor": "#888888", "axes.titlesize": 12, "font.size": 10.5, "lines.linewidth": 2,
+    "axes.grid": True, "grid.color": "#e6e6e6", "grid.linewidth": 0.8,
+    "axes.edgecolor": "#888888", "axes.titlesize": 12, "font.size": 10.5,
+    "lines.linewidth": 2, "axes.axisbelow": True,
 })
+SOMBRA = [pe.withStroke(linewidth=2.5, foreground="black")]
 
 
-# ================= value iteration (clase 3) =================
-def value_iteration(P, R, gamma, valida=None, tol=1e-9):
-    """P[s,a,s'], R[s,a]. 'valida[s,a]' marca acciones permitidas. Devuelve V, política, Q."""
-    V = np.zeros(P.shape[0])
+# ---------- la respuesta correcta (esto SÍ usa el mapa) ----------
+def iteracion_de_valor(env, gamma, tol=1e-12):
+    """Clase 4: V(s) <- max_a [R(s,a) + γ Σ P(s'|s,a) V(s')]. Devuelve V* y Q* (con Q* = 0 en la salida)."""
+    V = np.zeros(env.nS)
     while True:
-        Q = R + gamma * P @ V
-        if valida is not None:
-            Q = np.where(valida, Q, -np.inf)
-        V_nuevo = Q.max(1)
+        V_nuevo = (env.R + gamma * env.P @ V).max(axis=1)
         if np.max(np.abs(V_nuevo - V)) < tol:
-            return V_nuevo, Q.argmax(1), Q
+            Q = env.R + gamma * env.P @ V_nuevo
+            Q[env.goal] = 0.0
+            return V_nuevo, Q
         V = V_nuevo
 
 
-# ================= 1. bandits =================
-def mostrar_ctr(ctr, nombres):
-    fig, ax = plt.subplots(figsize=(7, 3))
-    bars = ax.bar(nombres, np.array(ctr) * 100, color=COLORES[0], width=0.55)
-    bars[int(np.argmax(ctr))].set_color(COLORES[2])
-    ax.bar_label(bars, fmt="%.1f%%", padding=3)
-    ax.set_ylabel("CTR real (%)"); ax.set_ylim(0, max(ctr) * 130)
-    ax.set_title("Lo que el anunciante NO ve: la tasa de clics real de cada anuncio")
-    ax.grid(axis="x", visible=False); plt.show()
+def pasos_de(v, gamma=0.99):
+    """Si el único premio es el +1 al entrar, V = γ^(n−1): un camino de n pasos."""
+    return 1 + np.log(np.maximum(v, 1e-12)) / np.log(gamma)
 
 
-def correr_bandit(algoritmo, ctr, T=20000, n_campanas=200, seed=0, eps=0.1, c_ucb=0.2, n_ab=500):
-    """Simula n_campanas campañas en paralelo. Devuelve regret acumulado medio y % de impresiones al mejor."""
-    rng = np.random.default_rng(seed); ctr = np.asarray(ctr); K = len(ctr)
-    n = np.zeros((n_campanas, K)); clics = np.zeros((n_campanas, K)); fila = np.arange(n_campanas)
-    regret = np.zeros(T); al_mejor = 0.0; elegido_ab = None
-    for t in range(T):
-        media = clics / np.maximum(n, 1)
-        if algoritmo == "A/B fijo":            # reparte parejo n_ab impresiones por anuncio y después se queda con el mejor
-            if t < n_ab * K:
-                a = np.full(n_campanas, t % K)
-            else:
-                elegido_ab = media.argmax(1) if elegido_ab is None else elegido_ab
-                a = elegido_ab
-        elif t < K:                             # los demás: primero muestran cada anuncio una vez
-            a = np.full(n_campanas, t)
-        elif algoritmo == "ε-greedy":
-            a = np.where(rng.random(n_campanas) < eps, rng.integers(K, size=n_campanas), media.argmax(1))
-        elif algoritmo == "UCB":
-            a = (media + c_ucb * np.sqrt(np.log(t + 1) / n)).argmax(1)
-        elif algoritmo == "Thompson":
-            a = rng.beta(1 + clics, 1 + n - clics).argmax(1)
-        clic = rng.random(n_campanas) < ctr[a]
-        n[fila, a] += 1; clics[fila, a] += clic
-        regret[t] = (ctr.max() - ctr[a]).mean(); al_mejor += (a == ctr.argmax()).mean()
-    return regret.cumsum(), 100 * al_mejor / T
+def acciones_optimas(Q_estrella):
+    """Máscara [s, a]: True si a es óptima en s (puede haber empates)."""
+    return np.isclose(Q_estrella, Q_estrella.max(axis=1, keepdims=True), rtol=0, atol=1e-9)
 
 
-def comparar_bandits(ctr, algoritmos=("A/B fijo", "ε-greedy", "UCB", "Thompson"), **kw):
-    res = {alg: correr_bandit(alg, ctr, **kw) for alg in algoritmos}
-    fig, axs = plt.subplots(1, 2, figsize=(15, 4.3), gridspec_kw={"width_ratios": [1.5, 1]})
-    for k, (alg, (reg, _)) in enumerate(res.items()):
-        axs[0].plot(reg, color=COLORES[k], label=alg)
-        axs[0].text(len(reg) * 1.01, reg[-1], f"{alg}", va="center", fontsize=10)
-    axs[0].set_xlim(0, len(reg) * 1.18)
-    axs[0].set_xlabel("impresiones mostradas"); axs[0].set_ylabel("clics perdidos (regret acumulado)")
-    axs[0].set_title("Cuántos clics se perdieron por no mostrar siempre el mejor anuncio")
-    axs[0].legend(frameon=False, loc="upper left")
-    vals = [res[a][1] for a in algoritmos]
-    bars = axs[1].bar(algoritmos, vals, color=COLORES[:len(algoritmos)], width=0.6)
-    axs[1].bar_label(bars, fmt="%.0f%%", padding=3); axs[1].set_ylim(0, 110)
-    axs[1].set_title("% de impresiones dadas al mejor anuncio"); axs[1].grid(axis="x", visible=False)
-    plt.tight_layout(); plt.show()
-    for alg in algoritmos:
-        print(f"{alg:10s}  clics perdidos: {res[alg][0][-1]:6.1f}   impresiones al mejor: {res[alg][1]:4.1f}%")
+# ---------- tabla y red one-hot con las mismas transiciones ----------
+def transiciones_al_azar(env, n, semilla=0):
+    """n transiciones (s, a, r, s', entró a la salida): casilla al azar (no la salida), flecha al azar, un paso."""
+    rng = np.random.default_rng(semilla); out = []
+    for _ in range(n):
+        env.reset()
+        s = int(rng.integers(env.nS - 1)); s = s if s < env.goal else s + 1; env.s = s
+        a = int(rng.integers(env.nA))
+        s2, r, fin, info = env.step(a)
+        out.append((s, a, r, s2, info["reached_goal"]))
+    return out
 
 
-# ================= 2. tutor como MDP =================
-NIVELES = 5                                  # nivel 0 (no sabe) ... 4 (domina)
-P_MEJORA_SUMA = 0.5                          # prob. de subir un nivel en suma al practicar suma
-def p_mejora_resta(nivel_suma):              # restar es más difícil y se apoya en saber sumar
-    return 0.1 + 0.1 * nivel_suma
-def p_acierto(nivel):
-    return 0.1 + 0.2 * nivel                 # 10% ... 90%
-
-
-def construir_tutor(recompensa):
-    """MDP del tutor. Estado = (nivel suma, nivel resta). Acciones: 0 = suma, 1 = resta."""
-    S = NIVELES * NIVELES; P = np.zeros((S, 2, S)); R = np.zeros((S, 2))
-    st = lambda ns, nr: ns * NIVELES + nr
-    for ns in range(NIVELES):
-        for nr in range(NIVELES):
-            s = st(ns, nr)
-            pm = [P_MEJORA_SUMA if ns < NIVELES - 1 else 0.0, p_mejora_resta(ns) if nr < NIVELES - 1 else 0.0]
-            destino = [st(min(ns + 1, NIVELES - 1), nr), st(ns, min(nr + 1, NIVELES - 1))]
-            for a in range(2):
-                P[s, a, destino[a]] += pm[a]; P[s, a, s] += 1 - pm[a]
-                if recompensa == "acierto":       # +1 si acierta, -1 si no (clase 2)
-                    R[s, a] = 2 * p_acierto([ns, nr][a]) - 1
-                else:                            # "aprendizaje": +1 cada vez que el alumno sube un nivel
-                    R[s, a] = pm[a]
-    return P, R
-
-
-def mapas_politica_tutor(politicas):
-    fig, axs = plt.subplots(1, len(politicas), figsize=(6.2 * len(politicas), 5))
-    cmap = ListedColormap([COLORES[0], COLORES[1], "#dddddd"])
-    for ax, (titulo, (pi, Q)) in zip(np.atleast_1d(axs), politicas.items()):
-        g = pi.reshape(NIVELES, NIVELES).astype(float).copy()
-        empate = np.isclose(Q[:, 0], Q[:, 1]).reshape(NIVELES, NIVELES)
-        g[empate] = 2
-        ax.imshow(g.T, origin="lower", cmap=cmap, vmin=0, vmax=2)
-        for ns in range(NIVELES):
-            for nr in range(NIVELES):
-                txt = ["suma", "resta", "—"][int(g[ns, nr])]
-                ax.text(ns, nr, txt, ha="center", va="center", color="white" if g[ns, nr] < 2 else "#333",
-                        fontsize=11, weight="bold")
-        ax.plot(0, 0, "s", ms=44, mfc="none", mec="#222", mew=2)
-        ax.set_xticks(range(NIVELES)); ax.set_yticks(range(NIVELES)); ax.grid(False)
-        ax.set_xlabel("nivel en SUMA"); ax.set_ylabel("nivel en RESTA"); ax.set_title(titulo)
-    plt.suptitle("Política óptima del tutor en cada estado (recuadro negro: el alumno al empezar)", y=1.0)
-    plt.tight_layout(); plt.show()
-
-
-def simular_alumnos(pi, n_problemas=40, n_alumnos=300, seed=0):
-    rng = np.random.default_rng(seed)
-    niveles = np.zeros((n_alumnos, n_problemas + 1, 2)); aciertos = np.zeros(n_alumnos)
-    for i in range(n_alumnos):
-        ns = nr = 0
-        for t in range(n_problemas):
-            a = pi[ns * NIVELES + nr]
-            aciertos[i] += rng.random() < p_acierto([ns, nr][a])
-            if a == 0 and ns < NIVELES - 1 and rng.random() < P_MEJORA_SUMA: ns += 1
-            if a == 1 and nr < NIVELES - 1 and rng.random() < p_mejora_resta(ns): nr += 1
-            niveles[i, t + 1] = ns, nr
-    return niveles.mean(0), aciertos.mean()
-
-
-def comparar_alumnos(politicas):
-    fig, axs = plt.subplots(1, len(politicas), figsize=(6.5 * len(politicas), 3.8), sharey=True)
-    for ax, (titulo, pi) in zip(axs, politicas.items()):
-        niv, ac = simular_alumnos(pi)
-        for k, nombre in enumerate(["suma", "resta"]):
-            ax.plot(niv[:, k], color=COLORES[k], label=f"nivel en {nombre}")
-        ax.set_title(f"{titulo}\naciertos: {ac:.0f} de {len(niv) - 1} · niveles finales: "
-                     f"suma {niv[-1, 0]:.1f}, resta {niv[-1, 1]:.1f}")
-        ax.set_xlabel("problema número"); ax.set_ylim(-0.2, NIVELES - 0.6)
-        ax.legend(frameon=False, loc="center right")
-    axs[0].set_ylabel("nivel promedio (0 a 4)")
-    plt.tight_layout(); plt.show()
-
-
-# ================= 3 y 6. resolver un MDP chico definido con funciones =================
-def resolver_mdp(estados, acciones, transicion, gamma=0.9, titulo="Política óptima", mostrar=True):
-    """transicion(s, a) -> lista de (probabilidad, s_siguiente, recompensa); lista vacía = acción no permitida."""
-    S, A = len(estados), len(acciones); pos = {s: i for i, s in enumerate(estados)}
-    P = np.zeros((S, A, S)); R = np.zeros((S, A)); valida = np.zeros((S, A), bool)
-    for s in estados:
-        for j, a in enumerate(acciones):
-            res = transicion(s, a)
-            if not res:
-                continue
-            valida[pos[s], j] = True
-            assert abs(sum(p for p, _, _ in res) - 1) < 1e-9, f"las probabilidades de ({s}, {a}) no suman 1"
-            for p, s2, r in res:
-                P[pos[s], j, pos[s2]] += p; R[pos[s], j] += p * r
-    V, pi, Q = value_iteration(P, R, gamma, valida)
-    tabla = pd.DataFrame({"estado": estados, "acción óptima": [acciones[k] for k in pi], "valor V(s)": V.round(2)})
-    for j, a in enumerate(acciones):
-        tabla[f"Q(s, {a})"] = np.where(valida[:, j], Q[:, j].round(2), np.nan)
-    if mostrar:
-        fig, ax = plt.subplots(figsize=(max(4, 1.3 * S), 1.6))
-        cm = ListedColormap(COLORES[:A])
-        ax.imshow(pi[None, :], cmap=cm, vmin=-0.5, vmax=A - 0.5, aspect="auto")
-        for i in range(S):
-            ax.text(i, 0, acciones[pi[i]], ha="center", va="center", color="white", fontsize=11, weight="bold")
-        ax.set_xticks(range(S)); ax.set_xticklabels([str(s) for s in estados]); ax.set_yticks([])
-        ax.set_xlabel("estado"); ax.set_title(titulo); ax.grid(False)
-        for sp in ax.spines.values(): sp.set_visible(False)
-        plt.show()
-    return tabla
-
-
-def robot_limpieza(alfa=0.8, beta=0.4, r_limpiar=2.0, r_esperar=1.0, r_rescate=-3.0):
-    """Sutton & Barto, ej. 3.3 (recycling robot), con nombres de robot de limpieza."""
-    def transicion(s, a):
-        if a == "limpiar":
-            if s == "alta":
-                return [(alfa, "alta", r_limpiar), (1 - alfa, "baja", r_limpiar)]
-            return [(beta, "baja", r_limpiar), (1 - beta, "alta", r_rescate)]   # se agota: hay que rescatarlo
-        if a == "esperar":
-            return [(1.0, s, r_esperar)]
-        if a == "cargar":
-            return [(1.0, "alta", 0.0)] if s == "baja" else []                  # con batería alta no tiene sentido
-    return ["alta", "baja"], ["limpiar", "esperar", "cargar"], transicion
-
-
-def mapa_politica_robot(gamma=0.9, alfa=0.8, r_limpiar=2.0):
-    betas = np.linspace(0, 1, 41); esperas = np.linspace(0, 2.5, 41)
-    acc_baja = np.zeros((len(esperas), len(betas)))
-    for i, rw in enumerate(esperas):
-        for j, b in enumerate(betas):
-            est, acc, tr = robot_limpieza(alfa, b, r_limpiar, rw)
-            t = resolver_mdp(est, acc, tr, gamma, mostrar=False)
-            acc_baja[i, j] = acc.index(t["acción óptima"][1])
-    fig, ax = plt.subplots(figsize=(7.5, 4.8))
-    ax.imshow(acc_baja, origin="lower", cmap=ListedColormap(COLORES[:3]), vmin=-0.5, vmax=2.5, aspect="auto",
-              extent=[betas[0], betas[-1], esperas[0], esperas[-1]])
-    ax.grid(False)
-    for k, nombre in enumerate(["limpiar", "esperar", "cargar"]):
-        yy, xx = np.argwhere(acc_baja == k).mean(0) if (acc_baja == k).any() else (np.nan, np.nan)
-        if not np.isnan(xx):
-            ax.text(betas[int(xx)], esperas[int(yy)], nombre, ha="center", va="center", color="white",
-                    fontsize=14, weight="bold")
-    ax.set_xlabel("β: probabilidad de NO agotarse limpiando con batería baja")
-    ax.set_ylabel("recompensa por esperar")
-    ax.set_title(f"¿Qué hace el robot con batería BAJA? (limpiar rinde {r_limpiar:g})")
-    plt.show()
-
-
-# ================= 4. deep search como MDP =================
-MAX_BUSQUEDAS, MAX_CONF = 5, 4
-P_RELEVANTE = [0.9, 0.75, 0.6, 0.45, 0.3]       # el 1er documento suele ser bueno; los siguientes, cada vez menos
-P_ACIERTO_CONF = [0.25, 0.55, 0.75, 0.88, 0.95] # prob. de responder bien según la confianza (0 = adivinar entre 4)
-ACC_DS = ["buscar", "leer", "responder"]
-
-
-def acciones_validas(q, d, c):
-    return np.array([q < MAX_BUSQUEDAS, d < q, True])      # solo se puede leer lo que ya se encontró
-
-
-def paso_ds(estado, a, costo, rng):
-    q, d, c = estado
-    if a == 2:
-        return None, float(rng.random() < P_ACIERTO_CONF[c])   # fin: +1 si la respuesta es correcta
-    if a == 0:
-        q += 1
-    else:
-        if rng.random() < P_RELEVANTE[d]:
-            c = min(c + 1, MAX_CONF)
-        d += 1
-    return (q, d, c), -costo
-
-
-def q_learning_ds(costo, episodios=30000, seed=0):
-    """Q-learning tabular. Tasa de aprendizaje 1/N^0.7: grande en lo poco visitado, chica en lo muy visitado."""
-    rng = np.random.default_rng(seed)
-    Q = np.zeros((MAX_BUSQUEDAS + 1, MAX_BUSQUEDAS + 1, MAX_CONF + 1, 3)); N = np.zeros_like(Q)
-    for ep in range(episodios):
-        eps = max(0.05, 1 - ep / (0.6 * episodios)); est = (0, 0, 0)
-        while est is not None:
-            v = acciones_validas(*est)
-            a = rng.choice(np.flatnonzero(v)) if rng.random() < eps else np.where(v, Q[est], -np.inf).argmax()
-            est2, r = paso_ds(est, a, costo, rng)
-            objetivo = r if est2 is None else r + np.where(acciones_validas(*est2), Q[est2], -np.inf).max()
-            N[est + (a,)] += 1
-            Q[est + (a,)] += (objetivo - Q[est + (a,)]) / N[est + (a,)] ** 0.7
-            est = est2
+def q_tabla(env, transiciones, alfa, gamma):
+    """Q-learning tabular (clase 6) sobre una lista fija de transiciones."""
+    Q = np.zeros((env.nS, env.nA))
+    for s, a, r, s2, fin in transiciones:
+        y = r if fin else r + gamma * Q[s2].max()
+        Q[s, a] += alfa * (y - Q[s, a])
     return Q
 
 
-def jugar_ds(Q, costo, rng):
-    est = (0, 0, 0); pasos = []; G = 0.0
+def red_one_hot(env):
+    """Una capa lineal sin sesgo: entra el one-hot de la casilla (60 números), salen 4. Pesos en 0."""
+    red = nn.Linear(env.nS, env.nA, bias=False).double()
+    nn.init.zeros_(red.weight)
+    return red
+
+
+def q_red_one_hot(env, transiciones, alfa, gamma):
+    """La misma lista de transiciones, pero con una red one-hot entrenada por descenso por gradiente (SGD, tasa α),
+    pérdida ½ (Q(s,a) − objetivo)². Devuelve la red y su matriz de salidas (60 × 4)."""
+    red = red_one_hot(env)
+    opt = torch.optim.SGD(red.parameters(), lr=alfa)
+    X = torch.eye(env.nS, dtype=torch.float64)              # fila s = one-hot de s
+    for s, a, r, s2, fin in transiciones:
+        with torch.no_grad():
+            y = r if fin else r + gamma * red(X[s2]).max().item()
+        perdida = 0.5 * (red(X[s])[a] - y) ** 2
+        opt.zero_grad(); perdida.backward(); opt.step()
+    with torch.no_grad():
+        return red, red(X).numpy()
+
+
+# ---------- redes con capas ocultas ----------
+def entradas(env, obs):
+    """Matriz (casillas × números de entrada) con la observación de cada casilla."""
+    return torch.from_numpy(np.stack([env.observe(s, kind=obs) for s in range(env.nS)]))
+
+
+def crear_red(n_entrada, oculta=64):
+    """Perceptrón multicapa (MLP): n_entrada -> 64 -> 64 -> 4."""
+    return nn.Sequential(nn.Linear(n_entrada, oculta), nn.ReLU(),
+                         nn.Linear(oculta, oculta), nn.ReLU(),
+                         nn.Linear(oculta, 4))
+
+
+def n_parametros(red):
+    return sum(p.numel() for p in red.parameters())
+
+
+def ajustar(env, obs, Q_objetivo, casillas, semilla=0, iteraciones=2000, lr=3e-3):
+    """Regresión: la red aprende Q_objetivo SOLO en las casillas indicadas (Adam, error cuadrático).
+    Devuelve la red y sus Q en todas las casillas."""
+    X = entradas(env, obs)
+    torch.manual_seed(semilla)
+    red = crear_red(X.shape[1])
+    opt = torch.optim.Adam(red.parameters(), lr=lr)
+    Y = torch.tensor(Q_objetivo, dtype=torch.float32)
+    m = torch.from_numpy(np.asarray(casillas))
+    for _ in range(iteraciones):
+        perdida = ((red(X[m]) - Y[m]) ** 2).mean()
+        opt.zero_grad(); perdida.backward(); opt.step()
+    with torch.no_grad():
+        return red, red(X).numpy()
+
+
+# ---------- evaluar una política sin explorar ----------
+SIGUIENTE = None
+def pasos_hasta_salir(env, Q, max_pasos=100):
+    """Para cada casilla: cuántos pasos tarda la política greedy (la flecha de mayor Q) en salir; max_pasos = no sale.
+    Usa la tabla de movimientos de la cueva solo para medir, no para aprender."""
+    global SIGUIENTE
+    if SIGUIENTE is None:
+        SIGUIENTE = np.array([[env._move(s, a)[0] for a in range(env.nA)] for s in range(env.nS)])
+    flecha = Q.argmax(axis=1); res = np.zeros(env.nS, int)
+    for s0 in range(env.nS):
+        s, t = s0, 0
+        while s != env.goal and t < max_pasos:
+            s = SIGUIENTE[s, flecha[s]]; t += 1
+        res[s0] = t if s == env.goal else max_pasos
+    return res
+
+
+def camino_greedy(env, Q, max_pasos=100):
+    s = env.reset(); camino = [s]
+    for _ in range(max_pasos):
+        s, r, fin, info = env.step(int(Q[s].argmax())); camino.append(s)
+        if info["reached_goal"]:
+            break
+    return camino
+
+
+# ---------- DQN (y Q-learning con red sin trucos) ----------
+def epsilon(paso, decae=4000, eps_fin=0.1):
+    """ε decreciente: de 1 a eps_fin en `decae` pasos, y después queda fijo."""
+    return max(eps_fin, 1 - (1 - eps_fin) * paso / decae)
+
+
+def dqn(env, usar_replay=True, usar_objetivo=True, semilla=0, pasos=10_000, obs="coords+touch",
+        lr=1e-3, lote=256, cada=4, copiar_cada=40, capacidad=10_000, calentamiento=500, decae=4000,
+        eps_fin=0.1, evaluar_cada=250, gamma=0.99):
+    """Q-learning con una red. Cada partida empieza en una casilla al azar (como en la clase 6, sección 5).
+    Cada `cada` pasos, un paso de gradiente sobre (objetivo − Q(s,a))², con objetivo = r + γ max Q(s', ·)
+    (o r si entró a la salida):
+      usar_replay=True:   el lote son `lote` transiciones al azar de la memoria (las últimas `capacidad`).
+      usar_replay=False:  el lote son las últimas `cada` transiciones, en orden (lo que acaba de vivir).
+      usar_objetivo=True: el max Q(s', ·) del objetivo sale de una copia congelada de la red, que se pone al día
+                          cada `copiar_cada` pasos.
+      usar_objetivo=False: sale de la misma red que se está entrenando.
+    Cada `evaluar_cada` pasos mide, sin explorar: error medio |max Q − V*|, el Q más grande y desde qué fracción
+    de las casillas sale la política greedy."""
+    torch.manual_seed(semilla); rng = np.random.default_rng(semilla)
+    X = entradas(env, obs)
+    red = crear_red(X.shape[1]); red_obj = crear_red(X.shape[1])
+    red_obj.load_state_dict(red.state_dict())
+    opt = torch.optim.Adam(red.parameters(), lr=lr)
+    S = np.zeros(capacidad, np.int64); S2 = np.zeros_like(S); A = np.zeros_like(S)
+    R = np.zeros(capacidad, np.float32); F = np.zeros(capacidad, np.float32)
+    n, n_grad = 0, 0
+    hist = {"paso": [], "error": [], "max_q": [], "sale": [], "pasos_S": []}
+    with torch.no_grad():
+        Qs = red(X).numpy()
+    def nueva_partida():
+        env.reset(); s = int(rng.integers(env.nS - 1)); s = s if s < env.goal else s + 1; env.s = s
+        return s
+    s = nueva_partida()
+    for paso in range(1, pasos + 1):
+        # actuar con ε-greedy
+        a = int(rng.integers(env.nA)) if rng.random() < epsilon(paso, decae, eps_fin) else int(Qs[s].argmax())
+        s2, r, fin, info = env.step(a)
+        i = n % capacidad
+        S[i], A[i], R[i], S2[i], F[i] = s, a, r, s2, float(info["reached_goal"])
+        n += 1
+        # aprender
+        if paso % cada == 0 and (n >= calentamiento or not usar_replay):
+            idx = rng.integers(min(n, capacidad), size=lote) if usar_replay else np.arange(n - cada, n) % capacidad
+            with torch.no_grad():
+                q_sig = (red_obj if usar_objetivo else red)(X[S2[idx]]).max(dim=1).values
+                y = torch.from_numpy(R[idx]) + gamma * (1 - torch.from_numpy(F[idx])) * q_sig
+            q_sa = red(X[S[idx]]).gather(1, torch.from_numpy(A[idx])[:, None]).squeeze(1)
+            perdida = ((q_sa - y) ** 2).mean()
+            opt.zero_grad(); perdida.backward(); opt.step(); n_grad += 1
+            with torch.no_grad():
+                Qs = red(X).numpy()
+            if usar_objetivo and n_grad % (copiar_cada // cada) == 0:
+                red_obj.load_state_dict(red.state_dict())
+        s = nueva_partida() if fin else s2
+        # medir (sin explorar)
+        if paso % evaluar_cada == 0:
+            ph = pasos_hasta_salir(env, Qs)
+            hist["paso"].append(paso); hist["error"].append(np.abs(Qs.max(axis=1) - V_estrella)[ng].mean())
+            hist["max_q"].append(Qs[ng].max()); hist["sale"].append(np.mean(ph[ng] < 100)); hist["pasos_S"].append(ph[env.start])
+    out = {k: np.array(v) for k, v in hist.items()}
+    out.update(Q=Qs, red=red, n_grad=n_grad)
+    return out
+
+
+def final(res, clave="sale", ultimas=4):
+    """Promedio de las últimas evaluaciones (las del último millar de pasos)."""
+    return float(np.mean(res[clave][-ultimas:]))
+
+
+# ---------- dibujos ----------
+def plot_cave(env, values=None, policy=None, path=None, ax=None, title=None, cmap="magma", clim=None, mark=None):
+    """env.plot + escala de color elegible (calculada sin la salida), flechas con borde y círculos opcionales."""
+    ax = env.plot(values=values, policy=policy, path=path, ax=ax, title=title, cmap=cmap)
+    if values is not None:
+        if clim is None:
+            v = np.asarray(values, dtype=float)[np.arange(env.nS) != env.goal]
+            clim = (v.min(), v.max())
+        ax.images[-1].set_clim(*clim)
+    for t in ax.texts:
+        t.set_path_effects(SOMBRA)
+    if mark is not None:
+        for m in np.atleast_1d(mark):
+            r, c = env.free[int(m)]
+            ax.plot(c, r, "o", mfc="none", mec="#00e5ff", mew=2.5, ms=15)
+    return ax
+
+
+def banda(ax, x, Y, color, label, ls="-", lim=(0, 100)):
+    """Promedio sobre semillas y banda de ± 1 desvío (recortada a los valores posibles)."""
+    m, sd = Y.mean(0), Y.std(0)
+    ax.plot(x, m, color=color, label=label, ls=ls)
+    ax.fill_between(x, np.clip(m - sd, *lim), np.clip(m + sd, *lim), color=color, alpha=0.18, lw=0)
+
+
+def banda_log(ax, x, Y, color, label):
+    """Para escalas log: la mediana y una banda del mínimo al máximo entre semillas."""
+    ax.plot(x, np.median(Y, 0), color=color, label=label)
+    ax.fill_between(x, Y.min(0), Y.max(0), color=color, alpha=0.18, lw=0)
+''', herramientas=True))
+
+# ======================================================================= 1
+cells.append(md(r"""
+## 1. $Q$ como matriz y como función
+
+### Paso 1 — La tabla es una imagen
+
+Calculamos $Q^*$ con el mapa, por iteración de valor (clase 4), y lo dibujamos de dos maneras. A la izquierda, **como matriz**: una fila por casilla, una columna por flecha (4); cada número es un color. A la derecha, el mismo contenido sobre la cueva: $V^*(s) = \max_a Q^*(s,a)$ y la mejor flecha.
+""", objetivos=["O1"]))
+cells.append(code(r"""
+V_estrella, Q_estrella = iteracion_de_valor(env, GAMMA)
+opt = acciones_optimas(Q_estrella)
+ng = np.arange(env.nS) != env.goal
+CLIM = (V_estrella[ng].min() - 0.01, 1.0)
+
+fig, axs = plt.subplots(1, 2, figsize=(14, 5.6), gridspec_kw=dict(width_ratios=[1, 2.6]))
+im = axs[0].imshow(Q_estrella[ng], aspect="auto", cmap="magma", vmin=0.78, vmax=1.0, interpolation="nearest")
+axs[0].set_xticks(range(env.nA)); axs[0].set_xticklabels(ACTION_NAMES); axs[0].grid(False)
+axs[0].set_ylabel("casilla s (0 … 58; sin la salida)"); axs[0].set_title("Q*(s, a) como matriz: 59 × 4")
+axs[0].set_yticks([0, 10, 20, 30, 40, 50]); axs[0].set_yticklabels(["S = 0", "10", "20", "30", "40", "50"])
+plt.colorbar(im, ax=axs[0], fraction=0.1)
+plot_cave(env, values=V_estrella, policy=Q_estrella.argmax(axis=1), ax=axs[1], clim=CLIM,
+          title="La misma tabla sobre la cueva: V*(s) = max Q*(s, ·) y la mejor flecha")
+plt.tight_layout(); plt.show()
+
+print(f"Q* es una matriz de {env.nS} × {env.nA} = {Q_estrella.size} números (la fila de la salida vale 0).")
+lejos = int(np.argmin(np.where(ng, V_estrella, np.inf)))
+print(f"V* fuera de la salida va de {V_estrella[lejos]:.4f} (casilla {env.free[lejos]}, a {pasos_de(V_estrella[lejos]):.0f} pasos) "
+      f"a {V_estrella[ng].max():.4f} (al lado de la salida, a 1 paso).  V*(S) = {V_estrella[env.start]:.4f}, "
+      f"a {pasos_de(V_estrella[env.start]):.0f} pasos")
+for s in [env.start, env.pos2s[(8, 11)]]:
+    print(f"fila de {env.free[s]} (casilla {s}):  " + "   ".join(f"{ACTION_NAMES[a]} {Q_estrella[s, a]:.4f}" for a in range(env.nA)))
+"""))
+cells.append(md(r"""
+Con $\gamma = 0{,}99$ y un solo premio de +1, todos los valores están entre 0,82 y 1: las diferencias entre flechas de una misma casilla son de un 1 a un 2 %. Eso va a importar cuando una red tenga que aprenderlas.
+
+### Paso 2 — La misma tabla, como función
+
+Una tabla es una **función** que recibe una pregunta y devuelve un número: «¿cuánto vale la flecha $a$ en la casilla $s$?». Escrita así:
+
+$$Q:\ (s, a) \longmapsto \text{valor} \qquad\text{o, devolviendo las cuatro flechas juntas,}\qquad Q:\ s \longmapsto \big(Q(s,\uparrow),\ Q(s,\rightarrow),\ Q(s,\downarrow),\ Q(s,\leftarrow)\big)$$
+
+La tabla guarda un número **independiente** por pregunta y, para responder, lo busca. Una red neuronal $Q_\theta$ con parámetros $\theta$ es otra manera de escribir esa función: en vez de buscar, calcula.
+"""))
+cells.append(code(r"""
+def Q_como_funcion(fila, columna, flecha):
+    s = env.pos2s[(fila, columna)]           # la casilla como número (fila de la matriz)
+    a = ACTION_NAMES.index(flecha)           # la flecha como número (columna de la matriz)
+    return Q_estrella[s, a]
+
+for fila, columna, flecha in [(1, 1, "→"), (1, 1, "↓"), (8, 11, "→"), (7, 6, "↑")]:
+    print(f"Q(casilla ({fila}, {columna}), {flecha}) = {Q_como_funcion(fila, columna, flecha):.4f}")
+"""))
+
+# ======================================================================= 2
+cells.append(md(r"""
+## 2. Una red con entrada *one-hot* es la tabla
+
+### Paso 1 — La entrada *one-hot*
+
+Para dársela a una red, la casilla tiene que ser una lista de números. La forma más simple es la codificación *one-hot*: 60 números, todos 0 salvo un 1 en la posición de la casilla (`env.observe(s, kind="onehot")`). Tomamos la red más chica posible: una capa lineal sin sesgo, $Q_\theta(s) = W\,x_s$, con $W$ de 4 × 60. Multiplicar $W$ por un *one-hot* **elige una columna**: la columna $s$ de $W$ son los cuatro valores de la casilla $s$.
+""", objetivos=["O1"]))
+cells.append(code(r"""
+x_S = env.observe(env.start, kind="onehot")
+print(f"one-hot de S: {len(x_S)} números, suma = {x_S.sum():.0f}, el 1 está en la posición {int(x_S.argmax())}")
+print("primeros 12:", x_S[:12].astype(int).tolist())
+
+red_demo = red_one_hot(env)
+with torch.no_grad():
+    red_demo.weight[:, env.start] = torch.tensor([0.1, 0.2, 0.3, 0.4], dtype=torch.float64)   # una columna cualquiera
+    salida = red_demo(torch.from_numpy(x_S).double()).numpy()
+print(f"\nW tiene {red_demo.weight.numel()} números = {env.nS} casillas × {env.nA} flechas, los mismos que la tabla")
+print("ponemos (0,1  0,2  0,3  0,4) en la columna de S; la red, con el one-hot de S, devuelve:", salida.round(2).tolist())
+"""))
+cells.append(md(r"""
+### Paso 2 — Un paso de gradiente, con números
+
+La red aprende por descenso por gradiente (*gradient descent*), con la pérdida $\tfrac12\,(Q_\theta(s,a) - y)^2$, donde $y$ es el objetivo de Q-learning de la clase 6: $y = r + \gamma \max_{a'} Q_\theta(s', a')$, o $y = r$ si entró a la salida. La derivada respecto de cada peso $W_{b,j}$ es $(Q_\theta(s,a) - y)\cdot x_j$ si $b = a$, y 0 si no. Con el *one-hot*, $x_j$ es 0 salvo en $j = s$, así que **solo un peso tiene gradiente**: el de la fila $a$, columna $s$.
+
+Lo vemos con una transición que entra a la salida, partiendo de pesos en 0 y con tasa de aprendizaje $\alpha = 0{,}5$.
+"""))
+cells.append(code(r"""
+ALFA = 0.5
+s, a = env.pos2s[(8, 11)], 1                       # al lado de la salida, flecha →
+env.reset(); env.s = s
+s2, r, fin, info = env.step(a)
+print(f"transición: {env.free[s]} --{ACTION_NAMES[a]}--> {env.free[s2]}   r = {r:g}   ¿entró a la salida? {info['reached_goal']}")
+
+red_paso = red_one_hot(env)
+X1 = torch.eye(env.nS, dtype=torch.float64)
+y = r                                              # entró a la salida: el objetivo es r
+perdida = 0.5 * (red_paso(X1[s])[a] - y) ** 2
+perdida.backward()
+g = red_paso.weight.grad
+print(f"pesos con gradiente distinto de 0: {int((g != 0).sum())} de {g.numel()}   (fila {ACTION_NAMES[a]}, columna {s}): "
+      f"gradiente = Q − y = 0 − {y:g} = {g[a, s].item():+.1f}")
+with torch.no_grad():
+    red_paso.weight -= ALFA * g
+print(f"paso de gradiente:  W[{ACTION_NAMES[a]}, {s}] = 0 − {ALFA} · ({g[a, s].item():+.1f}) = {red_paso.weight[a, s].item():.2f}")
+Q_paso = np.zeros((env.nS, env.nA)); Q_paso[s, a] += ALFA * (y - Q_paso[s, a])
+print(f"Q-learning tabular: Q({env.free[s]}, {ACTION_NAMES[a]}) = 0 + {ALFA} · ({y:g} − 0) = {Q_paso[s, a]:.2f}")
+"""))
+cells.append(md(r"""
+El paso de gradiente queda $W_{a,s} \leftarrow W_{a,s} + \alpha\,(y - W_{a,s})$: **la regla de Q-learning de la clase 6, letra por letra**.
+
+### Paso 3 — La tabla y la red, con las mismas 20 000 transiciones
+
+Ahora muchas transiciones: casilla al azar, flecha al azar, un paso. Las mismas 20 000, en el mismo orden, para Q-learning tabular ($\alpha = 0{,}5$) y para la red *one-hot* (SGD con tasa 0,5).
+"""))
+cells.append(code(r"""
+trans = transiciones_al_azar(env, 20_000, semilla=SEMILLA)
+Q_tab = q_tabla(env, trans, ALFA, GAMMA)
+red_lineal, Q_red1 = q_red_one_hot(env, trans, ALFA, GAMMA)
+
+fig, axs = plt.subplots(1, 2, figsize=(9, 5.2))
+for ax, M, titulo in [(axs[0], Q_tab[ng], "Tabla Q (Q-learning)"), (axs[1], Q_red1[ng], "Salidas de la red one-hot")]:
+    im = ax.imshow(M, aspect="auto", cmap="magma", vmin=0.78, vmax=1.0, interpolation="nearest")
+    ax.set_xticks(range(env.nA)); ax.set_xticklabels(ACTION_NAMES); ax.set_title(titulo); ax.grid(False)
+axs[0].set_ylabel("casilla s")
+plt.tight_layout(); plt.show()
+
+print(f"parámetros de la red: {red_lineal.weight.numel()}   números de la tabla: {Q_tab.size}")
+print(f"diferencia máxima entre tabla y red: {np.abs(Q_tab - Q_red1).max():.1e}")
+print(f"y las dos contra Q*: error máximo {np.abs(Q_tab - Q_estrella).max():.4f}; flechas óptimas en "
+      f"{np.mean(opt[np.arange(env.nS), Q_tab.argmax(1)][ng]):.0%} de las casillas")
+"""))
+cells.append(md(r"""
+Las dos matrices son idénticas, número por número (diferencia máxima: 0), y las dos llegaron a $Q^*$: **Q-learning tabular es un caso particular de una red**, la que tiene un parámetro propio por casilla y flecha. Por eso tampoco gana nada: lo que aprende en una casilla no le dice nada de la de al lado. Para que la red **comparta** lo aprendido entre casillas, hay que cambiar la entrada.
+"""))
+
+# ======================================================================= 3
+cells.append(md(r"""
+## 3. Generalizar: saber algo de donde casi no estuvo
+
+### Paso 1 — Un agente que no pasó por todos lados
+
+Como en la clase 6, un agente juega 100 partidas desde S con Q-learning tabular, $\varepsilon = 0{,}1$ y $\alpha = 0{,}2$, y contamos cuántas veces pisa cada casilla. Llamamos **poco visitadas** a las que pisó menos de 10 veces.
+""", objetivos=["O2"]))
+cells.append(code(r"""
+rng = np.random.default_rng(SEMILLA)
+Q_ag = rng.uniform(0, 1e-4, size=(env.nS, env.nA)); visitas = np.zeros(env.nS, int); salidas = 0
+for partida in range(100):
+    s = env.reset(); visitas[s] += 1
     while True:
-        a = np.where(acciones_validas(*est), Q[est], -np.inf).argmax()
-        pasos.append((est, ACC_DS[a]))
-        est2, r = paso_ds(est, a, costo, rng); G += r
-        if est2 is None:
-            return pasos, r, G
-        est = est2
-
-
-def evaluar_ds(Q, costo, n=5000, seed=1):
-    rng = np.random.default_rng(seed); L, A, G = [], [], []
-    for _ in range(n):
-        pasos, acierto, g = jugar_ds(Q, costo, rng)
-        L.append(len(pasos) - 1); A.append(acierto); G.append(g)
-    return np.mean(L), np.mean(A), np.mean(G)
-
-
-def optimo_ds(costo):
-    """Valor óptimo exacto (programación dinámica), para comparar con lo que aprendió Q-learning."""
-    @lru_cache(None)
-    def V(q, d, c):
-        mejor = P_ACIERTO_CONF[c]
-        if q < MAX_BUSQUEDAS: mejor = max(mejor, -costo + V(q + 1, d, c))
-        if d < q:
-            p = P_RELEVANTE[d]
-            mejor = max(mejor, -costo + p * V(q, d + 1, min(c + 1, MAX_CONF)) + (1 - p) * V(q, d + 1, c))
-        return mejor
-    return V(0, 0, 0)
-
-
-def barrido_costos(costos):
-    filas = []
-    for k in costos:
-        Q = q_learning_ds(k)
-        filas.append((k,) + evaluar_ds(Q, k) + (optimo_ds(k),))
-    return np.array(filas)
-
-
-def grafico_tradeoff(res):
-    costo, pasos, acierto, neto, opt = res.T
-    fig, axs = plt.subplots(1, 3, figsize=(16, 3.9))
-    axs[0].plot(costo, pasos, "o-", color=COLORES[0], ms=8)
-    axs[0].set_ylabel("pasos antes de responder"); axs[0].set_title("Cuánto investiga")
-    axs[1].plot(costo, acierto * 100, "o-", color=COLORES[1], ms=8)
-    axs[1].set_ylabel("% de respuestas correctas"); axs[1].set_title("Qué tan bien responde")
-    axs[1].set_ylim(0, 100)
-    axs[2].plot(costo, neto, "o-", color=COLORES[2], ms=8, label="Q-learning")
-    axs[2].plot(costo, opt, "--", color="#555", lw=1.5, label="óptimo exacto")
-    axs[2].set_ylabel("recompensa neta"); axs[2].set_title("Acierto − costo total")
-    axs[2].legend(frameon=False)
-    for ax in axs: ax.set_xlabel("costo por paso")
-    plt.tight_layout(); plt.show()
-
-
-def mostrar_trayectoria(costo, seed=3):
-    Q = q_learning_ds(costo)
-    pasos, acierto, G = jugar_ds(Q, costo, np.random.default_rng(seed))
-    print(f"costo por paso = {costo}:")
-    for (q, d, c), a in pasos:
-        print(f"   búsquedas={q} leídos={d} confianza={c}  ->  {a}")
-    print(f"   respuesta {'correcta' if acierto else 'incorrecta'} · recompensa total {G:+.2f}\n")
-
-
-# ================= 5. RLHF =================
-def diagrama_rlhf():
-    fig, ax = plt.subplots(figsize=(14, 3.6)); ax.set_xlim(0, 14); ax.set_ylim(0, 4.2); ax.axis("off")
-    cajas = [
-        (0.2, "1. Ajuste supervisado\n(SFT)", "personas escriben\nrespuestas modelo", COLORES[0]),
-        (4.9, "2. Modelo de recompensa", "personas ordenan respuestas:\nA mejor que B → aprende r(x, y)", COLORES[1]),
-        (9.6, "3. RL (PPO)", "el modelo genera, r(x, y) puntúa,\nPPO ajusta la política", COLORES[2]),
-    ]
-    for x, tit, sub, col in cajas:
-        ax.add_patch(mpatches.FancyBboxPatch((x, 1.0), 4.1, 2.3, boxstyle="round,pad=0.08", fc=col, ec="none", alpha=0.18))
-        ax.text(x + 2.05, 2.75, tit, ha="center", va="center", fontsize=13, weight="bold")
-        ax.text(x + 2.05, 1.65, sub, ha="center", va="center", fontsize=10.5, color="#444")
-    fl = dict(arrowstyle="-|>", lw=2, color="#333", mutation_scale=18)
-    ax.annotate("", xy=(4.85, 2.15), xytext=(4.35, 2.15), arrowprops=fl)
-    ax.annotate("", xy=(9.55, 2.15), xytext=(9.05, 2.15), arrowprops=fl)
-    ax.text(11.65, 0.45, "agente = el modelo de lenguaje · acción = la respuesta · recompensa = r(x, y)",
-            ha="center", fontsize=10.5, color="#333")
-    ax.set_title("RLHF: cómo se pasa de un modelo que completa texto a un asistente", fontsize=13)
-    plt.show()
-'''.lstrip("\n"), herramientas=True))
-
-# ---------------------------------------------------------------- 0
+        a = int(rng.integers(env.nA)) if rng.random() < 0.1 else int(Q_ag[s].argmax())
+        s2, r, fin, info = env.step(a); visitas[s2] += 1
+        y = r if info["reached_goal"] else r + GAMMA * Q_ag[s2].max()
+        Q_ag[s, a] += 0.2 * (y - Q_ag[s, a]); s = s2
+        if fin:
+            salidas += info["reached_goal"]; break
+poco = ng & (visitas < 10)
+vistas = ng & ~poco
+print(f"salidas en 100 partidas: {salidas}")
+print(f"casillas poco visitadas (< 10 visitas): {poco.sum()} de {ng.sum()}: " + ", ".join(f"{env.free[s]}·{visitas[s]}" for s in np.flatnonzero(poco)))
+print(f"casillas vistas (10 visitas o más): {vistas.sum()}")
+"""))
 cells.append(md(r"""
-## 0. Lo que ya sabemos, en una figura
+En 100 partidas este agente no llegó nunca a la salida: las casillas poco visitadas son justamente las de alrededor de la salida y el rincón de arriba a la derecha.
 
-La cueva resuelta con *value iteration* (clase 3): el color es el valor $V(s)$ de cada casilla y las flechas, la política. Todo lo que sigue es **esto mismo con otros estados, acciones y recompensas**.
+### Paso 2 — Tabla contra red con coordenadas
+
+Para mirar la generalización **sola**, sin el ruido del aprendizaje por refuerzo (eso vuelve en la sección 5), hacemos trampa a propósito: en las casillas vistas le damos a cada método el valor correcto $Q^*$, y le preguntamos por las que no vio.
+
+1. La **tabla** (o la red *one-hot*, que es lo mismo) guarda esos números; en las otras casillas no tiene nada y se queda en 0.
+2. Una **red con coordenadas**: entran 2 números, la fila y la columna divididas por el tamaño de la cueva (`env.observe(s, kind="coords")`); pasan por dos capas ocultas de 64 neuronas y salen 4. Se entrena con regresión común (Adam, error cuadrático) solo con las casillas vistas.
+3. Como referencia, **adivinar el promedio**: a cada casilla no vista, el promedio de $V^*$ de las vistas.
 """))
 cells.append(code(r"""
-env = CaveEnv()
-V_cueva, pi_cueva, _ = value_iteration(env.P, env.R, gamma=0.95)
-env.plot(values=V_cueva, policy=pi_cueva, title="La cueva: valor y política óptima (γ = 0.95)")
-plt.show()
+red_xy, Q_xy = ajustar(env, "coords", Q_estrella, vistas, semilla=SEMILLA)
+Q_tabla_vistas = np.where(vistas[:, None], Q_estrella, 0.0)
+
+V_xy, V_tv = Q_xy.max(axis=1), Q_tabla_vistas.max(axis=1)
+err_tabla = np.abs(V_tv - V_estrella)[poco].mean()
+err_prom = np.abs(V_estrella[vistas].mean() - V_estrella)[poco].mean()
+err_xy = np.abs(V_xy - V_estrella)[poco].mean()
+
+fig, axs = plt.subplots(1, 3, figsize=(20, 4.8))
+plot_cave(env, values=np.log10(1 + visitas), ax=axs[0], cmap="viridis", mark=np.flatnonzero(poco),
+          title="Visitas en 100 partidas (log10); círculos: < 10")
+plot_cave(env, values=V_tv, ax=axs[1], clim=CLIM, title="Tabla con lo visto: max Q (negro = 0, no sabe)")
+plot_cave(env, values=V_xy, policy=Q_xy.argmax(axis=1), ax=axs[2], clim=CLIM, title="Red con coordenadas: max Q y flecha")
+plt.tight_layout(); plt.show()
+
+print(f"red con coordenadas: 2 -> 64 -> 64 -> 4, {n_parametros(red_xy)} parámetros (la tabla: {env.nS * env.nA})")
+print(f"error medio |V − V*| en las {poco.sum()} casillas poco visitadas:")
+print(f"   tabla = {err_tabla:.4f}   adivinar el promedio = {err_prom:.4f}   red con coordenadas = {err_xy:.4f}")
+print(f"   (en las vistas, la red se equivoca en promedio {np.abs(V_xy - V_estrella)[vistas].mean():.4f})")
+print(f"flechas óptimas de la red en las poco visitadas: {np.mean(opt[np.arange(env.nS), Q_xy.argmax(1)][poco]):.0%}\n")
+print(f"{'casilla':>9s} {'visitas':>8s} {'V*':>7s} {'tabla':>7s} {'red':>7s}   pasos hasta la salida: de verdad / según la red")
+for s in np.flatnonzero(poco):
+    print(f"{str(env.free[s]):>9s} {visitas[s]:>8d} {V_estrella[s]:>7.4f} {V_tv[s]:>7.4f} {V_xy[s]:>7.4f}   "
+          f"{pasos_de(V_estrella[s]):>5.0f} / {pasos_de(V_xy[s]):.1f}")
 """))
 cells.append(md(r"""
-| | Cueva | Marketing | Tutor | Robot | Deep search |
-|---|---|---|---|---|---|
-| **Estado** | casilla | (uno solo) | nivel del alumno | batería | lo investigado |
-| **Acción** | ↑ → ↓ ← | qué anuncio | suma / resta | limpiar / esperar / cargar | buscar / leer / responder |
-| **Recompensa** | +1 en la salida | +1 por clic | +1 por nivel aprendido | trabajo hecho | acierto − costo |
+La tabla no sabe nada de las casillas que no vio: su valor quedó en 0 y el error es casi el valor entero. La red con coordenadas, en cambio, da en esas casillas valores muy cerca de los verdaderos, mejor que adivinar el promedio y con la mayoría de las flechas bien: casillas con coordenadas parecidas comparten los mismos pesos, así que lo que aprendió de las vecinas vistas «se contagia». Eso es **generalizar**.
+
+Una aclaración honesta: acá la red tiene **más** parámetros que la tabla (4612 contra 240). La ventaja no es el tamaño, sino que la cantidad de parámetros **no crece con la cantidad de casillas**: con pantallas de Atari, es la única opción.
 """))
 
-# ---------------------------------------------------------------- 1
+# ======================================================================= 4
 cells.append(md(r"""
-## 1. Marketing digital: el bandit multi-brazo
+## 4. Cuando generalizar engaña: vecinas separadas por una pared
 
-Una tienda online tiene **4 anuncios** y cada vez que alguien entra a la página debe mostrar uno. Cada anuncio tiene una tasa de clics (*click-through rate*, CTR) que **nadie conoce**. Cada impresión es una tragamonedas: tiro de una palanca (*arm*) y gano o no gano un clic. De ahí el nombre: **bandit multi-brazo** (*multi-armed bandit*).
+Generalizar es suponer que casillas con entradas parecidas valen parecido. En una cueva, eso falla justo donde hay paredes.
 
-### Paso 1 — Lo que no se ve
+### Paso 1 — Dos casillas parecidas para la red
+
+Las casillas (7, 6) y (7, 8) están a dos columnas, con la pared (7, 7) en el medio. Para la red con coordenadas son casi la misma entrada; para el agente, una está a 11 pasos de la salida y la otra a 5.
+""", objetivos=["O2"]))
+cells.append(code(r"""
+izq, der = env.pos2s[(7, 6)], env.pos2s[(7, 8)]
+for s in [izq, der]:
+    x = env.observe(s, kind="coords")
+    print(f"casilla {env.free[s]}: entrada = ({x[0]:.3f}, {x[1]:.3f})   V* = {V_estrella[s]:.4f}   "
+          f"a {pasos_de(V_estrella[s]):.0f} pasos de la salida   mejor flecha: "
+          + ", ".join(ACTION_NAMES[a] for a in np.flatnonzero(opt[s])))
+d = env.observe(der, kind="coords") - env.observe(izq, kind="coords")
+print(f"diferencia de entradas: ({d[0]:.3f}, {d[1]:.3f})   diferencia de V*: {V_estrella[der] - V_estrella[izq]:.4f} "
+      f"(el salto más grande entre dos casillas a dos columnas de distancia)")
+"""))
+cells.append(md(r"""
+### Paso 2 — Aun con todas las respuestas, la red se confunde
+
+Ahora le damos a la red con coordenadas el $Q^*$ correcto de **las 59 casillas**, sin esconderle ninguna, y miramos qué flecha elige en cada una. A la izquierda: verde, flecha óptima; rojo, no.
 """))
 cells.append(code(r"""
-ANUNCIOS = ["A", "B", "C", "D"]
-CTR_OCULTOS = [0.040, 0.025, 0.055, 0.030]     # el mejor es C, pero el algoritmo no lo sabe
-mostrar_ctr(CTR_OCULTOS, ANUNCIOS)
+red_xy_todo, Q_xy_todo = ajustar(env, "coords", Q_estrella, ng, semilla=SEMILLA, iteraciones=3000)
+bien_xy = opt[np.arange(env.nS), Q_xy_todo.argmax(axis=1)]
+
+fig, axs = plt.subplots(1, 2, figsize=(15, 4.8))
+plot_cave(env, values=np.where(bien_xy, 1.0, 0.0), policy=Q_xy_todo.argmax(axis=1), ax=axs[0], cmap="RdYlGn",
+          clim=(-0.3, 1.3), mark=[izq, der], title="Red con coordenadas, entrenada con las 59: verde = flecha óptima")
+plot_cave(env, values=np.abs(Q_xy_todo.max(axis=1) - V_estrella) * ng, ax=axs[1], cmap="magma", clim=(0, 0.02),
+          mark=[izq, der], title="Error |max Q − V*| de la misma red")
+plt.tight_layout(); plt.show()
+
+print(f"error medio |max Q − V*|: {np.abs(Q_xy_todo.max(1) - V_estrella)[ng].mean():.4f}   "
+      f"flechas óptimas: {bien_xy[ng].mean():.0%} de las casillas ({int((~bien_xy & ng).sum())} equivocadas)")
+for s in [izq, der]:
+    print(f"\ncasilla {env.free[s]}   V* = {V_estrella[s]:.4f}   red: max Q = {Q_xy_todo[s].max():.4f}")
+    print("   Q* :  " + "   ".join(f"{ACTION_NAMES[a]} {Q_estrella[s, a]:.4f}" for a in range(env.nA)))
+    print("   red:  " + "   ".join(f"{ACTION_NAMES[a]} {Q_xy_todo[s, a]:.4f}" for a in range(env.nA))
+          + f"   -> elige {ACTION_NAMES[int(Q_xy_todo[s].argmax())]}"
+          + ("" if bien_xy[s] else f" (la óptima es {', '.join(ACTION_NAMES[a] for a in np.flatnonzero(opt[s]))})"))
 """))
 cells.append(md(r"""
-Las diferencias son de 1 o 2 clics cada 100 impresiones: hacen falta **miles** de impresiones para distinguir un anuncio de otro.
+El error medio del valor es chico, pero las flechas cuentan otra historia. En (7, 6) la red elige **→, contra la pared**: del otro lado, a dos columnas, está (7, 8), que vale mucho más, y para la red «ir a la derecha desde ahí» se parece a estar en (7, 8). La red no puede poner un salto brusco entre dos entradas tan parecidas, así que suaviza: le sube la flecha → a (7, 6) y le baja el valor a (7, 8). Y como en esta cueva las flechas de una casilla se diferencian en un 1 o 2 %, un error chico en el valor alcanza para elegir mal. La tabla, que no generaliza, no se equivoca así.
 
-**¿Por qué es RL?** Es el MDP más chico posible: **un solo estado** (la página siempre es la misma), y cada episodio dura **un solo paso** (una impresión). No hay consecuencias demoradas: lo único que queda del problema de RL es el **dilema exploración–explotación** de la clase 5.
+> **Para enseñarlo:** una red es una tabla que comparte números entre casillas: aprende más rápido de lo que no vio, y por eso también se equivoca en lo que no vio.
 
-### Paso 2 — Cuatro estrategias
+### Paso 3 — Una ayuda: contarle dónde hay pared
 
-- **A/B fijo**: mostrar cada anuncio 500 veces por igual y después quedarse para siempre con el que tuvo más clics. Es lo que se hace tradicionalmente.
-- **ε-greedy** (clase 5): el 90% de las veces mostrar el mejor hasta ahora; el 10%, uno al azar.
-- **UCB** (*upper confidence bound*): mostrar el que tiene el mejor "optimista" = promedio + bonus por incertidumbre. Lo poco probado recibe el beneficio de la duda.
-- **Thompson sampling**: para cada anuncio imaginar un CTR plausible según los datos (una distribución Beta) y mostrar el que salió más alto. Explora más cuando hay más duda.
-
-Medimos el **regret**: los clics que se perdieron por no haber mostrado siempre el mejor anuncio.
-
-$$\text{regret}_T = \sum_{t=1}^{T} \big(\mu^* - \mu_{a_t}\big)$$
-
-donde $\mu^*$ es el CTR del mejor anuncio y $\mu_{a_t}$ el del anuncio mostrado. Simulamos 200 campañas de 20.000 impresiones cada una.
+Si la entrada dice dónde hay pared, la red puede separar las dos casillas. Agregamos cuatro **bigotes** (arriba, derecha, abajo, izquierda) que valen 1 si hay pared pegada (`kind="coords+touch"`): entran 6 números, salen 4. Es la entrada que va a usar el DQN de la sección 6.
 """))
 cells.append(code(r"""
-comparar_bandits(CTR_OCULTOS, T=20000, n_campanas=200, seed=SEMILLA)
+red_bg, Q_bg = ajustar(env, "coords+touch", Q_estrella, ng, semilla=SEMILLA, iteraciones=3000)
+bien_bg = opt[np.arange(env.nS), Q_bg.argmax(axis=1)]
+for s in [izq, der]:
+    o = env.observe(s, kind="coords+touch")
+    print(f"{env.free[s]}: entrada = ({o[0]:.3f}, {o[1]:.3f}) + bigotes " + " ".join(f"{n}:{int(b)}" for n, b in zip(ACTION_NAMES, o[2:]))
+          + f"   -> elige {ACTION_NAMES[int(Q_bg[s].argmax())]} ({'óptima' if bien_bg[s] else 'NO óptima'})")
+print(f"\nflechas óptimas:  coordenadas {bien_xy[ng].mean():.0%}   coordenadas + bigotes {bien_bg[ng].mean():.0%}")
+print(f"error medio |max Q − V*|:  coordenadas {np.abs(Q_xy_todo.max(1) - V_estrella)[ng].mean():.4f}   "
+      f"coordenadas + bigotes {np.abs(Q_bg.max(1) - V_estrella)[ng].mean():.4f}")
 """))
 cells.append(md(r"""
-**Qué mirar:**
+Con los bigotes, la red acierta la flecha en muchas más casillas. La entrada decide qué casillas «se parecen» para la red, y por lo tanto dónde generaliza bien y dónde engaña.
+"""))
 
-- **A/B fijo** pierde clics a ritmo constante durante la prueba (la mitad del tráfico va a anuncios malos) y, si se equivoca al elegir, sigue perdiendo para siempre.
-- **ε-greedy** nunca deja de explorar: su curva sigue subiendo en línea recta, porque un 10% de las impresiones siempre se desperdicia.
-- **UCB** y **Thompson** exploran más al principio y casi nada al final: la curva se aplana, y el ~90% de las impresiones va al mejor anuncio. (UCB gana por poco porque le ajustamos el bonus a CTR tan chicos; Thompson no necesita ningún ajuste.)
+# ======================================================================= 5
+cells.append(md(r"""
+## 5. Q-learning con red: el objetivo se mueve
 
-Por eso las plataformas de anuncios y de recomendación usan bandits en vez de pruebas A/B fijas.
+Hasta acá le dimos a la red las respuestas correctas. En RL no las tiene: el objetivo de Q-learning, $y = r + \gamma \max_{a'} Q_\theta(s', a')$, **lo calcula la misma red**. Cada paso de gradiente cambia $\theta$, y con $\theta$ cambia también el objetivo. Con la tabla no pasaba nada grave, porque tocar $Q(s,a)$ no movía $Q(s', \cdot)$. Con una red que generaliza, sí.
+
+### Paso 1 — Un peso que persigue su propia cola
+
+El ejemplo más chico (una variante del de Sutton y Barto, 11.2). Dos casillas: A, que la red describe con el número $x_A = 1$, y B, con $x_B = 2$. La red tiene un solo peso: $Q(A) = w \cdot 1$ y $Q(B) = w \cdot 2$. La única transición que ve es A → B, con premio 0. El objetivo para $Q(A)$ es $\gamma\, Q(B) = 2\gamma w$, y cada paso de gradiente hace
+
+$$w \leftarrow w + \alpha\,(2\gamma w - w)\cdot 1 = \big(1 + \alpha(2\gamma - 1)\big)\, w .$$
+
+Como $2\gamma - 1 = 0{,}98 > 0$, cada paso **agranda** $w$, y con $w$ crece el objetivo. Si además la red ve la transición B → salida (premio 1, el objetivo de $Q(B)$ es 1), el peso se frena.
+""", objetivos=["O3"]))
+cells.append(code(r"""
+def un_peso(transiciones, pasos=60, alfa=0.1, w=0.1):
+    hist = [w]
+    for k in range(pasos):
+        x, x_sig, r, fin = transiciones[k % len(transiciones)]
+        y = r if fin else r + GAMMA * w * x_sig          # el objetivo usa el mismo w
+        w = w + alfa * (y - w * x) * x
+        hist.append(w)
+    return np.array(hist)
+
+A_B = (1.0, 2.0, 0.0, False)       # de A (x = 1) a B (x = 2), premio 0
+B_sal = (2.0, 0.0, 1.0, True)      # de B a la salida, premio 1
+w_solo = un_peso([A_B])
+w_mezcla = un_peso([A_B, B_sal])
+
+fig, ax = plt.subplots(figsize=(9, 3.8))
+ax.plot(w_solo, color=COLORES[7], label="solo A → B")
+ax.plot(w_mezcla, color=COLORES[0], label="A → B y B → salida, alternadas")
+ax.set_xlabel("paso de gradiente"); ax.set_ylabel("w"); ax.set_title("Un peso que persigue su propio objetivo")
+ax.legend(frameon=False)
+plt.tight_layout(); plt.show()
+
+print(f"factor por paso: 1 + α(2γ − 1) = 1 + 0,1 · (2 · {GAMMA} − 1) = {1 + 0.1 * (2 * GAMMA - 1):.3f}")
+print("solo A → B, primeros pasos (α = 0,1):")
+w = 0.1
+for k in range(3):
+    y = GAMMA * w * 2
+    print(f"   w = {w:.4f}   objetivo = γ · Q(B) = {GAMMA} · {2 * w:.4f} = {y:.4f}   w nuevo = {w:.4f} + 0,1 · ({y:.4f} − {w:.4f}) = {w + 0.1 * (y - w):.4f}")
+    w = w + 0.1 * (y - w)
+print(f"después de 60 pasos: w = {w_solo[-1]:.2f} (creció × {w_solo[-1] / w_solo[0]:.1f}), y sigue creciendo")
+print(f"con las dos transiciones: w = {w_mezcla[-1]:.4f}  ->  Q(A) = {w_mezcla[-1]:.4f}, Q(B) = {2 * w_mezcla[-1]:.4f} "
+      f"(los verdaderos: Q(A) = {GAMMA}, Q(B) = 1; con un solo peso no se pueden tener los dos)")
 """))
 cells.append(md(r"""
-### ✍️ Ejercicio
+Con una sola transición el peso crece sin freno: el objetivo se escapa cada vez que la red se le acerca. Esto es lo que Sutton y Barto llaman la **tríada mortal** (*deadly triad*): **aproximación** (una red que comparte pesos) + ***bootstrapping*** (el objetivo usa la propia estimación) + **aprender *off-policy*** (de datos que no siguen la política que se evalúa; acá, siempre la misma transición). Con las tres juntas, el aprendizaje puede diverger. Con las dos transiciones mezcladas el peso se asienta (en un compromiso, porque un solo peso no alcanza para los dos valores).
 
-1. Cambien `c_ucb` a `1.41` (el valor "de libro", $\sqrt{2}$). ¿Por qué UCB explora de más cuando los CTR son tan chicos?
-2. Cambien los CTR para que los anuncios sean muy distintos (por ejemplo `[0.01, 0.02, 0.10, 0.03]`). ¿Sigue convenciendo el A/B fijo?
+### Paso 2 — En la cueva, sin trucos
+
+Ahora la red de verdad: entrada coordenadas + bigotes, 6 → 64 → 64 → 4, Adam con tasa $10^{-3}$. Q-learning tal cual, **sin trucos**: cada 4 pasos, un paso de gradiente con las últimas 4 transiciones, y el objetivo calculado con la misma red. Exploración $\varepsilon$-greedy, con $\varepsilon$ que baja de 1 a 0,1 en los primeros 4000 pasos; cada partida empieza en una casilla al azar; 10 000 pasos.
+
+Una pista para leer la figura: con un solo premio de +1, **ningún $Q$ verdadero puede pasar de 1**.
 """))
 cells.append(code(r"""
-# TODO: cambiar c_ucb y/o los CTR y volver a ejecutar
-c_ucb = 0.2
-ctr_ejercicio = [0.040, 0.025, 0.055, 0.030]
+t0 = time.time()
+sin_trucos = dqn(env, usar_replay=False, usar_objetivo=False, semilla=SEMILLA)
+print(f"{sin_trucos['n_grad']} pasos de gradiente en {time.time() - t0:.1f} s")
 
-comparar_bandits(ctr_ejercicio, algoritmos=("ε-greedy", "UCB", "Thompson"), T=10000, n_campanas=100, c_ucb=c_ucb)
+fig, axs = plt.subplots(1, 2, figsize=(15, 4))
+axs[0].plot(sin_trucos["paso"], sin_trucos["max_q"], color=COLORES[7])
+axs[0].axhline(1, color="k", ls="--", lw=1); axs[0].text(sin_trucos["paso"][-1], 1.25, "el Q verdadero más grande: 1", ha="right", fontsize=9)
+axs[0].set_yscale("log"); axs[0].set_xlabel("paso"); axs[0].set_ylabel("el Q más grande de la red (log)")
+axs[0].set_title("Q-learning con red, sin trucos: los valores se disparan")
+axs[1].plot(sin_trucos["paso"], 100 * sin_trucos["sale"], color=COLORES[7])
+axs[1].set_ylim(-3, 103); axs[1].set_xlabel("paso"); axs[1].set_ylabel("% de casillas desde las que sale")
+axs[1].set_title("La política greedy de la red, sin explorar")
+plt.tight_layout(); plt.show()
+
+k = int(np.argmax(sin_trucos["max_q"]))
+print(f"el Q más grande de la red: {sin_trucos['max_q'][0]:.2f} en el paso {sin_trucos['paso'][0]}, "
+      f"{sin_trucos['max_q'][k]:.1f} en el paso {sin_trucos['paso'][k]} (el pico), {sin_trucos['max_q'][-1]:.1f} al final")
+print(f"error medio |max Q − V*| al final: {sin_trucos['error'][-1]:.1f}   (V* está entre {V_estrella[ng].min():.2f} y 1)")
+print(f"casillas desde las que sale la política greedy: {final(sin_trucos):.0%} (promedio de las últimas 4 mediciones)")
+"""))
+cells.append(md(r"""
+En menos de mil pasos la red ya cree que hay casillas que valen decenas, y poco después más de cien, cuando nada puede valer más de 1. Después los valores bajan, pero al final siguen muy por encima de 1, y la política no sale casi desde ningún lado. Es el peso de recién, con 4868 pesos: cada paso empuja hacia arriba los valores de las casillas que acaba de pisar y, de paso, los de sus parecidas, que son las que usa el próximo objetivo.
 """))
 
-# ---------------------------------------------------------------- 2
+# ======================================================================= 6
 cells.append(md(r"""
-## 2. El tutor de IA, versión 2: el MDP que diseñaron ustedes
+## 6. DQN: memoria de repetición y red objetivo
 
-En la clase 2 vimos que con recompensa **+1 por acierto / −1 por error**, el tutor aprende a dar **solo sumas** (*reward hacking*). Ahora tomamos el rediseño de los alumnos y lo resolvemos con *value iteration*.
+DQN (*Deep Q-Network*, Mnih et al., 2015) es Q-learning con una red más dos ingredientes que atacan justo lo que vimos:
 
-**El MDP:**
+1. **Memoria de repetición** (*experience replay*): las transiciones $(s, a, r, s')$ se guardan en una memoria (acá, las últimas 10 000) y cada paso de gradiente usa un **lote al azar** de 256. Así la red no aprende siempre de lo último que vivió (pasos seguidos, casi iguales), sino de partidas mezcladas, como en el ejemplo de las dos transiciones.
+2. **Red objetivo** (*target network*): el objetivo $y = r + \gamma \max_{a'} Q_{\bar\theta}(s', a')$ se calcula con una **copia congelada** $\bar\theta$ de la red, que se pone al día cada 40 pasos. Durante un rato el objetivo se queda quieto, y la red lo puede alcanzar.
+3. **$\varepsilon$ decreciente**: al principio casi todo al azar, y $\varepsilon$ baja hasta 0,1. (Ya lo usamos en la sección 5.)
 
-- **Estado**: nivel estimado del alumno en suma y en resta, discretizado de 0 (no sabe) a 4 (domina): 5 × 5 = 25 estados.
-- **Acción**: dar un problema de **suma** o de **resta**.
-- **Dinámica**: al practicar suma, sube un nivel con probabilidad 0.5. Al practicar resta, la probabilidad de subir es baja y **crece con el nivel de suma** (restar se apoya en saber sumar): 0.1 + 0.1 × nivel de suma.
-- **Recompensa**, dos versiones:
-  - *acierto* (la de la clase 2): +1 / −1 según la respuesta;
-  - *aprendizaje* (la rediseñada): **+1 cada vez que el alumno sube un nivel**, en lo que sea.
+La pérdida de cada paso, sobre un lote de la memoria:
 
-### Paso 1 — Resolver los dos MDP y comparar las políticas
+$$\mathcal{L}(\theta) = \frac{1}{|\text{lote}|}\sum_{\text{lote}} \Big(\underbrace{r + \gamma \max_{a'} Q_{\bar\theta}(s', a')}_{\text{objetivo, con la red congelada}} - Q_\theta(s, a)\Big)^2$$
+
+En Atari, la receta es la misma con otra entrada (las últimas pantallas) y una red convolucional en vez de nuestro MLP.
+
+### Paso 1 — Con y sin cada ingrediente
+
+La misma red, la misma entrada, los mismos 10 000 pasos, la misma semilla y la misma cantidad de pasos de gradiente (uno cada 4 pasos). Cuatro versiones: sin trucos (la de la sección 5), solo red objetivo, solo memoria, y DQN con las dos.
+""", objetivos=["O3"]))
+cells.append(code(r"""
+VARIANTES = {
+    "sin trucos":         dict(usar_replay=False, usar_objetivo=False),
+    "solo red objetivo":  dict(usar_replay=False, usar_objetivo=True),
+    "solo memoria":       dict(usar_replay=True,  usar_objetivo=False),
+    "DQN (las dos)":      dict(usar_replay=True,  usar_objetivo=True),
+}
+COLOR_V = {"sin trucos": COLORES[7], "solo red objetivo": COLORES[3], "solo memoria": COLORES[4], "DQN (las dos)": COLORES[0]}
+t0 = time.time()
+var = {"sin trucos": sin_trucos}
+for nombre, kw in VARIANTES.items():
+    if nombre not in var:
+        var[nombre] = dqn(env, semilla=SEMILLA, **kw)
+print(f"tres variantes más en {time.time() - t0:.1f} s")
+print("ε cada mil pasos: " + "  ".join(f"{epsilon(p):.2f}" for p in range(0, 10_001, 1000)))
+
+fig, axs = plt.subplots(1, 2, figsize=(15, 4.4))
+for nombre, res in var.items():
+    axs[0].plot(res["paso"], res["error"], color=COLOR_V[nombre], label=nombre)
+    axs[1].plot(res["paso"], 100 * res["sale"], color=COLOR_V[nombre], label=nombre)
+axs[0].set_yscale("log"); axs[0].set_xlabel("paso"); axs[0].set_ylabel("error medio |max Q − V*| (log)")
+axs[0].set_title("¿Aprende los valores?"); axs[0].legend(frameon=False)
+axs[1].set_ylim(-3, 103); axs[1].set_xlabel("paso"); axs[1].set_ylabel("% de casillas desde las que sale")
+axs[1].set_title("¿Sale la política greedy?")
+plt.tight_layout(); plt.show()
+
+print(f"{'variante':>18s} {'Q más grande (pico)':>20s} {'error final':>12s} {'sale desde (final)':>19s} {'pasos desde S':>14s}")
+for nombre, res in var.items():
+    print(f"{nombre:>18s} {res['max_q'].max():>20.2f} {final(res, 'error'):>12.4f} {final(res):>19.0%} {res['pasos_S'][-1]:>14d}")
+print("(final = promedio de las últimas 4 mediciones, del paso 9250 al 10 000; pasos desde S: 100 = no sale)")
+"""))
+cells.append(md(r"""
+Cada ingrediente arregla una parte, y hacen falta los dos:
+
+- **Sin trucos**, los valores se disparan a cientos.
+- **Solo red objetivo**: el objetivo quieto frena la explosión, pero la red sigue aprendiendo de lo último que vivió y los valores suben despacio por encima de 1; la política no sale.
+- **Solo memoria**: los lotes mezclados ayudan, pero el objetivo se mueve con cada paso: los valores se disparan al principio y después bajan, sin llegar a una política que salga.
+- **DQN, con las dos**: el error baja a milésimas (0,0080), el Q más grande queda cerca de 1 y, al final, la política sale desde casi todas las casillas. (Casi: justo desde S, en el paso 10 000, no sale. Lo miramos en el paso 2.)
+
+Al principio, incluso DQN cree que algunas casillas valen un poco más de 1: el $\max$ del objetivo elige justo las flechas que la red sobreestimó. Esa **sobreestimación** es la que atacan variantes como *Double DQN*, que no vemos en este curso.
+
+### Paso 2 — Qué aprendió DQN
+
+Evaluamos la red de DQN en todas las casillas: su $\max_a Q_\theta(s,a)$ y su flecha, al lado del $V^*$ exacto, y el camino que sigue desde S sin explorar.
 """))
 cells.append(code(r"""
-gamma_tutor = 0.9
-politicas_tutor = {}
-for recompensa in ["acierto", "aprendizaje"]:
-    P_t, R_t = construir_tutor(recompensa)
-    V_t, pi_t, Q_t = value_iteration(P_t, R_t, gamma_tutor)
-    politicas_tutor[f"Recompensa = {recompensa}"] = (pi_t, Q_t)
-
-mapas_politica_tutor(politicas_tutor)
+Q_dqn = var["DQN (las dos)"]["Q"]
+camino = camino_greedy(env, Q_dqn)
+bien_dqn = opt[np.arange(env.nS), Q_dqn.argmax(axis=1)]
+fig, axs = plt.subplots(1, 2, figsize=(15, 4.8))
+plot_cave(env, values=Q_dqn.max(axis=1), policy=Q_dqn.argmax(axis=1), path=camino, ax=axs[0], clim=CLIM,
+          title=f"DQN: max Q, flecha y camino desde S ({len(camino) - 1} pasos)")
+plot_cave(env, values=V_estrella, policy=Q_estrella.argmax(axis=1), ax=axs[1], clim=CLIM, title="Referencia: V* y Q* (con el mapa)")
+plt.tight_layout(); plt.show()
+print(f"DQN: error medio |max Q − V*| = {np.abs(Q_dqn.max(1) - V_estrella)[ng].mean():.4f}   flechas óptimas: {bien_dqn[ng].mean():.0%}   "
+      f"camino desde S: {len(camino) - 1} pasos (el más corto: 20; 100 = no sale)")
+no_sale = [env.free[s_] for s_ in np.flatnonzero(ng & (pasos_hasta_salir(env, Q_dqn) == 100))]
+print(f"casillas desde las que la política greedy no sale: {len(no_sale)}: {no_sale}")
+if len(camino) > 100:
+    ciclo = sorted(set(camino[-10:]))
+    print("el camino desde S termina yendo y viniendo entre " + " y ".join(str(env.free[c]) for c in ciclo) + ":")
+    for c in ciclo:
+        print(f"   {env.free[c]}: la red elige {ACTION_NAMES[int(Q_dqn[c].argmax())]}   "
+              f"Q de la red: " + "  ".join(f"{ACTION_NAMES[b]} {Q_dqn[c, b]:.4f}" for b in range(env.nA))
+              + f"   óptima: {', '.join(ACTION_NAMES[b] for b in np.flatnonzero(opt[c]))}")
+c61 = env.free.index((6, 1))
+print(f"en (6, 1), Q(↑) − Q(↓) = {Q_dqn[c61, 0] - Q_dqn[c61, 2]:.6f}   (sin redondear)")
 """))
 cells.append(md(r"""
-Cada casilla es un estado; el texto es lo que el tutor elige ahí. Partimos del recuadro negro (0, 0) y el alumno se mueve hacia la derecha cuando aprende a sumar y hacia arriba cuando aprende a restar. "—" marca el estado donde las dos acciones valen lo mismo (el alumno ya domina todo).
+La red nunca vio el mapa ni a $V^*$: solo coordenadas, bigotes y recompensas. Su mapa de valores se parece al verdadero y la mayoría de sus flechas son óptimas. Pero alcanza con una flecha equivocada en el lugar justo: en (6, 1) la red elige ↑ en vez de ↓ por menos de una diezmilésima (0,000092), y el camino desde S (y desde toda la columna de la izquierda) queda yendo y viniendo entre (5, 1) y (6, 1). Es lo de la sección 4: en esta cueva, un error chico en el valor alcanza para cambiar una flecha. Y es una foto de un solo momento de una sola semilla, que es lo que discute la sección siguiente.
+"""))
 
-- **Recompensa = acierto**: desde el inicio, siempre "suma". El alumno se mueve solo por la fila de abajo: nunca aprende a restar. Las casillas "resta" de arriba a la izquierda son estados a los que este tutor nunca llega.
-- **Recompensa = aprendizaje**: primero suma (porque se aprende rápido **y** porque prepara para restar), y **en cuanto el alumno domina la suma, pasa a restas**.
+# ======================================================================= 7
+cells.append(md(r"""
+## 7. Comparar de forma justa: varias semillas
 
-### Paso 2 — Seguir a 300 alumnos simulados durante 40 problemas
+Todo lo anterior salió de **una** semilla: un orden de partidas al azar, unas flechas de exploración, unos pesos iniciales. ¿Y si tuvimos suerte? Para decir que un agente es mejor que otro hace falta, como mínimo, correrlo con varias semillas y mirar las curvas de aprendizaje con su dispersión. (Machado et al., 2018, piden además azar en el entorno, como las acciones pegajosas de la clase 7: si el entorno es determinista, un agente puede memorizar una secuencia en lugar de aprender a jugar.)
+
+### Paso 1 — Cinco semillas de cada uno
+
+Corremos Q-learning con red sin trucos y DQN con 5 semillas cada uno (las semillas 0 a 4; la 0 es la de la sección 6). Las bandas: en el error (escala log), del mínimo al máximo entre semillas, con la mediana; en el porcentaje de casillas desde las que sale, el promedio ± un desvío.
+""", objetivos=["O4"]))
+cells.append(code(r"""
+SEMILLAS = range(5)
+t0 = time.time()
+corridas = {"sin trucos": [var["sin trucos"]], "DQN (las dos)": [var["DQN (las dos)"]]}
+for nombre in corridas:
+    for sem in SEMILLAS:
+        if sem != SEMILLA:
+            corridas[nombre].append(dqn(env, semilla=sem, **VARIANTES[nombre]))
+print(f"{2 * (len(SEMILLAS) - 1)} corridas más en {time.time() - t0:.1f} s")
+
+x = var["DQN (las dos)"]["paso"]
+fig, axs = plt.subplots(1, 2, figsize=(15, 4.4))
+for nombre, rs in corridas.items():
+    banda_log(axs[0], x, np.array([r["error"] for r in rs]), COLOR_V[nombre], nombre)
+    banda(axs[1], x, 100 * np.array([r["sale"] for r in rs]), COLOR_V[nombre], nombre)
+axs[0].set_yscale("log"); axs[0].set_xlabel("paso"); axs[0].set_ylabel("error medio |max Q − V*| (log)")
+axs[0].set_title("5 semillas: mediana y banda mínimo–máximo"); axs[0].legend(frameon=False)
+axs[1].set_ylim(-5, 105); axs[1].set_xlabel("paso"); axs[1].set_ylabel("% de casillas desde las que sale")
+axs[1].set_title("5 semillas: promedio ± 1 desvío"); axs[1].legend(frameon=False, loc="upper left")
+plt.tight_layout(); plt.show()
+
+for nombre, rs in corridas.items():
+    s_ = np.array([final(r) for r in rs]); e_ = np.array([final(r, "error") for r in rs]); m_ = np.array([r["max_q"].max() for r in rs])
+    print(f"{nombre}:")
+    print(f"   sale desde (final): {s_.mean():.0%} ± {s_.std():.0%}   por semilla: {[format(v, '.0%') for v in s_]}")
+    print(f"   error final: {e_.mean():.4f} ± {e_.std():.4f}   por semilla: {[round(float(v), 4) for v in e_]}")
+    print(f"   Q más grande (pico) por semilla: {[round(float(v), 2) for v in m_]}")
+"""))
+cells.append(md(r"""
+Con cinco semillas, la diferencia entre los dos no deja dudas: en todas las semillas sin trucos los valores se disparan, y en todas las de DQN el error queda en centésimas. Pero miren la banda de DQN en el porcentaje de casillas desde las que sale: es ancha, la curva promedio sube a los saltos y todas las semillas pasan por un pozo cerca del paso 3000 antes de mejorar. Una semilla sola no cuenta esa parte.
+
+### Paso 2 — Una corrida con suerte contra el promedio
+
+Si hubiéramos corrido DQN una sola vez, ¿qué habríamos contado? Tomamos la **mejor** semilla de DQN en el momento en que mejor le fue, la peor al final, y las comparamos con el promedio de las cinco.
 """))
 cells.append(code(r"""
-comparar_alumnos({nombre: pi for nombre, (pi, Q) in politicas_tutor.items()})
+S_dqn = 100 * np.array([r["sale"] for r in corridas["DQN (las dos)"]])
+mejor_sem = int(np.argmax(S_dqn.max(axis=1))); peor_sem = int(np.argmin([final(r) for r in corridas["DQN (las dos)"]]))
+k_mejor = int(np.argmax(S_dqn[mejor_sem]))
+
+fig, ax = plt.subplots(figsize=(10, 4.2))
+banda(ax, x, S_dqn, COLOR_V["DQN (las dos)"], "DQN: promedio de 5 semillas ± 1 desvío")
+ax.plot(x, S_dqn[mejor_sem], color=COLORES[5], lw=1.3, label=f"semilla {mejor_sem} (la mejor)")
+ax.plot(x, S_dqn[peor_sem], color=COLORES[7], lw=1.3, ls="--", label=f"semilla {peor_sem} (la peor al final)")
+ax.plot(x[k_mejor], S_dqn[mejor_sem, k_mejor], "o", color=COLORES[5], ms=9)
+ax.set_ylim(-5, 105); ax.set_xlabel("paso"); ax.set_ylabel("% de casillas desde las que sale")
+ax.set_title("Una corrida con suerte no prueba nada"); ax.legend(frameon=False, loc="lower right")
+plt.tight_layout(); plt.show()
+
+prom = S_dqn.mean(0)
+print(f"semilla {mejor_sem}, paso {x[k_mejor]}: sale desde el {S_dqn[mejor_sem, k_mejor]:.0f} % de las casillas")
+print(f"promedio de las 5 semillas en ese mismo paso: {prom[k_mejor]:.0f} % ± {S_dqn[:, k_mejor].std():.0f} %")
+print(f"al final (últimas 4 mediciones): semilla {mejor_sem} = {final(corridas['DQN (las dos)'][mejor_sem]):.0%}   "
+      f"semilla {peor_sem} = {final(corridas['DQN (las dos)'][peor_sem]):.0%}   "
+      f"promedio = {np.mean([final(r) for r in corridas['DQN (las dos)']]):.0%}")
 """))
 cells.append(md(r"""
-Con la recompensa de acierto el alumno acierta más problemas… y no aprende a restar. Con la recompensa de aprendizaje acierta menos (las restas cuestan), pero termina sabiendo las dos cosas. **El algoritmo es el mismo; lo que cambió es qué le pedimos.**
-
-Ojo: en la vida real el nivel no se observa directamente. Un tutor real tendría que **estimarlo** a partir de los aciertos (los sistemas de tutoría usan modelos como *Bayesian knowledge tracing*). Es el mismo problema de "historia vs. estado" de la clase 2.
+Con la semilla con suerte, en el momento justo, diríamos que DQN «sale desde casi todas las casillas»; el promedio de las cinco en ese mismo paso dice bastante menos, y otra semilla termina más abajo. Ninguna de las dos frases es mentira, pero solo la del promedio con su dispersión sirve para comparar. Para decir que un agente es mejor que otro: **varias semillas, la curva entera con su dispersión (no solo el mejor punto), el mismo presupuesto de pasos para los dos y, si se puede, azar en el entorno**.
 """))
+
+# ======================================================================= Ejercicio
 cells.append(md(r"""
-### ✍️ Ejercicio
+## ✍️ Ejercicio — Saquen la red objetivo o la memoria y miren qué pasa
 
-Cambien la dificultad de la resta: por ejemplo, que no dependa de la suma (`return 0.3`) o que dependa mucho más (`return 0.05 + 0.2 * nivel_suma`). ¿En qué estados cambia la política?
-"""))
+Cambien `USAR_REPLAY` y `USAR_OBJETIVO` y ejecuten. La celda corre esa versión con 3 semillas y la dibuja contra la banda de DQN de la sección 7.
+
+Antes de ejecutar, **predigan**: sin la red objetivo, ¿se disparan los valores en las tres semillas o en algunas? Sin la memoria, ¿la política sale desde alguna casilla? Y si cambian `COPIAR_CADA` (cada cuántos pasos se pone al día la red objetivo) a 400, ¿mejora o empeora?
+""", objetivos=["O3", "O4"]))
 cells.append(code(r"""
-def p_mejora_resta(nivel_suma):
-    return 0.1 + 0.1 * nivel_suma        # TODO: cambiar y volver a ejecutar
+USAR_REPLAY = True      # TODO: probá False
+USAR_OBJETIVO = False   # TODO: probá True
+COPIAR_CADA = 40        # TODO: probá 400 (con USAR_OBJETIVO = True)
 
-P_t, R_t = construir_tutor("aprendizaje")
-V_t, pi_t, Q_t = value_iteration(P_t, R_t, gamma_tutor)
-mapas_politica_tutor({"Recompensa = aprendizaje (modificado)": (pi_t, Q_t)})
-"""))
-
-# ---------------------------------------------------------------- 3
-cells.append(md(r"""
-## 3. Robótica: el robot de limpieza
-
-Un clásico de Sutton & Barto (ejemplo 3.3, el *recycling robot*), contado como robot de limpieza. El robot tiene la batería **alta** o **baja**, y en cada turno decide:
-
-- **limpiar**: rinde 2 puntos, pero gasta batería. Con batería alta, sigue alta con probabilidad α; con batería baja, puede **agotarse** (probabilidad 1 − β): hay que ir a rescatarlo (−3) y vuelve cargado.
-- **esperar**: rinde 1 punto (alguien le acerca basura) y no gasta batería.
-- **cargar** (solo con batería baja): vuelve a alta, 0 puntos.
-
-Es un MDP de 2 estados y 3 acciones: lo resolvemos con *value iteration* usando la herramienta `resolver_mdp`, que también van a usar en el proyecto final.
-
-### Paso 1 — La tabla de la política
-"""))
-cells.append(code(r"""
-estados_r, acciones_r, transicion_r = robot_limpieza(alfa=0.8, beta=0.4, r_limpiar=2, r_esperar=1)
-tabla_robot = resolver_mdp(estados_r, acciones_r, transicion_r, gamma=0.9, titulo="Robot de limpieza (α = 0.8, β = 0.4)")
-tabla_robot
+ej = [dqn(env, usar_replay=USAR_REPLAY, usar_objetivo=USAR_OBJETIVO, copiar_cada=COPIAR_CADA, semilla=sem) for sem in range(3)]
+nombre_ej = f"replay = {USAR_REPLAY}, objetivo = {USAR_OBJETIVO}, copiar cada {COPIAR_CADA}"
+fig, axs = plt.subplots(1, 2, figsize=(15, 4.2))
+banda_log(axs[0], x, np.array([r["error"] for r in corridas["DQN (las dos)"]]), COLOR_V["DQN (las dos)"], "DQN (5 semillas)")
+banda(axs[1], x, 100 * np.array([r["sale"] for r in corridas["DQN (las dos)"]]), COLOR_V["DQN (las dos)"], "DQN (5 semillas)")
+for i, r in enumerate(ej):
+    axs[0].plot(x, r["error"], color=COLORES[1], lw=1, label=nombre_ej if i == 0 else None)
+    axs[1].plot(x, 100 * r["sale"], color=COLORES[1], lw=1, label=nombre_ej if i == 0 else None)
+axs[0].set_yscale("log"); axs[0].set_ylabel("error medio |max Q − V*| (log)"); axs[0].legend(frameon=False)
+axs[1].set_ylim(-5, 105); axs[1].set_ylabel("% de casillas desde las que sale"); axs[1].legend(frameon=False, loc="upper left")
+for ax in axs:
+    ax.set_xlabel("paso")
+plt.tight_layout(); plt.show()
+for i, r in enumerate(ej):
+    print(f"semilla {i}: Q más grande (pico) = {r['max_q'].max():.2f}   error final = {final(r, 'error'):.4f}   sale desde (final) = {final(r):.0%}")
 """))
 cells.append(md(r"""
-Con batería alta, limpia. Con batería baja, **va a cargar**: arriesgarse a quedar varado (60% de probabilidad, −3) no vale la pena. La tabla muestra también los valores $Q(s, a)$: cuánto vale cada acción en cada estado; "cargar" con batería alta no está permitida (NaN).
-
-### Paso 2 — ¿Cuándo cambia la decisión?
-
-Variamos β (qué tan seguido sobrevive el robot si limpia con batería baja) y la recompensa por esperar, y pintamos la acción óptima con batería baja.
-"""))
-cells.append(code(r"""
-mapa_politica_robot(gamma=0.9, alfa=0.8, r_limpiar=2)
-"""))
-cells.append(md(r"""
-Tres regiones con sentido común:
-
-- si limpiar con batería baja casi nunca agota al robot (β alto), **limpia**;
-- si esperar rinde bastante (en este caso, más de 1.5 de los 2 puntos que da limpiar), **espera**: no arriesga y no pierde un turno cargando;
-- en el resto, **carga**.
-
-Nadie programó estas reglas: salen de resolver el MDP. Los robots reales tienen estados continuos (posición, velocidad, ángulos) y se resuelven con Deep RL (clase 6), muchas veces primero en simulación.
-"""))
-cells.append(md(r"""
-### ✍️ Ejercicio
-
-Cambien `r_rescate` (lo que cuesta rescatar al robot) a `-10` o a `0`. ¿Qué pasa con la decisión en batería baja?
-"""))
-cells.append(code(r"""
-r_rescate = -3      # TODO: probar -10 y 0
-est, acc, tr = robot_limpieza(alfa=0.8, beta=0.4, r_limpiar=2, r_esperar=1, r_rescate=r_rescate)
-resolver_mdp(est, acc, tr, gamma=0.9, titulo=f"Robot con rescate = {r_rescate}")
-"""))
-
-# ---------------------------------------------------------------- 4
-cells.append(md(r"""
-## 4. Investigación documental tipo *deep search*
-
-Los asistentes que "investigan" (*deep research*, *deep search*) hacen un ciclo: buscan, leen, deciden si ya saben lo suficiente y responden. Cada paso cuesta (tiempo, dinero, tokens). Un MDP de juguete:
-
-- **Estado**: (búsquedas hechas, documentos leídos, confianza de 0 a 4).
-- **Acciones**:
-  - **buscar**: encuentra un documento nuevo (máximo 5);
-  - **leer**: lee el próximo documento encontrado; si es relevante, la confianza sube 1. Los primeros resultados suelen ser buenos (90% relevantes) y los siguientes, cada vez menos (hasta 30%);
-  - **responder**: termina el episodio.
-- **Recompensa**: **+1 si la respuesta es correcta** (más probable cuanto mayor la confianza: de 25%, adivinar entre 4, a 95%) **menos un costo por cada paso** de buscar o leer.
-
-El agente **no conoce** estas probabilidades: aprende con **Q-learning tabular** (clase 4), solo jugando.
-
-### Paso 1 — Una investigación con costo bajo y otra con costo alto
-"""))
-cells.append(code(r"""
-mostrar_trayectoria(costo=0.01)
-mostrar_trayectoria(costo=0.08)
-"""))
-cells.append(md(r"""
-Con costo bajo, el agente busca y lee casi todo antes de responder. Con costo alto, lee uno o dos documentos (los mejores) y responde.
-
-### Paso 2 — El trade-off "seguir buscando vs. responder ya"
-
-Entrenamos Q-learning para varios costos por paso (30.000 episodios cada uno) y medimos la política aprendida en 5.000 investigaciones. La línea punteada es el óptimo exacto calculado con programación dinámica, para chequear que Q-learning aprendió bien.
-"""))
-cells.append(code(r"""
-costos = [0.0, 0.01, 0.02, 0.03, 0.05, 0.08, 0.12, 0.2]
-resultados_ds = barrido_costos(costos)
-grafico_tradeoff(resultados_ds)
-"""))
-cells.append(md(r"""
-A medida que cada paso cuesta más, el agente **investiga menos** y **acierta menos**, pero su recompensa neta es la mejor posible para ese costo (coincide con el óptimo). Con costo muy alto, responde de entrada y adivina (25%).
-
-**Puente a los agentes de LLM.** Un agente que usa herramientas (buscar en la web, leer un PDF, ejecutar código) es exactamente esto, con un estado enorme (todo el texto de la conversación) y una política que es un modelo de lenguaje. Los sistemas de *deep research* se entrenan con RL usando como recompensa si la respuesta final es correcta, y el costo por paso (o un límite de pasos) es lo que les enseña a no buscar para siempre. Las mismas preguntas de diseño aparecen: ¿cómo se mide "correcta"? ¿cuánto cuesta un paso? ¿qué hace el agente si la recompensa se puede engañar?
-"""))
-cells.append(md(r"""
-### ✍️ Ejercicio
-
-Hagan que los documentos sean igual de buenos siempre (`P_RELEVANTE = [0.6] * 5`) y vuelvan a ejecutar el barrido. ¿El trade-off sigue siendo gradual o pasa a ser "todo o nada"? ¿Por qué?
-"""))
-cells.append(code(r"""
-P_RELEVANTE = [0.9, 0.75, 0.6, 0.45, 0.3]     # TODO: probar [0.6] * 5
-grafico_tradeoff(barrido_costos([0.0, 0.02, 0.04, 0.06, 0.08, 0.12]))
-"""))
-
-# ---------------------------------------------------------------- 5
-cells.append(md(r"""
-## 5. RLHF: ChatGPT, el mejor ejemplo de RL
-"""))
-cells.append(code(r"""
-diagrama_rlhf()
-"""))
-cells.append(md(r"""
-Un modelo de lenguaje preentrenado solo sabe **continuar texto**. Para convertirlo en un asistente, el **RL a partir de retroalimentación humana** (*RL from human feedback*, RLHF; Ouyang et al., 2022, InstructGPT) hace tres cosas: (1) lo ajusta con ejemplos de buenas respuestas escritas por personas (*supervised fine-tuning*, SFT; es aprendizaje por imitación); (2) le muestra a personas varias respuestas a la misma pregunta, ellas las **ordenan**, y con esos rankings entrena una red que predice cuánto le va a gustar a una persona una respuesta: el **modelo de recompensa** $r(x, y)$; (3) usa RL (el algoritmo PPO, *proximal policy optimization*) para que el modelo genere respuestas con alta recompensa, con una penalización por alejarse demasiado del modelo original (para que no "engañe" al modelo de recompensa: el *reward hacking* del tutor, otra vez). En lenguaje de este curso: **agente** = el modelo, **acción** = la respuesta, **recompensa** = $r(x, y)$, y cada conversación es un episodio de un paso, como un bandit con un número astronómico de brazos. Por eso decimos que ChatGPT es el ejemplo de RL que más gente usa todos los días.
-"""))
-
-# ---------------------------------------------------------------- 6
-cells.append(md(r"""
-## 6. Proyecto final: el MDP de su dominio
-
-Cada grupo elige un problema de **su** área (farmacia, laboratorio, marketing, salud, finanzas, docencia…) y lo convierte en un MDP chico que se pueda resolver con `resolver_mdp`. La entrega es este mismo bloque de celdas, completo.
-
-**Plantilla:**
-
-1. **El problema**: ¿quién decide, qué decide, cada cuánto?
-2. **Estados**: ¿qué hay que saber para decidir? (¿es Markov?) Pocos: entre 3 y 30.
-3. **Acciones**: entre 2 y 5.
-4. **Dinámica**: para cada estado y acción, a qué estados se puede pasar y con qué probabilidad.
-5. **Recompensa**: ¿qué número refleja lo que **de verdad** queremos? ¿Cómo podría el agente hacer trampa?
-6. **Resolver y mirar**: la tabla de la política, ¿tiene sentido? ¿Qué parámetro la hace cambiar?
-
-### Ejemplo resuelto — Stock de un medicamento en la farmacia
-
-- **Estado**: unidades en stock al cerrar el día (0 a 6).
-- **Acciones**: pedir 0, 2 o 4 unidades a la droguería (llegan para el día siguiente).
-- **Dinámica**: la demanda diaria es 0, 1, 2 o 3 unidades con probabilidades 0.2, 0.4, 0.3, 0.1.
-- **Recompensa**: +3 por unidad vendida, −1 por unidad pedida, −0.5 de costo fijo por pedido, −0.2 por unidad guardada, −2 por cada paciente que se va sin el medicamento.
-"""))
-cells.append(code(r"""
-ESTADOS = list(range(0, 7))                       # unidades en stock
-ACCIONES = ["pedir 0", "pedir 2", "pedir 4"]
-DEMANDA = {0: 0.2, 1: 0.4, 2: 0.3, 3: 0.1}
-STOCK_MAX = 6
-
-def transicion(s, a):
-    pedido = int(a.split()[1])
-    if s + pedido > STOCK_MAX:
-        return []                                 # no entra en la estantería: acción no permitida
-    resultado = []
-    for demanda, p in DEMANDA.items():
-        disponible = s + pedido
-        vendidas = min(disponible, demanda)
-        faltante = demanda - vendidas
-        s_sig = disponible - vendidas
-        r = 3 * vendidas - 1 * pedido - 0.5 * (pedido > 0) - 0.2 * s_sig - 2 * faltante
-        resultado.append((p, s_sig, r))
-    return resultado
-
-resolver_mdp(ESTADOS, ACCIONES, transicion, gamma=0.95, titulo="Farmacia: cuánto pedir según el stock")
-"""))
-cells.append(md(r"""
-La política es la clásica regla "(s, S)" de inventarios: **con poco stock, pedir; con suficiente, no pedir**. Nadie se la enseñó: sale de la recompensa.
-
-### ✍️ Ejercicio — Su proyecto
-
-Completen las celdas siguientes con su MDP (copien la estructura del ejemplo). Preguntas para la presentación: ¿qué parámetro cambia la política? ¿cómo podría el agente "hacer trampa" con su recompensa?
-
-**1–5. Problema, estados, acciones, dinámica, recompensa** (describir acá en texto):
-
-- Problema:
-- Estados:
-- Acciones:
-- Dinámica:
-- Recompensa:
-"""))
-cells.append(code(r"""
-# TODO: reemplazar por el MDP del grupo
-MIS_ESTADOS = ["A", "B"]
-MIS_ACCIONES = ["quedarse", "cambiar"]
-
-def mi_transicion(s, a):
-    # devolver una lista de (probabilidad, estado_siguiente, recompensa)
-    otro = "B" if s == "A" else "A"
-    if a == "quedarse":
-        return [(1.0, s, 1.0 if s == "B" else 0.0)]
-    return [(0.8, otro, 0.0), (0.2, s, 0.0)]
-
-resolver_mdp(MIS_ESTADOS, MIS_ACCIONES, mi_transicion, gamma=0.9, titulo="Nuestro MDP")
-"""))
-cells.append(md(r"""
-**6. Lo que encontramos** (¿la política tiene sentido? ¿qué parámetro la cambia? ¿cómo se podría hacer trampa con la recompensa?):
+**Lo que encontramos** (¿qué ingrediente frena la explosión de los valores? ¿cuál hace que la política salga? ¿se comportan igual las tres semillas?):
 
 -
 """))
 
-# ---------------------------------------------------------------- ejemplo resuelto: difusión
-cells.append(md(r"""
-## Ejemplo resuelto: la difusión de este curso como bandit
-
-El proyecto final pide plantear un problema propio como MDP. Este es el ejemplo resuelto: **cómo se propaga este curso**. El curso es un replicador (un *meme* en el sentido de Dawkins): vive solo si alguien lo aprende y se lo enseña a otra persona. Su campaña de Instagram es un bandit.
-
-| | |
-|---|---|
-| **Agente** | el curso, que elige qué publicar |
-| **Acciones (brazos)** | cuatro tipos de post: *intriga*, *concepto*, *demo interactiva*, *invitación a enseñar* |
-| **Estado** | el acto de la campaña (I, II, III) y la audiencia alcanzada; lo ignoramos y tratamos el problema como bandit (un solo estado) |
-| **Recompensa** | propagación por cada mil personas alcanzadas |
-
-**La recompensa de un meme.** Un replicador sobrevive si se copia con **fidelidad**, **fecundidad** y **longevidad**. Cada una tiene una métrica de Instagram o de GitHub:
-
-- **guardado** → longevidad (la persona vuelve a mirarlo): peso $w_g = 1$
-- **compartido** → fecundidad (llega a alguien más): peso $w_c = 3$
-- **visita al repositorio** → fidelidad (va a la fuente completa, no a un resumen): peso $w_v = 5$
-
-$$r = 1000 \cdot \frac{w_g \cdot \text{guardados} + w_c \cdot \text{compartidos} + w_v \cdot \text{visitas}}{\text{alcance}}$$
-
-**Política.** Los primeros 4 posts exploran (uno de cada tipo). Desde el quinto, **Thompson sampling**: cada tipo tiene una creencia Beta sobre su "tasa de propagación por persona"; se sortea un valor de cada una y se publica el tipo que salió más alto. Como la recompensa no es 0/1, contamos como "éxitos" la recompensa ponderada dividida por el peso mayor (una aproximación razonable para tasas chicas).
-
-> ⚠️ **Las tasas de abajo son SUPUESTAS** (inventadas para ilustrar). Más abajo hay una celda para pegar las métricas reales de cada post.
-"""))
-cells.append(code(r"""
-TIPOS = ["intriga", "concepto", "demo", "ensenar"]
-PESOS = np.array([1.0, 3.0, 5.0])          # guardado (longevidad), compartido (fecundidad), visita al repo (fidelidad)
-
-# ⚠️ SUPUESTO: tasas por persona alcanzada [guardado, compartido, visita al repo]. No son datos reales.
-TASAS_SUPUESTAS = np.array([
-    [0.015, 0.006, 0.002],   # intriga
-    [0.030, 0.005, 0.004],   # concepto
-    [0.025, 0.012, 0.008],   # demo interactiva
-    [0.018, 0.015, 0.006],   # invitación a enseñar
-])
-ALCANCE = 500                                # ⚠️ SUPUESTO: personas alcanzadas por post
-
-r_esperada = 1000 * TASAS_SUPUESTAS @ PESOS
-for t, r in zip(TIPOS, r_esperada):
-    print(f"{t:10s} recompensa esperada por 1000 alcanzados: {r:6.1f}")
-"""))
-cells.append(code(r"""
-def campania(n_posts, rng, politica="thompson"):
-    # Simula una campaña: devuelve los tipos elegidos y la recompensa de cada post.
-    wmax = PESOS.max()
-    a_beta, b_beta = np.ones(4), np.ones(4)
-    elegidos, recompensas = [], []
-    for k in range(n_posts):
-        if k < 4 or politica == "rotar":
-            a = k % 4                                       # explorar: uno de cada tipo (o rotar siempre)
-        else:
-            a = int(np.argmax(rng.beta(a_beta, b_beta)))    # Thompson sampling
-        conteos = rng.binomial(ALCANCE, TASAS_SUPUESTAS[a])  # guardados, compartidos, visitas
-        exitos = conteos @ PESOS / wmax
-        a_beta[a] += exitos
-        b_beta[a] += ALCANCE - exitos
-        elegidos.append(a)
-        recompensas.append(1000 * conteos @ PESOS / ALCANCE)
-    return np.array(elegidos), np.array(recompensas)
-
-
-def comparar_campanias(n_posts=36, n_sim=300, seed=0):
-    rng = np.random.default_rng(seed)
-    elig = np.array([campania(n_posts, rng)[0] for _ in range(n_sim)])
-    regret = {}
-    for pol in ("rotar", "thompson"):
-        rr = np.array([campania(n_posts, rng, pol)[1] for _ in range(n_sim)])
-        regret[pol] = np.cumsum(r_esperada.max() - rr, axis=1).mean(0)
-    fig, ax = plt.subplots(1, 2, figsize=(12, 3.8))
-    x = np.arange(1, n_posts + 1)
-    abajo = np.zeros(n_posts)
-    for i, t in enumerate(TIPOS):
-        frac = (elig == i).mean(0)
-        ax[0].bar(x, frac, bottom=abajo, color=COLORES[i], label=t, width=0.85)
-        abajo += frac
-    ax[0].axvline(4.5, color="#444", ls="--", lw=1)
-    ax[0].text(2.5, 1.03, "explorar", ha="center"); ax[0].text(min(20, n_posts * 0.6), 1.03, "Thompson", ha="center")
-    ax[0].set_xlabel("número de post"); ax[0].set_ylabel("fracción de campañas"); ax[0].set_ylim(0, 1.12)
-    ax[0].legend(ncols=4, loc="lower center", bbox_to_anchor=(0.5, -0.42), frameon=False)
-    ax[0].set_title("¿Qué tipo publica en cada post? (tasas supuestas)")
-    for pol, c in (("rotar", COLORES[1]), ("thompson", COLORES[2])):
-        ax[1].plot(x, regret[pol], color=c, label=pol)
-    ax[1].axvline(12, color="#888", ls=":", lw=1); ax[1].text(12.3, ax[1].get_ylim()[1] * 0.05, "fin de la campaña (12)")
-    ax[1].set_xlabel("número de post"); ax[1].set_ylabel("regret acumulado"); ax[1].legend(frameon=False)
-    ax[1].set_title("Propagación perdida frente a publicar siempre el mejor tipo")
-    plt.tight_layout(); plt.show()
-    print(f"Con 12 posts, Thompson eligió el mejor tipo (demo) en el post 12 en el {np.mean(elig[:, 11] == 2):.0%} de las campañas.")
-
-
-comparar_campanias(n_posts=36, n_sim=300, seed=SEMILLA)
-"""))
-cells.append(md(r"""
-**Qué mirar:**
-
-- En los posts 1 a 4 todas las campañas publican lo mismo: uno de cada tipo.
-- Desde el 5, Thompson se concentra en **demo** y en **invitación a enseñar**, que con estas tasas supuestas son parecidas; casi abandona *intriga*, que es claramente peor.
-- Con solo 12 posts la duda entre los dos mejores no se resuelve del todo: por eso Thompson los sigue alternando. Rotar los cuatro tipos para siempre pierde propagación a ritmo constante.
-
-### Las métricas reales
-
-Pegá en la celda de abajo lo que muestra Instagram para cada post a los 7 días (alcance, guardados, compartidos) y las visitas al repositorio que dé GitHub (*Insights → Traffic*). La página `difusion/estrategia.html` del sitio tiene un botón **"Copiar para el notebook"** que genera esta lista con el formato correcto. Si la lista queda vacía, se usa un ejemplo **supuesto**.
-"""))
-cells.append(code(r"""
-# ✍️ Pegar acá las métricas reales: (tipo, alcance, guardados, compartidos, visitas_repo)
-# tipo ∈ "intriga", "concepto", "demo", "ensenar"
-MIS_METRICAS = [
-    # ("intriga", 820, 14, 5, 1),
-]
-"""))
-cells.append(code(r"""
-# ⚠️ EJEMPLO SUPUESTO (no son datos reales): se usa solo si MIS_METRICAS está vacía
-EJEMPLO_SUPUESTO = [
-    ("intriga", 820, 14, 5, 1), ("concepto", 760, 11, 4, 2), ("demo", 900, 16, 6, 1), ("ensenar", 1100, 19, 9, 3),
-    ("concepto", 950, 30, 6, 4), ("demo", 1300, 34, 17, 11), ("demo", 1250, 30, 15, 10), ("concepto", 880, 25, 4, 3),
-    ("intriga", 870, 27, 5, 4), ("ensenar", 1400, 26, 22, 9), ("demo", 1500, 39, 19, 13), ("ensenar", 1700, 31, 27, 12),
-]
-
-
-def analizar(metricas, pesos=PESOS, n_mc=20000, seed=0):
-    df = pd.DataFrame(metricas, columns=["tipo", "alcance", "guardados", "compartidos", "visitas_repo"])
-    df.index = np.arange(1, len(df) + 1); df.index.name = "post"
-    pond = df[["guardados", "compartidos", "visitas_repo"]].to_numpy() @ pesos
-    df["r_por_1000"] = (1000 * pond / df["alcance"]).round(1)
-    df["exitos"] = pond / pesos.max()
-    rng = np.random.default_rng(seed)
-    filas, muestras = [], []
-    for t in TIPOS:
-        d = df[df["tipo"] == t]
-        a, b = 1 + d["exitos"].sum(), 1 + (d["alcance"] - d["exitos"]).sum()
-        muestras.append(rng.beta(a, b, n_mc))
-        filas.append({"tipo": t, "posts": len(d), "r medio": d["r_por_1000"].mean() if len(d) else np.nan})
-    gana = np.argmax(np.array(muestras), axis=0)
-    resumen = pd.DataFrame(filas).set_index("tipo")
-    resumen["P(mejor)"] = [np.mean(gana == i) for i in range(4)]
-    display(df.drop(columns="exitos"))
-    display(resumen.style.format({"r medio": "{:.1f}", "P(mejor)": "{:.0%}"}))
-    faltan = resumen.index[resumen["posts"] == 0].tolist()
-    if faltan:
-        print("Seguir explorando: faltan probar", ", ".join(faltan))
-    else:
-        mejor = resumen["P(mejor)"].idxmax()
-        print(f"Conviene repetir: {mejor} (probabilidad de ser el mejor: {resumen.loc[mejor, 'P(mejor)']:.0%})")
-        siguiente = TIPOS[int(np.argmax([m[0] for m in muestras]))]
-        print(f"Un sorteo de Thompson para el próximo post elige: {siguiente}")
-    return df, resumen
-
-
-if MIS_METRICAS:
-    datos = MIS_METRICAS
-else:
-    print("⚠️ MIS_METRICAS está vacía: se usa el EJEMPLO SUPUESTO.\n")
-    datos = EJEMPLO_SUPUESTO
-_ = analizar(datos)
-"""))
-cells.append(md(r"""
-**Para pensar:** si mañana el peso de los compartidos fuera 0, ¿cambia el tipo recomendado? ¿Qué recompensa haría que este curso se "hackee" a sí mismo, como el tutor que solo da sumas (por ejemplo, premiar alcance sin importar si alguien aprendió)? La página `difusion/estrategia.html` muestra la misma idea con una red de personas que crece según la fidelidad, la fecundidad y la longevidad del curso.
-"""))
-
+# ======================================================================= Cierre
 cells.append(md(r"""
 ## Preguntas para pensar
 
-1. En el bandit de anuncios la recompensa es el clic. ¿Qué anuncio aprendería a mostrar un algoritmo que maximiza clics si existiera un anuncio engañoso (*clickbait*)? ¿Qué tiene en común con el tutor que solo da sumas?
-2. En *deep search*, ¿quién decide el costo por paso? ¿Qué pasaría con un agente al que nunca se le cobra por buscar?
-3. En RLHF, la recompensa la aprende una red a partir de preferencias humanas. ¿Qué preferencias humanas podría estar aprendiendo que no queremos (por ejemplo, respuestas largas, seguras de sí mismas, aduladoras)?
-
+1. En la sección 4 la red se equivocaba justo al lado de una pared. Si el agente recibiera la imagen de la cueva entera en lugar de coordenadas, ¿seguiría pasando? ¿Qué entrada elegirían para un juego de Atari?
+2. La memoria de repetición reusa transiciones viejas, jugadas con una política anterior. ¿Por qué Q-learning puede aprender de ellas y SARSA (clase 6) no tanto?
+3. Un artículo dice que su agente «supera a DQN» y muestra una curva de una sola corrida. ¿Qué le pedirían antes de creerle?
+"""))
+cells.append(code(r"""
+print(f"Tiempo total del notebook: {time.time() - T0:.0f} s")
+"""))
+cells.append(md(r"""
 ## Próxima clase
 
-En la clase 9 el agente sale al mundo real, donde no hay simulador para jugar un millón de veces. Y es algo que ya usan: cada vez que conversan con un modelo de lenguaje están hablando con una política entrenada con RL. Lo que sigue (DPO, RL con recompensas verificables en modelos que razonan, agentes con herramientas) es la misma receta: estado, acción, recompensa… y mucho cuidado con lo que se le pide.
+Nuestra red miraba una casilla por vez, con sus coordenadas. El jugador a ciegas no las tiene: si solo siente los bigotes, dos lugares distintos se sienten igual. Cuando lo que se ve no alcanza para saber dónde se está, la red necesita memoria: en la clase 9, **redes recurrentes**, las mismas que leen texto palabra por palabra.
 """))
 
-save(cells, "08-aplicaciones.ipynb")
+save(cells, "08-de-la-tabla-a-la-red.ipynb", lento=True)
