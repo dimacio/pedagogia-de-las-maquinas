@@ -1144,6 +1144,36 @@ window.MODULOS = {
           { texto: "Aprender la recompensa con comparaciones, optimizar con PPO sin freno y al final imitar la política optimizada para suavizarla.", explicacion: "No: imitar va primero, para tener la referencia π_ref. Y optimizar sin freno es justo lo que en el notebook da −10." },
           { texto: "Imitar, optimizar con PPO usando el +1 de la salida y después aprender la recompensa para explicar lo que hizo la política.", explicacion: "No: en RLHF no hay recompensa escrita. La recompensa se aprende de las comparaciones antes de optimizar, y es esa la que se optimiza." },
           { texto: "Aprender la recompensa, imitar los pedazos ganadores y optimizar con una penalización por acercarse a π_ref, para explorar más.", explicacion: "No: la penalización es por alejarse de π_ref, no por acercarse. Y la imitación usa partidas grabadas, al principio de todo." }
+  "13": {
+    objetivos: [
+      "Describir un modelo de lenguaje como política: estado = texto hasta ahora, acción = próximo token, episodio = respuesta, recompensa al final.",
+      "Explicar cómo la temperatura cambia la política y por qué muestrear es explorar.",
+      "Distinguir una recompensa aprendida (clase 12) de una recompensa verificable y calcular las ventajas de GRPO de un grupo de respuestas.",
+      "Explicar por qué GRPO no necesita un crítico: el promedio del grupo hace de línea de base, como en la clase 11."
+    ],
+    tiempo: { pagina: 35, notebook: 60 },
+    previos: ["12", "9"],
+    requisitos: ["De la clase 9, que un modelo de lenguaje predice lo que sigue; de la clase 11, la línea de base y PPO.", "El notebook descarga una vez un modelo de ≈ 1 GB (Qwen2.5-0.5B-Instruct); en CPU corre más lento."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "Un asistente responde «¿Cuánto es 14 × 12?» con «14 × 12 = 168» en 12 tokens, y un verificador le pone 1 al terminar. Si se lo mira con el molde de la cueva, ¿qué es cada cosa?",
+        opciones: [
+          { texto: "Estado = la pregunta sola, acción = la respuesta entera elegida de una vez, episodio = la conversación, recompensa = el 1 del verificador.", explicacion: "No: la acción es un token, no la respuesta. Cada token se suma al estado, que crece (en la cueva, de 62 a 73 tokens), y la respuesta son 12 acciones seguidas." },
+          { texto: "Estado = el último token escrito, acción = el próximo token, episodio = la respuesta, y cada token correcto cobra su parte del 1.", explicacion: "No: el estado es todo el texto, con la pregunta y lo ya escrito. Y los tokens sueltos no valen nada: como en la cueva, todo da 0 menos el final." },
+          { texto: "Estado = todo el texto hasta ahora, acción = el próximo token, episodio = la respuesta hasta el token de fin, recompensa = un número al final.", explicacion: "Correcto. Es el camino de la cueva (20 pasos con 0 y un +1 al final) con tokens: π(token | texto). Que el 1 llegue tarde plantea el problema de siempre, qué token tuvo el mérito." },
+          { texto: "Estado = el texto hasta ahora, acción = uno de los 4 tokens más probables, episodio = cada token, recompensa = la probabilidad que le dio el modelo.", explicacion: "No: la acción es cualquiera de los 151 665 tokens del vocabulario, y un episodio es la respuesta entera. La probabilidad π es la política, no la recompensa." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O2",
+        pregunta: "Desde el estado de la cueva, el token más probable tiene 0,697 a T = 0,3, 0,269 a T = 1 y 0,059 a T = 1,8. Con 50 muestras salen 2, 9, 25 y 42 tokens distintos a T = 0,2, 0,7, 1,2 y 1,8. ¿Qué hace la temperatura?",
+        opciones: [
+          { texto: "Divide los logits: T chica concentra la masa en el más probable (explotar), T grande la reparte (explorar), y a T = 1,8 el texto se rompe.", explicacion: "Correcto. π_T = softmax(logits / T). Explorar no es gratis: a T = 1,8 aparecen pedazos de otros idiomas, como un ε demasiado grande en la cueva." },
+          { texto: "Cambia qué token prefiere el modelo: a T alta los tokens raros pasan a tener más puntaje que el más probable, por eso salen tantos distintos.", explicacion: "No: dividir los logits por T no cambia su orden; el más probable sigue siéndolo. Lo que cambia es cuánto se aplanan las diferencias entre ellos." },
+          { texto: "Es un premio a la variedad: a T alta se recompensa la respuesta distinta, y así el modelo aprende a no repetir siempre el mismo token.", explicacion: "No: con la temperatura no se entrena nada. Es la misma política muestreada de otra forma; los 2 o 42 tokens distintos salen sin tocar el modelo." },
+          { texto: "Sube la exploración sin costo: a T = 1,8 las respuestas son más variadas que a T = 0,2 y siguen siendo tan razonables como las de T = 1.", explicacion: "No: a T = 1,8 la política le da chance a miles de tokens raros y el texto se rompe; en la cuenta 17 + 25 deja de salir un número. La variedad con sentido aparece a T media." }
         ],
         correcta: 0
       },
@@ -1177,6 +1207,45 @@ window.MODULOS = {
         "Se elige algo difícil de puntuar con números y se presentan 5 comparaciones concretas, con la preferida marcada en cada una.",
         "Se dice qué recompensa aprendería una máquina de esas comparaciones y qué queda sin aprender porque ningún par lo cubría.",
         "Se describe un caso concreto de sobreoptimización (algo que la recompensa aprendida premia y la persona no querría) y un freno relacionado con la penalización por alejarse."
+        pregunta: "El verificador del notebook toma el último número de la respuesta y da 1 si coincide con el resultado. Para 17 + 25, a «cuarenta y dos» le da 0. ¿Qué distingue esta recompensa de la que se aprendía en la clase 12?",
+        opciones: [
+          { texto: "En el fondo nada: el verificador también se aprende de comparaciones de personas, solo que ya viene entrenado y se usa tal cual.", explicacion: "No: el verificador es un programa con una regla, el último número, y no se entrena. La recompensa aprendida de la clase 12 sale de comparaciones, como en RLHF." },
+          { texto: "Nunca se equivoca, y por eso sirve también para puntuar lo que no es una cuenta, por ejemplo si una explicación quedó clara.", explicacion: "No: se equivoca con «cuarenta y dos», y una respuesta dudosa que termina en el número justo cobra. Si una explicación es clara no se chequea con un programa." },
+          { texto: "Detecta errores que un modelo de recompensa no vería: «cuarenta y dos» vale 0 porque el resultado escrito en palabras está mal.", explicacion: "No: «cuarenta y dos» es correcto. Vale 0 porque el verificador no lee palabras; es él quien se equivoca, no la respuesta." },
+          { texto: "La pone un programa que chequea la respuesta, sin aprenderla; lo que un programa no puede chequear sigue pidiendo comparaciones.", explicacion: "Correcto. Sirve para cuentas o código con pruebas (la greedy acierta 9 de 12). La política aprende a cumplir esas reglas, incluido escribir el número en cifras." }
+        ],
+        correcta: 3
+      },
+      {
+        objetivo: "O3",
+        pregunta: "En 17 + 25, un grupo de 8 respuestas a T = 1 da seis veces 42 y dos veces 32: recompensas 11101110. Con Aᵢ = (rᵢ − promedio) / desvío, ¿qué ventajas quedan, y qué pasa en 7 × 8 − 9, donde fallan las 8?",
+        opciones: [
+          { texto: "Promedio 0,750: cada 42 recibe +0,250 y cada 32 −0,750; en 7 × 8 − 9 las ocho reciben −1, el castigo más fuerte del lote.", explicacion: "No: +0,250 y −0,750 son rᵢ − promedio, falta dividir por el desvío, 0,433. Y si las 8 valen 0, ninguna está por debajo del promedio: la ventaja es 0." },
+          { texto: "Promedio 0,750 y desvío 0,433: cada 42 recibe +0,577 y cada 32 −1,732; en 7 × 8 − 9 las ventajas son 0 y esa cuenta no enseña nada.", explicacion: "Correcto. Las ventajas suman ≈ 0: unas suben y otras bajan. Sin ningún acierto no hay con qué comparar, la recompensa escasa de la clase 7." },
+          { texto: "La ventaja es la recompensa misma: cada 42 recibe +1 y cada 32 recibe 0; en 7 × 8 − 9 las ocho reciben 0 y se descartan.", explicacion: "No: la ventaja compara cada respuesta con su grupo. Por eso un acierto vale +0,577 en 17 + 25 y ≈ +2,6 en 3 × 4 + 5, donde acierta 1 de 8." },
+          { texto: "Promedio 0,750 y desvío 0,433: cada 42 recibe +0,577 y cada 32 −1,732; en 7 × 8 − 9 GRPO empuja más fuerte, porque ahí hay más para mejorar.", explicacion: "No: las ventajas de 17 + 25 están bien, pero un grupo todo mal da ventajas 0. GRPO no sabe hacia dónde empujar si ninguna respuesta salió mejor que otra." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O4",
+        pregunta: "En el actor-crítico de la clase 11, la línea de base la daba un crítico, una segunda red que aprende V(s). GRPO actualiza Qwen2.5-0.5B sin crítico. ¿Por qué puede hacerlo?",
+        opciones: [
+          { texto: "Con recompensas verificables no hace falta línea de base: el verificador ya dice qué respuestas reforzar, y se refuerzan todas las correctas.", explicacion: "No: sin línea de base, un acierto en 8 × 7 (donde aciertan todas) empujaría igual que uno sorpresivo. La ventaja necesita saber qué se esperaba de cada pregunta." },
+          { texto: "El modelo de 494 M ya trae adentro un crítico que estima V para cada texto, entrenado junto con el lenguaje antes de empezar el RL.", explicacion: "No: Qwen2.5-0.5B no trae crítico. Agregar uno del mismo tamaño llevaría los 494 M de parámetros a 988 M para entrenar y tener en memoria." },
+          { texto: "Pregunta varias veces y usa el promedio del grupo como V(pregunta): una línea de base ruidosa, pero que no exige entrenar otra red de 494 M.", explicacion: "Correcto. En 14 × 12 el promedio de un grupo de 8 va de 0,250 a 0,750; a cambio no se entrena nada y se ahorra pasar de 494 M a 988 M parámetros." },
+          { texto: "GRPO deja de usar el recorte de PPO, y sin recorte la actualización ya es estable por sí sola, así que la línea de base sobra.", explicacion: "No: GRPO sigue usando el recorte de PPO. El recorte limita cuánto cambia la política; la línea de base dice qué salió mejor de lo esperado. Son piezas distintas." }
+        ],
+        correcta: 2
+      }
+    ],
+    actividad: {
+      titulo: "¿Quién pone el +1?",
+      consigna: "Elegí una tarea que le pedirías a un asistente: resolver un ejercicio, escribir una función, resumir una clase, dar un consejo, contestar un mail. Decidí quién pondría el +1 al final de la respuesta: ¿se puede verificar con un programa, como la cuenta con el último número o un código con sus pruebas, o hay que aprender la recompensa de comparaciones de personas, como en la clase 12? Si la tarea tiene partes de los dos tipos, separalas. Describí la regla del verificador o qué se le preguntaría a la gente al comparar dos respuestas. Después buscá cómo se podría engañar esa recompensa: una respuesta que cobra sin ser buena, como la dudosa que termina en el número justo, o una buena que no cobra, como «cuarenta y dos». Usá la pregunta de «Para enseñarlo»: si el asistente aprende de los pulgares arriba de la gente, ¿aprende las respuestas correctas o las que gustan? Cerralo con la oración de «Para enseñarlo»: un modelo de lenguaje es una política que elige la próxima palabra; para ajustarlo con RL hace falta decidir quién pone el +1 al final. Publicalo en Discussions; otra persona te devuelve con la rúbrica.",
+      rubrica: [
+        "Se nombra una tarea concreta y se dice si su recompensa se puede verificar con un programa o hay que aprenderla de comparaciones (o qué partes son de cada tipo), con una razón.",
+        "Se describe cómo se pondría el +1: la regla del verificador o qué se compara y quién compara, de modo que otra persona podría aplicarlo.",
+        "Se da al menos un ejemplo concreto de cómo esa recompensa se podría engañar o equivocar (una respuesta mala que cobra o una buena que no) y qué aprendería el asistente si se entrenara con ella."
       ]
     }
   }
