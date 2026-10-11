@@ -99,7 +99,7 @@
         <label class="ancho"><span>Cómo podría hacer trampa (reward hacking) y cómo lo evitás</span><textarea id="pTrampa" rows="2"></textarea></label>
       </div>
       <div class="medidor"><span>ficha</span><span class="barra"><i id="medProy"></i></span><b id="medTxt">0/7</b></div>
-      <div class="row"><button class="btn" id="bEjemplo">Cargar el ejemplo resuelto</button><button class="btn primary" id="bCopiarPy">Copiar como Python</button><button class="btn" id="bCopiarMd">Copiar como Markdown</button><button class="btn" id="bBorrarProy">Borrar</button><span class="cap" id="capProy" role="status" aria-live="polite"></span></div>
+      <div class="row"><button class="btn" id="bEjemplo">Cargar el ejemplo de la difusión</button><button class="btn primary" id="bCopiarPy">Copiar como Python</button><button class="btn" id="bCopiarMd">Copiar como Markdown</button><button class="btn" id="bBorrarProy">Borrar</button><span class="cap" id="capProy" role="status" aria-live="polite"></span></div>
       <textarea class="salida" id="outProy" readonly aria-label="Ficha del proyecto para copiar"></textarea>
     </div>
     <div class="texto">
@@ -108,7 +108,7 @@
       <p>Elegí una decisión que se repite en tu área y escribila como MDP, con pocos estados (de 3 a 30), unas pocas acciones, transiciones P, recompensa R y un γ.</p>
       <p>El ejemplo es la planta del ejercicio final del <a id="lnNb4" href="04-planificar-con-mapa.html">notebook de la clase 4</a>, que con γ = 0,9 riega solo cuando la tierra está seca.</p>
       <p>Si la recompensa la pone quien vende el agua y premia cada riego, la política riega siempre hasta ahogar la planta, un caso de trampa con la recompensa (<i>reward hacking</i>).</p>
-      <p>Completá la ficha, copiala como Python y pegala en la celda del ejercicio de ese notebook, donde <code>resolver_mdp</code> la resuelve con iteración de valor y de política.</p>
+      <p>Completá la ficha, copiala como Python y pegala en la celda del ejercicio de ese notebook, completá <code>mi_transicion</code> con tus P y R, y <code>resolver_mdp</code> la resuelve con iteración de valor y de política.</p>
       <p class="nota pregunta">¿Quién define la recompensa de tu problema, quién la ve y qué haría un agente que quisiera cumplirla sin hacer lo que querías?</p>
     </div>
   </section>
