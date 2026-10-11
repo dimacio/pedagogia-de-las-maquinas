@@ -1335,5 +1335,161 @@ window.MODULOS = {
         "Se dice cuándo convendría dejar de buscar y responder, y se da un ejemplo de recompensa que se puede engañar (por ejemplo, premiar que guste) con lo que el agente aprendería de ella."
       ]
     }
+  },
+
+  "15": {
+    objetivos: [
+      "Plantear un agente de difusión y un agente tutor como dos MDP con la misma forma y distinta recompensa.",
+      "Describir el circuito curador → generador → evaluador → publicador con una persona en el medio, y explicar por qué el evaluador tiene que ser otro modelo.",
+      "Distinguir un empujón (nudge) de un patrón oscuro y proponer una recompensa visible y editable por quien aprende.",
+      "Distinguir alinear a un agente con lo que la persona pide, con lo que hace y con lo que le conviene."
+    ],
+    tiempo: { pagina: 40, notebook: 60 },
+    previos: ["14", "2"],
+    requisitos: ["De la clase 14, los agentes de lenguaje; de la clase 2, el tutor tramposo que cobra por aciertos.", "El notebook descarga dos modelos (≈ 4 GB en total: Qwen2.5-0.5B-Instruct y Qwen2.5-1.5B-Instruct); en CPU tarda entre 20 y 60 minutos."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "En el notebook, con 2000 personas simuladas, el agente de difusión junta 19,7 interacciones por persona y solo un 3,6 % termina dominando el tema; el tutor junta 2,8 y llega al 49,3 %. ¿Qué separa a los dos agentes?",
+        opciones: [
+          { texto: "Las transiciones: la persona reacciona distinto a cada agente, y por eso uno la retiene y el otro la deja ir.", explicacion: "No: los dos usan los mismos estados, las mismas acciones y las mismas transiciones P. Si la persona respondiera distinto, no serían el mismo MDP." },
+          { texto: "Que el de difusión quedó mal entrenado: elige «entretener» siempre por un error, y con más entrenamiento aprendería a enseñar.", explicacion: "No: «entretener siempre» es la política óptima para lo que cobra. Hace bien su trabajo; el problema es qué trabajo se le pidió." },
+          { texto: "Solo la recompensa: el mismo MDP paga la interacción a uno y el aprendizaje al otro, y cada uno hace lo mejor para lo que cobra.", explicacion: "Correcto. Es lo que muestran las dos cuevas con el mismo mapa: una paga la casilla brillante y la otra la salida. Con r = w · interacción + (1 − w) · aprendizaje, cambiar w cambia el agente." },
+          { texto: "Que el tutor retiene mejor a la gente: se le va menos de la mitad y por eso termina con más personas que dominan el tema.", explicacion: "No: con el tutor se va el 50,7 %, más de la mitad. Cuando enseña bien, la persona deja de necesitarlo, y eso para el tutor no es un fracaso." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O2",
+        pregunta: "En la corrida del notebook, el post de F4 dice lo contrario de la fuente, el evaluador le puso 7,4 y el sistema sugirió publicarlo. ¿Cómo está armado el circuito de la fábrica y dónde se lo puede frenar?",
+        opciones: [
+          { texto: "El curador elige qué contar, el generador redacta, el evaluador puntúa y una persona decide antes del publicador; esa persona es el último freno, si lee el post.", explicacion: "Correcto. Cada agente deja lo suyo en un estado compartido que lee el siguiente. Si se apaga a la persona, F4 sale publicado con su 7,4 y nadie se da cuenta." },
+          { texto: "El evaluador puntúa la fuente, el curador elige las mejor puntuadas, el generador redacta y el publicador publica; la persona revisa después.", explicacion: "No: el evaluador puntúa los borradores del generador, no la fuente. Y la persona decide antes de publicar; revisar después ya no frena nada." },
+          { texto: "El generador redacta, el curador corrige lo que está mal y el publicador publica lo que supera el umbral; con el curador alcanza, no hace falta persona.", explicacion: "No: el curador va primero y elige qué ideas contar, no corrige borradores. Y F4 superaba el umbral, así que sin persona se publicaba." },
+          { texto: "Curador, generador y evaluador son un solo modelo que se revisa a sí mismo, y el publicador manda todo lo que ese modelo aprueba.", explicacion: "No: el evaluador es otro modelo (Qwen2.5-1.5B), justamente para no revisarse a sí mismo. Y antes del publicador decide una persona." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O2",
+        pregunta: "Con la misma rúbrica de cinco criterios, el generador (Qwen2.5-0.5B) puntúa sus borradores con 2,7 de media y el control malo a propósito también con 2,7. El evaluador distinto (Qwen2.5-1.5B) da 7,1 a los borradores y 5,0 al control, pero aprueba con 7,4 el post de F4. ¿Por qué el evaluador tiene que ser otro modelo?",
+        opciones: [
+          { texto: "Porque el generador se premia a sí mismo: se pone notas altas a todo, y un evaluador externo las baja a su lugar.", explicacion: "No: en esta corrida el generador no se premió, puntuó todo bajo. El problema no fue la nota alta sino que no separó nada: 2,7 contra 2,7." },
+          { texto: "Porque el modelo más grande no se equivoca: con una separación de 2,1 ya se puede sacar a la persona del circuito.", explicacion: "No: el evaluador distinto aprobó con 7,4 el post de F4, que dice lo contrario de la fuente. Separó lo groseramente malo, pero la persona sigue haciendo falta." },
+          { texto: "Porque usa una rúbrica más exigente que la del generador, y con la misma rúbrica los dos jueces darían lo mismo.", explicacion: "No: los dos usan la misma rúbrica de cinco criterios. Lo que cambia es quién la aplica." },
+          { texto: "Porque quien se juzga a sí mismo lo hace con los mismos puntos ciegos con que escribió: el generador no distinguió nada (separación 0,0) y el otro separó lo grosero (2,1).", explicacion: "Correcto. Separación = media(borradores) − control. Otro modelo tiene otros puntos ciegos, no ninguno: por eso el 7,4 a F4 y la persona antes de publicar." }
+        ],
+        correcta: 3
+      },
+      {
+        objetivo: "O3",
+        pregunta: "En el usuario de juguete de la sección 5, con el feed miope (γ = 0) de siempre, el empujón (el 60 % de los días decide no entrar) deja 28,6 clics en 90 días y un 9,6 % de activos al día 30; el patrón oscuro sube los clics a 57,6 pero deja activo solo el 2,6 %. ¿Qué los distingue y cuál es la salida que propone la clase?",
+        opciones: [
+          { texto: "El empujón cambia al agente y el patrón oscuro cambia el entorno; la salida es reentrenar el feed para que deje de mostrar ganchos.", explicacion: "No: ninguno de los dos toca al agente, que sigue siendo el feed miope que muestra ganchos. Los dos cambian cómo se presentan las opciones." },
+          { texto: "Usan el mismo mecanismo, cambiar el entorno, pero el empujón juega a favor de quien decide y el patrón oscuro en contra; la salida es una recompensa visible y editable por quien usa el sistema.", explicacion: "Correcto. Con los pesos a la vista, si la persona le da algo de peso a su satisfacción, hasta el feed miope muestra contenido útil. Es la pregunta de la clase 1, quién elige la recompensa, hecha interfaz." },
+          { texto: "El patrón oscuro es mejor para el usuario porque casi duplica los clics; la salida es que la plataforma ajuste mejor los pesos sin mostrarlos.", explicacion: "No: los clics los cobra la plataforma; al día 30 queda activo el 2,6 % y la satisfacción no sube. Y con pesos escondidos, quien aprende no elige qué cuenta." },
+          { texto: "El empujón no decide nada por la persona, a diferencia del patrón oscuro; la salida es prohibir cualquier cambio del entorno.", explicacion: "No: la pausa también decide por la persona, y por eso la clase pregunta quién debería elegir cuánto dura. La salida no es prohibir sino que la persona vea y edite la recompensa." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O4",
+        pregunta: "Lucía pidió un curso de programación. Con el mismo agente y las mismas transiciones, tres recompensas dan tres políticas: una muestra siempre el curso (aprendizaje 36,3), otra siempre videos cortos (83,2 % de noches con clic, aprendizaje 0) y otra sugiere cortar cuando está cansada y el curso cuando está descansada (44,4). ¿Qué alineación es cada una?",
+        opciones: [
+          { texto: "El curso siempre es alinear con lo que le conviene; los videos, con lo que pide; y cortar cuando está cansada, con lo que hace.", explicacion: "No: el curso siempre es exactamente lo que pidió. Los videos salen de lo que hace, su registro de clics, y sugerir cortar no aparece ni en lo que pide ni en lo que hace." },
+          { texto: "Las tres son la misma alineación con distinto γ: el agente que mira más lejos sugiere cortar y el más miope muestra videos.", explicacion: "No: lo que cambia es la recompensa, no el descuento. Cada una responde de otra forma a qué quiere decir «lo que quiere Lucía»." },
+          { texto: "El curso siempre es lo que pide; los videos, lo que hace (sus preferencias reveladas, como un feed); y cortar cuando está cansada, lo que le conviene, que alguien tiene que decidir.", explicacion: "Correcto. Lo que le conviene es la que más enseña, 44,4 contra 36,3 y 0, pero no sale sola de los datos: alguien escribió que cansada le conviene cortar." },
+          { texto: "Los videos son lo que le conviene, porque el registro de 3000 noches muestra lo que de verdad elige; el curso es lo que pide y cortar es lo que hace.", explicacion: "No: lo que elige en el registro son sus preferencias reveladas, lo que hace, y es lo que optimiza un feed. Con eso el aprendizaje es 0." }
+        ],
+        correcta: 2
+      }
+    ],
+    actividad: {
+      titulo: "La app que cobraría por otra cosa",
+      consigna: "Elegí una app que uses todos los días: una red social, un juego, una plataforma de videos, una app para aprender idiomas, el mapa del celular. Escribí qué creés que cobra hoy, como el agente de difusión que cobra la interacción, y qué hace por eso. Proponé otra recompensa y decí con qué la alineás: con lo que pedís, con lo que hacés o con lo que te conviene, y quién escribiría eso. Después buscá cómo te podría hacer trampa con tu recompensa nueva, como el tutor que cobra aciertos y solo da preguntas fáciles. Decidí qué parte de esa recompensa tendrías que poder ver y editar vos, y si agregarías un empujón a tu favor, como una pausa, sin que se vuelva un patrón oscuro. Usá la pregunta de «Para enseñarlo»: ¿qué app te gustaría que cobrara por otra cosa? Cerralo con la oración: dos agentes con el mismo molde hacen cosas opuestas si cobran por cosas distintas; antes de usar uno, preguntá a favor de quién juega su recompensa. Publicalo en Discussions; otra persona te devuelve con la rúbrica.",
+      rubrica: [
+        "Se nombra una app concreta, se dice qué cobra hoy y qué hace por eso, y se propone otra recompensa diciendo con qué la alinea (lo que la persona pide, hace o le conviene) y quién la escribe.",
+        "Se describe un caso concreto de cómo la recompensa nueva podría hacer trampa, algo que cobra sin servirle a la persona, como el tutor que da solo preguntas fáciles.",
+        "Se dice qué parte de la recompensa vería y editaría quien usa la app, y si se propone un empujón, se explica por qué juega a favor de la persona y no es un patrón oscuro."
+      ]
+    }
+  },
+
+  "16": {
+    objetivos: [
+      "Recorrer las quince clases anteriores sobre la misma cueva y nombrar la herramienta que agregó cada una.",
+      "Plantear un problema propio como MDP, diciendo quién define la recompensa, quién la ve y cómo podría el agente hacer trampa.",
+      "Presentar el proyecto entre pares y devolver otros con una rúbrica.",
+      "Explicar la difusión del curso como un bandit y el curso entero a otra persona."
+    ],
+    tiempo: { pagina: 35 },
+    previos: ["15", "1"],
+    requisitos: ["De la clase 1, el marco: Freire, Foucault y Dawkins; de la clase 15, las dos preguntas: a favor de quién juega la recompensa y cómo podría hacer trampa.", "Para resolver tu MDP, el notebook de la clase 4 (la celda del ejercicio final, con resolver_mdp). Esta clase no tiene notebook propio."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "En el recorrido, la parada 4 muestra flechas en todas las casillas de la cueva y la parada 6 solo en las casillas por donde pasó el agente. ¿Qué herramienta agregó cada una de esas dos clases?",
+        opciones: [
+          { texto: "La 4 agregó policy gradient, con flechas que son probabilidades, y la 6 la memoria de una red recurrente que recuerda por dónde pasó.", explicacion: "No: las flechas como probabilidades son de la clase 11 y la memoria de la clase 9. En el recorrido, la 4 planifica con el mapa y la 6 aprende jugando." },
+          { texto: "La 4 agregó Monte Carlo y TD, que estiman el valor con partidas jugadas, y la 6 la exploración con un bandit que cuenta visitas.", explicacion: "No: Monte Carlo y TD son la parada 5, y contar visitas es la 7. Las flechas en toda la cueva salen de tener el mapa, sin jugar ninguna partida." },
+          { texto: "La 4 agregó iteración de valor y de política con el mapa; la 6, SARSA y Q-learning, que aprenden las flechas de la experiencia, solo donde el agente estuvo.", explicacion: "Correcto. Con el mapa, el valor se derrama desde la salida y hay flecha en cada casilla; sin mapa, el agente solo sabe qué hacer en las casillas que visitó." },
+          { texto: "Las dos agregaron lo mismo, la ecuación de Bellman: la 6 tiene menos flechas porque usa un γ más chico que la 4.", explicacion: "No: Bellman es de la clase 3 y las dos clases la usan. La diferencia no está en γ sino en de dónde sale lo aprendido: del mapa en la 4, de partidas jugadas en la 6." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O2",
+        pregunta: "Elegís como proyecto los recordatorios de una app para estudiar. ¿Cuál de estas fichas cumple lo que pide el bloque 2 para plantear el problema como MDP?",
+        opciones: [
+          { texto: "Estados: cada minuto del día de cada persona que usa la app. Acciones: mandar o no un recordatorio. Recompensa: +1 cada vez que abre la app. γ = 0,9.", explicacion: "No: son demasiados estados para resolverlo en el notebook (el bloque pide de 3 a 30), y la ficha no dice quién define la recompensa, quién la ve ni cómo se podría hacer trampa." },
+          { texto: "Estados: al día, atrasada, abandonó. Acciones: recordar, no recordar. P estimadas para cada par. Recompensa: +1 si queda al día, −1 si no; γ = 0,9. La define quien estudia y la ve en la app; si premiara abrir la app, el agente recordaría siempre hasta que la desinstale.", explicacion: "Correcto. Tiene pocos estados, acciones, P, R y γ, dice quién define la recompensa y quién la ve, y nombra una trampa concreta, como la del riego que premia quien vende el agua." },
+          { texto: "Estados: al día, atrasada, abandonó. Acciones: recordar, no recordar. Recompensa: +1 por cada recordatorio enviado, definida por la empresa. γ = 0,9. Trampa: ninguna, porque la recompensa está clarísima.", explicacion: "No: es el caso de la planta con la recompensa de quien vende el agua. Premiar cada recordatorio lleva a recordar siempre; que la recompensa sea clara no quiere decir que mida lo que se quiere." },
+          { texto: "Estados y acciones listados, sin P ni γ: el notebook de la clase 4 las adivina a partir de los nombres. La recompensa la define quien estudia y no hay trampa posible porque nadie más la ve.", explicacion: "No: resolver_mdp necesita las transiciones y γ que vos le das; no adivina nada. Y que nadie más vea la recompensa no impide que el agente la cumpla sin hacer lo que querías." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O3",
+        pregunta: "Te toca devolver un proyecto: los estados son pocos y alcanzan para decidir, la recompensa mide lo que se quiere y dice quién la define, la presentación se entiende sin haber hecho el curso, pero la ficha no nombra ninguna trampa. ¿Qué devolución sigue la rúbrica de la página?",
+        opciones: [
+          { texto: "Poner «cumple» en los cuatro criterios: tres partes están muy bien y una sola que falte no alcanza para bajar la nota.", explicacion: "No: la rúbrica no es una nota general. Tiene un criterio por cada parte de la ficha, y el de la trampa, sin ninguna trampa nombrada, queda en «falta»." },
+          { texto: "Calcular si la política que sale del notebook consigue la recompensa más alta posible y devolver ese número como criterio principal.", explicacion: "No: ningún criterio de la rúbrica mide cuánto rinde la política. Mide si el planteo está completo y se entiende: estados y acciones, recompensa, trampa y presentación." },
+          { texto: "Marcar «a medias» la presentación porque no usa los términos del curso, como MDP o γ, y pedirle que agregue las fórmulas.", explicacion: "No: el criterio de la presentación es al revés, que se entienda en cinco minutos sin haber hecho el curso. Si se entiende sin fórmulas, cumple." },
+          { texto: "Marcar «falta» en Trampa, «cumple» en los otros tres, y nombrar una trampa que quien escribió el proyecto no vio, con una pregunta para esa persona.", explicacion: "Correcto. Cada criterio se marca por separado, y la página dice que una devolución útil nombra una trampa que quien escribió no vio: acá es justo lo que más ayuda." }
+        ],
+        correcta: 3
+      },
+      {
+        objetivo: "O4",
+        pregunta: "El bloque 4 plantea la campaña de difusión del curso como un bandit, el ejemplo resuelto del proyecto final. ¿Qué es cada pieza?",
+        opciones: [
+          { texto: "Los brazos son los cuatro tipos de post (intriga, concepto, demo, invitación a enseñar); la recompensa, guardados, compartidos y visitas al repositorio por cada mil alcanzadas, con pesos; UCB elige sumando una bonificación por lo poco probado.", explicacion: "Correcto. Es el bandit de la clase 7: los primeros cuatro posts prueban cada tipo una vez y desde el quinto decide el bandit. La visita al repositorio pesa más porque mide fidelidad." },
+          { texto: "Los brazos son las personas alcanzadas; la recompensa, el alcance total de cada post; y se elige siempre el tipo que más gente alcanzó.", explicacion: "No: los brazos son los tipos de post, lo que el curso puede elegir. Y la recompensa se mide por cada mil alcanzadas, para no premiar solo llegar a mucha gente que no guarda ni comparte nada." },
+          { texto: "Los brazos son los tipos de post y la recompensa los guardados, pero después de probar cada tipo una vez se publica siempre el de mejor promedio.", explicacion: "No: eso es elegir siempre el mejor promedio y dejar de explorar. UCB le suma a cada brazo una bonificación por lo poco probado: √(ln t / nₐ) crece para el tipo que se publicó menos." },
+          { texto: "Es un MDP con las semanas como estados, que se resuelve con iteración de valor como la planta, porque cada post cambia la cueva del siguiente.", explicacion: "No: el bloque lo plantea como bandit, elegir entre brazos según la recompensa que dieron, y lo resuelve con UCB o con muestreo de Thompson, como en la clase 7." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O2",
+        pregunta: "En el bloque 5 apretás «Que la elija otro» y después tocás vos otra casilla para poner la salida, sin mover γ. En los dos casos el agente encuentra el camino. ¿Qué muestra esto sobre la pregunta de Foucault?",
+        opciones: [
+          { texto: "Que con la salida puesta por otro el agente aprende peor: la iteración de valor funciona mejor cuando la meta la elige uno mismo.", explicacion: "No: el algoritmo es el mismo, la iteración de valor de la clase 4, y persigue igual de bien cualquier salida. Justamente por eso importa quién la puso." },
+          { texto: "Que quién pone la salida da igual siempre que γ sea alto: con γ cerca de 1 el agente llega a cualquier meta y elige bien por sí solo.", explicacion: "No: γ dice qué tan lejos ve el agente, no dónde está la salida. Con γ alto llega más lejos, pero a la meta que eligió otro." },
+          { texto: "Que el algoritmo no cambia y solo cambia quién eligió la meta; para Foucault, cuidarse es poder ver dónde está tu salida y quién la puso, en vez de aceptar la de otro.", explicacion: "Correcto. Es la pregunta de la clase 1 con las herramientas del curso, y las dos preguntas de la clase 15 hechas sobre vos: a favor de quién juega tu recompensa y cómo podría hacerte trampa." },
+          { texto: "Que la mejor salida es la que más se copia: según Dawkins, la recompensa que se propaga con más fidelidad es la que conviene elegir.", explicacion: "No: Dawkins explica cómo se propaga el curso, no quién elige la recompensa. La pregunta de quién pone la salida es de Foucault, y que una meta se copie mucho no dice a favor de quién juega." }
+        ],
+        correcta: 2
+      }
+    ],
+    actividad: {
+      titulo: "Proyecto final",
+      consigna: "Elegí una decisión que se repite en tu área y completá la ficha del bloque 2: estados (de 3 a 30), acciones, recompensa, γ, quién define la recompensa y quién la ve, y cómo podría el agente hacer trampa y cómo lo evitarías. Si querés ver la política, copiala como Python y resolvela en la celda del ejercicio del notebook de la clase 4. Sumale la presentación de cinco minutos para alguien que no hizo el curso y publicalo en Discussions con el título [Clase 16] Proyecto final: … Después devolvé los proyectos de las dos personas que te toquen en la ronda, con los cuatro criterios del bloque 3, y nombrá en cada uno una trampa que quien lo escribió no vio. Usá la pregunta de «Para enseñarlo»: ¿qué aprendiste vos porque alguien te lo enseñó, y a quién se lo enseñaste después? Cerralo con la oración de «Para enseñarlo»: le enseñamos a una máquina a salir de una cueva a oscuras y en el camino aprendimos a ver quién pone la salida. Otra persona te devuelve con los cuatro criterios del bloque 3; la rúbrica de abajo evalúa la actividad entera.",
+      rubrica: [
+        "La ficha plantea un problema propio como MDP con pocos estados que alcanzan para decidir, acciones, recompensa y γ, de modo que se podría cargar en el notebook de la clase 4.",
+        "Se dice quién define la recompensa y quién la ve, y se nombra al menos una trampa posible con una forma concreta de evitarla.",
+        "La presentación se entiende en cinco minutos sin haber hecho el curso, y las dos devoluciones usan la rúbrica y nombran una trampa que quien escribió no vio."
+      ]
+    }
   }
 };

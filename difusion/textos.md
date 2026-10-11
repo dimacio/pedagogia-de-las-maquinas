@@ -25,7 +25,7 @@ Ejemplo con fechas: empezar el lunes 19 de octubre de 2026 y terminar el viernes
 - **Política:** los posts 01 a 04 exploran, uno de cada tipo. Desde el 05, antes de publicar, cargar las métricas en `difusion/estrategia.html` (bloque 4): si recomienda otro tipo distinto del planificado, usar el mismo pie pero cambiar el cierre y el llamado a la acción al tipo recomendado.
 - **Métrica a registrar (a los 7 días de cada post):** en Instagram, *Estadísticas del post*: **alcance** (cuentas alcanzadas), **guardados** y **compartidos**. En GitHub, *Insights → Traffic*: **visitas al repositorio** de esa semana atribuibles al post (o con un link con parámetro, por ejemplo `?utm_source=ig&utm_content=post05`).
 - **Recompensa:** r = 1000 · (1·guardados + 3·compartidos + 5·visitas) / alcance. Guardado = longevidad, compartido = fecundidad, visita al repositorio = fidelidad (llega a la fuente completa). Los pesos son una decisión del docente y se pueden cambiar en la página.
-- Las mismas métricas se pegan en el notebook 08, sección "Ejemplo resuelto: la difusión de este curso como bandit" (botón "Copiar para el notebook" de la página).
+- Las mismas métricas se pegan en el notebook 08 del recorrido anterior (v1, `build/v1/notebooks/08-aplicaciones.ipynb`), sección "Ejemplo resuelto: la difusión de este curso como bandit" (botón "Copiar para el notebook" de la página). La teoría del bandit (UCB y Thompson) está en la clase 7, «Explorar», y el ejemplo resuelto se presenta en la clase 16, «Cierre».
 
 ---
 
@@ -40,7 +40,7 @@ Ejemplo con fechas: empezar el lunes 19 de octubre de 2026 y terminar el viernes
 >
 > Durante cuatro semanas te voy a contar cómo se sale de esta cueva. No hace falta saber programar para seguirme; hace falta curiosidad.
 >
-> Antes de seguir, pensalo: si estuvieras ahí, ¿qué harías primero? Dejámelo en un comentario. Y guardá este post: es el primer paso de un camino de doce.
+> Antes de seguir, pensalo: si estuvieras ahí, ¿qué harías primero? Dejámelo en un comentario. Y guardá este post: es el primer paso de un camino de dieciséis clases.
 
 - **Hashtags:** #AprendizajePorRefuerzo #ReinforcementLearning #IA #InteligenciaArtificial #MachineLearning #CienciaDeDatos
 - **Alt:** Ilustración en pixel art de una cueva completamente negra. Arriba a la izquierda, un personaje pequeño con una luz ámbar tenue a su alrededor; signos de pregunta grises flotan en la oscuridad. Texto: "Estás a ciegas en una cueva. No ves el mapa. No sabés dónde está la salida. Solo podés moverte."
@@ -84,7 +84,7 @@ Ejemplo con fechas: empezar el lunes 19 de octubre de 2026 y terminar el viernes
 
 > Probando, chocando y recordando. En la imagen hay cuarenta intentos superpuestos: casi todos se pierden y uno solo, en verde, llega a la salida. Aprender es lograr que esa excepción se vuelva la regla.
 >
-> Eso es el aprendizaje por refuerzo, y te lo puedo explicar en doce clases.
+> Eso es el aprendizaje por refuerzo, y te lo puedo explicar en dieciséis clases.
 >
 > Pero acá va algo honesto: soy un curso y, como cualquier idea, sobrevivo solo si alguien me aprende y se lo cuenta a otra persona. Así que te pido un favor concreto: etiquetá a una persona a la que te gustaría explicarle esto. Mejor todavía, explicáselo vos con este post.
 
@@ -116,7 +116,7 @@ Ejemplo con fechas: empezar el lunes 19 de octubre de 2026 y terminar el viernes
 >
 > Una vez que tenés ese mapa, decidir es fácil: siempre ir hacia la casilla más clara. Las flechitas son esa decisión, y la línea verde, el camino que resulta.
 >
-> En el sitio del curso (link en la bio), la clase 3 muestra cómo el valor se propaga desde la salida, casilla por casilla. Guardá este post y compartilo con alguien que esté por rendir programación dinámica.
+> En el sitio del curso (link en la bio), la clase 4 muestra cómo el valor se propaga desde la salida, casilla por casilla. Guardá este post y compartilo con alguien que esté por rendir programación dinámica.
 
 - **Hashtags:** #AprendizajePorRefuerzo #ReinforcementLearning #Bellman #ProgramaciónDinámica #IA #MachineLearning #CienciaDeDatos
 - **Alt:** Mapa de calor sobre una cueva grande: casillas de violeta oscuro lejos de la salida a amarillo claro cerca de ella, con flechas pequeñas en cada casilla y un camino verde de la entrada a la salida. Debajo, la fórmula V(s) = máx [ r + γ·V(s') ]. Texto: "Cada casilla tiene un valor. Bellman: estar acá vale lo que vale el mejor paso siguiente."
@@ -144,7 +144,7 @@ Ejemplo con fechas: empezar el lunes 19 de octubre de 2026 y terminar el viernes
 >
 > La solución es reemplazar la tabla por una red neuronal que mira el estado y devuelve el valor de cada acción. Así, en 2015, un mismo programa (DQN) aprendió a jugar decenas de juegos de Atari mirando la pantalla.
 >
-> La red no memoriza: generaliza. Lo que aprende en una casilla le sirve para las parecidas. Guardá este post para la clase 6.
+> La red no memoriza: generaliza. Lo que aprende en una casilla le sirve para las parecidas. Guardá este post para la clase 8.
 
 - **Hashtags:** #AprendizajePorRefuerzo #ReinforcementLearning #DeepLearning #RedesNeuronales #DQN #IA #MachineLearning
 - **Alt:** A la izquierda, una tabla con valores numéricos por casilla y por dirección (arriba, derecha, abajo, izquierda), con el mayor de cada fila resaltado en ámbar. A la derecha, la cueva como pequeña imagen de calor entra a una red neuronal de dos capas que termina en cuatro flechas. Texto: "De la tabla a la red. 60 casillas entran en una tabla. Una cámara tiene millones de estados."
@@ -198,9 +198,9 @@ Ejemplo con fechas: empezar el lunes 19 de octubre de 2026 y terminar el viernes
 
 > Salimos de la cueva. Ahora tiene todas las paredes marcadas y un camino verde que va de la entrada a la salida.
 >
-> Soy un curso libre de aprendizaje por refuerzo: un juego, doce clases con figuras interactivas, notebooks para Colab y este mismo experimento de difusión como proyecto final resuelto. Todo está en el repositorio del link de la bio (github.com/USUARIO/rl-a-ciegas), para usar, copiar y adaptar.
+> Soy un curso libre de aprendizaje por refuerzo: un juego, dieciséis clases en cuatro unidades con figuras interactivas, notebooks para Colab y este mismo experimento de difusión como proyecto final resuelto. Todo está en el repositorio del link de la bio (github.com/USUARIO/rl-a-ciegas), para usar, copiar y adaptar.
 >
 > Lo único que te pido a cambio es que me enseñes. Elegí a una persona, jugá con ella el juego de la cueva y explicale por qué el agente choca. Etiquetala acá abajo. Así sigo vivo.
 
 - **Hashtags:** #AprendizajePorRefuerzo #ReinforcementLearning #IA #CursoGratis #EducaciónAbierta #EnseñarEsAprender #MachineLearning
-- **Alt:** La cueva completa con todas las paredes en gris claro y un camino verde desde la entrada, donde está un personaje, hasta la salida verde, donde está otro. Debajo, un recuadro verde con "link en la bio · repositorio github.com/USUARIO/rl-a-ciegas". Título: "Enseñale esto a alguien. Curso libre: juego, 6 clases y notebooks. Para enseñarle a máquinas y a personas."
+- **Alt:** La cueva completa con todas las paredes en gris claro y un camino verde desde la entrada, donde está un personaje, hasta la salida verde, donde está otro. Debajo, un recuadro verde con "link en la bio · repositorio github.com/USUARIO/rl-a-ciegas". Título: "Enseñale esto a alguien. Curso libre: juego, dieciséis clases y notebooks. Para enseñarle a máquinas y a personas."
