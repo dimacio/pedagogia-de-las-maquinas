@@ -96,7 +96,7 @@
   <!-- B2b: descenso por gradiente -->
   <section class="bloque" id="b-gradiente" data-objetivos="O1">
     <div class="stage">
-      <div class="lz"><canvas id="cvGrad" aria-label="La curva del error (y − w)² según el peso w, con y = 1; cada punto es un paso de gradiente que baja por la curva hacia w = 1"></canvas></div>
+      <div class="lz"><canvas id="cvGrad" aria-label="La curva del error ½(y − w)² según el peso w, con y = 1; cada punto es un paso de gradiente que baja por la curva hacia w = 1"></canvas></div>
       <div class="row">
         <button class="btn primary" id="gPaso">Un paso de gradiente</button>
         <button class="btn" id="gCero">Peso en 0</button>
@@ -107,7 +107,7 @@
     <div class="texto">
       <div class="paso">Paso 3</div>
       <h2>Aprender es bajar por el error</h2>
-      <p>La red aprende por <b>descenso por gradiente</b> (<i>gradient descent</i>), que mueve cada peso un poco en la dirección que achica el error (y − Q)² entre el objetivo y y lo que dice la red. El <b>gradiente</b> (<i>gradient</i>) indica para qué lado sube el error con cada peso, así que el paso va para el lado contrario, de a α por vez. Con el <i>one-hot</i> solo un peso influye en Q(s,a), y ese paso queda igual a la regla de la tabla. En el notebook, un paso de gradiente con la transición de (8,11) a la salida toca 1 de los 240 pesos, que queda en W = 0,50 igual que la tabla, mientras que con las mismas 20&nbsp;000 transiciones las dos terminan idénticas.</p>
+      <p>La red aprende por <b>descenso por gradiente</b> (<i>gradient descent</i>), que mueve cada peso un poco en la dirección que achica el error ½(y − Q)² entre el objetivo y y lo que dice la red. El <b>gradiente</b> (<i>gradient</i>) indica para qué lado sube el error con cada peso, así que el paso va para el lado contrario, de a α por vez. Con el <i>one-hot</i> solo un peso influye en Q(s,a), y ese paso queda igual a la regla de la tabla. En el notebook, un paso de gradiente con la transición de (8,11) a la salida toca 1 de los 240 pesos, que queda en W = 0,50 igual que la tabla, mientras que con las mismas 20&nbsp;000 transiciones las dos terminan idénticas.</p>
       <div class="eq">W[a,s] ← W[a,s] + α (y − W[a,s])</div>
       <p class="nota pregunta">Volvé a la figura del paso 2, elegí la red de seis entradas y apretá «Un paso de gradiente». ¿Por qué ahora cambian casi todos los pesos y no uno solo?</p>
     </div>
@@ -580,10 +580,10 @@
   // =====================================================================
   const bG = await tarea(() => {
     const cv = $("cvGrad"), hud = $("hudGrad"), Yo = 1, ALFA = 0.5;
-    let hist = [0];
-    const err = w => (Yo - w) * (Yo - w);
+    let hist = [0], nPasos = 0;
+    const err = w => 0.5 * (Yo - w) * (Yo - w);
     function dibujar() {
-      const g = ejes(cv, 200, { x0: -0.1, x1: 1.3, y0: 0, y1: 1.2, ticksX: [0, 0.5, 1], ticksY: [0, 0.5, 1], tituloX: "peso w", tituloY: "error (y − w)²" });
+      const g = ejes(cv, 200, { x0: -0.1, x1: 1.3, y0: 0, y1: 1.2, ticksX: [0, 0.5, 1], ticksY: [0, 0.5, 1], tituloX: "peso w", tituloY: "error ½(y − w)²" });
       const xs = Array.from({ length: 71 }, (_, i) => -0.1 + i * 0.02);
       linea(g, xs, xs.map(err), COL.muted, 1.5);
       const { ctx, X, Y } = g;
@@ -595,10 +595,10 @@
         ctx.strokeStyle = COL.exit; ctx.fillStyle = COL.exit; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + d, y); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(x + d + Math.sign(d) * 6, y); ctx.lineTo(x + d, y - 5); ctx.lineTo(x + d, y + 5); ctx.closePath(); ctx.fill();
       }
-      hud.innerHTML = `<span>simulado: pasos <b>${hist.length - 1}</b></span><span>w = <b>${fmt(w, 3)}</b></span><span>error <b>${fmt(err(w), 3)}</b></span>`;
+      hud.innerHTML = `<span>simulado: pasos <b>${nPasos}</b></span><span>w = <b>${fmt(w, 3)}</b></span><span>error <b>${fmt(err(w), 3)}</b></span>`;
     }
-    $("gPaso").onclick = () => { const w = hist[hist.length - 1]; hist.push(w + ALFA * (Yo - w)); if (hist.length > 12) hist = hist.slice(-12); dibujar(); };
-    $("gCero").onclick = () => { hist = [0]; dibujar(); };
+    $("gPaso").onclick = () => { const w = hist[hist.length - 1]; hist.push(w + ALFA * (Yo - w)); nPasos++; if (hist.length > 12) hist = hist.slice(-12); dibujar(); };
+    $("gCero").onclick = () => { hist = [0]; nPasos = 0; dibujar(); };
     dibujar();
     return { dibujar };
   });

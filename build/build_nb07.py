@@ -842,7 +842,7 @@ cells.append(md(r"""
 
 ## Próxima clase
 
-Todo esto fue con una tabla: una fila por casilla, una cuenta de visitas por casilla. En una pantalla de Atari no hay tabla posible, porque casi nunca se repite exactamente la misma imagen. En la clase 8, **de la tabla a la red**: reemplazar la tabla $Q$ por una red neuronal, que vemos desde cero en la clase 8.
+Todo esto fue con una tabla: una fila por casilla, una cuenta de visitas por casilla. En una pantalla de Atari no hay tabla posible, porque casi nunca se repite exactamente la misma imagen. En la clase 8, **de la tabla a la red**: reemplazar la tabla $Q$ por una red neuronal, que vemos desde cero.
 """))
 
 save(cells, "07-explorar.ipynb")
