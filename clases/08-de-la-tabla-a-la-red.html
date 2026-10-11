@@ -87,9 +87,29 @@
     <div class="texto">
       <div class="paso">Paso 2</div>
       <h2>Una red que equivale a la tabla</h2>
-      <p>Reemplazar la tabla por una función Q<sub>θ</sub> con parámetros θ, como una red neuronal, se llama aproximación de funciones (<i>function approximation</i>). Con la entrada <i>one-hot</i>, 60 números en 0 salvo un 1 en la casilla, una red sin capas ocultas es una matriz W de 4 × 60 con 240 parámetros, uno por cada número de la tabla. En el notebook, un paso de gradiente con la transición de (8,11) a la salida toca 1 de los 240 pesos, que queda en W = 0,50 igual que la tabla, mientras que con las mismas 20&nbsp;000 transiciones las dos terminan idénticas. Una red con otra entrada, como la de seis números que entran y cuatro que salen, en cambio comparte cada peso entre todas las casillas.</p>
+      <p>Reemplazar la tabla por una función Q<sub>θ</sub> con parámetros θ se llama aproximación de funciones (<i>function approximation</i>). La más usada es una <b>red neuronal</b> (<i>neural network</i>), hecha de neuronas que multiplican cada número que entra por un <b>peso</b> (<i>weight</i>), suman todo y pasan el resultado a la capa siguiente. Con la entrada <i>one-hot</i>, 60 números en 0 salvo un 1 en la casilla, una red sin <b>capas ocultas</b> (<i>hidden layers</i>, las capas intermedias entre la entrada y la salida) es una matriz W de 4 × 60 con 240 pesos, uno por cada número de la tabla. Una red con otra entrada, como la de seis números que entran y cuatro que salen, en cambio comparte cada peso entre todas las casillas.</p>
+      <div class="eq">Q<sub>θ</sub>(s) = W x<sub>s</sub></div>
+      <p class="nota pregunta">Tocá otra casilla en la cueva. ¿Qué parte de W sale como Q, y para qué sirven los demás pesos?</p>
+    </div>
+  </section>
+
+  <!-- B2b: descenso por gradiente -->
+  <section class="bloque" id="b-gradiente" data-objetivos="O1">
+    <div class="stage">
+      <div class="lz"><canvas id="cvGrad" aria-label="La curva del error (y − w)² según el peso w, con y = 1; cada punto es un paso de gradiente que baja por la curva hacia w = 1"></canvas></div>
+      <div class="row">
+        <button class="btn primary" id="gPaso">Un paso de gradiente</button>
+        <button class="btn" id="gCero">Peso en 0</button>
+      </div>
+      <div class="hud" id="hudGrad"></div>
+      <p class="cap">Simulado en el navegador: el único peso que toca la transición de (8,11) a la salida, con objetivo y = 1 y α = 0,5, como en el paso 2. La flecha marca para dónde baja el error.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 3</div>
+      <h2>Aprender es bajar por el error</h2>
+      <p>La red aprende por <b>descenso por gradiente</b> (<i>gradient descent</i>), que mueve cada peso un poco en la dirección que achica el error (y − Q)² entre el objetivo y y lo que dice la red. El <b>gradiente</b> (<i>gradient</i>) indica para qué lado sube el error con cada peso, así que el paso va para el lado contrario, de a α por vez. Con el <i>one-hot</i> solo un peso influye en Q(s,a), y ese paso queda igual a la regla de la tabla. En el notebook, un paso de gradiente con la transición de (8,11) a la salida toca 1 de los 240 pesos, que queda en W = 0,50 igual que la tabla, mientras que con las mismas 20&nbsp;000 transiciones las dos terminan idénticas.</p>
       <div class="eq">W[a,s] ← W[a,s] + α (y − W[a,s])</div>
-      <p class="nota pregunta">Con la red de seis entradas, apretá «Un paso de gradiente». ¿Por qué ahora cambian casi todos los pesos y no uno solo?</p>
+      <p class="nota pregunta">Volvé a la figura del paso 2, elegí la red de seis entradas y apretá «Un paso de gradiente». ¿Por qué ahora cambian casi todos los pesos y no uno solo?</p>
     </div>
   </section>
 
@@ -114,9 +134,9 @@
       <p class="cap">Visitas y valores del notebook: un agente de Q-learning jugó 100 partidas desde S (ε = 0,1, α = 0,2). Después, cada método recibe el Q* correcto de las 48 casillas vistas y estima las otras. Tocá una casilla para ver sus números.</p>
     </div>
     <div class="texto">
-      <div class="paso">Paso 3</div>
+      <div class="paso">Paso 4</div>
       <h2>Generalizar: saber algo de donde casi no estuvo</h2>
-      <p>Un agente que jugó 100 partidas desde S con Q-learning dejó 11 casillas con menos de 10 visitas, las de alrededor de la salida y el rincón de arriba a la derecha. Para mirar solo la generalización (<i>generalization</i>), en el notebook cada método recibe el Q* correcto de las casillas vistas, como en una regresión, sin aprendizaje por refuerzo. La red con coordenadas recibe solo la fila y la columna (2 → 64 → 64 → 4, con 4612 parámetros), así que casillas cercanas comparten pesos y lo aprendido en las vistas se contagia a sus vecinas. En esas 11 casillas, la tabla se equivoca en 0,9681, adivinar el promedio en 0,0687 y la red con coordenadas en 0,0106.</p>
+      <p>Un agente que jugó 100 partidas desde S con Q-learning dejó 11 casillas con menos de 10 visitas, las de alrededor de la salida y el rincón de arriba a la derecha. Para mirar solo la generalización (<i>generalization</i>), en el notebook cada método recibe el Q* correcto de las casillas vistas, como en una regresión, sin aprendizaje por refuerzo. La red con coordenadas recibe solo la fila y la columna (2 → 64 → 64 → 4, es decir, entran 2 números, pasan por dos capas ocultas de 64 neuronas y salen 4, con 4612 parámetros en total), así que casillas cercanas comparten pesos y lo aprendido en las vistas se contagia a sus vecinas. En esas 11 casillas, la tabla se equivoca en 0,9681, adivinar el promedio en 0,0687 y la red con coordenadas en 0,0106.</p>
       <div class="eq">x<sub>s</sub> = (fila / 9, columna / 13)</div>
       <p class="nota pregunta">La red tiene 4612 parámetros y la tabla 240. ¿Dónde está la ventaja, si la red es más grande?</p>
     </div>
@@ -141,7 +161,7 @@
       <p class="cap">Redes del notebook (2 → 64 → 64 → 4 y 6 → 64 → 64 → 4), entrenadas con el Q* correcto de las 59 casillas. Los bigotes valen 1 si hay pared pegada. Tocá una casilla para ver sus cuatro Q.</p>
     </div>
     <div class="texto">
-      <div class="paso">Paso 4</div>
+      <div class="paso">Paso 5</div>
       <h2>Cuando generalizar engaña</h2>
       <p>Las casillas (7,6) y (7,8) están a dos columnas con una pared en el medio, así que para la red con coordenadas son casi la misma entrada, aunque una está a 11 pasos de la salida y la otra a 5. Aun entrenada con el Q* correcto de las 59 casillas, la red suaviza el salto y estima 0,9064 para (7,6) y 0,9528 para (7,8), contra 0,9044 y 0,9606 de verdad. En (7,6) elige →, contra la pared, porque desde ahí ir a la derecha se parece a estar en (7,8), que vale más. Con coordenadas acierta la flecha en el 71 % de las casillas, que pasa al 97 % si se le suman cuatro bigotes que valen 1 cuando hay pared pegada.</p>
       <div class="eq">V*(7,8) − V*(7,6) = 0,0562</div>
@@ -163,7 +183,7 @@
       <p class="cap" id="capObj"></p>
     </div>
     <div class="texto">
-      <div class="paso">Paso 5</div>
+      <div class="paso">Paso 6</div>
       <h2>El objetivo que se mueve</h2>
       <p>Hasta acá la red copiaba un Q* correcto, pero en RL el objetivo r + γ max Q(s′,a′) lo calcula la misma red, así que cada paso de gradiente mueve también el objetivo. En el ejemplo más chico (una variante de un ejemplo de Sutton y Barto), con un solo peso w, Q(A) = w, Q(B) = 2w y la transición de A a B con premio 0, el peso pasa de 0,1 a 27,30 en 60 pasos con α = 0,1. Sutton y Barto llaman tríada mortal (<i>deadly triad</i>) a la combinación de aproximación de funciones, objetivo que usa la propia estimación (<i>bootstrapping</i>) y aprendizaje off-policy, porque juntas pueden hacer diverger el aprendizaje. En la cueva, Q-learning con una red y sin trucos llega a creer que una casilla vale 128,83 cuando ninguna puede pasar de 1, mientras su política sale solo desde el 3 % de las casillas.</p>
       <div class="eq">w ← (1 + α(2γ − 1)) w = 1,098 w</div>
@@ -196,7 +216,7 @@
       <p class="cap">Curvas, tabla y mapa del notebook: la misma red 6 → 64 → 64 → 4, 10&nbsp;000 pasos, un paso de gradiente cada 4 y partidas que empiezan en una casilla al azar. «Final» es el promedio de las últimas 4 mediciones. Tocá una casilla del mapa para ver los Q de la red.</p>
     </div>
     <div class="texto">
-      <div class="paso">Paso 6</div>
+      <div class="paso">Paso 7</div>
       <h2>DQN: memoria de repetición y red objetivo</h2>
       <p>DQN (<i>Deep Q-Network</i>), la receta con la que Mnih et al. (2015) jugaron a Atari desde la pantalla, es Q-learning con una red, un ε que baja de 1 a 0,1 y dos ingredientes contra el objetivo que se mueve. La memoria de repetición (<i>experience replay</i>) guarda las transiciones (en el notebook, las últimas 10&nbsp;000) y aprende de lotes tomados al azar, que mezclan partidas en vez de repetir los últimos pasos. La red objetivo (<i>target network</i>) θ̄ es una copia congelada de la red θ que calcula el objetivo y se pone al día cada tanto (en el notebook, cada 40 pasos), para que la red pueda alcanzarlo. En el notebook, con los dos ingredientes el Q más alto no pasa de 1,16, el error final baja a 0,0080 y la política sale desde el 97 % de las casillas (promedio final), aunque en el paso 10&nbsp;000 no sale desde S, porque en (6,1) la red prefiere ↑ a ↓ por menos de una diezmilésima.</p>
       <div class="eq">objetivo = r + γ maxₐ′ Q<sub>θ̄</sub>(s′,a′)</div>
@@ -223,10 +243,10 @@
           </tbody>
         </table>
       </div>
-      <p class="cap">Curvas del notebook: semillas 0 a 4 de cada método, la banda es el promedio ± un desvío. La línea ámbar es la semilla 0, la de los pasos 5 y 6.</p>
+      <p class="cap">Curvas del notebook: semillas 0 a 4 de cada método, la banda es el promedio ± un desvío. La línea ámbar es la semilla 0, la de los pasos 6 y 7.</p>
     </div>
     <div class="texto">
-      <div class="paso">Paso 7</div>
+      <div class="paso">Paso 8</div>
       <h2>Comparar agentes de forma justa</h2>
       <p>Todo lo anterior salió de una sola semilla (<i>random seed</i>), que fija los pesos iniciales, el orden de las partidas y las flechas de exploración. Con 5 semillas, DQN termina saliendo desde el 94 % ± 5 % de las casillas (97, 96, 84, 96 y 95 %) y sin trucos desde el 1 % ± 1 %. La semilla 0 sale desde el 100 % de las casillas en el paso 5000, cuando el promedio de las cinco en ese paso es 68 % ± 36 %. Por eso Machado et al. (2018) piden varias semillas, la curva entera con su dispersión y azar en el entorno, como las acciones pegajosas de la clase 7, para que ningún agente gane memorizando.</p>
       <div class="eq">resultado = promedio ± desvío entre semillas</div>
@@ -505,7 +525,7 @@
       const ok = NOMETA.filter(s => OPT(s, pol[s])).length;
       hud.innerHTML = `<span>simulado: época <b>${red.epoca}</b> de ${EPOCAS}</span><span>pérdida <b>${red.perdida === null ? "—" : coma(red.perdida.toExponential(1))}</b></span><span>flechas óptimas <b>${pct(ok / NOMETA.length)}</b></span>` +
         (cambio ? `<span style="color:var(--lamp)">un paso de gradiente con ${nom(cambio.s)} movió <b style="color:var(--lamp)">${miles(cambio.k)}</b> de ${miles(NPAR)} pesos</span>` : "");
-      cap.textContent = `Simulado en el navegador: una red 6 → 32 → 32 → 4 (${miles(NPAR)} parámetros, más chica que la del notebook) aprende por regresión el Q* correcto de las 59 casillas, como el notebook en las secciones 3 y 4. Las líneas son los pesos (ámbar, positivos; celeste, negativos). Flechas rojas en la cueva: no óptimas. Tocá una casilla para cambiar la entrada.`;
+      cap.textContent = `Simulado en el navegador: una red 6 → 32 → 32 → 4 (${miles(NPAR)} parámetros, más chica que la del notebook) aprende por regresión el Q* correcto de las 59 casillas, como el notebook en las secciones 3 y 4. Una época es una pasada por las 59 casillas. La pérdida es el promedio de (y − Q)² entre lo que dice la red y el Q* correcto. Cuanto más baja, mejor copia. Las líneas son los pesos (ámbar, positivos; celeste, negativos). Flechas rojas en la cueva: no óptimas. Tocá una casilla para cambiar la entrada.`;
     }
     const dibujar = () => modo === "onehot" ? dibujarOneHot() : dibujarMlp();
     function pararEnt() { cancelAnimationFrame(raf); entrenando = false; $("rEnt").textContent = red.epoca >= EPOCAS ? "Entrenada" : "Entrenar"; }
@@ -553,6 +573,34 @@
     nota = `<span>el paso del notebook: (8,11) con → entra a la salida, r = 1</span><span>pesos que cambiaron <b>${ult.tocados}</b> de 240</span><span>W[→,(8,11)] = 0 − 0,5 · (0 − 1) = <b>${fmt(W(1, ult.s), 2)}</b>, la tabla: <b>${fmt(Qt[n + ult.s], 2)}</b></span>`;
     dibujar();
     return { dibujar: () => { T.medir(); dibujar(); } };
+  });
+
+  // =====================================================================
+  // B2b. Descenso por gradiente con un solo peso
+  // =====================================================================
+  const bG = await tarea(() => {
+    const cv = $("cvGrad"), hud = $("hudGrad"), Yo = 1, ALFA = 0.5;
+    let hist = [0];
+    const err = w => (Yo - w) * (Yo - w);
+    function dibujar() {
+      const g = ejes(cv, 200, { x0: -0.1, x1: 1.3, y0: 0, y1: 1.2, ticksX: [0, 0.5, 1], ticksY: [0, 0.5, 1], tituloX: "peso w", tituloY: "error (y − w)²" });
+      const xs = Array.from({ length: 71 }, (_, i) => -0.1 + i * 0.02);
+      linea(g, xs, xs.map(err), COL.muted, 1.5);
+      const { ctx, X, Y } = g;
+      for (let i = 1; i < hist.length; i++) { ctx.strokeStyle = "rgba(242,179,90,.6)"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(hist[i - 1]), Y(err(hist[i - 1]))); ctx.lineTo(X(hist[i]), Y(err(hist[i]))); ctx.stroke(); }
+      hist.forEach((w, i) => { const ult = i === hist.length - 1; ctx.fillStyle = ult ? COL.lamp : "rgba(242,179,90,.45)"; ctx.beginPath(); ctx.arc(X(w), Y(err(w)), ult ? 6 : 4, 0, 7); ctx.fill(); });
+      const w = hist[hist.length - 1];
+      if (Math.abs(Yo - w) > 0.02) {   // la flecha: para dónde baja el error
+        const x = X(w), y = Y(err(w)) - 16, d = Math.sign(Yo - w) * 22;
+        ctx.strokeStyle = COL.exit; ctx.fillStyle = COL.exit; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + d, y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x + d + Math.sign(d) * 6, y); ctx.lineTo(x + d, y - 5); ctx.lineTo(x + d, y + 5); ctx.closePath(); ctx.fill();
+      }
+      hud.innerHTML = `<span>simulado: pasos <b>${hist.length - 1}</b></span><span>w = <b>${fmt(w, 3)}</b></span><span>error <b>${fmt(err(w), 3)}</b></span>`;
+    }
+    $("gPaso").onclick = () => { const w = hist[hist.length - 1]; hist.push(w + ALFA * (Yo - w)); if (hist.length > 12) hist = hist.slice(-12); dibujar(); };
+    $("gCero").onclick = () => { hist = [0]; dibujar(); };
+    dibujar();
+    return { dibujar };
   });
 
   // =====================================================================
@@ -737,7 +785,7 @@
 
   Cueva.alCargarSprites(() => { b2.dibujar(); });
   let tRes = 0;
-  addEventListener("resize", () => { clearTimeout(tRes); tRes = setTimeout(() => { for (const f of [b1, b2, b3, b4, b5, b6, b7]) f.dibujar(); }, 120); });
+  addEventListener("resize", () => { clearTimeout(tRes); tRes = setTimeout(() => { for (const f of [b1, b2, bG, b3, b4, b5, b6, b7]) f.dibujar(); }, 120); });
 })();
 </script>
 </body>

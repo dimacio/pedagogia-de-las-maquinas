@@ -71,7 +71,7 @@
     <div class="texto">
       <div class="paso">Paso 2</div>
       <h2>Imitar es aprender supervisado</h2>
-      <p>La <b>clonación de comportamiento</b> (<i>behavior cloning</i>) aprende en cada casilla la flecha que más apretó el experto, sin mirar la recompensa. Es <b>aprendizaje supervisado</b> (<i>supervised learning</i>), como en la última pestaña de la clase 2, con la casilla como entrada y la flecha del experto como etiqueta. ALVINN (Pomerleau, 1988) aprendió así a manejar una camioneta, con una red que miraba la cámara y copiaba el volante del conductor. En el conjunto 0 del notebook, la copia coincide con el experto en sus 22 casillas con ejemplos y en las otras 37, donde las cuatro flechas empatan en 0, queda en ↑.</p>
+      <p>La <b>clonación de comportamiento</b> (<i>behavior cloning</i>), como el agente con memoria de la clase 9, aprende en cada casilla la flecha que más apretó el experto, sin mirar la recompensa. Es <b>aprendizaje supervisado</b> (<i>supervised learning</i>), como en la última pestaña de la clase 2, con la casilla como entrada y la flecha del experto como etiqueta. ALVINN (Pomerleau, 1988) aprendió así a manejar una camioneta, con una red que miraba la cámara y copiaba el volante del conductor. En el conjunto 0 del notebook, la copia coincide con el experto en sus 22 casillas con ejemplos y en las otras 37, donde las cuatro flechas empatan en 0, queda en ↑.</p>
       <div class="eq">π(s) = argmaxₐ N(s,a)</div>
       <p class="nota pregunta">Tocá una casilla negra. Si la copia nunca vio esa casilla, ¿por qué igual aprieta una flecha?</p>
     </div>
@@ -450,7 +450,7 @@
       T.sprite(parte[parte.length - 1], 2, m % 2); rotulo(T, START, "S", COL.ink, .4);
       const mc = medir(PI_C, +slip, CUB_C), me = medir(PI_EXP, +slip, CUB_C);
       const sinEj = cam.filter(s => s !== GOAL && !CUB_C[s]).length, llego = cam[cam.length - 1] === GOAL;
-      hud.innerHTML = `<span>simulado, slip ${coma(slip)}: copia sale <b>${fmt(mc.exito)}</b>, experto <b>${fmt(me.exito)}</b></span>` +
+      hud.innerHTML = `<span>simulado (una sola grabación, no el promedio de 10), slip ${coma(slip)}: copia sale <b>${fmt(mc.exito)}</b>, experto <b>${fmt(me.exito)}</b></span>` +
         `<span>pasos sin ejemplos: copia <b>${fmt(mc.fuera, 1)}</b>, experto <b>${fmt(me.fuera, 1)}</b></span>` +
         `<span>esta partida: <b>${cam.length - 1}</b> pasos${llego ? "" : " sin salir"}, <b>${sinEj}</b> en casillas sin ejemplos</span>`;
       document.querySelectorAll("#tbErr tr").forEach(tr => tr.classList.toggle("sel", tr.dataset.s === slip));
@@ -458,8 +458,8 @@
     function animar() {
       cancelAnimationFrame(raf);
       if (reducir) { prog = 1; dibujar(); return; }
-      prog = 0; const t0 = performance.now(), dur = Math.min(2600, 300 + cam.length * 12);
-      const f = now => { prog = Math.min(1, (now - t0) / dur); dibujar(); if (prog < 1) raf = requestAnimationFrame(f); };
+      prog = 0; let t0 = null; const dur = Math.min(2600, 300 + cam.length * 12);
+      const f = now => { if (t0 === null) t0 = now; prog = Math.max(0, Math.min(1, (now - t0) / dur)); dibujar(); if (prog < 1) raf = requestAnimationFrame(f); };
       raf = requestAnimationFrame(f);
     }
     document.querySelectorAll("#segSlip button").forEach(b => b.onclick = () => { slip = b.dataset.s; marcar("#segSlip button", "s", slip); partida(); animar(); });
@@ -522,8 +522,8 @@
     function animar() {
       cancelAnimationFrame(raf);
       if (reducir) { pasada = 59; dibujar(); return; }
-      const t0 = performance.now(), dur = 2400;
-      const f = now => { pasada = Math.min(59, Math.floor(60 * (now - t0) / dur)); dibujar(); if (pasada < 59) raf = requestAnimationFrame(f); };
+      let t0 = null; const dur = 2400;   // t0 del primer cuadro: performance.now() puede ser posterior a su marca de tiempo
+      const f = now => { if (t0 === null) t0 = now; pasada = Math.max(0, Math.min(59, Math.floor(60 * (now - t0) / dur))); dibujar(); if (pasada < 59) raf = requestAnimationFrame(f); };
       raf = requestAnimationFrame(f);
     }
     document.querySelectorAll("#segOff button").forEach(b => b.onclick = () => { vista = b.dataset.v; marcar("#segOff button", "v", vista); cancelAnimationFrame(raf); pasada = 59; dibujar(); });
