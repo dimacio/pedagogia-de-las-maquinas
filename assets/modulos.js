@@ -1257,5 +1257,83 @@ window.MODULOS = {
         "Se da al menos un ejemplo concreto de cómo esa recompensa se podría engañar o equivocar (una respuesta mala que cobra o una buena que no) y qué aprendería el asistente si se entrenara con ella."
       ]
     }
+  },
+
+  "16": {
+    objetivos: [
+      "Recorrer las quince clases anteriores sobre la misma cueva y nombrar la herramienta que agregó cada una.",
+      "Plantear un problema propio como MDP, diciendo quién define la recompensa, quién la ve y cómo podría el agente hacer trampa.",
+      "Presentar el proyecto entre pares y devolver otros con una rúbrica.",
+      "Explicar la difusión del curso como un bandit y el curso entero a otra persona."
+    ],
+    tiempo: { pagina: 35 },
+    previos: ["15", "1"],
+    requisitos: ["De la clase 1, el marco: Freire, Foucault y Dawkins; de la clase 15, las dos preguntas: a favor de quién juega la recompensa y cómo podría hacer trampa.", "Para resolver tu MDP, el notebook de la clase 4 (la celda del ejercicio final, con resolver_mdp). Esta clase no tiene notebook propio."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "En el recorrido, la parada 4 muestra flechas en todas las casillas de la cueva y la parada 6 solo en las casillas por donde pasó el agente. ¿Qué herramienta agregó cada una de esas dos clases?",
+        opciones: [
+          { texto: "La 4 agregó policy gradient, con flechas que son probabilidades, y la 6 la memoria de una red recurrente que recuerda por dónde pasó.", explicacion: "No: las flechas como probabilidades son de la clase 11 y la memoria de la clase 9. En el recorrido, la 4 planifica con el mapa y la 6 aprende jugando." },
+          { texto: "La 4 agregó Monte Carlo y TD, que estiman el valor con partidas jugadas, y la 6 la exploración con un bandit que cuenta visitas.", explicacion: "No: Monte Carlo y TD son la parada 5, y contar visitas es la 7. Las flechas en toda la cueva salen de tener el mapa, sin jugar ninguna partida." },
+          { texto: "La 4 agregó iteración de valor y de política con el mapa; la 6, SARSA y Q-learning, que aprenden las flechas de la experiencia, solo donde el agente estuvo.", explicacion: "Correcto. Con el mapa, el valor se derrama desde la salida y hay flecha en cada casilla; sin mapa, el agente solo sabe qué hacer en las casillas que visitó." },
+          { texto: "Las dos agregaron lo mismo, la ecuación de Bellman: la 6 tiene menos flechas porque usa un γ más chico que la 4.", explicacion: "No: Bellman es de la clase 3 y las dos clases la usan. La diferencia no está en γ sino en de dónde sale lo aprendido: del mapa en la 4, de partidas jugadas en la 6." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O2",
+        pregunta: "Elegís como proyecto los recordatorios de una app para estudiar. ¿Cuál de estas fichas cumple lo que pide el bloque 2 para plantear el problema como MDP?",
+        opciones: [
+          { texto: "Estados: cada minuto del día de cada persona que usa la app. Acciones: mandar o no un recordatorio. Recompensa: +1 cada vez que abre la app. γ = 0,9.", explicacion: "No: son demasiados estados para resolverlo en el notebook (el bloque pide de 3 a 30), y la ficha no dice quién define la recompensa, quién la ve ni cómo se podría hacer trampa." },
+          { texto: "Estados: al día, atrasada, abandonó. Acciones: recordar, no recordar. P estimadas para cada par. Recompensa: +1 si queda al día, −1 si no; γ = 0,9. La define quien estudia y la ve en la app; si premiara abrir la app, el agente recordaría siempre hasta que la desinstale.", explicacion: "Correcto. Tiene pocos estados, acciones, P, R y γ, dice quién define la recompensa y quién la ve, y nombra una trampa concreta, como la del riego que premia quien vende el agua." },
+          { texto: "Estados: al día, atrasada, abandonó. Acciones: recordar, no recordar. Recompensa: +1 por cada recordatorio enviado, definida por la empresa. γ = 0,9. Trampa: ninguna, porque la recompensa está clarísima.", explicacion: "No: es el caso de la planta con la recompensa de quien vende el agua. Premiar cada recordatorio lleva a recordar siempre; que la recompensa sea clara no quiere decir que mida lo que se quiere." },
+          { texto: "Estados y acciones listados, sin P ni γ: el notebook de la clase 4 las adivina a partir de los nombres. La recompensa la define quien estudia y no hay trampa posible porque nadie más la ve.", explicacion: "No: resolver_mdp necesita las transiciones y γ que vos le das; no adivina nada. Y que nadie más vea la recompensa no impide que el agente la cumpla sin hacer lo que querías." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O3",
+        pregunta: "Te toca devolver un proyecto: los estados son pocos y alcanzan para decidir, la recompensa mide lo que se quiere y dice quién la define, la presentación se entiende sin haber hecho el curso, pero la ficha no nombra ninguna trampa. ¿Qué devolución sigue la rúbrica de la página?",
+        opciones: [
+          { texto: "Poner «cumple» en los cuatro criterios: tres partes están muy bien y una sola que falte no alcanza para bajar la nota.", explicacion: "No: la rúbrica no es una nota general. Tiene un criterio por cada parte de la ficha, y el de la trampa, sin ninguna trampa nombrada, queda en «falta»." },
+          { texto: "Calcular si la política que sale del notebook consigue la recompensa más alta posible y devolver ese número como criterio principal.", explicacion: "No: ningún criterio de la rúbrica mide cuánto rinde la política. Mide si el planteo está completo y se entiende: estados y acciones, recompensa, trampa y presentación." },
+          { texto: "Marcar «a medias» la presentación porque no usa los términos del curso, como MDP o γ, y pedirle que agregue las fórmulas.", explicacion: "No: el criterio de la presentación es al revés, que se entienda en cinco minutos sin haber hecho el curso. Si se entiende sin fórmulas, cumple." },
+          { texto: "Marcar «falta» en Trampa, «cumple» en los otros tres, y nombrar una trampa que quien escribió el proyecto no vio, con una pregunta para esa persona.", explicacion: "Correcto. Cada criterio se marca por separado, y la página dice que una devolución útil nombra una trampa que quien escribió no vio: acá es justo lo que más ayuda." }
+        ],
+        correcta: 3
+      },
+      {
+        objetivo: "O4",
+        pregunta: "El bloque 4 plantea la campaña de difusión del curso como un bandit, el ejemplo resuelto del proyecto final. ¿Qué es cada pieza?",
+        opciones: [
+          { texto: "Los brazos son los cuatro tipos de post (intriga, concepto, demo, invitación a enseñar); la recompensa, guardados, compartidos y visitas al repositorio por cada mil alcanzadas, con pesos; UCB elige sumando una bonificación por lo poco probado.", explicacion: "Correcto. Es el bandit de la clase 7: los primeros cuatro posts prueban cada tipo una vez y desde el quinto decide el bandit. La visita al repositorio pesa más porque mide fidelidad." },
+          { texto: "Los brazos son las personas alcanzadas; la recompensa, el alcance total de cada post; y se elige siempre el tipo que más gente alcanzó.", explicacion: "No: los brazos son los tipos de post, lo que el curso puede elegir. Y la recompensa se mide por cada mil alcanzadas, para no premiar solo llegar a mucha gente que no guarda ni comparte nada." },
+          { texto: "Los brazos son los tipos de post y la recompensa los guardados, pero después de probar cada tipo una vez se publica siempre el de mejor promedio.", explicacion: "No: eso es elegir siempre el mejor promedio y dejar de explorar. UCB le suma a cada brazo una bonificación por lo poco probado: √(ln t / nₐ) crece para el tipo que se publicó menos." },
+          { texto: "Es un MDP con las semanas como estados, que se resuelve con iteración de valor como la planta, porque cada post cambia la cueva del siguiente.", explicacion: "No: el bloque lo plantea como bandit, elegir entre brazos según la recompensa que dieron, y lo resuelve con UCB o con muestreo de Thompson, como en la clase 7." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O2",
+        pregunta: "En el bloque 5 apretás «Que la elija otro» y después tocás vos otra casilla para poner la salida, sin mover γ. En los dos casos el agente encuentra el camino. ¿Qué muestra esto sobre la pregunta de Foucault?",
+        opciones: [
+          { texto: "Que con la salida puesta por otro el agente aprende peor: la iteración de valor funciona mejor cuando la meta la elige uno mismo.", explicacion: "No: el algoritmo es el mismo, la iteración de valor de la clase 4, y persigue igual de bien cualquier salida. Justamente por eso importa quién la puso." },
+          { texto: "Que quién pone la salida da igual siempre que γ sea alto: con γ cerca de 1 el agente llega a cualquier meta y elige bien por sí solo.", explicacion: "No: γ dice qué tan lejos ve el agente, no dónde está la salida. Con γ alto llega más lejos, pero a la meta que eligió otro." },
+          { texto: "Que el algoritmo no cambia y solo cambia quién eligió la meta; para Foucault, cuidarse es poder ver dónde está tu salida y quién la puso, en vez de aceptar la de otro.", explicacion: "Correcto. Es la pregunta de la clase 1 con las herramientas del curso, y las dos preguntas de la clase 15 hechas sobre vos: a favor de quién juega tu recompensa y cómo podría hacerte trampa." },
+          { texto: "Que la mejor salida es la que más se copia: según Dawkins, la recompensa que se propaga con más fidelidad es la que conviene elegir.", explicacion: "No: Dawkins explica cómo se propaga el curso, no quién elige la recompensa. La pregunta de quién pone la salida es de Foucault, y que una meta se copie mucho no dice a favor de quién juega." }
+        ],
+        correcta: 2
+      }
+    ],
+    actividad: {
+      titulo: "El proyecto final",
+      consigna: "Elegí una decisión que se repite en tu área y completá la ficha del bloque 2: estados (de 3 a 30), acciones, recompensa, γ, quién define la recompensa y quién la ve, y cómo podría el agente hacer trampa y cómo lo evitarías. Si querés ver la política, copiala como Python y resolvela en la celda del ejercicio del notebook de la clase 4. Sumale la presentación de cinco minutos para alguien que no hizo el curso y publicalo en Discussions con el título [Clase 16] Proyecto final: … Después devolvé los proyectos de las dos personas que te toquen en la ronda, con la rúbrica de la página, y nombrá en cada uno una trampa que quien lo escribió no vio. Usá la pregunta de «Para enseñarlo»: ¿qué aprendiste vos porque alguien te lo enseñó, y a quién se lo enseñaste después? Cerralo con la oración de «Para enseñarlo»: le enseñamos a una máquina a salir de una cueva a oscuras y en el camino aprendimos a ver quién pone la salida. Otra persona te devuelve con la rúbrica.",
+      rubrica: [
+        "La ficha plantea un problema propio como MDP con pocos estados que alcanzan para decidir, acciones, recompensa y γ, de modo que se podría cargar en el notebook de la clase 4.",
+        "Se dice quién define la recompensa y quién la ve, y se nombra al menos una trampa posible con una forma concreta de evitarla.",
+        "La presentación se entiende en cinco minutos sin haber hecho el curso, y las dos devoluciones usan la rúbrica y nombran una trampa que quien escribió no vio."
+      ]
+    }
   }
 };
