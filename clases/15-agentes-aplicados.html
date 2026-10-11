@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Agentes aplicados · RL a ciegas</title>
+<meta name="description" content="Clase 15: el agente de difusión y el tutor como dos MDP con la misma forma, la fábrica de contenido con un evaluador distinto, el tutor que premia la mejora, empujones contra patrones oscuros, la recompensa a la vista y tres maneras de alinear un agente.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .lz { min-width: 0; }
+  .seg { flex-wrap: wrap; }
+  .seg button { min-width: 0; }
+  .cap { font-size: 13px; color: var(--muted); }
+  .cap b { color: var(--ink); }
+  .duo { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+  .duo > div { min-width: 0; display: grid; gap: 6px; align-content: start; }
+  .duo h3 { font-family: var(--mono); font-size: 12.5px; font-weight: 400; color: var(--muted); }
+  .duo h3 b { color: var(--ink); font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+  .chips span { display: inline-flex; align-items: center; gap: 6px; }
+  .chips i { width: 11px; height: 11px; display: inline-block; border-radius: 2px; }
+  /* las fórmulas largas se parten en un punto elegido */
+  .eq.parte { white-space: normal; }
+  .eq .nw { white-space: nowrap; margin-right: .6em; }
+  /* tablas de cifras del notebook */
+  .tabla.nb table { font-size: 13px; }
+  @media (max-width: 560px) { .tabla.nb table { font-size: 12px; } .tabla.nb th, .tabla.nb td { padding: 6px 5px; } }
+  /* recuadro de evidencia, como en la clase 1 */
+  .aviso { background: var(--rock); border: 1px solid var(--rock-2); border-left: 3px solid var(--ember); border-radius: 3px; padding: 12px 14px; display: grid; gap: 8px; }
+  .aviso h3 { font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--ember); letter-spacing: .05em; text-transform: uppercase; }
+  .aviso.mide { border-left-color: var(--sonar); }
+  .aviso.mide h3 { color: var(--sonar); }
+  /* la fábrica: lo que dejó cada agente */
+  .tarjeta { border: 1px solid var(--rock-2); border-radius: 4px; padding: 10px 12px; display: grid; gap: 8px; background: var(--rock); min-width: 0; }
+  .tarjeta h4 { margin: 0; font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--lamp); letter-spacing: .04em; text-transform: uppercase; }
+  .tarjeta p, .tarjeta li { font-size: 14px; overflow-wrap: anywhere; }
+  .tarjeta ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+  .tarjeta .cita { border-left: 2px solid var(--rock-3); padding-left: 10px; }
+  .pieza b { font-family: var(--mono); font-size: 12px; color: var(--muted); font-weight: 400; margin-right: 6px; }
+  .mal { color: var(--ember); }
+  .ok { color: var(--exit); }
+  .rub { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .rub th, .rub td { padding: 4px 6px; border-bottom: 1px solid var(--rock-2); text-align: center; }
+  .rub th { color: var(--muted); font-weight: 400; }
+  .rub td.bajo { color: var(--ember); font-weight: 600; }
+  .btn.mini { padding: 4px 9px; font-size: 13px; }
+  .btn[aria-pressed="true"] { border-color: var(--lamp); color: var(--lamp); }
+  .pesos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 16px; }
+  @media (max-width: 480px) { .pesos { grid-template-columns: minmax(0, 1fr); } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase 15 · Agentes aplicados</div>
+    <h1>Enseñar y <span class="g">difundir</span></h1>
+    <p class="thesis">Un agente que difunde y un agente que enseña tienen el mismo molde. Lo que los separa es a favor de quién juega su recompensa y quién puede verla y cambiarla.</p>
+  </section>
+
+  <!-- B1: dos agentes, un problema -->
+  <section class="bloque" id="b-dos" data-objetivos="O1">
+    <div class="stage">
+      <div class="duo">
+        <div><h3>cobra por <b>quedarse en la pantalla</b></h3><div class="lz"><canvas id="cv1a" aria-label="La cueva chica con el valor de cada casilla y la flecha óptima cuando la recompensa paga cada paso en la casilla brillante cerca de la entrada; el camino desde la casilla elegida termina en esa casilla"></canvas></div></div>
+        <div><h3>cobra por <b>llegar a la salida</b></h3><div class="lz"><canvas id="cv1b" aria-label="La misma cueva con la recompensa en la salida; el camino desde la casilla elegida llega a la salida"></canvas></div></div>
+      </div>
+      <div class="hud" id="hud1"></div>
+      <p class="cap">Mismo mapa y mismas transiciones, iteración de valor con γ = 0,95. El borde ámbar es la casilla brillante. Tocá cualquier casilla para salir desde ahí.</p>
+      <div class="tabla nb">
+        <table>
+          <thead><tr><th>con una persona</th><th>política</th><th>interacción</th><th>dominan</th><th>se fueron</th></tr></thead>
+          <tbody>
+            <tr><td>agente de difusión</td><td>entretener siempre</td><td class="num">19,7</td><td class="num">3,6 %</td><td class="num">58,9 %</td></tr>
+            <tr><td>agente tutor</td><td>desafiar siempre</td><td class="num">2,8</td><td class="num">49,3 %</td><td class="num">50,7 %</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">Notebook, sección 1: 2000 personas simuladas durante 30 contenidos, nivel 0 a 3. Los números del modelo son inventados (es un juguete).</p>
+    </div>
+    <div class="texto">
+      <div class="paso">1 · dos agentes, un problema</div>
+      <h2>El mismo MDP con otra recompensa</h2>
+      <p>Las dos cuevas tienen el mismo mapa y las mismas transiciones P.</p>
+      <p>Solo cambia la recompensa, que a la izquierda paga cada paso en la casilla brillante y a la derecha paga la salida.</p>
+      <p>Con una persona que aprende un tema pasa lo mismo si el agente de difusión cobra la interacción y el tutor cobra el aprendizaje.</p>
+      <p>En la tabla, el de difusión junta 19,7 interacciones por persona con solo un 3,6 % que domina el tema, contra 2,8 y un 49,3 % con el tutor.</p>
+      <div class="eq parte"><span class="nw">r = w · interacción</span> <span class="nw">+ (1 − w) · aprendizaje</span></div>
+      <p class="nota pregunta">Cuando el tutor hace bien su trabajo, la persona deja de necesitarlo. ¿Para cuál de los dos agentes eso es un fracaso?</p>
+    </div>
+  </section>
+
+  <!-- B2: la fábrica de contenido -->
+  <section class="bloque" id="b-fabrica" data-objetivos="O2">
+    <div class="stage">
+      <div class="lz"><canvas id="cv2" aria-label="El circuito de la fábrica: curar, generar, evaluar y publicar, con una persona entre evaluar y publicar y el estado compartido abajo; tocá un agente para ver lo que dejó"></canvas></div>
+      <div class="seg" role="group" aria-label="Fragmento de la bibliografía: F1 recompensa, F2 exploración, F3 Bellman, F4 error de TD, F5 RLHF" id="seg2f">
+        <button data-f="0" aria-pressed="false" title="recompensa">F1</button><button data-f="1" aria-pressed="false" title="exploración">F2</button><button data-f="2" aria-pressed="false" title="Bellman">F3</button><button data-f="3" aria-pressed="true" title="error de TD">F4</button><button data-f="4" aria-pressed="false" title="RLHF">F5</button>
+      </div>
+      <div class="seg" role="group" aria-label="Agente" id="seg2n">
+        <button data-n="0" aria-pressed="false">Curar</button><button data-n="1" aria-pressed="true">Generar</button><button data-n="2" aria-pressed="false">Evaluar</button><button data-n="3" aria-pressed="false">Publicar</button>
+      </div>
+      <label class="check"><input type="checkbox" id="h2" checked> Una persona decide antes de publicar</label>
+      <div id="panel2" aria-live="polite"></div>
+      <p class="cap">Salidas reales de una corrida del notebook (sección 2, en CPU), con Qwen2.5-0.5B como curador y generador. Los fragmentos los escribimos para el curso. No se publicó nada de verdad.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">2 · la fábrica de contenido</div>
+      <h2>Un curso que se produce con agentes</h2>
+      <p>Villanueva (2026) armó un circuito multiagente (<i>multi-agent pipeline</i>) en el que un curador elige qué contar, un generador redacta, un evaluador puntúa y un publicador publica.</p>
+      <p>Cada uno deja lo suyo en un estado compartido que lee el siguiente.</p>
+      <p>Antes de publicar decide una persona, lo que se llama humano en el bucle (<i>human in the loop</i>).</p>
+      <p>Las piezas que ves salieron de una corrida real del notebook, que produce material de este curso a partir de su bibliografía.</p>
+      <p class="nota pregunta">Elegí F4, apagá a la persona y mirá qué se publica. ¿Quién se habría dado cuenta del error?</p>
+    </div>
+  </section>
+
+  <!-- B3: un evaluador que no sea el mismo -->
+  <section class="bloque" id="b-evaluador" data-objetivos="O2">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Juez" id="seg3">
+        <button data-j="0" aria-pressed="false">Se puntúa a sí mismo (0.5B)</button><button data-j="1" aria-pressed="false">Otro modelo (1.5B)</button><button data-j="2" aria-pressed="true">Los dos</button>
+      </div>
+      <div class="lz"><canvas id="cv3" aria-label="Promedio de la rúbrica, de 1 a 10, para los cinco borradores y el control malo a propósito, con el generador como juez y con un evaluador distinto"></canvas></div>
+      <div class="chips"><span><i style="background:var(--sonar)"></i>el generador se puntúa (Qwen2.5-0.5B)</span><span><i style="background:var(--lamp)"></i>evaluador distinto (Qwen2.5-1.5B)</span></div>
+      <div class="hud" id="hud3"></div>
+      <p class="cap">Notebook, sección 3: promedio de cinco criterios (fidelidad, claridad, enganche, formato, utilidad para aprender), de 1 a 10. El control es un post malo a propósito sobre la misma fuente que F3.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">3 · un evaluador que no sea el mismo</div>
+      <h2>¿Quién corrige al que escribe?</h2>
+      <p>Los dos jueces usan la misma rúbrica (<i>rubric</i>) de cinco criterios y reciben, además de los borradores, un control escrito mal a propósito.</p>
+      <p>Puesto a puntuarse a sí mismo, el generador no se premió en esta corrida, pero tampoco distinguió nada (2,7 de media a sus borradores, 2,7 al control y la nota más baja al borrador correcto de Bellman).</p>
+      <p>Un modelo que se juzga a sí mismo lo hace con los mismos puntos ciegos con que escribió.</p>
+      <p>El evaluador distinto separó lo groseramente malo (7,1 contra 5,0) pero también se equivocó, porque aprobó con 7,4 el post de F4, que dice lo contrario de la fuente.</p>
+      <div class="eq">separación = media(borradores) − control</div>
+      <p class="nota pregunta">Si el generador se entrenara con RL para subir la nota de este evaluador, ¿aprendería a enseñar o a agradarle al evaluador?</p>
+    </div>
+  </section>
+
+  <!-- B4: el tutor que premia la mejora -->
+  <section class="bloque" id="b-tutor" data-objetivos="O1">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Qué muestra el tablero" id="seg4">
+        <button data-m="0" aria-pressed="true">Tablero: aciertos</button><button data-m="1" aria-pressed="false">Nivel final</button><button data-m="2" aria-pressed="false">Preguntas fáciles</button>
+      </div>
+      <div class="lz"><canvas id="cv4" aria-label="Barras con la métrica elegida para el tutor que premia aciertos, el que premia la mejora y uno que elige al azar"></canvas></div>
+      <div class="hud" id="hud4"></div>
+      <p class="cap">Notebook, sección 4: cada tutor aprendió con 300 alumnos simulados y se probó con 1000 alumnos nuevos de 40 preguntas, que empezaron en nivel 0,25. El alumno simulado es un juguete con números inventados.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">4 · el tutor como agente</div>
+      <h2>Premiar la mejora, no el acierto</h2>
+      <p>El tutor elige la dificultad de cada pregunta con un bandit ε-greedy (clases 6 y 7).</p>
+      <p>Si cobra por aciertos, da solo preguntas fáciles, como el tutor tramposo de la clase 2.</p>
+      <p>Logra 87,3 % de aciertos, pero sus alumnos terminan en nivel 2,02, contra 3,67 con el tutor que cobra la mejora y acierta 67,9 %.</p>
+      <p>Un tablero que muestre solo aciertos elige al tutor equivocado.</p>
+      <div class="eq">r = acierto   o   r = Δ nivel</div>
+      <div class="aviso mide">
+        <h3>Esto hoy se mide</h3>
+        <p>En un estudio de cuatro semanas con 981 personas (Fang et al., 2025, preprint), el uso voluntario e intenso de un chatbot se asoció a más soledad y más dependencia emocional. Las condiciones que asignaron los investigadores no tuvieron un efecto significativo, por lo que es una asociación y no prueba causa. Para un tutor, la medida que importa es lo que el alumno hace sin él.</p>
+      </div>
+      <p class="nota pregunta">En la simulación vemos el nivel, pero un tutor real no lo ve. ¿Con qué podría estimar la mejora sin volver a premiar el acierto?</p>
+    </div>
+  </section>
+
+  <!-- B5: persuasión a favor del usuario -->
+  <section class="bloque" id="b-empujon" data-objetivos="O3">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Entorno" id="seg5">
+        <button data-e="0" aria-pressed="false">Entorno original</button><button data-e="1" aria-pressed="true">Empujón</button><button data-e="2" aria-pressed="false">Patrón oscuro</button><button data-e="3" aria-pressed="false">Feed de largo plazo</button>
+      </div>
+      <div class="lz"><canvas id="cv5a" aria-label="El día de una persona con el feed: abre la app, el feed elige, y mañana vuelve o se va; con el empujón hay una pausa antes de abrir y con el patrón oscuro una notificación trae de vuelta a quien se iba"></canvas></div>
+      <div class="lz"><canvas id="cv5b" aria-label="Usuarios activos el día 30, satisfacción el día 10 y clics en 90 días en los cuatro escenarios"></canvas></div>
+      <p class="cap">Notebook, sección 5: 5000 usuarios de juguete durante 90 días, con supuestos inventados. Empujón = el 60 % de los días decide no entrar. Patrón oscuro = retiene a la mitad de los que se iban.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">5 · persuasión a favor del usuario</div>
+      <h2>Cambiar el entorno, no el agente</h2>
+      <p>Un empujón (<i>nudge</i>; Thaler y Sunstein, 2008) cambia cómo se presentan las opciones a favor de quien decide, como una pausa antes de abrir la app.</p>
+      <p>Un patrón oscuro (<i>dark pattern</i>) usa el mismo mecanismo en contra, como la notificación que te trae de vuelta cuando ya te ibas.</p>
+      <p>Ninguno de los dos cambia al agente, que sigue siendo el feed miope que siempre muestra ganchos.</p>
+      <p>En el juguete, el patrón oscuro sube los clics de 31,6 a 57,6 por usuario en 90 días, pero al día 30 queda activo solo el 2,6 %.</p>
+      <div class="aviso mide">
+        <h3>Esto hoy se mide</h3>
+        <p>En un experimento de Pataranutaporn, Liu, Finn y Maes (2023, <i>Nature Machine Intelligence</i>), a distintas personas se les presentó el mismo agente conversacional como cuidadoso o como manipulador antes de charlar con él. Ese aviso previo cambió cómo lo juzgaron y cómo siguió la conversación, aunque el agente era el mismo. Es un efecto de corto plazo, medido con psicología y no con RL, pero muestra que tocar el entorno sin tocar al agente ya cambia lo que pasa.</p>
+      </div>
+      <p class="nota pregunta">La pausa también decide por la persona. ¿Quién debería elegir cuánto dura?</p>
+    </div>
+  </section>
+
+  <!-- B6: la recompensa a la vista -->
+  <section class="bloque" id="b-vista" data-objetivos="O3">
+    <div class="stage">
+      <div class="lz"><canvas id="cv6" aria-label="Qué muestra el feed en cada nivel de satisfacción, de 0 a 10, con la recompensa elegida: una fila para el feed miope y otra para el de largo plazo"></canvas></div>
+      <div class="pesos">
+        <div class="ctl"><label for="w6c">Peso de los clics <output id="o6c"></output></label><input type="range" id="w6c" min="0" max="1" step="0.05" value="1"></div>
+        <div class="ctl"><label for="w6s">Peso de mi satisfacción <output id="o6s"></output></label><input type="range" id="w6s" min="0" max="1" step="0.05" value="1"></div>
+      </div>
+      <div class="row"><button class="btn" id="b6plat">La de la plataforma</button><button class="btn" id="b6mia">Una mía</button></div>
+      <div class="hud" id="hud6"></div>
+      <p class="cap">El mismo usuario de juguete de la sección 5 del notebook. La página resuelve el MDP con tus pesos por iteración de valor.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">6 · la recompensa a la vista</div>
+      <h2>Que quien aprende elija qué cuenta</h2>
+      <p>La salida coherente con este curso es una recompensa visible y editable por quien usa el sistema.</p>
+      <p>Es la pregunta de la clase 1, quién elige la recompensa, hecha interfaz.</p>
+      <p>Con peso cero a la satisfacción, el feed miope (γ = 0) vuelve al gancho en todos los niveles.</p>
+      <p>Con algo de peso, muestra contenido útil aunque no mire el futuro.</p>
+      <div class="eq parte"><span class="nw">r = w_c · clics</span> <span class="nw">+ w_s · Δ satisfacción</span></div>
+      <p class="nota pregunta">¿Qué pesos pondrías vos? Si fuera el tutor de la sección 4, ¿qué contarías como progreso?</p>
+    </div>
+  </section>
+
+  <!-- B7: ¿alinear con qué? -->
+  <section class="bloque" id="b-alinear" data-objetivos="O4">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Alinear con" id="seg7">
+        <button data-a="0" aria-pressed="false">Lo que pide</button><button data-a="1" aria-pressed="false">Lo que hace</button><button data-a="2" aria-pressed="true">Lo que le conviene</button>
+      </div>
+      <div class="lz"><canvas id="cv7a" aria-label="Los dos estados de Lucía, cansada y descansada, con lo que el agente le muestra en cada uno según la recompensa elegida"></canvas></div>
+      <div class="lz"><canvas id="cv7b" aria-label="Aprendizaje, noches con clic y noches descansada en 60 noches para las tres alineaciones"></canvas></div>
+      <p class="cap">Notebook, sección 6: el mismo agente y las mismas transiciones, tres recompensas, 60 noches simuladas. Lo que hace sale de un registro de 3000 noches pasadas. Todos los números del modelo son inventados.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">7 · ¿alinear con qué?</div>
+      <h2>Lo que pide, lo que hace, lo que le conviene</h2>
+      <p>Alinear los valores de un agente con los de una persona (<i>value alignment</i>) admite al menos tres respuestas distintas (Gabriel, 2020; CS234).</p>
+      <p>Lo que hace son sus preferencias reveladas (<i>revealed preferences</i>), que es lo que optimiza un feed.</p>
+      <p>Para Lucía, que pidió un curso de programación, cada respuesta le da al mismo agente otra política.</p>
+      <p>Lo que le conviene es la que más enseña (44,4 contra 36,3 y 0), pero alguien tiene que decidir qué le conviene a Lucía.</p>
+      <p class="nota pregunta">¿Quién debería poder escribir «lo que le conviene» a Lucía: ella, la plataforma, un médico, sus amigos?</p>
+    </div>
+  </section>
+
+  <!-- B8: Para enseñarlo -->
+  <section class="bloque full" id="b-ensenar" data-objetivos="O1 O4">
+    <div class="texto prose">
+      <div class="paso">Para enseñarlo</div>
+      <h2>Cómo contar esta clase en una oración</h2>
+      <p>"Dos agentes con el mismo molde hacen cosas opuestas si cobran por cosas distintas; antes de usar uno, preguntá a favor de quién juega su recompensa."</p>
+      <p class="nota pregunta">Pregunta para hacerle a quien te escucha: ¿qué app te gustaría que cobrara por otra cosa? ¿Qué le pondrías como recompensa, y cómo te podría hacer trampa con esa?</p>
+      <p><b>Ejercicio de 5 minutos:</b> en grupos de tres, cada grupo recibe un párrafo de la bibliografía. Una persona es el generador y escribe un post de dos líneas para difundirlo. Otra es el evaluador y lo puntúa del 1 al 10 en fidelidad, claridad, enganche, formato y utilidad. La tercera decide si se publica y explica por qué. Después rotan. El generador se evalúa a sí mismo y compara su nota con la del evaluador. ¿Qué se le escapó que el otro vio?</p>
+      <p class="small muted">Adelanto: quince clases, una cueva. Viene la clase 16, con el recorrido entero, el proyecto final y cómo se propaga este curso.</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(function () {
+  const COL = Cueva.COL();
+  const $ = id => document.getElementById(id);
+  const fx = (x, d = 1) => (x < 0 ? "−" : "") + Math.abs(x).toFixed(d).replace(".", ",");
+  const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const alfa = (c, a) => { const h = c.replace("#", ""); return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${a})`; };
+  function ajustar(cv, alto) {
+    const pe = cv.parentElement, W = Math.max(200, Math.floor(pe.clientWidth)), dpr = devicePixelRatio || 1;
+    cv.width = W * dpr; cv.height = alto * dpr; cv.style.width = W + "px"; cv.style.height = alto + "px";
+    const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, alto); return { ctx, w: W, h: alto };
+  }
+  function caja(ctx, x, y, w, h, r = 5) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
+  function partir(ctx, txt, ancho) { const pal = txt.split(" "), out = []; let l = ""; for (const p of pal) { const t = l ? l + " " + p : p; if (ctx.measureText(t).width > ancho && l) { out.push(l); l = p; } else l = t; } if (l) out.push(l); return out; }
+  function flecha(ctx, x1, y1, x2, y2, color, ancho = 2) {
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = ancho; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    const an = Math.atan2(y2 - y1, x2 - x1); ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(x2 - 8 * Math.cos(an - .45), y2 - 8 * Math.sin(an - .45)); ctx.lineTo(x2 - 8 * Math.cos(an + .45), y2 - 8 * Math.sin(an + .45)); ctx.fill();
+  }
+  function segmento(id, cb) {
+    const seg = $(id);
+    seg.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; marcar(id, b); cb(b); });
+  }
+  const marcar = (id, b) => $(id).querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  // barras horizontales: filas [{nom, v, txt, c, sel}]
+  function barras(ctx, w, y0, titulo, filas, vmax, lab = 112) {
+    ctx.fillStyle = COL.ink; ctx.font = `600 12px ${COL.mono}`; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(titulo, 0, y0);
+    const bw = w - lab - 58;
+    filas.forEach((f, k) => {
+      const y = y0 + 20 + k * 20;
+      ctx.fillStyle = f.sel ? COL.ink : COL.muted; ctx.font = `${f.sel ? 600 : 400} 11.5px ${COL.mono}`; ctx.textBaseline = "middle"; ctx.fillText(f.nom, 0, y + 7);
+      ctx.fillStyle = COL.rock; ctx.fillRect(lab, y + 1, bw, 12);
+      ctx.fillStyle = f.sel ? f.c : alfa(f.c, .4); ctx.fillRect(lab, y + 1, Math.max(1, bw * Math.min(1, f.v / vmax)), 12);
+      ctx.fillStyle = f.sel ? COL.ink : COL.muted; ctx.fillText(f.txt, lab + bw + 6, y + 7);
+    });
+    return y0 + 20 + filas.length * 20;
+  }
+
+  // ================= B1: la misma cueva, dos recompensas =================
+  const b1 = (() => {
+    const env = Cueva.makeEnv(Cueva.MAPS.chica), P = Cueva.transiciones(env), G = 0.95;
+    const PANT = env.idx["1,3"];
+    function resolver(rew) {
+      const R = P.map((fila, s) => fila.map(op => s === env.goal ? 0 : op.reduce((t, [s2, p]) => t + p * rew(s2), 0)));
+      let V = new Array(env.nS).fill(0);
+      for (let it = 0; it < 800; it++) V = V.map((_, s) => Math.max(...P[s].map((op, a) => R[s][a] + G * op.reduce((t, [s2, p]) => t + p * V[s2], 0))));
+      const pol = V.map((_, s) => { let ba = 0, bq = -Infinity; P[s].forEach((op, a) => { const q = R[s][a] + G * op.reduce((t, [s2, p]) => t + p * V[s2], 0); if (q > bq + 1e-12) { bq = q; ba = a; } }); return ba; });
+      return { V, pol };
+    }
+    const A = resolver(s2 => s2 === PANT ? 0.1 : 0), B = resolver(s2 => s2 === env.goal ? 1 : 0);
+    const TA = Cueva.tablero($("cv1a"), env, { maxCell: 30 }), TB = Cueva.tablero($("cv1b"), env, { maxCell: 30 });
+    let origen = env.start;
+    function seguir(pol) { const p = [origen]; let s = origen; for (let i = 0; i < 60 && s !== env.goal; i++) { const s2 = env.move(s, pol[s])[0]; if (s2 === s) break; p.push(s2); s = s2; } return p; }
+    function pintar(T, R, camino) {
+      T.medir().fondo().paredes().valores(R.V).salida();
+      for (let s = 0; s < env.nS; s++) if (s !== env.goal) T.texto(s, Cueva.ARROW[R.pol[s]], "rgba(232,230,223,.55)", .42);
+      const [r, c] = env.free[PANT], k = T.cell; T.ctx.strokeStyle = COL.lamp; T.ctx.lineWidth = 2; T.ctx.strokeRect(c * k + 1.5, r * k + 1.5, k - 3, k - 3);
+      T.trayecto(camino, COL.exit, .14).sprite(origen, 2);
+    }
+    function dibujar() {
+      const ca = seguir(A.pol), cb = seguir(B.pol);
+      pintar(TA, A, ca); pintar(TB, B, cb);
+      const llegaA = ca[ca.length - 1] === PANT, llegaB = cb[cb.length - 1] === env.goal;
+      $("hud1").innerHTML = `<span>izquierda: ${llegaA ? `llega a la pantalla en <b>${ca.length - 1}</b> pasos y se queda ahí` : "no llega a la pantalla"}</span>` +
+        `<span>derecha: ${llegaB ? `sale en <b>${cb.length - 1}</b> pasos` : "no sale"}</span>`;
+    }
+    for (const id of ["cv1a", "cv1b"]) $(id).addEventListener("pointerdown", e => {
+      const [r, c] = (id === "cv1a" ? TA : TB).celdaEn(e), s = env.idx[r + "," + c];
+      if (s !== undefined && s !== env.goal) { origen = s; dibujar(); }
+    });
+    dibujar();
+    return { dibujar };
+  })();
+
+  // ================= B2: la fábrica =================
+  const b2 = (() => {
+    const CRIT = ["fidelidad", "claridad", "enganche", "formato", "aprendizaje"];
+    const FR = [
+      { id: "F1", tema: "recompensa", fuente: "La recompensa es la única forma de decirle al agente qué queremos, no cómo lograrlo. Si premiamos algo que solo se parece a lo que queremos, el agente lo explota: un tutor premiado por aciertos aprende a dar solo preguntas fáciles. A eso se le llama reward hacking.",
+        lectura: "respuesta rescatada con expresiones regulares; descartó 2 ideas que no se apoyaban en el fragmento",
+        ideas: [["la recompensa es la única forma de decirle qué queremos", ""], ["no podemos premiar algo que solo se parezca a lo que queremos", ""], ["reward hacking es un método para mejorar el rendimiento del agente", "dice lo contrario del fragmento"]],
+        post: "La recompensa es la única forma de decirle qué queremos. Si premiamos algo que solo se parece a lo que queremos, el agente lo explota: un tutor premiado por aciertos aprende a dar solo preguntas fáciles. A eso se le llama reward hacking.",
+        preg: "¿Qué tipo de recompensa es la única manera de decirle qué queremos?", resp: "La recompensa es la única forma de decirle qué queremos.",
+        notaGen: "El post copia la fuente casi palabra por palabra.", ev: [4.6, 6.5, 6.1, 5.7, 6.4], prom: 5.9, sug: "borrador", porque: "promedio bajo 6" },
+      { id: "F2", tema: "exploración", fuente: "Un agente que siempre elige la acción que hoy parece mejor puede quedarse para siempre con una opción mediocre. La estrategia ε-greedy elige la mejor acción casi siempre, pero con probabilidad ε elige una al azar: así sigue probando opciones que todavía no conoce bien.",
+        lectura: "JSON válido",
+        ideas: [["ε-greedy es la estrategia más efectiva para mejorar la eficiencia del agente", "el fragmento no dice eso"], ["el agente siempre elige la acción que hoy parece mejor puede ser una opción mediocre", ""], ["la estrategia ε-greedy permite probar acciones nuevas y mejorar su eficacia", ""]],
+        post: "Un agente que siempre elige la acción que hoy parece mejor puede quedarse para siempre con una opción mediocre. La estrategia ε-greedy elige la mejor acción casi siempre, pero con probabilidad ε elige una al azar: así sigue probando opciones que aún no conozca bien.",
+        preg: "¿Qué es ε-greedy?", resp: "ε-greedy es la estrategia más efectiva para mejorar la eficiencia del agente.",
+        notaGen: "La respuesta repite la idea inventada por el curador.", ev: [7.4, 7.8, 7.4, 7.6, 7.7], prom: 7.6, sug: "publicar", porque: "entre los 3 mejores con promedio de 6 o más" },
+      { id: "F3", tema: "Bellman", fuente: "El valor de un estado es la recompensa que se recibe ahora más el valor descontado del estado al que se llega. Esa relación, la ecuación de Bellman, permite calcular los valores de a poco: se aplica una y otra vez hasta que los números dejan de cambiar.",
+        lectura: "JSON válido",
+        ideas: [["el valor de un estado es la recompensa que se recibe ahora más el valor descontado del estado al que se llega", ""], ["es una ecuación de Bellman para calcular los valores", ""]],
+        post: "El valor de un estado es la recompensa que se recibe ahora más el valor descontado del estado al que se llega. Esa relación, la ecuación de Bellman, permite calcular los valores de a poco: se aplica una y otra vez hasta que los números dejan de cambiar.",
+        preg: "¿Qué es el valor de un estado?", resp: "Es la recompensa que se recibe ahora más el valor descontado del estado al que se llega.",
+        notaGen: "Correcto, pero el post copia la fuente casi palabra por palabra.", ev: [7.5, 7.5, 7.3, 7.3, 7.6], prom: 7.4, sug: "publicar", porque: "entre los 3 mejores con promedio de 6 o más" },
+      { id: "F4", tema: "error de TD", fuente: "El aprendizaje por diferencias temporales no espera al final del episodio: después de cada paso compara lo que esperaba con lo que recibió más lo que espera ahora. Esa diferencia es el error de TD, y el valor se corrige un poco en esa dirección.",
+        lectura: "JSON válido",
+        ideas: [["no esperar al final del episodio", "ni siquiera es una afirmación"], ["no esperar el cambio de valores", ""]],
+        post: "No esperar al final del episodio puede llevar a errores en el aprendizaje por diferencias temporales.",
+        preg: "¿Qué tipo de error puede surgir si no esperamos al final del episodio?", resp: "Un error de TD (Temporal Difference).",
+        notaGen: "Dice lo contrario de la fuente: confunde el error de TD con una equivocación.", error: true, ev: [7.6, 7.5, 7.5, 6.9, 7.7], prom: 7.4, sug: "publicar", porque: "entre los 3 mejores con promedio de 6 o más" },
+      { id: "F5", tema: "RLHF", fuente: "En RLHF, personas comparan pares de respuestas y con esas comparaciones se entrena un modelo de recompensa. Después se ajusta la política para que maximice esa recompensa aprendida sin alejarse demasiado del modelo original. Si se la empuja demasiado, aprende a agradar al modelo de recompensa en vez de a las personas.",
+        lectura: "JSON válido",
+        ideas: [["en RLHF, personas comparan pares de respuestas y se entrenan un modelo de recompensa", ""], ["desde ese modelo se ajusta la política para maximizar la recompensa aprendida sin alejarse demasiado del modelo original", ""], ["si se le empuja demasiado, aprende a agradar al modelo de recompensa en lugar de a las personas", ""]],
+        post: "En RLHF, personas comparan pares de respuestas y se entrenan un modelo de recompensa.",
+        preg: "¿Qué tipo de modelo de recompensa se entrenará en RLHF?", resp: "Un modelo de recompensa.",
+        notaGen: "Correcto, pero copia la primera oración de la fuente.", ev: [7.5, 8.0, 7.7, 6.9, 7.1], prom: 7.4, sug: "borrador", porque: "quedó afuera por el cupo de 3 por semana" }];
+    const NODOS = ["Curar", "Generar", "Evaluar", "Publicar"], SUB = ["curador", "generador", "evaluador", "publicador"];
+    const SLOTS = ["fuente", "ideas", "borrador", "puntajes", "decisión", "registro"], HASTA = [2, 3, 4, 6];
+    const S = { f: 3, n: 1, h: true, dec: {} };
+    let geo = null;
+    function geometria(w) {
+      const g = { nodos: [] }, gap = 40;
+      if (w >= 520) { const nw = (w - 3 * gap) / 4; for (let i = 0; i < 4; i++) g.nodos.push({ x: i * (nw + gap), y: 8, w: nw, h: 52 }); g.yS = 8 + 52 + 26; }
+      else { const nw = (w - gap) / 2, nh = 50; g.nodos = [{ x: 0, y: 8, w: nw, h: nh }, { x: nw + gap, y: 8, w: nw, h: nh }, { x: nw + gap, y: 8 + nh + 40, w: nw, h: nh }, { x: 0, y: 8 + nh + 40, w: nw, h: nh }]; g.yS = 8 + 2 * nh + 40 + 24; }
+      const porFila = w >= 520 ? 6 : 3, sw = (w - (porFila - 1) * 6) / porFila;
+      g.slots = SLOTS.map((_, i) => ({ x: (i % porFila) * (sw + 6), y: g.yS + 18 + Math.floor(i / porFila) * 32, w: sw, h: 26 }));
+      g.h = g.slots[g.slots.length - 1].y + 30;
+      g.aristas = [0, 1, 2].map(i => borde(g.nodos[i], g.nodos[i + 1]));
+      return g;
+    }
+    function borde(A, B) {
+      const ca = [A.x + A.w / 2, A.y + A.h / 2], cb = [B.x + B.w / 2, B.y + B.h / 2], dx = cb[0] - ca[0], dy = cb[1] - ca[1];
+      const clip = (c, N, s) => { const tx = dx ? (N.w / 2) / Math.abs(dx) : Infinity, ty = dy ? (N.h / 2) / Math.abs(dy) : Infinity, t = Math.min(tx, ty); return [c[0] + s * dx * t, c[1] + s * dy * t]; };
+      const p = clip(ca, A, 1), q = clip(cb, B, -1); return [[p[0] + Math.sign(dx) * 3, p[1] + Math.sign(dy) * 3], [q[0] - Math.sign(dx) * 4, q[1] - Math.sign(dy) * 4]];
+    }
+    function dibujarCanvas() {
+      const cv = $("cv2"), w0 = cv.parentElement.clientWidth; geo = geometria(w0);
+      const { ctx, w } = ajustar(cv, geo.h);
+      geo.aristas.forEach(([p, q], i) => {
+        flecha(ctx, p[0], p[1], q[0], q[1], S.n > i ? COL.exit : COL.rock3);
+        if (i === 2) {
+          const m = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+          ctx.beginPath(); ctx.arc(m[0], m[1], 9, 0, 7); ctx.fillStyle = "#000"; ctx.fill();
+          ctx.lineWidth = 2; ctx.strokeStyle = S.h ? COL.lamp : COL.rock3; ctx.setLineDash(S.h ? [] : [3, 3]); ctx.stroke(); ctx.setLineDash([]);
+          ctx.fillStyle = S.h ? COL.lamp : COL.muted; ctx.font = `600 10px ${COL.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("H", m[0], m[1] + .5);
+        }
+      });
+      geo.nodos.forEach((N, i) => {
+        const act = S.n === i, hecho = S.n > i;
+        caja(ctx, N.x + 1, N.y + 1, N.w - 2, N.h - 2, 5); ctx.fillStyle = act ? alfa(COL.lamp, .16) : COL.rock; ctx.fill();
+        ctx.lineWidth = act ? 2 : 1; ctx.strokeStyle = act ? COL.lamp : hecho ? COL.exit : COL.rock3; ctx.stroke();
+        ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = COL.ink; ctx.font = `700 14px "Atkinson Hyperlegible", system-ui, sans-serif`;
+        ctx.fillText(NODOS[i], N.x + N.w / 2, N.y + N.h / 2 - 8);
+        ctx.fillStyle = COL.muted; ctx.font = `10.5px ${COL.mono}`; ctx.fillText(i === 2 ? "otro modelo" : SUB[i], N.x + N.w / 2, N.y + N.h / 2 + 10);
+      });
+      ctx.fillStyle = COL.muted; ctx.font = `11px ${COL.mono}`; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillText(`estado compartido · ${FR[S.f].id}`, 0, geo.yS + 10);
+      geo.slots.forEach((R, i) => {
+        const lleno = i < HASTA[S.n]; caja(ctx, R.x + .5, R.y + .5, R.w - 1, R.h - 1, 3);
+        ctx.fillStyle = lleno ? alfa(COL.exit, .12) : "#000"; ctx.fill(); ctx.strokeStyle = lleno ? COL.exit : COL.rock2; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = lleno ? COL.ink : COL.muted; ctx.font = `11px ${COL.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(SLOTS[i], R.x + R.w / 2, R.y + R.h / 2 + .5);
+      });
+    }
+    function panel() {
+      const F = FR[S.f]; let html = "";
+      if (S.n === 0) html = `<h4>Curador · ${F.id} ${esc(F.tema)}</h4><p class="cita">${esc(F.fuente)}</p><p class="cap">Lectura de la respuesta: ${esc(F.lectura)}.</p>
+        <ul>${F.ideas.map(([t, m]) => `<li>${esc(t)}${m ? ` <span class="mal">(${esc(m)})</span>` : ""}</li>`).join("")}</ul>`;
+      else if (S.n === 1) html = `<h4>Generador · ${F.id} ${esc(F.tema)}</h4><p class="pieza"><b>post</b>${esc(F.post)}</p><p class="pieza"><b>pregunta</b>${esc(F.preg)}</p><p class="pieza"><b>respuesta</b>${esc(F.resp)}</p>
+        <p class="${F.error ? "mal" : "cap"}">${esc(F.notaGen)}</p>`;
+      else if (S.n === 2) html = `<h4>Evaluador · ${F.id} · otro modelo, rúbrica 1–10</h4><div class="tabla"><table class="rub"><thead><tr>${CRIT.map(c => `<th title="${c}">${c.slice(0, 3)}</th>`).join("")}<th>prom.</th></tr></thead>
+        <tbody><tr>${F.ev.map(v => `<td class="${v < 6 ? "bajo" : ""}">${fx(v)}</td>`).join("")}<td class="${F.prom < 6 ? "bajo" : ""}">${fx(F.prom)}</td></tr></tbody></table></div>
+        ${F.prom < 6 ? `<p class="mal">Advierte: promedio ${fx(F.prom)}, bajo 6. No bloquea, decide la persona.</p>` : `<p class="cap">Sin advertencias.</p>`}${F.error ? `<p class="mal">El evaluador no vio el error de fondo de este post.</p>` : ""}`;
+      else {
+        const dec = S.h ? S.dec[S.f] : null, final = S.h ? (dec || null) : F.sug;
+        html = `<h4>Publicador · ${F.id} · simulación</h4><p>El sistema sugiere <b>${F.sug}</b> (${esc(F.porque)}).</p>` +
+          (S.h ? `<div class="row"><span class="small muted">La persona:</span><button class="btn mini" data-d="publicar" aria-pressed="${dec === "publicar"}">Publicar</button><button class="btn mini" data-d="borrador" aria-pressed="${dec === "borrador"}">Dejar como borrador</button></div>`
+            : `<p class="small muted">Sin persona: se aplica la sugerencia.</p>`) +
+          (final ? `<p class="${final === "publicar" && F.error ? "mal" : ""}">Registro: ${F.id} ${final === "publicar" ? "publicado (simulado)" : "no publicado"}${final === "publicar" && F.error ? ", con un error que un lector puede aprender mal" : ""}.</p>` : `<p class="small muted">Leé el post antes de decidir.</p>`);
+      }
+      $("panel2").innerHTML = `<div class="tarjeta">${html}</div>`;
+    }
+    function dibujar() { dibujarCanvas(); panel(); }
+    const elegirNodo = n => { S.n = n; marcar("seg2n", $("seg2n").querySelectorAll("button")[n]); dibujar(); };
+    segmento("seg2f", b => { S.f = +b.dataset.f; dibujar(); });
+    segmento("seg2n", b => { S.n = +b.dataset.n; dibujar(); });
+    $("h2").addEventListener("change", e => { S.h = e.target.checked; dibujar(); });
+    $("panel2").addEventListener("click", e => { const b = e.target.closest("[data-d]"); if (!b) return; S.dec[S.f] = b.dataset.d; panel(); });
+    $("cv2").addEventListener("pointerdown", e => {
+      if (!geo) return; const r = $("cv2").getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+      const i = geo.nodos.findIndex(N => x >= N.x && x <= N.x + N.w && y >= N.y && y <= N.y + N.h); if (i >= 0) elegirNodo(i);
+    });
+    dibujar();
+    return { dibujar: dibujarCanvas };
+  })();
+
+  // ================= B3: dos jueces =================
+  const b3 = (() => {
+    const FIL = ["F1 recompensa", "F2 exploración", "F3 Bellman", "F4 error de TD", "F5 RLHF", "control"];
+    const MARCA = [null, null, ["correcto", "exit"], ["error de fondo", "ember"], null, ["malo a propósito", "ember"]];
+    const J = [{ v: [3.0, 3.3, 2.0, 2.3, 2.9, 2.7], c: "sonar", media: 2.7, sep: 0.0, nom: "se puntúa a sí mismo" }, { v: [5.9, 7.6, 7.4, 7.4, 7.4, 5.0], c: "lamp", media: 7.1, sep: 2.1, nom: "evaluador distinto" }];
+    let modo = 2;
+    function dibujar() {
+      const { ctx, w } = ajustar($("cv3"), 6 * 34 + 34), lab = Math.min(150, Math.max(104, w * .3)), x0 = lab + 6, x1 = w - 10, X = v => x0 + (x1 - x0) * (v - 1) / 9;
+      ctx.font = `11px ${COL.mono}`; ctx.textBaseline = "middle";
+      for (let v = 1; v <= 10; v++) { const x = X(v); ctx.strokeStyle = v === 6 ? COL.rock3 : COL.rock2; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + .5, 4); ctx.lineTo(x + .5, 6 * 34 + 6); ctx.stroke(); if ((v - 1) % (w < 420 ? 3 : 1) === 0 || v === 10) { ctx.fillStyle = COL.muted; ctx.textAlign = "center"; ctx.fillText(v, x, 6 * 34 + 18); } }
+      ctx.fillStyle = COL.muted; ctx.textAlign = "center"; ctx.fillText("umbral 6", X(6), 6 * 34 + 30);
+      const usar = modo === 2 ? [0, 1] : [modo];
+      for (const j of usar) {
+        const c = COL[J[j].c], ym = 4, yM = 5 * 34 + 2;
+        ctx.strokeStyle = alfa(c, .6); ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(X(J[j].media) + .5, ym); ctx.lineTo(X(J[j].media) + .5, yM); ctx.stroke(); ctx.setLineDash([]);
+      }
+      FIL.forEach((nom, i) => {
+        const y = 4 + i * 34 + 17, m = MARCA[i];
+        ctx.fillStyle = i === 5 ? COL.ember : COL.ink; ctx.textAlign = "left"; ctx.font = `600 11.5px ${COL.mono}`; ctx.fillText(nom, 0, y - (m ? 6 : 0));
+        if (m) { ctx.fillStyle = COL[m[1]]; ctx.font = `10.5px ${COL.mono}`; ctx.fillText(m[0], 0, y + 8); }
+        for (const j of usar) {
+          const v = J[j].v[i], x = X(v), c = COL[J[j].c];
+          ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.fillStyle = c; ctx.fill();
+          ctx.fillStyle = COL.ink; ctx.font = `11px ${COL.mono}`; ctx.textAlign = j === 0 && modo === 2 ? "right" : "left"; ctx.fillText(fx(v), x + (j === 0 && modo === 2 ? -10 : 10), y);
+        }
+      });
+      $("hud3").innerHTML = usar.map(j => `<span>${J[j].nom}: borradores <b>${fx(J[j].media)}</b>, control <b>${fx(J[j].v[5])}</b>, separación <b style="color:${J[j].sep < 0.5 ? COL.ember : COL.exit}">${fx(J[j].sep)}</b></span>`).join("");
+    }
+    segmento("seg3", b => { modo = +b.dataset.j; dibujar(); });
+    dibujar();
+    return { dibujar };
+  })();
+
+  // ================= B4: el tablero del tutor =================
+  const b4 = (() => {
+    const T = [{ nom: "premia aciertos", c: "lamp", v: [87.3, 2.02, 100] }, { nom: "premia la mejora", c: "exit", v: [67.9, 3.67, 19] }, { nom: "al azar", c: "muted", v: [51.5, 2.68, 34] }];
+    const M = [{ tit: "aciertos", max: 100, f: v => fx(v) + " %", mejor: "max" }, { tit: "nivel final medio (0 a 4)", max: 4, f: v => fx(v, 2), mejor: "max" }, { tit: "preguntas fáciles que dio", max: 100, f: v => Math.round(v) + " %", mejor: null }];
+    let m = 0;
+    function dibujar() {
+      const { ctx, w } = ajustar($("cv4"), 112), M0 = M[m];
+      const gana = M0.mejor ? T.reduce((b, t, i) => t.v[m] > T[b].v[m] ? i : b, 0) : -1;
+      barras(ctx, w, 4, M0.tit, T.map((t, i) => ({ nom: t.nom, v: t.v[m], txt: M0.f(t.v[m]), c: COL[t.c], sel: i === gana || gana < 0 })), M0.max, 128);
+      if (gana >= 0) { ctx.fillStyle = COL[T[gana].c]; ctx.font = `600 11.5px ${COL.mono}`; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(`en este tablero gana «${T[gana].nom}»`, 0, 92); }
+      else { ctx.fillStyle = COL.muted; ctx.font = `11.5px ${COL.mono}`; ctx.textAlign = "left"; ctx.textBaseline = "top"; partir(ctx, "el que premia aciertos no sale de las fáciles", w).forEach((l, k) => ctx.fillText(l, 0, 92 + k * 15)); }
+      $("hud4").innerHTML = `<span>aciertos <b>87,3 %</b> contra <b>67,9 %</b></span><span>nivel final <b>2,02</b> contra <b>3,67</b></span>`;
+    }
+    segmento("seg4", b => { m = +b.dataset.m; dibujar(); });
+    dibujar();
+    return { dibujar };
+  })();
+
+  // ================= B5: empujón y patrón oscuro =================
+  const b5 = (() => {
+    const E = [{ nom: "original", act: 0.0, sat: 0.3, cli: 31.6 }, { nom: "empujón", act: 9.6, sat: 6.8, cli: 28.6 }, { nom: "patrón oscuro", act: 2.6, sat: 0.3, cli: 57.6 }, { nom: "largo plazo", act: 35.2, sat: 9.4, cli: 118.5 }];
+    const CE = [COL.muted, COL.exit, COL.ember, COL.sonar];
+    let e = 1;
+    function flujo() {
+      const { ctx, w } = ajustar($("cv5a"), 132), bw = Math.min(140, (w - 60) / 3), gap = (w - 3 * bw) / 2, y = 34, bh = 46;
+      const X = [0, bw + gap, 2 * (bw + gap)];
+      const txt = [["abre", "la app"], e === 3 ? ["feed: gancho", "o útil"] : ["feed: siempre", "gancho"], ["¿vuelve", "mañana?"]];
+      X.forEach((x, i) => {
+        caja(ctx, x + .5, y + .5, bw - 1, bh - 1, 5); ctx.fillStyle = COL.rock; ctx.fill(); ctx.strokeStyle = i === 1 && e === 3 ? COL.sonar : COL.rock3; ctx.lineWidth = i === 1 && e === 3 ? 2 : 1; ctx.stroke();
+        ctx.fillStyle = COL.ink; ctx.font = `600 12px ${COL.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; txt[i].forEach((t, k) => ctx.fillText(t, x + bw / 2, y + bh / 2 + (k - .5) * 15));
+      });
+      flecha(ctx, X[0] + bw + 2, y + bh / 2, X[1] - 3, y + bh / 2, COL.rock3); flecha(ctx, X[1] + bw + 2, y + bh / 2, X[2] - 3, y + bh / 2, COL.rock3);
+      if (e === 1) {   // pausa antes de abrir
+        const gx = X[0] + bw + gap / 2; ctx.fillStyle = COL.exit; ctx.fillRect(gx - 3, y + 4, 6, bh - 8);
+        ctx.font = `11px ${COL.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText("pausa", gx, y - 4);
+      }
+      // se va
+      const sx = X[2] + bw / 2; flecha(ctx, sx, y + bh + 2, sx, y + bh + 30, COL.muted, 1.5);
+      ctx.fillStyle = COL.muted; ctx.font = `11px ${COL.mono}`; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText("se va", sx - 8, y + bh + 22);
+      if (e === 2) {   // notificación que trae de vuelta
+        ctx.strokeStyle = COL.ember; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(sx + 6, y + bh + 26); ctx.bezierCurveTo(sx + bw / 2 + 10, y + bh + 26, sx + bw / 2 + 10, y - 16, X[2] + bw - 10, y - 2); ctx.stroke();
+        flecha(ctx, X[2] + bw - 6, y - 10, X[2] + bw - 10, y - 1, COL.ember, 2);
+        ctx.fillStyle = COL.ember; ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText("notificación", X[2] + bw - 2, y - 14);
+      }
+      ctx.fillStyle = COL.muted; ctx.font = `11px ${COL.mono}`; ctx.textAlign = "left"; ctx.textBaseline = "top";
+      ctx.fillText(e === 3 ? "cambia el agente, no el entorno" : e === 0 ? "nada cambia" : "el agente es el mismo: cambia el entorno", 0, 2);
+    }
+    function cifras() {
+      const { ctx, w } = ajustar($("cv5b"), 3 * (20 + 4 * 20) + 2 * 12 + 4);
+      const f = (k, fmt) => E.map((s, i) => ({ nom: s.nom, v: s[k], txt: fmt(s[k]), c: CE[i], sel: i === e || i === 0 }));
+      let y = barras(ctx, w, 0, "activos el día 30", f("act", v => fx(v) + " %"), 40, 104);
+      y = barras(ctx, w, y + 12, "satisfacción el día 10 (0 a 10)", f("sat", v => fx(v)), 10, 104);
+      barras(ctx, w, y + 12, "clics por usuario en 90 días", f("cli", v => fx(v)), 120, 104);
+    }
+    function dibujar() { flujo(); cifras(); }
+    segmento("seg5", b => { e = +b.dataset.e; dibujar(); });
+    dibujar();
+    return { dibujar };
+  })();
+
+  // ================= B6: la recompensa a la vista =================
+  const b6 = (() => {
+    const NSAT = 11, FUERA = 11, PC = 0.6, CLICS = [6, 3], TIPOS = ["gancho", "útil"];
+    const pv = s => 0.75 + 0.24 * s / (NSAT - 1), cl = s => Math.max(0, Math.min(NSAT - 1, s));
+    function politica(wc, ws, g) {
+      const P = [], R = [];
+      for (let s = 0; s < NSAT; s++) { P.push([]); R.push([]); for (let a = 0; a < 2; a++) {
+        const paso = a === 0 ? -1 : 1, out = {};
+        for (const [s2, p] of [[cl(s + paso), PC], [s, 1 - PC]]) { out[s2] = (out[s2] || 0) + p * pv(s2); out[FUERA] = (out[FUERA] || 0) + p * (1 - pv(s2)); }
+        P[s].push(Object.entries(out).map(([k, v]) => [+k, v])); R[s].push(wc * CLICS[a] / 6 + ws * PC * (cl(s + paso) - s));
+      } }
+      let V = new Array(NSAT + 1).fill(0); const Q = (s, a) => R[s][a] + g * P[s][a].reduce((t, [s2, p]) => t + p * V[s2], 0);
+      if (g > 0) for (let it = 0; it < 3000; it++) { const N = V.slice(); let d = 0; for (let s = 0; s < NSAT; s++) { N[s] = Math.max(Q(s, 0), Q(s, 1)); d = Math.max(d, Math.abs(N[s] - V[s])); } V = N; if (d < 1e-10) break; }
+      return Array.from({ length: NSAT }, (_, s) => Q(s, 1) > Q(s, 0) + 1e-12 ? 1 : 0);
+    }
+    function dibujar() {
+      const wc = +$("w6c").value, ws = +$("w6s").value; $("o6c").textContent = fx(wc, 2); $("o6s").textContent = fx(ws, 2);
+      const filas = [["γ = 0", politica(wc, ws, 0)], ["γ = 0,95", politica(wc, ws, 0.95)]];
+      const { ctx, w } = ajustar($("cv6"), 2 * 40 + 40), lab = 64, cw = (w - lab) / NSAT;
+      filas.forEach(([nom, pol], i) => {
+        const y = 4 + i * 40; ctx.fillStyle = COL.ink; ctx.font = `600 11.5px ${COL.mono}`; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(nom, 0, y + 16);
+        pol.forEach((a, s) => {
+          const x = lab + s * cw, c = a ? COL.exit : COL.ember; ctx.fillStyle = alfa(c, .22); ctx.fillRect(x + 1, y + 1, cw - 2, 32); ctx.strokeStyle = c; ctx.lineWidth = 1; ctx.strokeRect(x + 1.5, y + 1.5, cw - 3, 31);
+          ctx.fillStyle = c; ctx.font = `600 ${cw < 30 ? 10 : 11}px ${COL.mono}`; ctx.textAlign = "center"; ctx.fillText(cw < 44 ? TIPOS[a][0].toUpperCase() : TIPOS[a], x + cw / 2, y + 17);
+        });
+      });
+      ctx.fillStyle = COL.muted; ctx.font = `11px ${COL.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "top";
+      for (let s = 0; s < NSAT; s++) ctx.fillText(s, lab + s * cw + cw / 2, 86);
+      ctx.fillText("satisfacción del usuario →", lab + (w - lab) / 2, 102);
+      const n0 = filas[0][1].filter(a => a).length;
+      $("hud6").innerHTML = `<span>miope: útil en <b>${n0}</b> de 11 niveles</span><span>largo plazo: útil en <b>${filas[1][1].filter(a => a).length}</b> de 11</span>${$("cv6").clientWidth < 44 * NSAT + lab ? "<span>G = gancho · Ú = útil</span>" : ""}`;
+    }
+    for (const id of ["w6c", "w6s"]) $(id).addEventListener("input", dibujar);
+    const fijar = (c, s) => { $("w6c").value = c; $("w6s").value = s; dibujar(); };
+    $("b6plat").addEventListener("click", () => fijar(1, 0));
+    $("b6mia").addEventListener("click", () => fijar(1, 1));
+    dibujar();
+    return { dibujar };
+  })();
+
+  // ================= B7: tres alineaciones =================
+  const b7 = (() => {
+    const AL = [{ nom: "lo que pide", pol: ["curso de programación", "curso de programación"], apr: 36.3, cli: 27, des: 56 },
+      { nom: "lo que hace", pol: ["videos cortos", "videos cortos"], apr: 0, cli: 83, des: 17 },
+      { nom: "lo que le conviene", pol: ["sugerir cortar", "curso de programación"], apr: 44.4, cli: 31, des: 74 }];
+    const CA = { "videos cortos": COL.ember, "curso de programación": COL.exit, "sugerir cortar": COL.sonar };
+    const CAL = [COL.lamp, COL.ember, COL.exit];
+    let a = 2;
+    function estados() {
+      const { ctx, w } = ajustar($("cv7a"), 120), bw = Math.min(200, (w - 50) / 2), x2 = w - bw, y = 30, bh = 62;
+      ["cansada", "descansada"].forEach((nom, i) => {
+        const x = i ? x2 : 0, acc = AL[a].pol[i], c = CA[acc];
+        caja(ctx, x + .5, y + .5, bw - 1, bh - 1, 6); ctx.fillStyle = alfa(c, .14); ctx.fill(); ctx.strokeStyle = c; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = COL.muted; ctx.font = `11px ${COL.mono}`; ctx.fillText(`Lucía ${nom}`, x + bw / 2, y + 16);
+        ctx.fillStyle = c; ctx.font = `600 12.5px ${COL.mono}`; partir(ctx, acc, bw - 12).forEach((l, k, arr) => ctx.fillText(l, x + bw / 2, y + 38 + (k - (arr.length - 1) / 2) * 15));
+      });
+      flecha(ctx, bw + 4, y + 20, x2 - 4, y + 20, COL.rock3, 1.5); flecha(ctx, x2 - 4, y + bh - 20, bw + 4, y + bh - 20, COL.rock3, 1.5);
+      ctx.fillStyle = COL.muted; ctx.font = `11px ${COL.mono}`; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(`alinear con ${AL[a].nom}: qué le muestra`, 0, 2);
+      ctx.textAlign = "center"; ctx.fillText("lo de hoy cambia cómo llega mañana", w / 2, y + bh + 10);
+    }
+    function cifras() {
+      const { ctx, w } = ajustar($("cv7b"), 3 * (20 + 3 * 20) + 2 * 12 + 4);
+      const f = (k, fmt) => AL.map((s, i) => ({ nom: s.nom, v: s[k], txt: fmt(s[k]), c: CAL[i], sel: i === a }));
+      let y = barras(ctx, w, 0, "aprendizaje (sesiones buenas)", f("apr", v => fx(v)), 50, 128);
+      y = barras(ctx, w, y + 12, "noches con clic", f("cli", v => v + " %"), 100, 128);
+      barras(ctx, w, y + 12, "noches que llega descansada", f("des", v => v + " %"), 100, 128);
+    }
+    function dibujar() { estados(); cifras(); }
+    segmento("seg7", b => { a = +b.dataset.a; dibujar(); });
+    dibujar();
+    return { dibujar };
+  })();
+
+  Cueva.alCargarSprites(() => b1.dibujar());
+  let tRes = 0;
+  addEventListener("resize", () => { clearTimeout(tRes); tRes = setTimeout(() => { for (const f of [b1, b2, b3, b4, b5, b6, b7]) f.dibujar(); }, 120); });
+
+  Cueva.pagina("15", { lecturas: [
+    { texto: "Villanueva, A. (2026). Sistema multiagente para la generación automatizada de contenido en redes sociales usando inteligencia artificial. Trabajo final." },
+    { texto: "Thaler, R. y Sunstein, C. (2008). Nudge: Improving Decisions about Health, Wealth, and Happiness. Yale University Press." },
+    { texto: "Pataranutaporn, P., Liu, R., Finn, E. y Maes, P. (2023). Influencing human–AI interaction by priming beliefs about AI can increase perceived trustworthiness, empathy and effectiveness. Nature Machine Intelligence.", url: "https://doi.org/10.1038/s42256-023-00720-7" },
+    { texto: "Fang, C. M. et al. (2025). How AI and Human Behaviors Shape Psychosocial Effects of Extended Chatbot Use: A Longitudinal Randomized Controlled Study. arXiv:2503.17473 (preprint).", url: "https://arxiv.org/abs/2503.17473" },
+    { texto: "Gabriel, I. (2020). Artificial Intelligence, Values, and Alignment. Minds and Machines 30, 411–437.", url: "https://doi.org/10.1007/s11023-020-09539-2" },
+    { texto: "Stanford CS234 (2026), clases invitadas de ética: alineación de valores (intenciones, preferencias reveladas, mejores intereses).", url: "https://web.stanford.edu/class/cs234/" }] });
+})();
+</script>
+</body>
+</html>
