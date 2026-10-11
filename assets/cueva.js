@@ -217,7 +217,7 @@
     { id: "13", archivo: "13-el-lenguaje-como-politica.html", titulo: "El modelo de lenguaje como política: token, temperatura, GRPO", nb: "13-el-lenguaje-como-politica.ipynb", bloque: "Clase 13", unidad: 4 },
     { id: "14", archivo: "14-agentes-de-lenguaje.html", titulo: "Agentes de lenguaje: ReAct, herramientas, riesgos", nb: "14-agentes-de-lenguaje.ipynb", bloque: "Clase 14", unidad: 4, pronto: true },
     { id: "15", archivo: "15-agentes-aplicados.html", titulo: "Agentes aplicados: tutor, difusión, persuasión, alineación", nb: "15-agentes-aplicados.ipynb", bloque: "Clase 15", unidad: 4 },
-    { id: "16", archivo: "16-cierre.html", titulo: "Cierre: proyecto final y cómo se propaga", nb: null, bloque: "Clase 16", unidad: 4, pronto: true }
+    { id: "16", archivo: "16-cierre.html", titulo: "Cierre: proyecto final y cómo se propaga", nb: null, bloque: "Clase 16", unidad: 4 }
   ];
   const colab = nb => `https://colab.research.google.com/github/${REPO}/blob/${RAMA}/notebooks/${nb}`;
   const github = ruta => `https://github.com/${REPO}/blob/${RAMA}/${ruta}`;
