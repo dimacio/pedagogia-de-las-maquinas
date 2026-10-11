@@ -123,7 +123,7 @@
     <div class="texto">
       <div class="paso">Paso 3</div>
       <h2>De comparaciones a una recompensa: Bradley-Terry</h2>
-      <p>El modelo de <b>Bradley-Terry</b> (1952) dice que la probabilidad de preferir A depende solo de la diferencia entre las recompensas de A y de B. Si valen lo mismo da 0,5, como una moneda. En la pregunta 1 del notebook, R(A) = +0,70 y R(B) = +0,90 con una persona de ruido τ = 0,3 en lugar de 1, así que r = R/τ y P(A ≻ B) = σ(−0,20 / 0,3) = 0,339, contra 0,450 con τ = 1. Al revés, con muchas elecciones se busca la recompensa que mejor las explica, con una regresión logística como la de clasificar en dos clases.</p>
+      <p>El modelo de <b>Bradley-Terry</b> (1952) dice que la probabilidad de preferir A depende solo de la diferencia entre las recompensas de A y de B. Si valen lo mismo da 0,5, como una moneda. En la pregunta 1 del notebook, R(A) = +0,70 y R(B) = +0,90 con una persona de ruido τ = 0,3 en lugar de 1, así que r = R/τ y P(A ≻ B) = σ(−0,20 / 0,3) = 0,339, contra 0,450 con τ = 1. Al revés, con muchas elecciones se busca la recompensa que mejor las explica, con una regresión logística (<i>logistic regression</i>), que ajusta probabilidades pasadas por σ, la función sigmoide (<i>sigmoid</i>), que vuelve cualquier número una probabilidad entre 0 y 1.</p>
       <div class="eq">P(A ≻ B) = σ(r(A) − r(B))</div>
       <p class="nota pregunta">En la pregunta 1 la persona eligió A, la menos probable. ¿Qué le dice esa elección al ajuste sobre r(A) y r(B)?</p>
     </div>

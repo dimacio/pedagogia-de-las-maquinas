@@ -1190,7 +1190,7 @@ window.MODULOS = {
     ],
     tiempo: { pagina: 35, notebook: 60 },
     previos: ["12", "9"],
-    requisitos: ["De la clase 9, que un modelo de lenguaje predice lo que sigue; de la clase 11, la línea de base y PPO.", "El notebook descarga una vez un modelo de ≈ 1 GB (Qwen2.5-0.5B-Instruct); en CPU corre más lento."],
+    requisitos: ["De la clase 9, que un modelo de lenguaje predice lo que sigue; de la clase 11, la línea de base y PPO; de la clase 12, RLHF y la penalización por alejarse de π_ref.", "El notebook descarga una vez un modelo de ≈ 1 GB (Qwen2.5-0.5B-Instruct) y es lento: en CPU tardó 7,1 min."],
     cuestionario: [
       {
         objetivo: "O1",
@@ -1230,7 +1230,7 @@ window.MODULOS = {
         pregunta: "En 17 + 25, un grupo de 8 respuestas a T = 1 da seis veces 42 y dos veces 32: recompensas 11101110. Con Aᵢ = (rᵢ − promedio) / desvío, ¿qué ventajas quedan, y qué pasa en 7 × 8 − 9, donde fallan las 8?",
         opciones: [
           { texto: "Promedio 0,750: cada 42 recibe +0,250 y cada 32 −0,750; en 7 × 8 − 9 las ocho reciben −1, el castigo más fuerte del lote.", explicacion: "No: +0,250 y −0,750 son rᵢ − promedio, falta dividir por el desvío, 0,433. Y si las 8 valen 0, ninguna está por debajo del promedio: la ventaja es 0." },
-          { texto: "Promedio 0,750 y desvío 0,433: cada 42 recibe +0,577 y cada 32 −1,732; en 7 × 8 − 9 las ventajas son 0 y esa cuenta no enseña nada.", explicacion: "Correcto. Las ventajas suman ≈ 0: unas suben y otras bajan. Sin ningún acierto no hay con qué comparar, la recompensa escasa de la clase 7." },
+          { texto: "Promedio 0,750 y desvío 0,433: cada 42 recibe +0,577 y cada 32 −1,732; en 7 × 8 − 9 las ventajas son 0 y esa cuenta no enseña nada.", explicacion: "Correcto. Las ventajas suman ≈ 0: unas suben y otras bajan. Sin ningún acierto no hay con qué comparar, la recompensa escasa de la clase 2." },
           { texto: "La ventaja es la recompensa misma: cada 42 recibe +1 y cada 32 recibe 0; en 7 × 8 − 9 las ocho reciben 0 y se descartan.", explicacion: "No: la ventaja compara cada respuesta con su grupo. Por eso un acierto vale +0,577 en 17 + 25 y ≈ +2,6 en 3 × 4 + 5, donde acierta 1 de 8." },
           { texto: "Promedio 0,750 y desvío 0,433: cada 42 recibe +0,577 y cada 32 −1,732; en 7 × 8 − 9 GRPO empuja más fuerte, porque ahí hay más para mejorar.", explicacion: "No: las ventajas de 17 + 25 están bien, pero un grupo todo mal da ventajas 0. GRPO no sabe hacia dónde empujar si ninguna respuesta salió mejor que otra." }
         ],
@@ -1238,7 +1238,7 @@ window.MODULOS = {
       },
       {
         objetivo: "O4",
-        pregunta: "En el actor-crítico de la clase 11, la línea de base la daba un crítico, una segunda red que aprende V(s). GRPO actualiza Qwen2.5-0.5B sin crítico. ¿Por qué puede hacerlo?",
+        pregunta: "En el actor-crítico de la clase 11, la línea de base la daba un crítico, una segunda tabla que aprende V(s); en un modelo de lenguaje sería una segunda red. GRPO actualiza Qwen2.5-0.5B sin crítico. ¿Por qué puede hacerlo?",
         opciones: [
           { texto: "Con recompensas verificables no hace falta línea de base: el verificador ya dice qué respuestas reforzar, y se refuerzan todas las correctas.", explicacion: "No: sin línea de base, un acierto en 8 × 7 (donde aciertan todas) empujaría igual que uno sorpresivo. La ventaja necesita saber qué se esperaba de cada pregunta." },
           { texto: "El modelo de 494 M ya trae adentro un crítico que estima V para cada texto, entrenado junto con el lenguaje antes de empezar el RL.", explicacion: "No: Qwen2.5-0.5B no trae crítico. Agregar uno del mismo tamaño llevaría los 494 M de parámetros a 988 M para entrenar y tener en memoria." },
@@ -1346,7 +1346,7 @@ window.MODULOS = {
     ],
     tiempo: { pagina: 40, notebook: 60 },
     previos: ["14", "2"],
-    requisitos: ["De la clase 14, los agentes de lenguaje; de la clase 2, el tutor tramposo que cobra por aciertos.", "El notebook descarga dos modelos (≈ 4 GB en total: Qwen2.5-0.5B-Instruct y Qwen2.5-1.5B-Instruct); en CPU tarda entre 20 y 60 minutos."],
+    requisitos: ["De la clase 14, los agentes de lenguaje; de la clase 2, el tutor tramposo que cobra por aciertos.", "El notebook descarga dos modelos (≈ 4 GB en total: Qwen2.5-0.5B-Instruct y Qwen2.5-1.5B-Instruct); y es lento: en CPU tardó 13,8 min."],
     cuestionario: [
       {
         objetivo: "O1",
@@ -1383,7 +1383,7 @@ window.MODULOS = {
       },
       {
         objetivo: "O3",
-        pregunta: "En el usuario de juguete de la sección 5, con el feed miope (γ = 0) de siempre, el empujón (el 60 % de los días decide no entrar) deja 28,6 clics en 90 días y un 9,6 % de activos al día 30; el patrón oscuro sube los clics a 57,6 pero deja activo solo el 2,6 %. ¿Qué los distingue y cuál es la salida que propone la clase?",
+        pregunta: "En el usuario de juguete de la sección 5, con el feed miope (γ = 0) de siempre, el empujón (el 60 % de los días decide no entrar) deja 28,6 clics en 90 días y un 9,6 % de activos al día 30; el patrón oscuro sube los clics a 57,6 pero deja activo el 2,6 %, contra el 9,6 % del empujón. ¿Qué los distingue y cuál es la salida que propone la clase?",
         opciones: [
           { texto: "El empujón cambia al agente y el patrón oscuro cambia el entorno; la salida es reentrenar el feed para que deje de mostrar ganchos.", explicacion: "No: ninguno de los dos toca al agente, que sigue siendo el feed miope que muestra ganchos. Los dos cambian cómo se presentan las opciones." },
           { texto: "Usan el mismo mecanismo, cambiar el entorno, pero el empujón juega a favor de quien decide y el patrón oscuro en contra; la salida es una recompensa visible y editable por quien usa el sistema.", explicacion: "Correcto. Con los pesos a la vista, si la persona le da algo de peso a su satisfacción, hasta el feed miope muestra contenido útil. Es la pregunta de la clase 1, quién elige la recompensa, hecha interfaz." },

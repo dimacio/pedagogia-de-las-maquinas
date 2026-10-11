@@ -381,6 +381,6 @@
     addEventListener("storage", e => { if (e.key === CLAVE_PROGRESO) pintarProgreso(); });
   }
 
-  window.Cueva = { REPO, MAPS, DR, ARROW, DIRN, makeEnv, transiciones, recompensa, iteracionValor, politicaGreedy, camino, rng,
+  window.Cueva = { REPO, RAMA, MAPS, DR, ARROW, DIRN, makeEnv, transiciones, recompensa, iteracionValor, politicaGreedy, camino, rng,
     COL, rampa, gradienteCSS, tablero, lienzo, alCargarSprites, CLASES, colab, github, pagina, progreso: { leer: leerProgreso, aprobados, pintar: pintarProgreso } };
 })();

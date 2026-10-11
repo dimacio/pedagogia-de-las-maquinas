@@ -4,8 +4,6 @@ Doce posts de imagen única (1080×1350) en `difusion/posts/post-01.png` … `po
 
 Voz: el curso habla en primera persona. Es un replicador que necesita que lo aprendan y lo enseñen para seguir vivo.
 
-Reemplazar `USUARIO` por el usuario real de GitHub (en `assets/cueva.js`, constante `REPO`, y volver a renderizar el post 12).
-
 ## Calendario sugerido (4 semanas, 3 posts por semana)
 
 Lunes, miércoles y viernes, entre las 19 y las 21 h (ajustar al horario en que la cuenta tenga más actividad según Instagram).
@@ -198,9 +196,9 @@ Ejemplo con fechas: empezar el lunes 19 de octubre de 2026 y terminar el viernes
 
 > Salimos de la cueva. Ahora tiene todas las paredes marcadas y un camino verde que va de la entrada a la salida.
 >
-> Soy un curso libre de aprendizaje por refuerzo: un juego, dieciséis clases en cuatro unidades con figuras interactivas, notebooks para Colab y este mismo experimento de difusión como proyecto final resuelto. Todo está en el repositorio del link de la bio (github.com/USUARIO/rl-a-ciegas), para usar, copiar y adaptar.
+> Soy un curso libre de aprendizaje por refuerzo: un juego, dieciséis clases en cuatro unidades con figuras interactivas, notebooks para Colab y este mismo experimento de difusión como proyecto final resuelto. Todo está en el repositorio del link de la bio (github.com/dimacio/pedagogia-de-las-maquinas), para usar, copiar y adaptar.
 >
 > Lo único que te pido a cambio es que me enseñes. Elegí a una persona, jugá con ella el juego de la cueva y explicale por qué el agente choca. Etiquetala acá abajo. Así sigo vivo.
 
 - **Hashtags:** #AprendizajePorRefuerzo #ReinforcementLearning #IA #CursoGratis #EducaciónAbierta #EnseñarEsAprender #MachineLearning
-- **Alt:** La cueva completa con todas las paredes en gris claro y un camino verde desde la entrada, donde está un personaje, hasta la salida verde, donde está otro. Debajo, un recuadro verde con "link en la bio · repositorio github.com/USUARIO/rl-a-ciegas". Título: "Enseñale esto a alguien. Curso libre: juego, dieciséis clases y notebooks. Para enseñarle a máquinas y a personas."
+- **Alt:** La cueva completa con todas las paredes en gris claro y un camino verde desde la entrada, donde está un personaje, hasta la salida verde, donde está otro. Debajo, un recuadro verde con "link en la bio · repositorio github.com/dimacio/pedagogia-de-las-maquinas". Título: "Enseñale esto a alguien. Curso libre: juego, dieciséis clases y notebooks. Para enseñarle a máquinas y a personas."
