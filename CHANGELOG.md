@@ -30,6 +30,7 @@ Formato: una sección por versión (SemVer sobre el curso, ver `fabrica/CONVENCI
 - Clase 9: redes recurrentes desde la v1 7 sin la cadena de Markov (bigotes, n-gramas, red con un lazo, agente con memoria, puente al modelo de lenguaje); recuadro de falsas memorias.
 - Clase 10 (nueva): clonación de comportamiento, errores compuestos, DAgger, RL offline, cambio de distribución, imitar o mejorar.
 - Clase 11 (nueva): políticas con softmax, REINFORCE como imitación ponderada, línea de base, actor-crítico, recorte de PPO.
+- Clase 12 (nueva): preferencias, Bradley-Terry, recompensa aprendida, RLHF con penalización, sobreoptimización, DPO.
 
 ### Aviso
 - El progreso de los cuestionarios guardado en el navegador vuelve a cero (los ids cambian de significado).

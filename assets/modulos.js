@@ -1101,5 +1101,83 @@ window.MODULOS = {
         "Se describe qué podría salir mal con un cambio demasiado grande después de un solo resultado y se propone un límite concreto a cuánto cambiar de una vez, relacionado con el recorte de PPO."
       ]
     }
+  },
+
+  "12": {
+    objetivos: [
+      "Explicar por qué a veces no se puede escribir la recompensa y conviene aprenderla de comparaciones entre dos trayectos o respuestas.",
+      "Explicar el modelo de Bradley-Terry (la probabilidad de preferir uno depende de la diferencia de recompensas) y leer una recompensa aprendida de comparaciones.",
+      "Describir las etapas de RLHF (imitar, aprender la recompensa, optimizar con una penalización por alejarse) y el riesgo de sobreoptimizar una recompensa aprendida.",
+      "Explicar la idea de DPO: usar las preferencias para ajustar la política directamente, sin un modelo de recompensa aparte."
+    ],
+    tiempo: { pagina: 40, notebook: 75 },
+    previos: ["11", "2"],
+    requisitos: ["De la clase 11, policy gradient y la idea de PPO: no alejarse demasiado de la política anterior.", "De la clase 2, la trampa de la recompensa: el agente optimiza lo que se le pide, no lo que se quería."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "En el notebook, una persona con ruido τ = 0,3 juzga pedazos de partida de 12 pasos. Comparando dos en el mismo momento, el mejor gana en el 70,6 % de los pares; si puntúa cada pedazo en días distintos, baja a 70,2, 66,9 y 63,9 % según cuánto le cambie el humor. ¿Por qué comparar sale mejor?",
+        opciones: [
+          { texto: "Porque comparando la persona no se equivoca nunca, y lo que le falta al 70,6 % para llegar a 100 son pares en que los dos pedazos valían lo mismo.", explicacion: "No: con τ = 0,3 también se equivoca al comparar, y la tabla cuenta solo los 930 pares de recompensas distintas. Comparar no quita ese ruido, quita el del humor." },
+          { texto: "Porque el humor del día afecta a los dos pedazos por igual y se cancela; con puntajes de días distintos, ese humor se suma al ruido.", explicacion: "Correcto. Cuanto más varía el humor (desvío 0,5, 1 y 2), más baja el acierto con puntajes, de 70,2 a 63,9 %, mientras que comparar se queda en 70,6 %." },
+          { texto: "Porque una comparación da más información que un puntaje: dice cuánto mejor es un pedazo, mientras que el puntaje solo dice si es bueno.", explicacion: "No: es al revés, una comparación solo dice cuál gana. Su ventaja no es que informe más sino que es más consistente." },
+          { texto: "Porque con puntajes la persona usa cada día otra recompensa escondida y cambia qué casillas considera derrumbes.", explicacion: "No: la recompensa escondida es siempre la misma. Lo que cambia de un día a otro es un desvío de humor que se suma al puntaje de cada pedazo." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O2",
+        pregunta: "Bradley-Terry dice P(A ≻ B) = σ(r(A) − r(B)). En la pregunta 1 del notebook, R(A) = +0,70 y R(B) = +0,90, y la persona tiene ruido τ = 0,3, así que r = R/τ. ¿Con qué probabilidad prefiere A?",
+        opciones: [
+          { texto: "0,5: la diferencia de 0,20 es chica, y Bradley-Terry da una moneda siempre que las dos recompensas sean positivas.", explicacion: "No: da 0,5 solo cuando las dos valen lo mismo. Lo que importa es la diferencia, −0,20, no el signo de cada recompensa." },
+          { texto: "0,450: σ(−0,20) da lo mismo con cualquier ruido, porque τ cambia la escala de las dos y la diferencia queda igual.", explicacion: "No: 0,450 es la cuenta con τ = 1. Dividir por τ = 0,3 agranda la diferencia a −0,20/0,3 y la persona elige con más decisión." },
+          { texto: "0,661: σ(0,20/0,3), porque Bradley-Terry mira cuánto supera la recompensa más alta a la otra y le asigna eso a A.", explicacion: "No: 0,661 = 1 − 0,339 es la probabilidad de preferir B, la de más recompensa. Para A, la diferencia r(A) − r(B) es negativa." },
+          { texto: "0,339: σ(−0,20/0,3); con τ = 1 sería 0,450, porque una persona con más ruido elige más cerca de la suerte.", explicacion: "Correcto. Solo importa la diferencia, dividida por τ. Si la persona igual eligió A, la menos probable, el ajuste sube r(A) y baja r(B)." }
+        ],
+        correcta: 3
+      },
+      {
+        objetivo: "O3",
+        pregunta: "En el RLHF en chico del notebook, con 300 comparaciones, π_ref rinde −3,91, optimizar sin penalización da −10 y con β = 0,3 da −1,33, cerca del óptimo de −1,09. ¿En qué orden van las etapas de RLHF?",
+        opciones: [
+          { texto: "Imitar para tener π_ref, aprender un modelo de recompensa con comparaciones y optimizar con PPO restando β · KL(π ‖ π_ref).", explicacion: "Correcto. Con el mismo modelo de recompensa, la penalización pasa de −10 a −1,33: deja a la política cerca de π_ref, que por lo menos sale de la cueva." },
+          { texto: "Aprender la recompensa con comparaciones, optimizar con PPO sin freno y al final imitar la política optimizada para suavizarla.", explicacion: "No: imitar va primero, para tener la referencia π_ref. Y optimizar sin freno es justo lo que en el notebook da −10." },
+          { texto: "Imitar, optimizar con PPO usando el +1 de la salida y después aprender la recompensa para explicar lo que hizo la política.", explicacion: "No: en RLHF no hay recompensa escrita. La recompensa se aprende de las comparaciones antes de optimizar, y es esa la que se optimiza." },
+          { texto: "Aprender la recompensa, imitar los pedazos ganadores y optimizar con una penalización por acercarse a π_ref, para explorar más.", explicacion: "No: la penalización es por alejarse de π_ref, no por acercarse. Y la imitación usa partidas grabadas, al principio de todo." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O3",
+        pregunta: "Con 300 comparaciones se barre β. Al bajarlo, la recompensa aprendida sube siempre, hasta 13,4; la verdadera sube hasta −1,18 con β = 0,1 y cae a −10 con β = 0,03 o menos. Con 3000 comparaciones la verdadera no cae: se queda en −1,09. ¿Qué está pasando?",
+        opciones: [
+          { texto: "Con β chico el optimizador deja de converger: el −10 es un error numérico, y con 3000 comparaciones hay datos de sobra para evitarlo.", explicacion: "No: el optimizador converge bien, a una política que va a una casilla con premio inventado y se queda ahí. El que tiene errores es el modelo de recompensa." },
+          { texto: "La aprendida está bien y la verdadera está mal medida; con 3000 comparaciones las dos coinciden porque la verdadera se corrige.", explicacion: "No: la verdadera es la escondida, lo que de verdad quería la persona, y no cambia. Lo que mejora con 3000 comparaciones es el modelo aprendido." },
+          { texto: "Optimizar fuerte explota los errores del modelo, como una casilla con premio inventado; la penalización frena a la política cerca de π_ref.", explicacion: "Correcto. Es la sobreoptimización que midieron Gao, Schulman y Hilton (2023), la trampa de la clase 2 con una recompensa aprendida. Con 3000 comparaciones el modelo casi no tiene esos errores." },
+          { texto: "Conviene β lo más alto posible: así la verdadera nunca cae y la política queda siempre en su mejor valor, sin riesgo.", explicacion: "No: con β muy grande la política casi no se mueve de π_ref, que rinde −3,91. El mejor retorno verdadero aparece con un β intermedio." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O4",
+        pregunta: "En el notebook, una política elige entre cuatro rutas desde S. DPO sube la ruta B, la preferida, de 0,20 a 0,566 y baja la A de 0,55 a 0,135. RLHF en dos pasos, con las mismas comparaciones y el mismo β, llega a la misma política hasta el tercer decimal. ¿Qué saltea DPO?",
+        opciones: [
+          { texto: "Las comparaciones: DPO ajusta la política con la recompensa escondida directamente, y por eso no necesita preguntarle nada a la persona.", explicacion: "No: DPO usa las mismas 1000 comparaciones que RLHF. La recompensa escondida solo se usa para medir, nunca para aprender." },
+          { texto: "El modelo de recompensa aparte: la recompensa de cada ruta queda como β · log[π(y)/π_ref(y)] y la política se ajusta con las preferencias.", explicacion: "Correcto. Ahorra entrenar y guardar un segundo modelo y correr PPO. No cambia el resultado, solo el camino." },
+          { texto: "La política de referencia: sin modelo de recompensa ya no hace falta medir contra π_ref, y la ruta preferida sube sin freno.", explicacion: "No: en DPO todo se mide relativo a π_ref, y ahí está el freno. Por eso B llega a 0,566 y no a 1." },
+          { texto: "El riesgo de sobreoptimizar: como no hay modelo de recompensa, la política ya no puede heredar errores de las comparaciones.", explicacion: "No: la política sigue aprendiendo las comparaciones, con sus huecos y su ruido. El problema del paso 6 sigue ahí." }
+        ],
+        correcta: 1
+      }
+    ],
+    actividad: {
+      titulo: "Enseñar comparando",
+      consigna: "Elegí algo que no sabrías puntuar con números pero sí comparar: dos textos (dos mensajes, dos resúmenes), dos recorridos para ir a un lugar, dos fotos, dos recetas. Armá 5 comparaciones de a pares y anotá cuál preferís en cada una, sin explicar por qué. Después ponete en el lugar de una máquina que solo ve esos 5 votos: ¿qué recompensa aprendería de ellos? ¿Qué rasgos premiaría y qué no puede saber, porque ningún par lo tocaba? Contá cómo podría sobreoptimizarla: qué texto o recorrido exagerado sacaría un puntaje altísimo con esa recompensa aprendida aunque vos nunca lo elegirías, y qué freno le pondrías, como la penalización por alejarse de lo que ya se hacía. Usá la pregunta de «Para enseñarlo»: si alguien mira mil veces cuál de dos fotos elegís, ¿qué aprende de tus gustos y qué no puede aprender nunca? Cerralo con la oración: cuando no sabés escribir lo que querés, podés enseñarlo comparando; pero la máquina aprende tus comparaciones, no lo que querías. Publicalo en Discussions; otra persona te devuelve con la rúbrica.",
+      rubrica: [
+        "Se elige algo difícil de puntuar con números y se presentan 5 comparaciones concretas, con la preferida marcada en cada una.",
+        "Se dice qué recompensa aprendería una máquina de esas comparaciones y qué queda sin aprender porque ningún par lo cubría.",
+        "Se describe un caso concreto de sobreoptimización (algo que la recompensa aprendida premia y la persona no querría) y un freno relacionado con la penalización por alejarse."
+      ]
+    }
   }
 };
