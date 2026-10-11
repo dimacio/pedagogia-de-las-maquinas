@@ -1,12 +1,12 @@
-"""Arma notebooks/00a-python-desde-la-cueva.ipynb (Pre curso A — Python, NumPy y Matplotlib)."""
+"""Arma notebooks/00a-python-desde-la-cueva.ipynb (Nivelación 0a — Python, NumPy y Matplotlib)."""
 from _nbutil import md, code, writefile_cell, save
 
 cells = []
 
 cells.append(md(r"""
-# Pre curso A — Python, NumPy y Matplotlib desde la cueva
+# Nivelación 0a — Python, NumPy y Matplotlib desde la cueva
 
-**RL a ciegas** · pre curso · vía profunda
+**RL a ciegas** · Nivelación 0a
 
 Antes de entrenar agentes necesitamos tres herramientas: **Python** (el lenguaje), **NumPy** (cuentas con arreglos de números) y **Matplotlib** (gráficos). En vez de aprenderlas con ejemplos sueltos, vamos a **construir el juego de la cueva a mano**, de a poco.
 
@@ -32,7 +32,7 @@ cells.append(md(r"""
 ## Paso 1 — Números y strings: el mapa es texto
 
 La forma más simple de guardar la cueva es escribirla como **texto**: una lista de renglones, donde `#` es pared, `.` es piso, `S` es el inicio y `G` la salida (*goal*). Así la vería un programador antes de dibujarla.
-"""))
+""", objetivos=["O1"]))
 cells.append(code(r"""
 CUEVA = [
     "##############",
@@ -73,7 +73,7 @@ cells.append(md(r"""
 ## Paso 2 — Listas, rebanadas, bucles y comprensiones
 
 `CUEVA` es una **lista**: una colección ordenada que se recorre con índices. Con **rebanadas** (`inicio:fin`, el fin no se incluye) sacamos pedazos, como recortar una imagen. Miremos la esquina de arriba a la izquierda, las primeras 4 filas y 6 columnas.
-"""))
+""", objetivos=["O2"]))
 cells.append(code(r"""
 recorte = [fila[0:6] for fila in CUEVA[0:4]]   # filas 0..3, columnas 0..5
 for fila in recorte:
@@ -119,7 +119,7 @@ Un **diccionario** asocia claves con valores. Lo usamos dos veces:
 
 - de cada **acción** (0, 1, 2, 3) a su **desplazamiento** `(Δfila, Δcolumna)`;
 - de cada **casilla** `(r, c)` a su **número de estado** (0, 1, 2, …). Los algoritmos de RL prefieren estados numerados; el número es el índice en la lista `libres`.
-"""))
+""", objetivos=["O3"]))
 cells.append(code(r"""
 ACCIONES = {0: (-1, 0), 1: (0, 1), 2: (1, 0), 3: (0, -1)}
 NOMBRES = ["↑", "→", "↓", "←"]
@@ -137,7 +137,7 @@ cells.append(md(r"""
 ## Paso 4 — Funciones: la regla del juego
 
 La regla de la cueva cabe en una **función**: "si hago `a` desde `pos`, ¿adónde llego?, ¿choqué?". Si la casilla de destino es pared, me quedo donde estaba y aviso que choqué. Una función devuelve resultados con `return` (acá, dos cosas a la vez).
-"""))
+""", objetivos=["O3"]))
 cells.append(code(r"""
 def mover(pos, a, mapa=CUEVA):
     '''Devuelve (nueva_pos, choque) al intentar la acción a desde pos.'''
@@ -163,7 +163,7 @@ Una **clase** junta datos (el mapa, la posición, las paredes tocadas) con las f
 - `step(a)` hace una acción y devuelve `(estado, recompensa, terminado)`.
 
 Además guarda en `tocadas` las paredes que el jugador va descubriendo, como en el juego.
-"""))
+""", objetivos=["O3", "O4"]))
 cells.append(code(r"""
 class Cueva:
     def __init__(self, mapa=CUEVA, max_pasos=200):
@@ -218,7 +218,7 @@ cells.append(md(r"""
 ## Paso 6 — NumPy: el mapa como matriz
 
 Las listas de strings son cómodas para leer, pero lentas e incómodas para hacer cuentas. **NumPy** guarda números en un **arreglo** (*array*) de tamaño fijo y opera con todos a la vez. Convertimos el mapa en una matriz de 0 (piso) y 1 (pared).
-"""))
+""", objetivos=["O1", "O2"]))
 cells.append(code(r"""
 import numpy as np
 
@@ -294,7 +294,7 @@ cells.append(md(r"""
 ## Paso 7 — La cueva como imagen RGB
 
 Una foto en colores es un arreglo de forma `(alto, ancho, 3)`: tres números por pixel, para el **rojo**, el **verde** y el **azul** (canales RGB), entre 0 y 1. Armemos la cueva así: fondo negro (la oscuridad), paredes gris claro, salida verde, inicio blanco. Cada color se pinta con una máscara.
-"""))
+""", objetivos=["O1"]))
 cells.append(code(r"""
 import matplotlib.pyplot as plt
 plt.rcParams["figure.dpi"] = 100
@@ -345,7 +345,7 @@ cells.append(md(r"""
 ## Paso 8 — Matplotlib: lo que hay vs. lo que se ve
 
 Con `plt.subplots` armamos varias figuras en una. A la izquierda, el **mapa real**. A la derecha, **lo que sabe el jugador** después de la partida al azar del Paso 5: todo negro salvo las paredes que tocó (gris claro), con su recorrido en azul. Así se ve la cueva en el juego.
-"""))
+""", objetivos=["O1", "O4"]))
 cells.append(code(r"""
 vista = np.zeros((H, W, 3))
 for (r, c) in cueva.tocadas:
@@ -399,7 +399,7 @@ cells.append(md(r"""
 ## ✍️ Ejercicio 1 — Rediseñar la cueva
 
 Cambiá el mapa `MI_CUEVA` (por ejemplo, tapá el pasillo de la derecha poniendo `#` en la fila 1, o abrí un atajo) y ejecutá. La celda redibuja la imagen y vuelve a contar casillas libres y callejones. Regla: el borde tiene que ser todo `#` y tiene que haber un `S` y un `G`.
-"""))
+""", objetivos=["O1"]))
 cells.append(code(r"""
 MI_CUEVA = [
     "##############",
@@ -430,7 +430,7 @@ cells.append(md(r"""
 ## ✍️ Ejercicio 2 — Más paciencia
 
 Cambiá `paciencia` (el máximo de pasos por partida: probá 500 y 2000) y mirá qué fracción de partidas llega a la salida. ¿Crece mucho? ¿Cuánto tarda en promedio el agente al azar?
-"""))
+""", objetivos=["O4"]))
 cells.append(code(r"""
 paciencia = 200   # TODO: probá 500 y 2000
 
@@ -457,8 +457,8 @@ Todo lo que necesita el curso ya está en este notebook: el mapa, las acciones, 
 - `CaveEnv._move` es nuestra `mover`, y `free` / `pos2s` son `libres` / `pos2s`;
 - `CaveEnv.plot` dibuja la cueva igual que el Paso 7, con un mapa de calor encima.
 
-Lo nuevo: el piso resbaloso (`slip`, pre curso B), el modelo `P` y `R` (pre curso C y clase 3) y las observaciones para redes (clase 6).
-"""))
+Lo nuevo: el piso resbaloso (`slip`, nivelación 0b), el modelo `P` y `R` (nivelación 0c y clase 4) y las observaciones para redes (clase 8).
+""", objetivos=["O4"]))
 cells.append(writefile_cell())
 cells.append(md(r"""
 Comprobemos que el entorno oficial y nuestra `Cueva` son **el mismo juego**: misma cantidad de estados, mismo inicio y misma salida, y la misma secuencia de acciones al azar lleva a los mismos estados.
@@ -497,7 +497,7 @@ cells.append(md(r"""
 
 ## Próxima clase
 
-Pre curso B: **probabilidad**. Le ponemos piso resbaloso a la cueva y nos preguntamos cosas como "¿cuántos pasos voy a tardar *en promedio*?" o "¿dónde estoy, si acabo de chocar?". Es la misma matemática que hay detrás de un clasificador que da probabilidades en vez de respuestas.
+Nivelación 0b: **probabilidad**. Le ponemos piso resbaloso a la cueva y nos preguntamos cosas como "¿cuántos pasos voy a tardar *en promedio*?" o "¿dónde estoy, si acabo de chocar?". Es la misma matemática que hay detrás de un clasificador que da probabilidades en vez de respuestas.
 
 ---
 
