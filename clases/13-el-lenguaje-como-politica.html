@@ -86,7 +86,7 @@
         <div class="row"><button class="btn primary" id="b2sig">Siguiente token</button><button class="btn" id="b2todo">Ver todo</button></div>
         <div class="hud" id="hud2t"></div>
       </div>
-      <p class="cap">Arriba, el camino más corto de la cueva, calculado en el navegador con el mapa. Abajo, los 12 tokens de la respuesta greedy del notebook (sección 2), con la probabilidad π que les daba la política y el largo del estado en tokens.</p>
+      <p class="cap">Arriba, el camino más corto de la cueva, calculado en el navegador con el mapa. Abajo, los 12 tokens (contando el de fin) de la respuesta greedy del notebook (sección 2), con la probabilidad π que les daba la política y el largo del estado en tokens.</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 2</div>
@@ -121,7 +121,7 @@
         <h3 id="tit3r">respuestas del notebook</h3>
         <div class="muestras" id="mu3"></div>
       </div>
-      <p class="cap">Las barras se recalculan en el navegador sobre los 5 tokens más probables que imprime el notebook, como si el modelo eligiera solo entre ellos. La tabla, las 50 muestras y las respuestas (cortadas en 40 caracteres) son del notebook (sección 3), a la temperatura más cercana a la del control.</p>
+      <p class="cap">Las barras se recalculan en el navegador sobre los 5 tokens más probables que imprime el notebook, como si el modelo eligiera solo entre ellos. La tabla, las 50 muestras y las respuestas (cortadas en 40 caracteres) son del notebook (sección 3), a la temperatura más cercana a la del control. La entropía mide qué tan repartida está la probabilidad: vale 0 si un solo token se lleva todo.</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 3</div>
@@ -186,7 +186,7 @@
     <div class="texto">
       <div class="paso">Paso 6</div>
       <h2>Sin crítico: el grupo como línea de base</h2>
-      <p>En el actor-crítico de la clase 11, la línea de base la daba un crítico (<i>critic</i>), una segunda red que aprende V(s). Para este modelo, un crítico del mismo tamaño llevaría los 494 M de parámetros a 988 M para entrenar y tener en memoria. GRPO se lo ahorra porque pregunta varias veces y usa el promedio del grupo como V(pregunta), una línea de base ruidosa que en 14 × 12 va de 0,250 a 0,750 según el grupo de 8. La actualización sigue usando el recorte de PPO, como en DeepSeek-R1 (DeepSeek-AI, 2025), que se entrenó con GRPO y recompensas verificables de exactitud y de formato.</p>
+      <p>En el actor-crítico de la clase 11, la línea de base la daba un crítico (<i>critic</i>), una segunda red que aprende V(s). Para este modelo, un crítico del mismo tamaño llevaría los 494 M de parámetros a 988 M para entrenar y tener en memoria. GRPO se lo ahorra porque pregunta varias veces y usa el promedio del grupo como V(pregunta), una línea de base ruidosa que en 14 × 12 va de 0,250 a 0,750 según el grupo de 8. La actualización sigue usando el recorte de PPO, como en DeepSeek-R1-Zero (DeepSeek-AI, 2025), que se entrenó con GRPO y recompensas verificables de exactitud y de formato.</p>
       <div class="eq parte"><span class="nw">crítico: b = V(s)</span> <span class="nw">GRPO: b = promedio del grupo</span></div>
       <p class="nota pregunta">En 8 × 7 los cinco grupos dan 1,000. ¿Para qué le sirve esa línea de base perfecta a GRPO?</p>
     </div>
