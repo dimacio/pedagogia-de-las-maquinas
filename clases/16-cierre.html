@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Proyecto final y cierre · RL a ciegas</title>
+<meta name="description" content="Clase 16: las quince clases anteriores sobre la misma cueva, el MDP de tu dominio como proyecto final con devolución entre pares, la difusión del curso como bandit y la vuelta a la pregunta de la clase 1: quién elige tu recompensa.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/estilo.css">
+<style>
+  .lz { min-width: 0; }
+  .seg { flex-wrap: wrap; }
+  .cap { font-size: 13px; color: var(--muted); margin: 0; }
+  .cap b { color: var(--ink); }
+  /* recorrido */
+  .paradas { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); gap: 4px; }
+  @media (max-width: 620px) { .paradas { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+  .paradas button { font-family: var(--mono); font-size: 13px; padding: 6px 0; background: var(--rock); color: var(--muted); border: 1px solid var(--rock-2); border-radius: 3px; cursor: pointer; }
+  .paradas button.hecha { color: var(--ink); border-color: var(--rock-3); }
+  .paradas button[aria-pressed="true"] { background: var(--lamp); color: var(--cave); border-color: var(--lamp); }
+  .ficha { background: var(--rock); border: 1px solid var(--rock-2); border-left: 3px solid var(--lamp); border-radius: 3px; padding: 10px 12px; display: grid; gap: 4px; min-height: 88px; }
+  .ficha .t { font-family: var(--mono); font-size: 12px; color: var(--lamp); letter-spacing: .05em; text-transform: uppercase; }
+  .ficha b { font-size: 15.5px; }
+  /* formularios */
+  .form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 12px; }
+  @media (max-width: 600px) { .form { grid-template-columns: minmax(0, 1fr); } }
+  .form label { display: grid; gap: 4px; font-size: 13.5px; color: var(--muted); min-width: 0; }
+  .form label.ancho { grid-column: 1 / -1; }
+  .form input, .form textarea, .form select { width: 100%; font-family: var(--body); font-size: 14px; }
+  .form label.listo > span::after { content: " ✓"; color: var(--exit); }
+  .medidor { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+  .medidor .barra { flex: 1; height: 8px; background: var(--rock-2); border-radius: 4px; overflow: hidden; }
+  .medidor .barra i { display: block; height: 100%; width: 0; background: var(--exit); transition: width .2s; }
+  .medidor b { color: var(--ink); }
+  textarea.salida { font-size: 12.5px; height: 120px; resize: vertical; }
+  .rub label:not(.ancho2) { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+  .rub select { width: auto; }
+  .rub label.ancho2 { grid-template-columns: minmax(0, 1fr); }
+  .sub { font-family: var(--mono); font-size: 12px; color: var(--lamp); letter-spacing: .05em; text-transform: uppercase; margin-top: 4px; }
+  /* difusión */
+  .post-ver { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; align-items: start; }
+  .post-ver img { width: 110px; height: auto; display: block; border: 1px solid var(--rock-2); background: var(--rock); aspect-ratio: 1080 / 1350; }
+  .post-ver .t { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .post-ver b { display: block; font-size: 15.5px; margin: 2px 0 4px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px 12px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .chips span { display: inline-flex; align-items: center; gap: 5px; }
+  .chips i { width: 11px; height: 11px; display: inline-block; border-radius: 2px; }
+  /* enseñar el curso */
+  .pasos-curso { margin: 0; padding-left: 22px; display: grid; gap: 6px; font-size: 14px; }
+  canvas:focus-visible { outline: 2px solid var(--exit); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="clase-head">
+    <div class="eyebrow">Clase 16 · Cierre</div>
+    <h1>Ahora, <span class="g">enseñalo</span></h1>
+    <p class="thesis">Si aprendiste a enseñarle a una máquina, ya sabés enseñarle a una persona. El último ejercicio es tu proyecto y el siguiente es propagar el curso.</p>
+  </section>
+
+  <!-- B1: el recorrido -->
+  <section class="bloque" id="b-recorrido" data-objetivos="O1">
+    <div class="stage">
+      <div class="lz"><canvas id="cvMapa" aria-label="La cueva grande con quince paradas numeradas, una por clase, que se iluminan en orden; la salida es la clase 16"></canvas></div>
+      <div class="paradas" id="paradas" role="group" aria-label="Elegir clase"></div>
+      <div class="ficha" id="fichaMapa" aria-live="polite"></div>
+      <div class="row"><button class="btn" id="bAnt">← Anterior</button><button class="btn" id="bSig">Siguiente →</button><button class="btn primary" id="bRecorrer">Recorrer todo</button></div>
+    </div>
+    <div class="texto">
+      <div class="paso">1 · El recorrido</div>
+      <h2>Quince clases, una sola cueva</h2>
+      <p>Cada número es una de las quince clases anteriores y cada una dejó una herramienta sobre el mismo mapa de la cueva grande.</p>
+      <p>Tocá un número para ver la capa de esa clase debajo del camino verde.</p>
+      <p>Lo que empezó como un chico a oscuras en la entrada termina con valores, políticas, memoria, una recompensa aprendida y agentes que hablan.</p>
+      <p>La salida es esta clase, la 16, donde todo se junta en tu proyecto.</p>
+      <p class="nota pregunta">¿Qué clase te costó más? Volvé a esa parada y contala en una oración, como en su bloque «Para enseñarlo».</p>
+    </div>
+  </section>
+
+  <!-- B2: el MDP de tu dominio -->
+  <section class="bloque" id="b-mdp" data-objetivos="O2">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Quién define la recompensa" id="segPlanta">
+        <button type="button" aria-pressed="true" data-m="planta">Premia la planta sana</button>
+        <button type="button" aria-pressed="false" data-m="riego">Premia cada riego</button>
+      </div>
+      <div class="lz"><canvas id="cvPlanta" aria-label="El MDP de la planta del notebook de la clase 4: tres estados, la acción óptima en cada uno y las transiciones de esa acción con sus probabilidades"></canvas></div>
+      <div class="hud" id="hudPlanta"></div>
+      <div class="sub">Tu ficha</div>
+      <div class="form" id="formProy">
+        <label class="ancho"><span>Nombre del proyecto</span><input type="text" id="pNom" placeholder="Ej.: reposición de stock en una farmacia"></label>
+        <label><span>Estados: qué ve el agente</span><textarea id="pEst" rows="3" placeholder="Uno por línea"></textarea></label>
+        <label><span>Acciones: qué puede hacer</span><textarea id="pAcc" rows="3" placeholder="Una por línea"></textarea></label>
+        <label><span>Recompensa: qué se premia</span><input type="text" id="pRec" placeholder="Ej.: +1 por paciente atendido"></label>
+        <label><span>γ: cuánto pesa el futuro</span><input type="text" id="pGam" inputmode="decimal" placeholder="Ej.: 0,9"></label>
+        <label class="ancho"><span>Quién define la recompensa y quién la ve</span><input type="text" id="pQuien" placeholder="Ej.: la dirección técnica; la ven los empleados en una planilla"></label>
+        <label class="ancho"><span>Cómo podría hacer trampa (reward hacking) y cómo lo evitás</span><textarea id="pTrampa" rows="2"></textarea></label>
+      </div>
+      <div class="medidor"><span>ficha</span><span class="barra"><i id="medProy"></i></span><b id="medTxt">0/7</b></div>
+      <div class="row"><button class="btn" id="bEjemplo">Cargar el ejemplo resuelto</button><button class="btn primary" id="bCopiarPy">Copiar como Python</button><button class="btn" id="bCopiarMd">Copiar como Markdown</button><button class="btn" id="bBorrarProy">Borrar</button><span class="cap" id="capProy" role="status" aria-live="polite"></span></div>
+      <textarea class="salida" id="outProy" readonly aria-label="Ficha del proyecto para copiar"></textarea>
+    </div>
+    <div class="texto">
+      <div class="paso">2 · El MDP de tu dominio</div>
+      <h2>Tu problema, tu recompensa</h2>
+      <p>Elegí una decisión que se repite en tu área y escribila como MDP, con pocos estados (de 3 a 30), unas pocas acciones, transiciones P, recompensa R y un γ.</p>
+      <p>El ejemplo es la planta del ejercicio final del <a id="lnNb4" href="04-planificar-con-mapa.html">notebook de la clase 4</a>, que con γ = 0,9 riega solo cuando la tierra está seca.</p>
+      <p>Si la recompensa la pone quien vende el agua y premia cada riego, la política riega siempre hasta ahogar la planta, un caso de trampa con la recompensa (<i>reward hacking</i>).</p>
+      <p>Completá la ficha, copiala como Python y pegala en la celda del ejercicio de ese notebook, donde <code>resolver_mdp</code> la resuelve con iteración de valor y de política.</p>
+      <p class="nota pregunta">¿Quién define la recompensa de tu problema, quién la ve y qué haría un agente que quisiera cumplirla sin hacer lo que querías?</p>
+    </div>
+  </section>
+
+  <!-- B3: proyecto final -->
+  <section class="bloque" id="b-proyecto" data-objetivos="O3">
+    <div class="stage">
+      <div class="lz"><canvas id="cvRonda" aria-label="Las personas del grupo en ronda, como casillas; las flechas muestran quién devuelve el proyecto de quién. Tocá una persona para ver sus devoluciones"></canvas></div>
+      <div class="ctl"><label for="sN">Personas en el grupo <output id="oN"></output></label><input type="range" id="sN" min="4" max="12" step="1" value="8"></div>
+      <div class="row"><button class="btn" id="bRonda">Otra ronda</button></div>
+      <div class="hud" id="hudRonda"></div>
+      <div class="sub">Tu presentación</div>
+      <div class="form">
+        <label class="ancho"><span>Cómo lo contarías en cinco minutos a alguien que no hizo el curso</span><textarea id="pPres" rows="3"></textarea></label>
+      </div>
+      <div class="row"><button class="btn primary" id="bCopiarTodo">Copiar el proyecto para Discussions</button><span class="cap" id="capTodo" role="status" aria-live="polite"></span></div>
+      <div class="sub">Tu devolución</div>
+      <div class="form rub" id="formRub"></div>
+      <div class="row"><button class="btn" id="bCopiarDev">Copiar la devolución</button><span class="cap" id="capDev" role="status" aria-live="polite"></span></div>
+      <textarea class="salida" id="outDev" readonly aria-label="Devolución en Markdown"></textarea>
+    </div>
+    <div class="texto">
+      <div class="paso">3 · Proyecto final</div>
+      <h2>Presentarlo y devolver</h2>
+      <p>El proyecto final es la ficha del bloque anterior más una presentación de cinco minutos que se entienda sin haber hecho el curso.</p>
+      <p>Publicalo en GitHub Discussions con el título <code>[Clase 16] Proyecto final: …</code> y devolvé los proyectos de las dos personas que te toquen en la ronda.</p>
+      <p>La página arma la devolución con una rúbrica de cuatro criterios, uno por cada parte de la ficha, lista para pegar como respuesta.</p>
+      <p>Una devolución útil nombra una trampa que quien escribió el proyecto no vio.</p>
+      <p class="nota pregunta">Mostrale tu ficha a alguien de tu área que no hizo el curso. ¿Qué pregunta te hizo que la ficha no respondía?</p>
+    </div>
+  </section>
+
+  <!-- B4: la difusión como bandit -->
+  <section class="bloque" id="b-difusion" data-objetivos="O4">
+    <div class="stage">
+      <div class="lz"><canvas id="cvPosts" aria-label="Los doce posts de la campaña de difusión: los cuatro primeros prueban un tipo cada uno y desde el quinto decide el bandit; tocá uno para verlo"></canvas></div>
+      <div class="chips" id="chipsPosts"></div>
+      <div class="post-ver" id="postVer"></div>
+    </div>
+    <div class="texto">
+      <div class="paso">4 · El ejemplo resuelto</div>
+      <h2>Este curso, planteado como bandit</h2>
+      <p>La campaña de difusión es un proyecto final ya resuelto, con el curso como agente y cuatro tipos de post como brazos de un bandit (intriga, concepto, demo e invitación a enseñar).</p>
+      <p>La recompensa son los guardados, compartidos y visitas al repositorio por cada mil personas alcanzadas, con pesos que miden longevidad, fecundidad y fidelidad.</p>
+      <p>Elegir el próximo post es el problema de la <a href="07-explorar.html">clase 7</a>, donde UCB suma al promedio de cada brazo una bonificación por lo poco probado.</p>
+      <div class="eq">puntaje(a) = promedioₐ + c √(ln t / nₐ)</div>
+      <p>La <a href="../difusion/estrategia.html">estrategia completa</a> usa muestreo de Thompson, el otro camino que nombró la clase 7, con una tabla para cargar las métricas reales.</p>
+      <p class="nota pregunta">¿Por qué una visita al repositorio pesa más que un guardado? ¿Qué propagación premiaría el peso al revés?</p>
+    </div>
+  </section>
+
+  <!-- B5: vuelta a la clase 1 -->
+  <section class="bloque" id="b-quien" data-objetivos="O2">
+    <div class="stage">
+      <div class="lz"><canvas id="cvQuien" aria-label="La cueva chica con el mapa de valores: tocá una casilla para poner ahí la salida; el slider de gamma cambia hasta dónde llega la luz"></canvas></div>
+      <div class="ctl"><label for="sG">γ: cuánto pesa el futuro <output id="oG"></output></label><input type="range" id="sG" min="0" max="0.99" step="0.01" value="0.95"></div>
+      <div class="row"><button class="btn" id="bOtro">Que la elija otro</button><button class="btn" id="bOrig">Salida original</button></div>
+      <div class="hud" id="hudQuien"></div>
+      <p class="cap">Tocá cualquier casilla para poner ahí la salida. Cada paso cuesta un poco, como en la clase 4, para que el agente prefiera llegar antes.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">5 · Vuelta a la clase 1</div>
+      <h2>¿Quién elige tu recompensa?</h2>
+      <p>El algoritmo es la iteración de valor de la clase 4 y lo único que cambia al tocar una casilla es quién eligió la meta.</p>
+      <p>Con γ cerca de 0 la luz no pasa de las vecinas de la salida, como en el feed de la clase 1 que solo mira el próximo clic.</p>
+      <div class="eq">horizonte efectivo ≈ 1 / (1 − γ)</div>
+      <p>Para Foucault, cuidarse es poder ver dónde está tu salida y quién la puso, en lugar de aceptar la que pone otro.</p>
+      <p>Son las dos preguntas de la clase 15 hechas sobre vos, a favor de quién juega tu recompensa y cómo podría hacerte trampa.</p>
+      <p class="nota pregunta">Pensá en una app que usás todos los días. ¿Dónde puso la salida y con qué γ? ¿En qué casilla la pondrías vos?</p>
+    </div>
+  </section>
+
+  <!-- B6: para enseñarlo -->
+  <section class="bloque" id="b-ensenar" data-objetivos="O4 O3">
+    <div class="stage">
+      <div class="lz"><canvas id="cvSemanas" aria-label="Dieciséis semanas en cuatro unidades de cuatro clases; tocá una semana para ver qué clase va"></canvas></div>
+      <div class="hud" id="hudSemanas"></div>
+      <div class="sub">Para dar el curso entero</div>
+      <ol class="pasos-curso">
+        <li>Hacé un <i>fork</i> del repositorio, cambiá <code>REPO</code> en <code>assets/cueva.js</code> y publicalo en GitHub Pages.</li>
+        <li>Activá GitHub Discussions para las actividades entre pares, con el prefijo <code>[Clase N]</code>.</li>
+        <li>Una clase por semana durante dieciséis semanas. La página se hace antes del encuentro y en el encuentro va el ejercicio de «Para enseñarlo».</li>
+        <li>Para la vía con código, la nivelación (0a, 0b, 0c) va antes de la semana 1.</li>
+        <li>En la semana 16, el proyecto final entre pares y una clase que cada persona le da a alguien de afuera.</li>
+      </ol>
+    </div>
+    <div class="texto">
+      <div class="paso">Para enseñarlo</div>
+      <h2>Cómo dar este curso a otra persona</h2>
+      <p>«Le enseñamos a una máquina a salir de una cueva a oscuras y en el camino aprendimos a ver quién pone la salida.»</p>
+      <p class="nota pregunta">Pregunta para hacerle a quien te escucha: ¿qué aprendiste vos porque alguien te lo enseñó, y a quién se lo enseñaste después?</p>
+      <p><b>Ejercicio de 5 minutos:</b> cada persona elige una parada del recorrido y se la cuenta a otra en dos minutos usando solo la cueva.</p>
+      <p>Si la oración que repite quien escucha se parece a la de esa clase, la copia fue fiel.</p>
+      <p>En términos de Dawkins, el curso dura si se copia con <b>fidelidad</b> (la prueba de la oración), con <b>fecundidad</b> (enseñarle a alguien de afuera) y con <b>longevidad</b> (un repositorio libre que cualquiera copia).</p>
+    </div>
+  </section>
+</main>
+<script src="../assets/modulos.js"></script>
+<script src="../assets/cueva.js"></script>
+<script>
+(() => {
+  Cueva.pagina("16", { lecturas: [
+    { texto: "Freire, P. (1970). Pedagogía del oprimido, cap. 2.", url: "" },
+    { texto: "Foucault, M. (2001). La hermenéutica del sujeto. Curso en el Collège de France, 1981–1982.", url: "" },
+    { texto: "Dawkins, R. (1976). El gen egoísta, cap. 11.", url: "" },
+    { texto: "Amodei, D. et al. (2016). Concrete Problems in AI Safety (reward hacking).", url: "https://arxiv.org/abs/1606.06565" },
+    { texto: "Sutton, R. S. y Barto, A. G. (2018). Reinforcement Learning: An Introduction, 2.ª ed., cap. 17 (fronteras).", url: "http://incompleteideas.net/book/the-book-2nd.html" }
+  ] });
+
+  const COL = Cueva.COL();
+  const MONO = COL.mono || "monospace";
+  const reducir = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = id => document.getElementById(id);
+  const fmt = (x, d = 2) => x.toFixed(d).replace(".", ",");
+  const guardar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } };
+  const leer = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch (e) { return d; } };
+  const copiar = (ta, cap) => {
+    const ok = () => cap.textContent = "Copiado.", no = () => { ta.select(); cap.textContent = "Seleccionado: copialo con Ctrl+C."; };
+    try { navigator.clipboard.writeText(ta.value).then(ok, no); } catch (e) { no(); }
+  };
+  const INFO = {}; Cueva.CLASES.forEach(c => INFO[c.id] = c);
+  // ancho útil del contenedor de un canvas
+  function ajustar(cv, alto) {
+    const pe = cv.parentElement, cs = getComputedStyle(pe);
+    const w = Math.max(200, pe.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 2), dpr = devicePixelRatio || 1;
+    cv.width = w * dpr; cv.height = alto * dpr; cv.style.width = w + "px"; cv.style.height = alto + "px";
+    const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx, w, h: alto };
+  }
+  function flecha(ctx, x1, y1, cx, cy, x2, y2, color, ancho = 1.6) {
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = ancho;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.quadraticCurveTo(cx, cy, x2, y2); ctx.stroke();
+    const an = Math.atan2(y2 - cy, x2 - cx), L = 7;
+    ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(x2 - L * Math.cos(an - .45), y2 - L * Math.sin(an - .45)); ctx.lineTo(x2 - L * Math.cos(an + .45), y2 - L * Math.sin(an + .45)); ctx.closePath(); ctx.fill();
+  }
+
+  // ================= B1: el recorrido sobre la cueva =================
+  const mapa = (() => {
+    const N = 15;
+    const env = Cueva.makeEnv(Cueva.MAPS.grande), cv = $("cvMapa"), T = Cueva.tablero(cv, env, { maxCell: 26 });
+    const G = 0.96;
+    const V = Cueva.iteracionValor(env, { gamma: G, iters: 120 }).V, POL = Cueva.politicaGreedy(env, V, { gamma: G });
+    const RUTA = Cueva.camino(env, POL), L = RUTA.length - 1;
+    const idx = k => Math.round((k - 1) * L / N);   // k = 1..15; la salida queda para la clase 16
+    const PARADA = k => RUTA[idx(k)];
+    const caminata = (() => { const r = Cueva.rng(11), toc = new Set(), tr = [env.start]; let s = env.start; for (let i = 0; i < 90; i++) { const a = Math.floor(r() * 4), [s2, b, k] = env.move(s, a); if (b) toc.add(k); else { s = s2; tr.push(s); } } return { toc, tr }; })();
+    const visitas = (() => { const r = Cueva.rng(5), n = new Array(env.nS).fill(0); let s = env.start; for (let i = 0; i < 700; i++) { n[s]++; let ba = 0, bn = Infinity; for (let a = 0; a < 4; a++) { const [s2, b] = env.move(s, a); const v = b ? Infinity : n[s2] + r() * .5; if (v < bn) { bn = v; ba = a; } } s = env.move(s, ba)[0]; if (s === env.goal) s = env.start; } return n; })();
+    const firma = s => { let f = 0; for (let a = 0; a < 4; a++) if (env.move(s, a)[1]) f |= 1 << a; return f; };
+    const registros = (() => { const out = []; for (let k = 0; k < 14; k++) { const r = Cueva.rng(100 + k), tr = [env.start]; let s = env.start; for (let i = 0; i < 70 && s !== env.goal; i++) { const a = r() < .3 ? Math.floor(r() * 4) : POL[s]; s = env.move(s, a)[0]; tr.push(s); } out.push(tr); } return out; })();
+    const vistos = new Set(); registros.forEach(tr => tr.forEach(s => vistos.add(s)));
+    const distDesde = s0 => { const d = new Array(env.nS).fill(Infinity); d[s0] = 0; const q = [s0]; while (q.length) { const u = q.shift(); for (let a = 0; a < 4; a++) { const [v, b] = env.move(u, a); if (!b && d[v] === Infinity) { d[v] = d[u] + 1; q.push(v); } } } return d; };
+    const PAL = ["#14182a", "#3b2f5c", "#1c4b5a", "#2d5a3c", "#5c3a2a", "#4a4a20", "#5a2440", "#24405a", "#3a5a5a", "#5a4a3a", "#2a3a5a", "#4a2a5a", "#3a3a3a", "#5a5a2a", "#2a5a4a", "#5a2a2a"];
+    const PALABRA = ["arriba", "derecha", "abajo", "izquierda"];
+    const HERR = {
+      1: "El marco: a quién le enseñamos, con qué recompensa y quién la elige. Arrancás a oscuras.",
+      2: "Agente, entorno, historia y estado. Una caminata al azar descubre paredes a los golpes.",
+      3: "De la cadena de Markov a Bellman: el retorno descontado con γ le da un valor a cada casilla.",
+      4: "Con el mapa, iteración de valor y de política: el valor se derrama desde la salida y aparecen las flechas.",
+      5: "Sin mapa, Monte Carlo y TD estiman el valor con partidas jugadas.",
+      6: "SARSA y Q-learning: las flechas se aprenden de la experiencia, solo donde el agente estuvo.",
+      7: "Explorar: del bandit de anuncios a contar visitas en la cueva (más celeste, más visitas).",
+      8: "De la tabla a la red: casillas que se sienten igual (mismo color) comparten lo aprendido.",
+      9: "Memoria: cuando la casilla no alcanza, una red recurrente resume la historia.",
+      10: "Aprender de registros: imitar partidas grabadas y hacer RL offline sin volver a jugar.",
+      11: "Policy gradient: las flechas son probabilidades y se refuerza lo que salió bien.",
+      12: "Aprender la recompensa: de «¿cuál de estos dos trayectos preferís?» sale lo que se premia.",
+      13: "El modelo de lenguaje como política: el estado es texto y la acción es un token.",
+      14: "Agentes de lenguaje: pensar, usar una herramienta, observar y volver a decidir.",
+      15: "Agentes aplicados: a favor de quién juega la recompensa y cómo podría hacer trampa."
+    };
+    let k = 1;
+    const parEl = $("paradas");
+    parEl.innerHTML = Array.from({ length: N }, (_, i) => `<button type="button" data-k="${i + 1}" aria-label="Clase ${i + 1}">${i + 1}</button>`).join("");
+    parEl.querySelectorAll("button").forEach(b => b.addEventListener("click", () => { parar(); ir(+b.dataset.k); }));
+
+    function dibujar() {
+      const lit = RUTA.slice(0, idx(k) + 1), ctx = T.ctx, cell = T.cell;
+      T.medir().fondo().paredes("#10131b");
+      if (k === 3) T.valores(V);
+      if (k === 4) T.valores(V);
+      if (k === 7) { const hi = Math.max(...visitas); for (let s = 0; s < env.nS; s++) if (visitas[s]) { const [r, c] = env.free[s]; T.casilla(r, c, Cueva.rampa("visitas", Math.sqrt(visitas[s] / hi))); } }
+      if (k === 8) for (let s = 0; s < env.nS; s++) { const [r, c] = env.free[s]; T.casilla(r, c, PAL[firma(s)]); }
+      if (k === 15) { const d = distDesde(PARADA(15)); for (let s = 0; s < env.nS; s++) if (d[s] < 14) { const [r, c] = env.free[s]; ctx.globalAlpha = .9 * (1 - d[s] / 14); T.casilla(r, c, COL.exit, 2); ctx.globalAlpha = 1; } }
+      const conocidas = new Set();
+      for (const s of lit) { const [r, c] = env.free[s]; for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if (env.rows[r + dr] && env.isWall(r + dr, c + dc)) conocidas.add((r + dr) + "," + (c + dc)); }
+      if (k === 2) for (const x of caminata.toc) conocidas.add(x);
+      T.tocadas(conocidas, COL.chalk);
+      if (k === 2) T.trayecto(caminata.tr, "rgba(242,179,90,.35)", .1);
+      if (k === 5) registros.slice(0, 3).forEach(tr => T.trayecto(tr, "rgba(242,179,90,.45)", .07));
+      if (k === 10) registros.forEach(tr => T.trayecto(tr, "rgba(94,200,216,.28)", .06));
+      if (k === 4) T.flechas(POL, "rgba(11,13,18,.8)");
+      if (k === 6) for (const s of vistos) if (s !== env.goal) T.texto(s, Cueva.ARROW[POL[s]], COL.lamp, .45);
+      if (k === 11) for (let s = 0; s < env.nS; s++) if (s !== env.goal) { ctx.globalAlpha = .25 + .6 * ((s * 7) % 5) / 4; T.texto(s, Cueva.ARROW[POL[s]], COL.lamp, .42); ctx.globalAlpha = 1; }
+      if (k === 12) T.trayecto(registros[2], "rgba(224,100,90,.75)", .08);
+      T.trayecto(lit, COL.exit, .14);
+      if (k === 9) lit.forEach((s, i) => { const [r, c] = env.free[s]; ctx.globalAlpha = .15 + .85 * i / lit.length; ctx.fillStyle = COL.lamp; ctx.beginPath(); ctx.arc(c * cell + cell / 2, r * cell + cell / 2, cell * .18, 0, 7); ctx.fill(); ctx.globalAlpha = 1; });
+      if (k === 13) lit.slice(0, -1).forEach((s, i) => { const s2 = lit[i + 1]; let a = 0; for (let x = 0; x < 4; x++) if (env.move(s, x)[0] === s2) a = x; if (i % 2 === 0) T.texto(s, PALABRA[a].slice(0, 3), COL.cave, .3); });
+      if (k === 14) lit.forEach((s, i) => { if (i % 4 === 2) T.texto(s, "obs", COL.cave, .3); });
+      for (let j = 1; j <= N; j++) {
+        if (j === k) continue;
+        const [r, c] = env.free[PARADA(j)];
+        ctx.fillStyle = j < k ? "rgba(11,13,18,.85)" : "rgba(11,13,18,.6)"; ctx.fillRect(c * cell + cell * .1, r * cell + cell * .1, cell * .8, cell * .8);
+        ctx.fillStyle = j < k ? COL.lamp : COL.muted; ctx.font = `600 ${Math.round(cell * (j > 9 ? .36 : .42))}px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(j, c * cell + cell / 2, r * cell + cell / 2 + 1);
+      }
+      T.salida(); T.texto(env.goal, "16", COL.cave, .38);
+      if (k === 1) { const [r, c] = env.free[env.start]; ctx.fillStyle = COL.muted; ctx.font = `600 ${Math.round(cell * .55)}px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("?", (c + 1) * cell + cell / 2, r * cell + cell / 2 + 1); }
+      T.sprite(PARADA(k), 1);
+      const c = INFO[String(k)];
+      const tit = c.pronto ? `${c.titulo} <span class="small muted">(próximamente)</span>` : `<a href="${c.archivo}">${c.titulo}</a>`;
+      $("fichaMapa").innerHTML = `<span class="t">Clase ${k} · unidad ${c.unidad}</span><b>${tit}</b><span class="small">${HERR[k]}</span>`;
+      parEl.querySelectorAll("button").forEach(b => { const j = +b.dataset.k; b.setAttribute("aria-pressed", j === k ? "true" : "false"); b.classList.toggle("hecha", j < k); });
+      $("bAnt").disabled = k === 1; $("bSig").disabled = k === N;
+    }
+    function ir(n) { k = Math.max(1, Math.min(N, n)); dibujar(); }
+    let timer = null;
+    function parar() { clearTimeout(timer); timer = null; $("bRecorrer").textContent = "Recorrer todo"; }
+    function recorrer(ms) {
+      if (reducir) { ir(N); return; }
+      $("bRecorrer").textContent = "Pausa"; ir(1);
+      const tic = () => { if (k < N) { ir(k + 1); timer = setTimeout(() => requestAnimationFrame(tic), ms); } else parar(); };
+      timer = setTimeout(() => requestAnimationFrame(tic), ms);
+    }
+    $("bAnt").addEventListener("click", () => { parar(); ir(k - 1); });
+    $("bSig").addEventListener("click", () => { parar(); ir(k + 1); });
+    $("bRecorrer").addEventListener("click", () => { if (timer) { parar(); return; } recorrer(1400); });
+    cv.addEventListener("click", ev => { const [r, c] = T.celdaEn(ev); for (let j = 1; j <= N; j++) { const [pr, pc] = env.free[PARADA(j)]; if (Math.abs(pr - r) + Math.abs(pc - c) <= 1) { parar(); ir(j); return; } } });
+    Cueva.alCargarSprites(dibujar);
+    dibujar();
+    recorrer(260);   // al cargar, las quince casillas se encienden una por clase
+    return { dibujar };
+  })();
+
+  // ================= B2: el MDP de la planta (notebook de la clase 4, celda del ejercicio) =================
+  const planta = (() => {
+    const EST = ["seca", "bien", "ahogada"], ACC = ["regar", "no regar"], GAMMA = 0.9;
+    // transiciones del ejemplo del notebook 04: [probabilidad, estado siguiente, recompensa]
+    const TR = {
+      seca: { "regar": [[0.9, "bien", 1], [0.1, "seca", -1]], "no regar": [[1, "seca", -1]] },
+      bien: { "regar": [[0.7, "bien", 1], [0.3, "ahogada", -1]], "no regar": [[0.6, "bien", 1], [0.4, "seca", -1]] },
+      ahogada: { "regar": [[1, "ahogada", -1]], "no regar": [[0.5, "bien", 1], [0.5, "ahogada", -1]] }
+    };
+    let modo = "planta";
+    const rec = (r, a) => modo === "planta" ? r : (a === "regar" ? 1 : 0);
+    function resolver() {
+      let V = { seca: 0, bien: 0, ahogada: 0 };
+      const q = (s, a, V) => TR[s][a].reduce((t, [p, s2, r]) => t + p * (rec(r, a) + GAMMA * V[s2]), 0);
+      for (let i = 0; i < 2000; i++) {
+        const N = {}; let d = 0;
+        EST.forEach(s => { N[s] = Math.max(...ACC.map(a => q(s, a, V))); d = Math.max(d, Math.abs(N[s] - V[s])); });
+        V = N; if (d < 1e-10) break;
+      }
+      const pol = {}; EST.forEach(s => { pol[s] = ACC.reduce((b, a) => q(s, a, V) > q(s, b, V) + 1e-12 ? a : b, ACC[0]); });
+      return { V, pol };
+    }
+    const cv = $("cvPlanta");
+    const COLS = { seca: COL.ember, bien: COL.exit, ahogada: COL.sonar };
+    function dibujar() {
+      const { V, pol } = resolver();
+      const { ctx, w, h } = ajustar(cv, 200);
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      const bw = Math.min(110, w / 3 - 18), bh = 62, yc = h / 2;
+      const X = i => w * (i + .5) / 3;
+      // transiciones de la acción elegida
+      EST.forEach((s, i) => {
+        TR[s][pol[s]].forEach(([p, s2]) => {
+          const j = EST.indexOf(s2), x1 = X(i), x2 = X(j);
+          let lx, ly;
+          ctx.font = `12px ${MONO}`;
+          if (j === i) {
+            const y0 = yc - bh / 2;
+            flecha(ctx, x1 - 14, y0, x1 - 30, y0 - 46, x1 + 10, y0 - 1, COL.lamp);
+            lx = x1 - 10; ly = y0 - 34;
+          } else {
+            const arriba = j > i, dy = arriba ? -bh / 2 : bh / 2, off = arriba ? -48 : 48;
+            const xa = x1 + (j > i ? bw / 4 : -bw / 4), xb = x2 - (j > i ? bw / 4 : -bw / 4);
+            flecha(ctx, xa, yc + dy, (xa + xb) / 2, yc + dy + off, xb, yc + dy, COL.lamp);
+            lx = (xa + xb) / 2; ly = yc + dy + off / 2 + (arriba ? -10 : 14);
+          }
+          ctx.fillStyle = COL.lamp; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.fillText(fmt(p, p === 1 ? 0 : 1), lx, ly);
+        });
+      });
+      // estados
+      EST.forEach((s, i) => {
+        const x = X(i) - bw / 2, y = yc - bh / 2;
+        ctx.fillStyle = COL.rock || "#1a1e29"; ctx.fillRect(x, y, bw, bh);
+        ctx.strokeStyle = COLS[s]; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, bw - 2, bh - 2);
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillStyle = COLS[s]; ctx.font = `600 13px ${MONO}`; ctx.fillText(s, X(i), y + 14);
+        ctx.fillStyle = COL.ink; ctx.font = `12px ${MONO}`; ctx.fillText(pol[s], X(i), y + 32);
+        ctx.fillStyle = COL.muted; ctx.fillText(modo === "planta" ? "V* " + fmt(V[s]) : "riega", X(i), y + 49);
+      });
+      $("hudPlanta").innerHTML = modo === "planta"
+        ? `<span>recompensa: <b>+1</b> si la planta queda bien, <b>−1</b> si no</span><span>la define <b>quien cuida la planta</b></span><span>γ = <b>0,9</b> · valores del notebook de la clase 4</span>`
+        : `<span>recompensa: <b>+1</b> por cada riego</span><span>la define <b>quien vende el agua</b></span><span>riega en los tres estados y la planta <b style="color:var(--ember)">termina ahogada</b></span>`;
+    }
+    $("segPlanta").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+      modo = b.dataset.m; $("segPlanta").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false")); dibujar();
+    }));
+    $("lnNb4").href = Cueva.colab("04-planificar-con-mapa.ipynb");
+    dibujar();
+    return { dibujar };
+  })();
+
+  // ficha del proyecto
+  const CAMPOS = [["pNom", "Proyecto"], ["pEst", "Estados"], ["pAcc", "Acciones"], ["pRec", "Recompensa"], ["pGam", "γ"], ["pQuien", "Quién define la recompensa y quién la ve"], ["pTrampa", "Trampa posible y cómo evitarla"]];
+  const EJEMPLO = {
+    pNom: "La difusión de este curso como bandit",
+    pEst: "acto de la campaña (I, II, III)\naudiencia ya alcanzada",
+    pAcc: "post de intriga\npost de concepto\npost con demo interactiva\npost que invita a enseñar",
+    pRec: "1000 · (1·guardados + 3·compartidos + 5·visitas al repo) / alcance, a los 7 días",
+    pGam: "0",
+    pQuien: "La define quien da el curso; los pesos están a la vista en la página de difusión y cualquiera puede cambiarlos.",
+    pTrampa: "Juntar guardados con posts de intriga que no llevan al material. Se evita pesando más la visita al repositorio, que mide fidelidad."
+  };
+  const lineas = t => (t || "").split("\n").map(x => x.trim()).filter(Boolean);
+  const valoresProy = () => Object.fromEntries(CAMPOS.map(([id]) => [id, $(id).value]));
+  const mdProy = v => `## ${v.pNom.trim() || "Proyecto final"}\n\n` + CAMPOS.slice(1).map(([id, t]) => {
+    const x = (v[id] || "").trim(); if (!x) return `**${t}:** (pendiente)`;
+    return (id === "pEst" || id === "pAcc") ? `**${t}:**\n${lineas(x).map(l => "- " + l).join("\n")}` : `**${t}:** ${x}`;
+  }).join("\n\n");
+  const pyProy = v => {
+    const q = x => JSON.stringify(x);
+    const E = lineas(v.pEst), A = lineas(v.pAcc), g = parseFloat((v.pGam || "").replace(",", "."));
+    return `# Proyecto final: ${v.pNom.trim() || "(sin nombre)"}\n# Recompensa: ${v.pRec.trim() || "(pendiente)"}\n# Quién la define y quién la ve: ${v.pQuien.trim() || "(pendiente)"}\n# Trampa posible: ${v.pTrampa.trim().replace(/\n/g, " ") || "(pendiente)"}\n` +
+      `MIS_ESTADOS = [${(E.length ? E : ["estado 1", "estado 2", "estado 3"]).map(q).join(", ")}]\nMIS_ACCIONES = [${(A.length ? A : ["acción 1", "acción 2"]).map(q).join(", ")}]\nMI_GAMMA = ${isFinite(g) && g >= 0 && g < 1 ? g : 0.9}\n\n` +
+      `def mi_transicion(s, a):\n    # lista de (probabilidad, estado siguiente, recompensa); reemplazar por las P y R de tu problema\n    return [(1.0, s, 0.0)]\n\nmi_sol = resolver_mdp(MIS_ESTADOS, MIS_ACCIONES, mi_transicion, gamma=MI_GAMMA)\n`;
+  };
+  let salidaProy = "py";
+  function actualizarProy(guarda = true) {
+    const v = valoresProy(); let n = 0;
+    CAMPOS.forEach(([id]) => { const ok = v[id].trim().length >= (id === "pGam" ? 1 : 3); if (ok) n++; $(id).closest("label").classList.toggle("listo", ok); });
+    $("medProy").style.width = (100 * n / CAMPOS.length) + "%"; $("medTxt").textContent = `${n}/${CAMPOS.length}`;
+    $("outProy").value = salidaProy === "py" ? pyProy(v) : mdProy(v);
+    if (guarda) guardar("rlac-c16-proyecto", v);
+  }
+  (() => {
+    const g = leer("rlac-c16-proyecto", null);
+    if (g && typeof g === "object") CAMPOS.forEach(([id]) => { if (typeof g[id] === "string") $(id).value = g[id]; });
+    CAMPOS.forEach(([id]) => $(id).addEventListener("input", () => actualizarProy()));
+    $("bEjemplo").addEventListener("click", () => { CAMPOS.forEach(([id]) => $(id).value = EJEMPLO[id]); actualizarProy(); $("capProy").textContent = "Ejemplo cargado: reemplazalo por el tuyo."; });
+    $("bBorrarProy").addEventListener("click", () => { CAMPOS.forEach(([id]) => $(id).value = ""); actualizarProy(); $("capProy").textContent = ""; });
+    $("bCopiarPy").addEventListener("click", () => { salidaProy = "py"; actualizarProy(false); copiar($("outProy"), $("capProy")); });
+    $("bCopiarMd").addEventListener("click", () => { salidaProy = "md"; actualizarProy(false); copiar($("outProy"), $("capProy")); });
+    actualizarProy(false);
+  })();
+
+  // ================= B3: ronda de devoluciones y rúbrica =================
+  const ronda = (() => {
+    const cv = $("cvRonda"), rnd = Cueva.rng(16), ALTO = 280;
+    let N = 8, o = 1, sel = 0, pos = [], lado = 30;
+    const LET = "ABCDEFGHIJKL";
+    const devuelve = i => [(i + o) % N, (i + o + 1) % N];
+    function dibujar() {
+      $("oN").textContent = N;
+      const { ctx, w, h } = ajustar(cv, ALTO);
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+      const R = Math.min(w, h) / 2 - 30, cx = w / 2, cy = h / 2;
+      lado = Math.max(22, Math.min(32, R * .32));
+      pos = Array.from({ length: N }, (_, i) => { const t = -Math.PI / 2 + 2 * Math.PI * i / N; return [cx + R * Math.cos(t), cy + R * Math.sin(t)]; });
+      ctx.fillStyle = COL.muted; ctx.font = `12px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("Discussions", cx, cy);
+      const linea = (i, j, color, ancho) => {
+        const [x1, y1] = pos[i], [x2, y2] = pos[j], dx = x2 - x1, dy = y2 - y1, d = Math.hypot(dx, dy) || 1;
+        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, k = .18 * d;
+        const a = lado * .62, sx = x1 + dx / d * a, sy = y1 + dy / d * a, ex = x2 - dx / d * a, ey = y2 - dy / d * a;
+        flecha(ctx, sx, sy, mx - dy / d * k, my + dx / d * k, ex, ey, color, ancho);
+      };
+      for (let i = 0; i < N; i++) for (const j of devuelve(i)) if (i !== sel && j !== sel) linea(i, j, "rgba(141,147,163,.3)", 1);
+      for (const j of devuelve(sel)) linea(sel, j, COL.lamp, 2.2);
+      for (let i = 0; i < N; i++) if (devuelve(i).includes(sel)) linea(i, sel, COL.exit, 2.2);
+      pos.forEach(([x, y], i) => {
+        ctx.fillStyle = i === sel ? COL.ink : (COL.rock || "#1a1e29"); ctx.fillRect(x - lado / 2, y - lado / 2, lado, lado);
+        ctx.strokeStyle = COL.rock3; ctx.lineWidth = 1; ctx.strokeRect(x - lado / 2 + .5, y - lado / 2 + .5, lado - 1, lado - 1);
+        ctx.fillStyle = i === sel ? COL.cave : COL.ink; ctx.font = `600 ${Math.round(lado * .5)}px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(LET[i], x, y + 1);
+      });
+      const rec = []; for (let i = 0; i < N; i++) if (devuelve(i).includes(sel)) rec.push(LET[i]);
+      const [a, b] = devuelve(sel);
+      $("hudRonda").innerHTML = `<span>proyecto de <b>${LET[sel]}</b></span><span style="color:var(--exit)">lo devuelven <b>${rec.join(" y ")}</b></span><span style="color:var(--lamp)">${LET[sel]} devuelve <b>${LET[a]} y ${LET[b]}</b></span><span>cada proyecto recibe <b>2</b> devoluciones</span>`;
+    }
+    $("sN").addEventListener("input", () => { N = +$("sN").value; o = Math.min(o, N - 2); sel = Math.min(sel, N - 1); dibujar(); });
+    $("bRonda").addEventListener("click", () => { let n; do { n = 1 + Math.floor(rnd() * (N - 2)); } while (n === o && N > 3); o = n; dibujar(); });
+    cv.addEventListener("click", ev => {
+      const b = cv.getBoundingClientRect(), x = ev.clientX - b.left, y = ev.clientY - b.top;
+      const i = pos.findIndex(([px, py]) => Math.abs(px - x) <= lado * .7 && Math.abs(py - y) <= lado * .7); if (i >= 0) { sel = i; dibujar(); }
+    });
+    dibujar();
+    return { dibujar };
+  })();
+
+  (() => {
+    $("pPres").value = leer("rlac-c16-presentacion", "");
+    $("pPres").addEventListener("input", () => guardar("rlac-c16-presentacion", $("pPres").value));
+    $("bCopiarTodo").addEventListener("click", () => {
+      const v = valoresProy(), ta = document.createElement("textarea");
+      ta.value = mdProy(v) + `\n\n**Presentación en cinco minutos:** ${$("pPres").value.trim() || "(pendiente)"}`;
+      ta.setAttribute("readonly", ""); ta.style.position = "absolute"; ta.style.left = "-9999px"; document.body.appendChild(ta);
+      const fin = () => setTimeout(() => ta.remove(), 0);
+      try { navigator.clipboard.writeText(ta.value).then(() => { $("capTodo").textContent = "Copiado: pegalo en un tema nuevo de Discussions."; fin(); }, () => { ta.select(); document.execCommand && document.execCommand("copy"); $("capTodo").textContent = "Si no se copió, usá «Copiar como Markdown» arriba."; fin(); }); }
+      catch (e) { $("capTodo").textContent = "Usá «Copiar como Markdown» arriba."; fin(); }
+    });
+    const CRIT = [
+      ["Estados y acciones", "alcanzan para decidir (Markov) y son pocos"],
+      ["Recompensa", "mide lo que de verdad se quiere y dice quién la define y quién la ve"],
+      ["Trampa", "nombra al menos una trampa posible y una forma concreta de evitarla"],
+      ["Presentación", "se entiende en cinco minutos sin haber hecho el curso"]
+    ];
+    const NIV = ["cumple", "a medias", "falta"];
+    $("formRub").innerHTML = CRIT.map(([t, d], i) => `<label class="ancho"><span><b>${t}</b>: ${d}</span><select id="rub${i}">${NIV.map(n => `<option>${n}</option>`).join("")}</select></label>`).join("") +
+      `<label class="ancho ancho2"><span>Una trampa que no viste en la ficha</span><input type="text" id="rubTrampa"></label><label class="ancho ancho2"><span>Una pregunta para quien lo escribió</span><input type="text" id="rubPreg"></label>`;
+    const ids = [...CRIT.map((_, i) => "rub" + i), "rubTrampa", "rubPreg"];
+    function dev() {
+      $("outDev").value = "### Devolución\n\n" + CRIT.map(([t], i) => `- **${t}:** ${$("rub" + i).value}`).join("\n") +
+        `\n\n**Una trampa que no viste:** ${$("rubTrampa").value.trim() || "(pendiente)"}\n\n**Pregunta:** ${$("rubPreg").value.trim() || "(pendiente)"}`;
+    }
+    ids.forEach(id => { $(id).addEventListener("input", dev); $(id).addEventListener("change", dev); });
+    $("bCopiarDev").addEventListener("click", () => copiar($("outDev"), $("capDev")));
+    dev();
+  })();
+
+  // ================= B4: la campaña de difusión =================
+  const posts = (() => {
+    const TIPO = { intriga: COL.lamp, concepto: COL.sonar, demo: COL.exit, "enseñar": "#b48ad8" };
+    const P = [["Estás a ciegas", "intriga"], ["La pared que tocás", "concepto"], ["La salida es verde", "demo"], ["¿Cómo aprende algo que no ve?", "enseñar"],
+      ["Recompensa", "concepto"], ["Cada casilla tiene un valor", "demo"], ["Explorar o explotar", "demo"], ["De la tabla a la red", "concepto"],
+      ["Cuidado con lo que premiás", "intriga"], ["Soy un meme", "enseñar"], ["Esta campaña es un bandit", "demo"], ["Enseñale esto a alguien", "enseñar"]];
+    $("chipsPosts").innerHTML = Object.entries(TIPO).map(([t, c]) => `<span><i style="background:${c}"></i>${t}</span>`).join("");
+    const cv = $("cvPosts");
+    let sel = 0, geo = null;
+    function dibujar() {
+      const { ctx, w } = ajustar(cv, 126); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, 126);
+      const pad = 8, gap = 6, cw = (w - 2 * pad - 11 * gap) / 12, ch = Math.min(cw * 1.25, 64), y = 34;
+      geo = { pad, gap, cw, ch, y };
+      ctx.font = `12px ${MONO}`; ctx.textBaseline = "bottom"; ctx.textAlign = "left";
+      const x4 = pad + 4 * (cw + gap) - gap / 2;
+      ctx.fillStyle = COL.muted; ctx.fillText(w > 420 ? "explorar: uno de cada tipo" : "explorar", pad, y - 8);
+      ctx.textAlign = "right"; ctx.fillText(w > 420 ? "desde el quinto decide el bandit" : "decide el bandit", w - pad, y - 8);
+      ctx.strokeStyle = COL.rock3; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x4 + .5, y - 4); ctx.lineTo(x4 + .5, y + ch + 22); ctx.stroke(); ctx.setLineDash([]);
+      P.forEach(([t, tp], i) => {
+        const x = pad + i * (cw + gap);
+        ctx.fillStyle = TIPO[tp]; ctx.globalAlpha = i < 4 ? 1 : .75; ctx.fillRect(x, y, cw, ch); ctx.globalAlpha = 1;
+        if (i === sel) { ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.strokeRect(x - 2, y - 2, cw + 4, ch + 4); }
+        ctx.fillStyle = COL.cave; ctx.font = `600 ${Math.max(9, Math.min(13, cw * .45))}px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(String(i + 1).padStart(2, "0"), x + cw / 2, y + ch / 2);
+      });
+      ctx.fillStyle = COL.muted; ctx.font = `11px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "top";
+      ["semana 1", "semana 2", "semana 3", "semana 4"].forEach((s, j) => ctx.fillText(w > 420 ? s : "s" + (j + 1), pad + (j * 3 + 1.5) * (cw + gap) - gap / 2, y + ch + 8));
+      const [t, tp] = P[sel], n = String(sel + 1).padStart(2, "0");
+      $("postVer").innerHTML = `<img src="../difusion/posts/post-${n}.png" alt="Post ${n} de la campaña: ${t}" loading="lazy" width="110" height="138"><div><span class="t">post ${n} · ${tp}${sel < 4 ? " · exploración" : " · planificado, el bandit puede cambiarlo"}</span><b>${t}</b><span class="small muted">${sel < 4 ? "Uno de los cuatro posts que prueban cada tipo una vez, para tener con qué comparar." : "Antes de publicarlo se cargan las métricas de los anteriores en la página de difusión. Si recomienda otro tipo, se cambian el cierre y el llamado a la acción."}</span></div>`;
+    }
+    cv.addEventListener("click", ev => {
+      if (!geo) return; const b = cv.getBoundingClientRect(), x = ev.clientX - b.left, y = ev.clientY - b.top;
+      if (y < geo.y - 4 || y > geo.y + geo.ch + 4) return;
+      const i = Math.floor((x - geo.pad + geo.gap / 2) / (geo.cw + geo.gap)); if (i >= 0 && i < 12) { sel = i; dibujar(); }
+    });
+    dibujar();
+    return { dibujar };
+  })();
+
+  // ================= B5: ¿quién elige tu recompensa? =================
+  const quien = (() => {
+    const BASE = Cueva.MAPS.chica, cv = $("cvQuien"), hud = $("hudQuien"), COSTO = 0.02;
+    const env0 = Cueva.makeEnv(BASE), meta0 = env0.free[env0.goal];
+    let meta = meta0.slice(), quienPuso = "el mapa original", env, T;
+    const rnd = Cueva.rng(21);
+    function armar() {
+      const rows = BASE.map((f, r) => f.split("").map((ch, c) => (r === meta[0] && c === meta[1]) ? "G" : (ch === "G" ? "." : ch)).join(""));
+      env = Cueva.makeEnv(rows);
+      T = Cueva.tablero(cv, env, { maxCell: 34 });
+    }
+    function dibujar() {
+      const g = +$("sG").value; $("oG").textContent = fmt(g);
+      let V = new Array(env.nS).fill(0);
+      for (let i = 0; i < 400; i++) { const r = Cueva.iteracionValor(env, { gamma: g, costo: COSTO, V }); V = r.V; if (r.delta < 1e-9) break; }
+      const pol = Cueva.politicaGreedy(env, V, { gamma: g, costo: COSTO }), p = Cueva.camino(env, pol);
+      const llega = p[p.length - 1] === env.goal;
+      T.medir().fondo().paredes(COL.rock2).valores(V).salida().entrada();
+      T.trayecto(p, llega ? COL.exit : COL.ember, .12).sprite(env.start, 2);
+      const hor = g >= .99 ? "100" : fmt(1 / (1 - g), 1);
+      hud.innerHTML = `<span>salida puesta por <b>${quienPuso}</b></span><span>horizonte ≈ <b>${hor}</b> pasos</span><span>${llega ? `llega en <b>${p.length - 1}</b> pasos` : '<b style="color:var(--ember)">no llega</b>: no ve tan lejos'}</span>`;
+    }
+    function poner(r, c, por) { if (env0.isWall(r, c) || (r === env0.free[env0.start][0] && c === env0.free[env0.start][1])) return; meta = [r, c]; quienPuso = por; armar(); dibujar(); }
+    cv.addEventListener("click", ev => { const [r, c] = T.celdaEn(ev); poner(r, c, "vos"); });
+    $("bOtro").addEventListener("click", () => { let s; do { s = Math.floor(rnd() * env0.nS); } while (s === env0.start); const [r, c] = env0.free[s]; poner(r, c, "otro"); });
+    $("bOrig").addEventListener("click", () => poner(meta0[0], meta0[1], "el mapa original"));
+    $("sG").addEventListener("input", dibujar);
+    armar(); Cueva.alCargarSprites(dibujar); dibujar();
+    return { dibujar };
+  })();
+
+  // ================= B6: dieciséis semanas =================
+  const semanas = (() => {
+    const UNI = { 1: "Fundamentos", 2: "Sin mapa", 3: "De la red a la política", 4: "Lenguaje y agentes" };
+    const CL = Cueva.CLASES.filter(c => /^\d+$/.test(c.id));
+    const COLU = { 1: COL.sonar, 2: COL.lamp, 3: "#b48ad8", 4: COL.exit };
+    const cv = $("cvSemanas");
+    let sel = 16, geo = [];
+    function dibujar() {
+      const pe = cv.parentElement, dos = pe.clientWidth >= 480;
+      const alto = dos ? 2 * 62 + 26 : 4 * 62;
+      const { ctx, w } = ajustar(cv, alto);
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, alto);
+      geo = [];
+      const gu = dos ? 18 : 0, gc = 5;
+      const cwu = dos ? (w - gu) / 2 : w, cs = (cwu - 3 * gc) / 4, ch = Math.min(36, cs);
+      for (let u = 1; u <= 4; u++) {
+        const x0 = dos ? ((u - 1) % 2) * (cwu + gu) : 0, y0 = dos ? Math.floor((u - 1) / 2) * 62 : (u - 1) * 62;
+        ctx.fillStyle = COLU[u]; ctx.font = `600 11px ${MONO}`; ctx.textAlign = "left"; ctx.textBaseline = "top";
+        ctx.fillText(`U${u} · ${UNI[u]}`, x0, y0 + 2);
+        for (let j = 0; j < 4; j++) {
+          const n = (u - 1) * 4 + j + 1, x = x0 + j * (cs + gc), y = y0 + 18;
+          ctx.fillStyle = n === sel ? COLU[u] : "#1a1e29"; ctx.fillRect(x, y, cs, ch);
+          ctx.strokeStyle = COLU[u]; ctx.lineWidth = 1; ctx.strokeRect(x + .5, y + .5, cs - 1, ch - 1);
+          ctx.fillStyle = n === sel ? COL.cave : COL.ink; ctx.font = `600 13px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.fillText(n, x + cs / 2, y + ch / 2 + 1);
+          geo.push([n, x, y, cs, ch]);
+        }
+      }
+      if (dos) { ctx.fillStyle = COL.muted; ctx.font = `11px ${MONO}`; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText("una clase por semana, dieciséis semanas", 0, 2 * 62 + 8); }
+      const c = CL[sel - 1];
+      const tit = c.id === "16" ? `${c.titulo} (esta clase)` : c.pronto ? `${c.titulo} (próximamente)` : `<a href="${c.archivo}">${c.titulo}</a>`;
+      $("hudSemanas").innerHTML = `<span>semana <b>${sel}</b> · unidad ${c.unidad}</span><span>${tit}</span>`;
+    }
+    cv.addEventListener("click", ev => {
+      const b = cv.getBoundingClientRect(), x = ev.clientX - b.left, y = ev.clientY - b.top;
+      const g = geo.find(([, gx, gy, gw, gh]) => x >= gx && x <= gx + gw && y >= gy && y <= gy + gh); if (g) { sel = g[0]; dibujar(); }
+    });
+    dibujar();
+    return { dibujar };
+  })();
+
+  let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { mapa.dibujar(); planta.dibujar(); ronda.dibujar(); posts.dibujar(); quien.dibujar(); semanas.dibujar(); }, 80); });
+})();
+</script>
+</body>
+</html>

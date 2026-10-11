@@ -29,7 +29,7 @@
     return { path, tocadas, visitas, fin: s };
   }
 
-  // exploración por conteo: ir a la vecina menos visitada (curiosidad, clase 5)
+  // exploración por conteo: ir a la vecina menos visitada (curiosidad, clase 7)
   function curiosidad(env, pasos, seed) {
     const r = Cueva.rng(seed); let s = env.start; const visitas = new Array(env.nS).fill(0); visitas[s]++; const tocadas = new Set(); const path = [s];
     const cuenta = {};
