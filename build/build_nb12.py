@@ -702,7 +702,7 @@ print(f"\nmejor β (mediana de la verdadera): {BETAS[j_mejor]:g} → verdadera {
 cells.append(md(r"""
 Es la curva de la sobreoptimización. Con $\beta$ grande la política es casi $\pi_{\text{ref}}$ y las dos recompensas dicen lo mismo: no muy bueno. Al bajar $\beta$ las dos mejoran juntas: la política aprende a esquivar los derrumbes y el retorno verdadero se acerca a $V^*(S)$. Pero si se sigue bajando, **la aprendida pega un salto y la verdadera se desploma a −10** (en una semilla, ya con $\beta = 0{,}1$): el optimizador encontró la casilla con el premio inventado y se quedó ahí. La columna KL muestra el precio: para llegar a esa casilla la política tiene que alejarse muchísimo de $\pi_{\text{ref}}$.
 
-La penalización por alejarse funciona como un freno: deja a la política cerca de lo que hacía la política imitada, que es por donde pasaban los datos con los que se aprendió la recompensa, y no la deja ir a buscar los errores del modelo.
+La penalización por alejarse funciona como un freno: deja a la política cerca de lo que hacía la política imitada, que por lo menos sale de la cueva, y no la deja ir a buscar los errores del modelo. (En el RLHF real hay una razón más: las comparaciones se hacen con respuestas de $\pi_{\text{ref}}$, así que cerca de ella el modelo de recompensa está mejor entrenado. Acá los pedazos salen de casillas y flechas al azar.)
 
 ### Paso 2 — Con más comparaciones, el modelo de recompensa aguanta más
 

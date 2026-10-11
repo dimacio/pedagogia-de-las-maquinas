@@ -150,12 +150,12 @@
           <tbody id="tbMapa"></tbody>
         </table>
       </div>
-      <p class="cap">Comparaciones simuladas y ajuste de Bradley-Terry en el navegador como en el notebook (persona con τ = 0,3, pedazos de 12 pasos, otra semilla). La aprendida se muestra multiplicada por τ. La línea es el plan de la iteración de valor (clase 4) con la aprendida. La tabla es la del notebook, con 5 semillas.</p>
+      <p class="cap">Comparaciones simuladas y ajuste de Bradley-Terry en el navegador como en el notebook (persona con τ = 0,3, pedazos de 12 pasos, otra semilla). La aprendida se muestra multiplicada por τ. La línea es el plan de la iteración de valor (clase 4) con la aprendida. La tabla es la del notebook, con 5 semillas. Con otra semilla el plan de la figura puede quedarse en otra casilla que la (5,4) del notebook: el efecto es el mismo.</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 4</div>
       <h2>El mapa de la recompensa aprendida</h2>
-      <p>Si la recompensa de un pedazo es la suma de una recompensa por casilla, ajustar Bradley-Terry a muchas comparaciones arma un mapa, que se llama modelo de recompensa (<i>reward model</i>). En el notebook, la correlación entre el mapa aprendido y el escondido es 0,228 con 100 comparaciones, 0,841 con 300, 0,981 con 1000 y 0,992 con 3000. Planificar con ese mapa (clase 4) explota sus errores, porque con 300 comparaciones el plan se queda para siempre en (5,4), donde la aprendida vale +0,300 y la escondida −0,1, con un retorno verdadero de −10. El plan sale de la cueva en 0 de 5 semillas con 300 comparaciones, en 3 de 5 con 1000 y en 5 de 5 con 3000, ya con el retorno óptimo de −1,09.</p>
+      <p>Si la recompensa de un pedazo es la suma de una recompensa por casilla, ajustar Bradley-Terry a muchas comparaciones arma un mapa, que se llama modelo de recompensa (<i>reward model</i>). En el notebook, la correlación entre el mapa aprendido y el escondido es 0,228 con 100 comparaciones, 0,841 con 300, 0,981 con 1000 y 0,992 con 3000. Planificar con ese mapa (clase 4) explota sus errores, porque con 300 comparaciones el plan se queda para siempre en (5,4), donde la aprendida vale +0,300 y la escondida −0,1, con un retorno verdadero de −10 (−0,1 por paso para siempre). El plan sale de la cueva en 0 de 5 semillas con 300 comparaciones, en 3 de 5 con 1000 y en 5 de 5 con 3000, ya con el retorno óptimo de −1,09.</p>
       <div class="eq"><span class="hat">r̂</span>(pedazo) = Σ<sub>s</sub> θ<sub>s</sub> · veces(s)</div>
       <p class="nota pregunta">Con 300 comparaciones, mirá las casillas verdes del mapa aprendido. ¿Por qué el plan va a buscar justo esas?</p>
     </div>
@@ -173,12 +173,12 @@
       <div class="lz"><canvas id="cvRlhf" aria-label="La cueva en cada etapa de RLHF: las flechas más probables y el camino más probable de la política, o el mapa de la recompensa aprendida"></canvas></div>
       <div class="hud" id="hudRlhf" aria-live="polite"></div>
       <div class="lz"><canvas id="cvRlhfBarras" aria-label="Barras con el retorno verdadero desde S en el notebook: política imitada −3,91, sin penalización −10, con penalización −1,33 y óptimo −1,09"></canvas></div>
-      <p class="cap">Las cuatro vistas de la cueva se simulan en el navegador como en el notebook (200 partidas grabadas, 300 comparaciones, β = 0,3, otra semilla). Las barras son el retorno verdadero desde S del notebook, con la media de 5 semillas.</p>
+      <p class="cap">Las cuatro vistas de la cueva se simulan en el navegador como en el notebook (200 partidas grabadas, 300 comparaciones, β = 0,3, otra semilla). Las barras son el retorno verdadero desde S del notebook, con la media de 5 semillas. Como la cueva es chica, el notebook y la página resuelven la etapa 3 exacta, con una iteración de valor «suave», en lugar de PPO.</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 5</div>
       <h2>RLHF: imitar, aprender la recompensa, optimizar</h2>
-      <p>El aprendizaje por refuerzo con preferencias humanas (<i>reinforcement learning from human feedback</i>, RLHF) tiene tres etapas (Christiano et al., 2017; Ouyang et al., 2022). Primero se imita (clase 10) para tener una política de referencia π<sub>ref</sub>, después se aprende un modelo de recompensa con comparaciones y al final se optimiza con PPO (clase 11). Esa optimización resta una penalización por alejarse de π<sub>ref</sub> (<i>KL penalty</i>), medida con la divergencia KL. En el notebook, con 300 comparaciones, π<sub>ref</sub> rinde −3,91, optimizar sin penalización da −10 y con β = 0,3 da −1,33, cerca del óptimo de −1,09.</p>
+      <p>El aprendizaje por refuerzo con preferencias humanas (<i>reinforcement learning from human feedback</i>, RLHF) tiene tres etapas (Christiano et al., 2017; Ouyang et al., 2022). Primero se imita (clase 10) para tener una política de referencia π<sub>ref</sub>, después se aprende un modelo de recompensa con comparaciones y al final se optimiza con PPO (clase 11). Esa optimización resta una penalización por alejarse de π<sub>ref</sub> (<i>KL penalty</i>), medida con la divergencia KL, que dice cuánto difieren dos distribuciones de probabilidad. En el notebook, con 300 comparaciones, π<sub>ref</sub> rinde −3,91, optimizar sin penalización da −10 y con β = 0,3 da −1,33, cerca del óptimo de −1,09.</p>
       <div class="eq">objetivo = <span class="hat">r̂</span> − β · KL(π ‖ π<sub>ref</sub>)</div>
       <p class="nota pregunta">El modelo de recompensa es el mismo en las dos versiones de la etapa 3. ¿Por qué la penalización ayuda justo cuando ese modelo tiene errores?</p>
     </div>
