@@ -402,7 +402,7 @@ print("¿piso normal: cada acción lleva a una sola casilla?", np.all((env.P > 0
 cells.append(md(r"""
 ### Paso 2 — Una casilla, cuatro destinos
 
-Tomemos el cruce de la clase 3, en la fila 5, columna 6 (solo arriba hay pared). Para cada acción, $P(s' \mid \text{cruce}, a)$ es una distribución sobre las casillas de llegada. Con piso normal, toda la probabilidad cae en un solo lugar.
+Tomemos un cruce, la casilla de la fila 5, columna 6 (solo arriba hay pared). Para cada acción, $P(s' \mid \text{cruce}, a)$ es una distribución sobre las casillas de llegada. Con piso normal, toda la probabilidad cae en un solo lugar.
 """))
 cells.append(code(r"""
 cruce = env.pos2s[(5, 6)]
@@ -895,7 +895,7 @@ cells.append(md(r"""
 
 ## Próxima clase
 
-Todo esto pidió conocer $P$ y $R$. ¿Y si no tenemos el mapa? En la clase 5 **evaluamos sin mapa, jugando**: Monte Carlo promedia partidas enteras y la diferencia temporal (TD) aprende paso a paso. Es como pasar del gradiente exacto sobre todo el conjunto de datos al descenso por gradiente estocástico con lotes chicos.
+Todo esto pidió conocer $P$ y $R$. ¿Y si no tenemos el mapa? En la clase 5 **evaluamos sin mapa, jugando**: Monte Carlo promedia partidas enteras y la diferencia temporal (TD) aprende paso a paso. Es la misma diferencia que vimos en la clase 3 entre resolver Bellman con $P$ y promediar muchas caminatas.
 """))
 
 save(cells, "04-planificar-con-mapa.ipynb")

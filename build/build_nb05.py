@@ -332,7 +332,7 @@ Todo lo de hoy sale de listas como esa. La idea de fondo: **reemplazar la suma s
 
 ### Paso 3 — El valor verdadero (solo para comparar)
 
-Este es el mapa de $V^\pi$ que el agente tendría que descubrir, calculado con $P$ y $R$ como en la clase 3. Marcamos tres casillas que vamos a seguir: **S**, el **cruce** (5, 6) de las clases 3 y 4, y la casilla (8, 10), a dos pasos de la salida.
+Este es el mapa de $V^\pi$ que el agente tendría que descubrir, calculado con $P$ y $R$ como en la clase 3. Marcamos tres casillas que vamos a seguir: **S**, el **cruce** (5, 6) de la clase 4, y la casilla (8, 10), a dos pasos de la salida.
 """))
 cells.append(code(r"""
 cruce = env.pos2s[(5, 6)]
@@ -852,7 +852,7 @@ cells.append(md(r"""
 
 ## Próxima clase
 
-Hoy evaluamos una política que nos dieron. ¿Cómo **elegir** mejores acciones sin mapa? En la clase 6, **controlar sin mapa**: SARSA y Q-learning usan este mismo $\delta$, pero sobre el valor de cada acción, $Q(s, a)$. Es como pasar de medir qué tan bien anda una red a entrenarla con esa misma medida.
+Hoy evaluamos una política que nos dieron. ¿Cómo **elegir** mejores acciones sin mapa? En la clase 6, **controlar sin mapa**: SARSA y Q-learning usan este mismo $\delta$, pero sobre el valor de cada acción, $Q(s, a)$. Es el mismo paso que dimos en la clase 4, de evaluar una política a mejorarla con $Q$, ahora sin mapa.
 """))
 
 save(cells, "05-evaluar-sin-mapa.ipynb")

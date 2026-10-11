@@ -30,6 +30,8 @@
   .cuenta .v { color: var(--lamp); }
   .cuenta .d { color: var(--sonar); }
   .hat { font-family: var(--body); }
+  /* fórmulas largas: se parten en los espacios comunes, nunca en los &nbsp; (como en las clases 6 y 7) */
+  .eq.parte { white-space: normal; }
   /* tabla de cifras del notebook */
   .tabla.rms table { font-size: 13px; }
   .tabla.rms td.num.sel { color: var(--lamp); }
@@ -63,12 +65,12 @@
       <div class="row"><button class="btn primary" id="otraPartida">Otra partida</button></div>
       <div class="cuenta" id="expB1" aria-live="polite"></div>
       <div class="hud" id="hudB1"></div>
-      <p class="cap">Partidas desde S simuladas en el navegador (otra semilla que el notebook). Las medianas son de las 5000 partidas del notebook. El valor verdadero se calcula con el mapa, que el agente no tiene, solo para comparar.</p>
+      <p class="cap">Partidas desde S simuladas en el navegador (otra semilla que el notebook). Las medianas son de las 5 000 partidas del notebook. El valor verdadero se calcula con el mapa, que el agente no tiene, solo para comparar.</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 1</div>
       <h2>Sin mapa, solo partidas</h2>
-      <p>Sin mapa, el agente no conoce P ni R y lo único que tiene son sus partidas (<i>episodes</i>), listas de experiencias (s, a, r, s′). Hoy no elige nada nuevo, sino que evalúa una política dada, las flechas óptimas de la clase 4 con ε = 0,7, es decir, con un 70 % de pasos al azar. No usamos el dado de la clase 3 porque desde S sus partidas duran una mediana de 1036 pasos, mientras que con ε = 0,7 la mediana baja a 69. Desde el paso 2, cada partida empieza en una casilla al azar para que todas reciban visitas.</p>
+      <p>Sin mapa, el agente no conoce P ni R y lo único que tiene son sus partidas (<i>episodes</i>), listas de experiencias (s, a, r, s′). Hoy no elige nada nuevo, sino que evalúa una política dada, las flechas óptimas de la clase 4 con ε = 0,7, es decir, con un 70 % de pasos al azar. No usamos el dado de la clase 3 porque desde S sus partidas duran una mediana de 1 036 pasos, mientras que con ε = 0,7 la mediana baja a 69. Desde el paso 2, cada partida empieza en una casilla al azar para que todas reciban visitas.</p>
       <div class="eq">(s₀,a₀,r₀,s₁), (s₁,a₁,r₁,s₂), …</div>
       <p class="nota pregunta">Con ε = 0,7, ¿con qué probabilidad da el paso que marca la flecha? Ojo, que el dado también puede elegirla.</p>
     </div>
@@ -136,7 +138,7 @@
     <div class="texto">
       <div class="paso">Paso 4</div>
       <h2>TD: corregir en cada paso</h2>
-      <p>La <b>diferencia temporal</b> (<i>temporal difference</i>, TD) no espera el final de la partida y corrige V(s) después de cada paso. Su objetivo es r + γV(s′), el premio del paso más lo que ya cree que vale la casilla adonde llegó. Apoyarse así en otra estimación se llama <i>bootstrapping</i>. En el notebook, después de 200 partidas con α = 0,1, el paso (5,6) → (5,7) con r = 0 tiene V(s) = 0,4507 y V(s′) = 0,5671, así que el objetivo es 0,5614 y V(s) sube a 0,4618.</p>
+      <p>La <b>diferencia temporal</b> (<i>temporal difference</i>, TD), en su versión de un paso, TD(0), no espera el final de la partida y corrige V(s) después de cada paso. Su objetivo es r + γV(s′), el premio del paso más lo que ya cree que vale la casilla adonde llegó. Apoyarse así en otra estimación se llama <i>bootstrapping</i>. En el notebook, después de 200 partidas con α = 0,1, el paso (5,6) → (5,7) con r = 0 tiene V(s) = 0,4507 y V(s′) = 0,5671, así que el objetivo es 0,5614 y V(s) sube a 0,4618.</p>
       <div class="eq">V(s) ← V(s) + α [r + γV(s′) − V(s)]</div>
       <p class="nota pregunta">Pasá a «Desde V = 0» y terminá la partida. ¿Por qué TD corrige una sola casilla?</p>
     </div>
@@ -153,7 +155,7 @@
       <div class="lz"><canvas id="cvDelta" aria-label="Barras con el error delta de cada paso de una partida desde S: verdes si es positivo, rojas si es negativo"></canvas></div>
       <div class="row"><button class="btn" id="deltaOtra">Otra partida</button></div>
       <div class="hud" id="hudDelta"></div>
-      <p class="cap">Una misma partida desde S, mirada con tres V distintos, sin corregir nada. «Después de aprender» es TD con α = 0,1 tras 3000 partidas, simulado en el navegador (otra semilla que el notebook).</p>
+      <p class="cap">Una misma partida desde S, mirada con tres V distintos, sin corregir nada. «Después de aprender» es TD con α = 0,1 tras 3 000 partidas, simulado en el navegador (otra semilla que el notebook).</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 5</div>
@@ -171,42 +173,59 @@
   <!-- B6: sesgo y varianza -->
   <section class="bloque" id="b-sesgo" data-objetivos="O3">
     <div class="stage">
-      <div class="seg" role="group" aria-label="Qué mirar" id="segVista">
-        <button aria-pressed="true" data-v="rms">Error en las 59 casillas</button>
-        <button aria-pressed="false" data-v="cruce">El cruce, 10 semillas</button>
-      </div>
       <div class="seg" role="group" aria-label="Paso alfa" id="segAlfa">
         <button aria-pressed="false" data-a="0.03">α = 0,03</button>
         <button aria-pressed="true" data-a="0.1">α = 0,1</button>
         <button aria-pressed="false" data-a="0.3">α = 0,3</button>
       </div>
-      <div class="lz"><canvas id="cvSV" aria-label="Error RMS contra partidas jugadas, en escala logarítmica, para Monte Carlo con alfa 1 sobre n, Monte Carlo con alfa fijo y TD con el mismo alfa; o el valor del cruce en 10 semillas"></canvas></div>
+      <div class="lz"><canvas id="cvSV" aria-label="El valor estimado del cruce partida a partida en 10 semillas, para Monte Carlo y TD con el mismo alfa, con el valor verdadero punteado"></canvas></div>
       <div class="chips" id="chipsSV"></div>
-      <div class="tabla rms">
-        <table>
-          <thead><tr><th>RMS (notebook) · N =</th><th>10</th><th>100</th><th>300</th><th>1000</th><th>3000</th></tr></thead>
-          <tbody id="tbRMS"></tbody>
-        </table>
-      </div>
       <div class="hud" id="hudSV"></div>
-      <p class="cap">Curvas simuladas en el navegador como en el notebook (10 semillas, 3000 partidas con inicio al azar, los tres métodos ven las mismas partidas), con banda de ± 1 desvío. La tabla es la del notebook. Error RMS: raíz del promedio de los errores al cuadrado en las 59 casillas. Es una intuición, sin demostración.</p>
+      <p class="cap">Curvas simuladas en el navegador como en el notebook (10 semillas, 3 000 partidas con inicio al azar, los dos métodos ven las mismas partidas). Cada línea es una semilla y la punteada es el valor verdadero del cruce.</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 6</div>
       <h2>Sesgo y varianza</h2>
-      <p>El <b>sesgo</b> (<i>bias</i>) es errar siempre para el mismo lado, mientras que la <b>varianza</b> (<i>variance</i>) es temblar de partida en partida. Con α = 0,1, TD empieza sesgado porque se apoya en valores que arrancaron en 0, con las 10 semillas del cruce por debajo del verdadero (sesgo de −0,61 a las 100 partidas y de −0,17 a las 300). Con el mismo α fijo, TD termina más abajo que Monte Carlo (0,0127 contra 0,0233 a las 3000 partidas) porque tiembla menos, con un desvío en el cruce de 0,0100 contra 0,0272. Aun así, Monte Carlo con α = 1/n no tiene sesgo, su paso se achica solo y acá las partidas son cortas y sus retornos varían poco, así que en esta cueva es el más preciso de los incrementales, con un error RMS (<i>root mean square</i>) de 0,0055 a las 3000 partidas contra 0,0127 de TD con α = 0,1.</p>
-      <div class="eq">error cuadrático medio = sesgo² + varianza</div>
+      <p>El <b>sesgo</b> (<i>bias</i>) es errar siempre para el mismo lado, mientras que la <b>varianza</b> (<i>variance</i>) es temblar de partida en partida. Con α = 0,1, TD empieza sesgado porque se apoya en valores que arrancaron en 0, con las 10 semillas del cruce por debajo del verdadero (sesgo de −0,61 a las 100 partidas y de −0,17 a las 300). Monte Carlo no se apoya en otras estimaciones y no tiene ese sesgo, pero tiembla más, con un desvío final en el cruce de 0,0272 contra 0,0100 de TD. El error cuadrático medio junta las dos fallas.</p>
+      <div class="eq parte">error cuadrático medio&nbsp;= sesgo²&nbsp;+&nbsp;varianza</div>
+      <p class="nota pregunta">Pasá a α = 0,3. ¿TD llega antes o después al valor verdadero? ¿Y tiembla más o menos que con α = 0,1?</p>
+    </div>
+  </section>
+
+  <!-- B7: por qué igual gana Monte Carlo con 1/n -->
+  <section class="bloque" id="b-gana" data-objetivos="O3">
+    <div class="stage">
+      <div class="seg" role="group" aria-label="Paso alfa" id="segAlfaR">
+        <button aria-pressed="false" data-a="0.03">α = 0,03</button>
+        <button aria-pressed="true" data-a="0.1">α = 0,1</button>
+        <button aria-pressed="false" data-a="0.3">α = 0,3</button>
+      </div>
+      <div class="lz"><canvas id="cvRMS" aria-label="Error RMS contra partidas jugadas, en escala logarítmica, para Monte Carlo con alfa 1 sobre n, Monte Carlo con alfa fijo y TD con el mismo alfa"></canvas></div>
+      <div class="chips" id="chipsRMS"></div>
+      <div class="tabla rms">
+        <table>
+          <thead><tr><th>RMS (notebook) · N =</th><th>10</th><th>100</th><th>300</th><th>1 000</th><th>3 000</th></tr></thead>
+          <tbody id="tbRMS"></tbody>
+        </table>
+      </div>
+      <div class="hud" id="hudRMS"></div>
+      <p class="cap">Curvas simuladas en el navegador como en el notebook (10 semillas, 3 000 partidas con inicio al azar, los tres métodos ven las mismas partidas), con banda de ± 1 desvío. La tabla es la del notebook. Error RMS: raíz del promedio de los errores al cuadrado en las 59 casillas. Es una intuición, sin demostración.</p>
+    </div>
+    <div class="texto">
+      <div class="paso">Paso 7</div>
+      <h2>Por qué igual gana Monte Carlo</h2>
+      <p>Con el mismo α fijo, TD termina con menos error que Monte Carlo porque tiembla menos, con un error RMS (<i>root mean square</i>) en las 59 casillas de 0,0127 contra 0,0233 a las 3 000 partidas. Aun así, Monte Carlo con α = 1/n no tiene sesgo y su paso se achica solo, así que deja de temblar a medida que junta visitas. Además, acá las partidas son cortas y sus retornos varían poco. Por eso en esta cueva es el más preciso de los incrementales, con 0,0055 a las 3 000 partidas contra 0,0127 de TD con α = 0,1.</p>
       <p class="nota pregunta">Si las partidas duraran mil pasos, como con el dado, ¿cuál de los dos temblaría más? ¿Por qué?</p>
     </div>
   </section>
 
-  <!-- B7: equivalencia de certeza -->
+  <!-- B8: equivalencia de certeza -->
   <section class="bloque" id="b-certeza" data-objetivos="O4">
     <div class="stage">
       <div class="seg" role="group" aria-label="Cuántas partidas" id="segCE">
         <button aria-pressed="false" data-n="30">30 partidas</button>
         <button aria-pressed="true" data-n="300">300 partidas</button>
-        <button aria-pressed="false" data-n="3000">3000 partidas</button>
+        <button aria-pressed="false" data-n="3000">3 000 partidas</button>
       </div>
       <div class="lz"><canvas id="cvCE" aria-label="Mapa de calor del valor de la equivalencia de certeza, con la casilla elegida y sus destinos marcados con la probabilidad contada"></canvas></div>
       <div class="lz"><canvas id="cvCEb" aria-label="Barras con la fila de P verdadera, en gris, y la fila de P estimada contando, en verde, para la casilla elegida"></canvas></div>
@@ -214,15 +233,15 @@
       <p class="cap">Las mismas partidas del paso 2, contadas y resueltas en el navegador como en el notebook. Tocá una casilla para ver su fila de P̂.</p>
     </div>
     <div class="texto">
-      <div class="paso">Paso 7</div>
+      <div class="paso">Paso 8</div>
       <h2>Armar el mapa con lo jugado</h2>
-      <p>La <b>equivalencia de certeza</b> (<i>certainty equivalence</i>) usa las partidas para armar el mapa (la cadena P^π de esta política, como en la clase 4, sin separar por acción) y después resuelve Bellman como en las clases 3 y 4, como si ese mapa fuera el verdadero. Cuenta cuántas veces pasó de s a s′ para estimar P̂ y promedia el premio cobrado al salir de s para estimar R̂. Con las mismas 300 partidas del notebook da V̂(S) = 0,5029 y un error RMS de 0,0101, contra 0,0169 de Monte Carlo. Usa mejor los datos, con 0,0027 a las 3000 partidas contra 0,0055 de Monte Carlo y 0,0127 de TD, pero hay que guardar una tabla de 60 × 60 y resolver un sistema.</p>
+      <p>La <b>equivalencia de certeza</b> (<i>certainty equivalence</i>) arma con las partidas el mapa de esta política, la cadena P<sup>π</sup> de la clase 4 sin separar por acción, para resolver Bellman como si ese mapa fuera el verdadero. Para estimar P̂ cuenta cuántas veces pasó de s a s′, mientras que para R̂ promedia el premio cobrado al salir de s. Con las mismas 300 partidas del notebook da V̂(S) = 0,5029 y un error RMS de 0,0101, contra 0,0169 de Monte Carlo. A las 3 000 partidas también gana, con 0,0027 contra 0,0055 de Monte Carlo y 0,0127 de TD, pero hay que guardar una tabla de 60 × 60 y resolver un sistema.</p>
       <div class="eq"><span class="hat">V̂</span> = (I − γ<span class="hat">P̂</span>)⁻¹ <span class="hat">R̂</span></div>
       <p class="nota pregunta">Si la cueva tuviera un millón de casillas, ¿qué parte de la equivalencia de certeza dejaría de ser posible?</p>
     </div>
   </section>
 
-  <!-- B8: Para enseñarlo -->
+  <!-- B9: Para enseñarlo -->
   <section class="bloque full" id="b-ensenar" data-objetivos="O1 O2">
     <div class="texto prose">
       <div class="paso">Para enseñarlo</div>
@@ -381,7 +400,7 @@
       const sim = `esta partida: <b>${T}</b> pasos${p.fin ? "" : " (cortada)"}${prog < 1 ? " …" : ""}`;
       hud.innerHTML = `<span>${sim}</span><span>paredes tocadas <b>${toc.size}</b></span>` +
         (eps === EPS ? `<span>mediana del notebook: <b>69</b> pasos</span><span>V verdadero(S) <b>0,5004</b></span>`
-                     : `<span>mediana del notebook: <b>1036</b> pasos</span><span>V verdadero(S) <b>0,0136</b> (mapa en escala log)</span>`);
+                     : `<span>mediana del notebook: <b>1 036</b> pasos</span><span>V verdadero(S) <b>0,0136</b> (mapa en escala log)</span>`);
     }
     function animar() {
       cancelAnimationFrame(raf);
@@ -564,9 +583,10 @@
     "MC 0.03": [0.6666, 0.4261, 0.2348, 0.0684, 0.0149], "MC 0.1": [0.5738, 0.2361, 0.0774, 0.0241, 0.0233], "MC 0.3": [0.4328, 0.1033, 0.0436, 0.0447, 0.0436],
     "TD 0.03": [0.7139, 0.6693, 0.5947, 0.4237, 0.1798], "TD 0.1": [0.7016, 0.5860, 0.4250, 0.1544, 0.0127], "TD 0.3": [0.6736, 0.4349, 0.1925, 0.0285, 0.0280]
   };
-  const b6 = await tarea(() => {
-    const cv = $("cvSV"), hud = $("hudSV"), chips = $("chipsSV"), tb = $("tbRMS");
-    let vista = "rms", alfa = 0.1;
+  // la misma figura en dos bloques: el cruce en 10 semillas (paso 6) y el error RMS con la tabla (paso 7)
+  const figuraSV = (vista, ids) => tarea(() => {
+    const cv = $(ids.cv), hud = $(ids.hud), chips = $(ids.chips), tb = ids.tb ? $(ids.tb) : null;
+    let alfa = 0.1;
     const media = (arrs, i) => arrs.reduce((t, a) => t + a[i], 0) / arrs.length;
     const desv = (arrs, i, m) => Math.sqrt(arrs.reduce((t, a) => t + (a[i] - m) ** 2, 0) / arrs.length);
     function banda(g, arrs, color, guiones = null) {
@@ -589,8 +609,8 @@
         g.ctx.restore();
         chips.innerHTML = `<span><i style="background:var(--muted)"></i>MC, α = 1/n</span><span><i style="background:var(--lamp)"></i>MC, α = ${A()}</span><span><i style="background:var(--sonar)"></i>TD, α = ${A()}</span>`;
         const piso = arrs => arrs.reduce((t, a) => t + a.slice(2000).reduce((x, y) => x + y, 0) / (NP - 2000), 0) / arrs.length;
-        hud.innerHTML = `<span>a las 3000 partidas (simulado): MC 1/n <b>${fmt(m1[NP - 1], 4)}</b>, MC <b>${fmt(mM[NP - 1], 4)}</b>, TD <b>${fmt(mT[NP - 1], 4)}</b></span>` +
-          `<span>piso (partidas 2001–3000): MC <b>${fmt(piso(ERR[kMC()]), 4)}</b>, TD <b>${fmt(piso(ERR[kTD()]), 4)}</b></span>`;
+        hud.innerHTML = `<span>a las 3 000 partidas (simulado): MC 1/n <b>${fmt(m1[NP - 1], 4)}</b>, MC <b>${fmt(mM[NP - 1], 4)}</b>, TD <b>${fmt(mT[NP - 1], 4)}</b></span>` +
+          `<span>piso (partidas 2 001–3 000): MC <b>${fmt(piso(ERR[kMC()]), 4)}</b>, TD <b>${fmt(piso(ERR[kTD()]), 4)}</b></span>`;
       } else {
         const g = ejes(cv, 260, { x0: 1, x1: NP, y0: 0, y1: 1, xlog: true, ticksX: [1, 10, 100, 1000, 3000], ticksY: [0, .25, .5, .75, 1], fx: v => String(v), fy: v => coma(String(v)), tituloX: "partidas (log) →", tituloY: "V(cruce) estimado" });
         g.recortar();
@@ -605,16 +625,17 @@
         hud.innerHTML = [99, 299].map(i => `<span>N = ${i + 1}: semillas por debajo MC <b>${debajo(kMC(), i)}</b>, TD <b>${debajo(kTD(), i)}</b> · sesgo TD <b>${fmtS(sesgo(kTD(), i), 2)}</b></span>`).join("") +
           `<span>temblor final (simulado): MC <b>${fmt(temblor(kMC()), 4)}</b>, TD <b>${fmt(temblor(kTD()), 4)}</b></span>`;
       }
-      tb.innerHTML = ["MC 1/n", kMC(), kTD()].map(k => `<tr><td>${k.replace(" 1/n", ", α = 1/n").replace(/ (0\.\d+)$/, (_, a) => `, α = ${coma(a)}`)}</td>${NB_RMS[k].map(v => `<td class="num">${fmt(v, 4)}</td>`).join("")}</tr>`).join("");
+      if (tb) tb.innerHTML = ["MC 1/n", kMC(), kTD()].map(k => `<tr><td>${k.replace(" 1/n", ", α = 1/n").replace(/ (0\.\d+)$/, (_, a) => `, α = ${coma(a)}`)}</td>${NB_RMS[k].map(v => `<td class="num">${fmt(v, 4)}</td>`).join("")}</tr>`).join("");
     }
-    document.querySelectorAll("#segVista button").forEach(b => b.onclick = () => { vista = b.dataset.v; marcar("#segVista button", "v", vista); dibujar(); });
-    document.querySelectorAll("#segAlfa button").forEach(b => b.onclick = () => { alfa = +b.dataset.a; marcar("#segAlfa button", "a", b.dataset.a); dibujar(); });
+    document.querySelectorAll(`#${ids.seg} button`).forEach(b => b.onclick = () => { alfa = +b.dataset.a; marcar(`#${ids.seg} button`, "a", b.dataset.a); dibujar(); });
     dibujar();
     return { dibujar };
   });
+  const b6 = await figuraSV("cruce", { seg: "segAlfa", cv: "cvSV", hud: "hudSV", chips: "chipsSV" });
+  const b6b = await figuraSV("rms", { seg: "segAlfaR", cv: "cvRMS", hud: "hudRMS", chips: "chipsRMS", tb: "tbRMS" });
 
   // =====================================================================
-  // B7. Equivalencia de certeza: contar, estimar y resolver Bellman
+  // B8. Equivalencia de certeza: contar, estimar y resolver Bellman
   // =====================================================================
   const b7 = await tarea(() => {
     const cv = $("cvCE"), cvb = $("cvCEb"), hud = $("hudCE"), T = Cueva.tablero(cv, env, { maxCell: 40 });
@@ -662,7 +683,7 @@
   });
 
   let tRes = 0;
-  addEventListener("resize", () => { clearTimeout(tRes); tRes = setTimeout(() => { for (const f of [b1, b2, b3, b4, b5, b6, b7]) f.dibujar(); }, 120); });
+  addEventListener("resize", () => { clearTimeout(tRes); tRes = setTimeout(() => { for (const f of [b1, b2, b3, b4, b5, b6, b6b, b7]) f.dibujar(); }, 120); });
 })();
 </script>
 </body>

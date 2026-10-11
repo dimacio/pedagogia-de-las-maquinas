@@ -622,7 +622,7 @@ plt.tight_layout(); plt.show()
 cells.append(md(r"""
 El optimismo cambia todo: los exploradores optimistas pisan **las 155 casillas** de la cueva y llegan a la salida en las 20 semillas, con una fracción del presupuesto (mediana de 8666 pasos el optimista solo). Después de encontrarla, la mayoría de sus partidas salen (el 72 % de las últimas 20, con $\varepsilon = 0{,}1$ que sigue probando): lo que encontraron, lo aprovechan.
 
-El conteo solo, en cambio, **empeora** las cosas, y vale la pena entender por qué. La bonificación también paga por volver a una casilla conocida (cada vez menos, pero algo). Y en una tabla, una flecha que nunca se probó vale 0: menos que cualquier camino conocido, que ya acumuló bonificaciones. El agente aprende a dar vueltas por lo que ya conoce. La bonificación solo empuja hacia lo nuevo si **lo nunca probado vale al menos tanto como lo ya visto**, y eso es otra vez optimismo: junto con $Q_0 = 1$, el conteo es el explorador más rápido de la carrera (mediana de 5218 pasos, y en 7 de las 20 semillas llega en la primera partida, antes del paso 300; el optimista solo, en ninguna). (Con redes neuronales, como en Bellemare et al., lo nuevo no vale 0 de entrada; la clase 8 cuenta esa parte.)
+El conteo solo, en cambio, **empeora** las cosas, y vale la pena entender por qué. La bonificación también paga por volver a una casilla conocida (cada vez menos, pero algo). Y en una tabla, una flecha que nunca se probó vale 0: menos que cualquier camino conocido, que ya acumuló bonificaciones. El agente aprende a dar vueltas por lo que ya conoce. La bonificación solo empuja hacia lo nuevo si **lo nunca probado vale al menos tanto como lo ya visto**, y eso es otra vez optimismo: junto con $Q_0 = 1$, el conteo es el explorador más rápido de la carrera (mediana de 5218 pasos, y en 7 de las 20 semillas llega en la primera partida, antes del paso 300; el optimista solo, en ninguna). (Con redes neuronales, como en Bellemare et al., lo nuevo no vale 0 de entrada.)
 
 ### Paso 3 — La carrera completa
 """))
@@ -842,7 +842,7 @@ cells.append(md(r"""
 
 ## Próxima clase
 
-Todo esto fue con una tabla: una fila por casilla, una cuenta de visitas por casilla. En una pantalla de Atari no hay tabla posible, porque casi nunca se repite exactamente la misma imagen. En la clase 8, **de la tabla a la red**: reemplazar la tabla $Q$ por una red neuronal, como las que ya conocen de visión.
+Todo esto fue con una tabla: una fila por casilla, una cuenta de visitas por casilla. En una pantalla de Atari no hay tabla posible, porque casi nunca se repite exactamente la misma imagen. En la clase 8, **de la tabla a la red**: reemplazar la tabla $Q$ por una red neuronal, que vemos desde cero en la clase 8.
 """))
 
 save(cells, "07-explorar.ipynb")

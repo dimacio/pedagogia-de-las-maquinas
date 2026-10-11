@@ -28,6 +28,8 @@
     padding: 8px 10px; overflow-x: auto; white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }
   .cuenta b { color: var(--ink); font-weight: 600; }
   .cuenta .v { color: var(--lamp); }
+  /* fórmulas largas: se parten en los espacios comunes, nunca en los &nbsp; (como en las clases 6 y 7) */
+  .eq.parte { white-space: normal; }
   .tabla td.op { color: var(--exit); font-weight: 700; }
   .tabla td.mejor { box-shadow: inset 0 0 0 2px var(--exit); }
   /* la tabla del robot entra entera en pantallas chicas: la columna ganadora se ve sin desplazar */
@@ -57,7 +59,7 @@
     <div class="texto">
       <div class="paso">Paso 1</div>
       <h2>Ahora el caminante elige</h2>
-      <p>Ahora el caminante deja el dado y elige en cada casilla una de cuatro acciones. Una cadena con recompensa y acciones es un <b>proceso de decisión de Markov</b> (<i>Markov decision process</i>, MDP). Para cada acción, el <b>modelo de transición</b> (<i>transition model</i>) P(s′|s,a) dice adónde va a parar el caminante desde s. La recompensa R(s,a) es la de la clase 3, +1 en el paso que entra a la salida, con γ = 0,99.</p>
+      <p>Ahora el caminante deja el dado y elige en cada casilla una de cuatro acciones. Una cadena con recompensa y acciones es un <b>proceso de decisión de Markov</b> (<i>Markov decision process</i>, MDP), en cuya fórmula S nombra al conjunto de casillas y no a la casilla de inicio. Para cada acción, el <b>modelo de transición</b> (<i>transition model</i>) P(s′|s,a) dice adónde va a parar el caminante desde s. La recompensa R(s,a) es la de la clase 3, +1 en el paso que entra a la salida, con γ = 0,99.</p>
       <div class="eq">MDP = (S, A, P, R, γ)</div>
       <p class="nota pregunta">Desde S, ¿cuántas de las cuatro acciones dejan al caminante donde está? Contalas antes de tocar.</p>
     </div>
@@ -78,7 +80,7 @@
     <div class="texto">
       <div class="paso">Paso 2</div>
       <h2>Con la política fija, vuelve a ser una cadena</h2>
-      <p>Una <b>política</b> (<i>policy</i>) π(a|s), como en la clase 2, dice con qué probabilidad se elige cada acción en cada casilla. Con la política fija, cada casilla vuelve a tener una sola distribución de destinos, el promedio de las cuatro tablas pesado por π. Un MDP con la política fija es entonces un proceso de recompensa de Markov (MRP) como el de la clase 3, con R<sup>π</sup>(s) = Σₐ π(a|s) R(s,a) en el lugar de su R(s). Con la política al azar se recupera el caminante del dado, con V(S) = 0,0136 y V(cruce) = 0,0771.</p>
+      <p>Una <b>política</b> (<i>policy</i>) π(a|s), como en la clase 2, dice con qué probabilidad se elige cada acción en cada casilla. Con la política fija, cada casilla vuelve a tener una sola distribución de destinos, el promedio de las cuatro tablas pesado por π. Un MDP con la política fija es entonces un proceso de recompensa de Markov (MRP) como el de la clase 3, con R<sup>π</sup>(s) = Σₐ π(a|s) R(s,a) en el lugar de su R(s). Con la política al azar se recupera el caminante del dado, con V(S) = 0,0136 y V(cruce) = 0,0771 en el cruce (5,6), la casilla de la fila 5 y la columna 6.</p>
       <div class="eq">P<sup>π</sup>(s′|s) = Σₐ π(a|s) P(s′|s,a)</div>
       <p class="nota pregunta">Con «todas ↑» todo vale 0. ¿Por qué ninguna casilla cobra nunca nada?</p>
     </div>
@@ -163,8 +165,8 @@
     <div class="texto">
       <div class="paso">Paso 6</div>
       <h2>Iteración de valor: el máximo en cada vuelta</h2>
-      <p>La <b>iteración de valor</b> (<i>value iteration</i>) repite la cuenta de la clase 3 con un solo cambio, quedarse con la mejor acción en vez de promediarlas. No hay política que evaluar, porque las flechas salen solas de la acción que da el máximo. El valor se derrama desde la salida y converge en 22 vueltas, con todas las flechas óptimas desde la vuelta 19. Cada vuelta es un solo barrido, más barato que evaluar una política entera, y llega al mismo <b>valor óptimo</b> (<i>optimal value</i>) V*(S) = 0,8262 que la iteración de política.</p>
-      <div class="eq">V(s) ← maxₐ [ R(s,a) + γ Σₛ′ P(s′|s,a) V(s′) ]</div>
+      <p>La <b>iteración de valor</b> (<i>value iteration</i>) repite la cuenta de la clase 3 quedándose con la mejor acción en vez de promediarlas, así que no hay política que evaluar porque las flechas salen solas del máximo. El valor se derrama desde la salida un paso por vuelta hasta la casilla más lejana, que está a 21 pasos, con todas las flechas óptimas desde la vuelta 19. Cada vuelta es un solo barrido, más barato que evaluar una política entera. Converge en 22 vueltas al mismo <b>valor óptimo</b> (<i>optimal value</i>) V*(S) = 0,8262 que la iteración de política.</p>
+      <div class="eq parte">V(s)&nbsp;←&nbsp;maxₐ [&nbsp;R(s,a)&nbsp;+ γ&nbsp;Σₛ′&nbsp;P(s′|s,a)&nbsp;V(s′)&nbsp;]</div>
       <p class="nota pregunta">S está a 20 pasos de la salida. ¿Por qué hacen falta 22 vueltas para terminar?</p>
     </div>
   </section>
@@ -184,7 +186,7 @@
       <div class="paso">Paso 7</div>
       <h2>Piso resbaloso</h2>
       <p>Con un piso resbaloso (<i>slip</i>) de 0,2, la acción hace lo que pide con probabilidad 0,8 y desvía al caminante hacia cada costado con 0,1. Sin slip, las 12 partidas del notebook tardan 20 pasos y dibujan una sola línea, pero con slip cada una es distinta y tardan entre 21 y 29. Por eso V es un retorno esperado, el promedio sobre todas las partidas posibles. En esta cueva no hay pozos y resbalar solo hace perder tiempo, así que V*(S) baja de 0,8262 a 0,7742 sin que cambie ninguna flecha.</p>
-      <div class="eq">P(s′|s,↓) = 0,8 hacia ↓, 0,1 hacia ←, 0,1 hacia →</div>
+      <div class="eq parte">P(s′|s,↓)&nbsp;=&nbsp;0,8&nbsp;hacia&nbsp;↓, 0,1&nbsp;hacia&nbsp;←, 0,1&nbsp;hacia&nbsp;→</div>
       <p class="nota pregunta">Si hubiera un pozo al costado del pasillo, ¿la flecha óptima con slip seguiría siendo la misma?</p>
     </div>
   </section>
@@ -208,7 +210,7 @@
       <div class="paso">Paso 8</div>
       <h2>Costo por paso y γ</h2>
       <p>Con γ = 1 y sin costo por paso, llegar ahora o dentro de mil pasos da lo mismo, así que todas las casillas valen 1. Las cuatro acciones empatan en todas partes y el desempate elige ↑, por eso el caminante se queda chocando arriba de S y no llega. Un costo de 0,01 por paso devuelve el apuro, con V*(S) = 0,81 y el camino de 20 pasos. Sin costo, bajar γ a 0,9 o a 0,5 no cambia ninguna flecha, pero V*(S) cae de 0,826 (γ = 0,99) a 0,135 y a 1,91 · 10⁻⁶.</p>
-      <div class="eq">rₜ = +1 si el paso entra a la salida, −costo si no</div>
+      <div class="eq parte">rₜ&nbsp;=&nbsp;+1 si el paso entra a la&nbsp;salida, −costo&nbsp;si&nbsp;no</div>
       <p class="nota pregunta">Con γ = 0,5, S vale unas millonésimas. Si ese valor hubiera que estimarlo jugando, con ruido, ¿se notaría la diferencia entre dos flechas?</p>
     </div>
   </section>
@@ -236,13 +238,13 @@
         </table>
       </div>
       <div class="hud" id="hudRobot"></div>
-      <p class="cap">Iteración de valor de dos estados en el navegador, como en el notebook (buscar rinde 2, rescate −3, γ = 0,9). Tocá el mapa para mover β y r_espera.</p>
+      <p class="cap">Iteración de valor de dos estados en el navegador, como en el notebook (buscar rinde 2, rescate −3, γ = 0,9). Estas α y β son probabilidades del robot, no el paso α que aparece en la clase 5. Tocá el mapa para mover β y r_espera.</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 9</div>
       <h2>El mismo molde fuera de la cueva: el robot de reciclaje</h2>
       <p>El robot de reciclaje de Sutton y Barto (ejemplo 3.3) es un MDP de dos estados, batería alta o baja, con tres acciones, buscar latas, esperar o recargar. Buscar rinde 2 y esperar rinde 1, pero con batería baja buscar puede agotar al robot, que cuesta un rescate de −3. Con α = 0,8, β = 0,4 y γ = 0,9, conviene buscar con batería alta y recargar con batería baja, donde recargar vale 15,25, esperar 14,73 y buscar 13,64. Con α = 0,8, buscar con batería baja conviene recién cuando β supera 0,863.</p>
-      <div class="eq">Q(baja, buscar) = β(2 + γV(baja)) + (1−β)(−3 + γV(alta))</div>
+      <div class="eq parte">Q(baja,&nbsp;buscar)&nbsp;= β(2&nbsp;+&nbsp;γV(baja)) + (1−β)(−3&nbsp;+&nbsp;γV(alta))</div>
       <p class="nota pregunta">El tutor de la clase 2 también se puede plantear como un MDP. ¿Cuáles serían sus estados, sus acciones y su recompensa?</p>
     </div>
   </section>
@@ -766,7 +768,10 @@
       tb.innerHTML = ["alta", "baja"].map((t, s) => `<tr><td>${t}</td><td class="op">${ACC[sol.pi[s]]}</td><td class="num">${fmt(sol.V[s], 2)}</td>` +
         sol.Q[s].map((q, a) => `<td class="num${a === sol.pi[s] ? " mejor" : ""}">${isFinite(q) ? fmt(q, 2) : "—"}</td>`).join("") + `</tr>`).join("");
       const u = umbral(al, rw);
-      hud.innerHTML = `<span>con batería baja conviene buscar si β &gt; <b>${isNaN(u) ? "–" : fmt(u, 3)}</b> (con este α y este r_espera)</span>`;
+      const siempre = isNaN(u) && resolver(al, 0, rw).pi[1] === 0, nunca = !siempre && (isNaN(u) || u >= 0.9995);
+      hud.innerHTML = siempre ? `<span>con este r_espera, buscar con batería baja conviene con cualquier β</span>`
+        : nunca ? `<span>con este r_espera, buscar no conviene con ningún β</span>`
+        : `<span>con batería baja conviene buscar si β &gt; <b>${fmt(u, 3)}</b> (con este α y este r_espera)</span>`;
     }
     for (const el of [sa, sb, sw]) el.oninput = dibujar;
     const tocar = e => { const m = caja, b = cv.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top; if (!m || x < m.mx0 || x > m.mx0 + m.mw || y < m.my0 || y > m.my0 + m.mh) return;
