@@ -32,6 +32,7 @@ Formato: una sección por versión (SemVer sobre el curso, ver `fabrica/CONVENCI
 - Clase 11 (nueva): políticas con softmax, REINFORCE como imitación ponderada, línea de base, actor-crítico, recorte de PPO.
 - Clase 12 (nueva): preferencias, Bradley-Terry, recompensa aprendida, RLHF con penalización, sobreoptimización, DPO.
 - Clase 13: el modelo de lenguaje como política (token, temperatura, verificador, ventajas de GRPO), notebook lento con Qwen2.5-0.5B.
+- Clase 14: agentes de lenguaje (ReAct en la cueva, el mismo bucle buscando información, arnés y herramientas, la ventana de contexto como estado, cuándo responder como MDP, complacencia), notebook lento con Qwen2.5-0.5B.
 - Clase 15: agentes aplicados (dos MDP con distinta recompensa, fábrica de contenido con evaluador distinto, tutor que premia la mejora, empujones, tres alineaciones), notebook lento con Qwen2.5-0.5B y 1.5B.
 - Clase 16: cierre con el recorrido de las 16 clases, el MDP propio, el proyecto final con devolución entre pares, la difusión del curso como bandit y la vuelta a Foucault; difusión actualizada a dieciséis clases.
 
