@@ -104,7 +104,7 @@
       </div>
       <label class="check"><input type="checkbox" id="h2" checked> Una persona decide antes de publicar</label>
       <div id="panel2" aria-live="polite"></div>
-      <p class="cap">Salidas reales de una corrida del notebook (sección 2, en CPU), con Qwen2.5-0.5B como curador y generador. Los fragmentos los escribimos para el curso. No se publicó nada de verdad.</p>
+      <p class="cap">Salidas reales de una corrida del notebook (sección 2, en CPU), con Qwen2.5-0.5B como curador y generador. Los fragmentos los escribimos para el curso. No se publicó nada de verdad. En la corrida, la persona simulada aceptó la sugerencia y F4 salió publicado igual: la persona frena solo si lee el post.</p>
     </div>
     <div class="texto">
       <div class="paso">2 · la fábrica de contenido</div>
@@ -182,10 +182,10 @@
       <p>Un empujón (<i>nudge</i>; Thaler y Sunstein, 2008) cambia cómo se presentan las opciones a favor de quien decide, como una pausa antes de abrir la app.</p>
       <p>Un patrón oscuro (<i>dark pattern</i>) usa el mismo mecanismo en contra, como la notificación que te trae de vuelta cuando ya te ibas.</p>
       <p>Ninguno de los dos cambia al agente, que sigue siendo el feed miope que siempre muestra ganchos.</p>
-      <p>En el juguete, el patrón oscuro sube los clics de 31,6 a 57,6 por usuario en 90 días, pero al día 30 queda activo solo el 2,6 %.</p>
+      <p>En el juguete, el patrón oscuro sube los clics de 31,6 a 57,6 por usuario en 90 días, pero la satisfacción sigue en 0,3, igual que sin él.</p>
       <div class="aviso mide">
         <h3>Esto hoy se mide</h3>
-        <p>En un experimento de Pataranutaporn, Liu, Finn y Maes (2023, <i>Nature Machine Intelligence</i>), a distintas personas se les presentó el mismo agente conversacional como cuidadoso o como manipulador antes de charlar con él. Ese aviso previo cambió cómo lo juzgaron y cómo siguió la conversación, aunque el agente era el mismo. Es un efecto de corto plazo, medido con psicología y no con RL, pero muestra que tocar el entorno sin tocar al agente ya cambia lo que pasa.</p>
+        <p>En un experimento de Pataranutaporn, Liu, Finn y Maes (2023, <i>Nature Machine Intelligence</i>), a distintas personas se les presentó el mismo agente conversacional como cuidadoso, como manipulador o sin decir nada de sus motivos antes de charlar con él. Ese aviso previo cambió cómo lo juzgaron y cómo siguió la conversación, aunque el agente era el mismo. Es un efecto de corto plazo, medido con psicología y no con RL, pero muestra que tocar el entorno sin tocar al agente ya cambia lo que pasa.</p>
       </div>
       <p class="nota pregunta">La pausa también decide por la persona. ¿Quién debería elegir cuánto dura?</p>
     </div>
@@ -209,7 +209,7 @@
       <p>La salida coherente con este curso es una recompensa visible y editable por quien usa el sistema.</p>
       <p>Es la pregunta de la clase 1, quién elige la recompensa, hecha interfaz.</p>
       <p>Con peso cero a la satisfacción, el feed miope (γ = 0) vuelve al gancho en todos los niveles.</p>
-      <p>Con algo de peso, muestra contenido útil aunque no mire el futuro.</p>
+      <p>Con suficiente peso, muestra contenido útil aunque no mire el futuro.</p>
       <div class="eq parte"><span class="nw">r = w_c · clics</span> <span class="nw">+ w_s · Δ satisfacción</span></div>
       <p class="nota pregunta">¿Qué pesos pondrías vos? Si fuera el tutor de la sección 4, ¿qué contarías como progreso?</p>
     </div>
