@@ -1,12 +1,12 @@
-"""Arma notebooks/00c-algebra-lineal.ipynb (Pre curso C — Álgebra lineal con Bellman)."""
+"""Arma notebooks/00c-algebra-lineal.ipynb (Nivelación 0c — Álgebra lineal con Bellman)."""
 from _nbutil import md, code, writefile_cell, save
 
 cells = []
 
 cells.append(md(r"""
-# Pre curso C — Álgebra lineal con una sola matriz
+# Nivelación 0c — Álgebra lineal con una sola matriz
 
-**RL a ciegas** · pre curso · vía profunda
+**RL a ciegas** · Nivelación 0c
 
 Regla de esta clase: **una sola matriz**. Toda el álgebra lineal que necesitamos para el curso cabe en una matriz de la cueva: $P^\pi$, la que dice **adónde voy desde cada casilla** si elijo acciones al azar. Con ella vamos a calcular cuánto vale estar en cada casilla, de tres maneras distintas.
 
@@ -19,7 +19,7 @@ Hoy vamos a ver:
 5. **Identidad, inversa y sistemas lineales**: $V = (I - \gamma P)^{-1} R$ de un saque.
 6. **Normas**: cuánto cambia $V$ de una vuelta a la otra.
 7. **Autovalores**: por qué $\gamma$ controla la velocidad de convergencia.
-8. **Gradiente**: encontrar $V$ bajando una pendiente (adelanto de la clase 6).
+8. **Gradiente**: encontrar $V$ bajando una pendiente (adelanto de la clase 8).
 
 > Cómo usar este notebook: ejecutar las celdas en orden. Tarda menos de un minuto.
 """))
@@ -157,10 +157,10 @@ def dibujar_matriz(M, ax, titulo, fmt="{:.2f}", cmap="Blues", vmin=None, vmax=No
 cells.append(md(r"""
 ## Paso 1 — Vectores: la cueva como 60 números
 
-La cueva tiene 60 casillas libres. Si a cada una le asignamos un número, tenemos un **vector** $V \in \mathbb{R}^{60}$. El ejemplo de hoy: $V(s) = \gamma^{d(s)}$, donde $d(s)$ es la distancia (en pasos) de la casilla $s$ a la salida. Cerca de la salida vale casi 1; lejos, casi 0. (Es el valor de una política perfecta; lo vamos a reencontrar en la clase 3.)
+La cueva tiene 60 casillas libres. Si a cada una le asignamos un número, tenemos un **vector** $V \in \mathbb{R}^{60}$. El ejemplo de hoy: $V(s) = \gamma^{d(s)}$, donde $d(s)$ es la distancia (en pasos) de la casilla $s$ a la salida. Cerca de la salida vale casi 1; lejos, casi 0. (Es el valor de una política perfecta; lo vamos a reencontrar en la clase 4.)
 
 El mismo vector se puede dibujar de dos maneras: como una **tira** de 60 números en el orden de los estados, o **sobre la cueva**.
-"""))
+""", objetivos=["O1"]))
 cells.append(code(r"""
 env = CaveEnv()
 gamma = 0.9
@@ -195,7 +195,7 @@ cells.append(md(r"""
 Con piso resbaloso (`slip=0.2`), desde la casilla del círculo intento ↓. Hay tres destinos posibles, cada uno con su probabilidad: eso es un vector $p$ (casi todo ceros). ¿Cuánto vale, **en promedio**, la casilla donde voy a caer? Multiplico casilla por casilla y sumo:
 
 Izquierda: $p$. Centro: $V$. Derecha: el producto elemento a elemento $p_i V_i$.
-"""))
+""", objetivos=["O2"]))
 cells.append(code(r"""
 env_r = CaveEnv(slip=0.2)
 s, ABAJO = env.pos2s[(1, 11)], 2
@@ -229,7 +229,7 @@ Si apilamos el vector $p$ de **cada** casilla, una fila por casilla, obtenemos u
 $$P^\pi[s, s'] = \sum_a \pi(a)\, P(s' \mid s, a)$$
 
 Empecemos por una cueva chiquita de 11 casillas, para poder leer la matriz entera. Arriba, la cueva con el número de cada estado (en amarillo); abajo, $P^\pi$ con sus números.
-"""))
+""", objetivos=["O2"]))
 cells.append(code(r"""
 chica = CaveEnv(cave_map=CUEVA_CHICA)
 Pc, Rc = matriz_politica(chica)
@@ -283,8 +283,8 @@ Con eso, la ecuación de Bellman de una política (clase 3) es una sola línea: 
 
 $$V_{k+1} = R + \gamma\, P\, V_k$$
 
-Empecemos con $V_0 = 0$ y apliquemos la regla una y otra vez. Usamos $\gamma = 0.99$ y, como el valor de caminar al azar es muy chico lejos de la salida, lo pintamos en **escala logarítmica** ($\log_{10} V$; negro = todavía 0).
-"""))
+Empecemos con $V_0 = 0$ y apliquemos la regla una y otra vez. Usamos $\gamma = 0{,}99$ y, como el valor de caminar al azar es muy chico lejos de la salida, lo pintamos en **escala logarítmica** ($\log_{10} V$; negro = todavía 0).
+""", objetivos=["O3"]))
 cells.append(code(r"""
 gamma = 0.99
 hist = iterar(P, R, gamma, K=200)
@@ -321,7 +321,7 @@ $$(I - \gamma P)\, V = R \quad\Longrightarrow\quad V = (I - \gamma P)^{-1} R$$
 - $(I - \gamma P)^{-1}$ es la **inversa**: la matriz que "deshace" a $I - \gamma P$. Existe porque $\gamma < 1$ (lo vemos en el Paso 7).
 
 Veamos las cuatro matrices en la cueva chica.
-"""))
+""", objetivos=["O4"]))
 cells.append(code(r"""
 g = 0.9
 I = np.eye(chica.nS)
@@ -372,7 +372,7 @@ Para saber cuándo cortar la iteración necesitamos medir **el tamaño de un vec
 $$\|x\|_1 = \sum_i |x_i| \qquad \|x\|_2 = \sqrt{\textstyle\sum_i x_i^2} \qquad \|x\|_\infty = \max_i |x_i|$$
 
 En RL se usa mucho la última ("la casilla que más cambió"). Midamos $\|V_{k+1} - V_k\|$ en cada vuelta.
-"""))
+""", objetivos=["O3"]))
 cells.append(code(r"""
 hist = iterar(P, R, gamma, K=3000)
 dif = np.diff(np.array(hist), axis=0)              # V_{k+1} - V_k para cada k
@@ -400,7 +400,7 @@ Un **autovector** (*eigenvector*) de una matriz es una dirección que la matriz 
 - del otro lado, "estar en la salida con probabilidad 1": como es absorbente, $d\,P = d$ (también autovalor 1).
 
 Calculemos todos los autovalores de $P^\pi$.
-"""))
+""", objetivos=["O4"]))
 cells.append(code(r"""
 lam = np.linalg.eigvals(P)
 lam = lam[np.argsort(-np.abs(lam))]
@@ -447,7 +447,7 @@ for g, m in zip(gammas, pendientes):
     print(f"γ = {g}:  pendiente medida = {m:+.4f}   log γ = {np.log(g):+.4f}   (vueltas para dividir el error por 10 ≈ {np.log(10) / -m:.0f})")
 """))
 cells.append(md(r"""
-Los puntos caen sobre la recta o apenas por debajo: **la velocidad la fija $\gamma$**. ($\gamma^k$ es el peor caso; la matriz de verdad ayuda un poquito más, porque su segundo autovalor, $\approx 0.999$, es apenas menor que 1.) La moraleja práctica: un $\gamma$ cercano a 1 mira lejos en el futuro, pero hace que todo converja **mucho** más lento. Con $\gamma = 0.99$ hacen falta unas 200 vueltas para ganar un solo dígito de precisión.
+Los puntos caen sobre la recta o apenas por debajo: **la velocidad la fija $\gamma$**. ($\gamma^k$ es el peor caso; la matriz de verdad ayuda un poquito más, porque su segundo autovalor, $\approx 0{,}999$, es apenas menor que 1.) La moraleja práctica: un $\gamma$ cercano a 1 mira lejos en el futuro, pero hace que todo converja **mucho** más lento. Con $\gamma = 0{,}99$ hacen falta unas 200 vueltas para ganar un solo dígito de precisión.
 """))
 
 # ---------------------------------------------------------------- Paso 8
@@ -462,8 +462,8 @@ $L$ es una función de 60 variables que vale 0 justo en la solución. Su **gradi
 
 $$V \leftarrow V - \alpha\, \nabla L(V), \qquad \nabla L(V) = (\gamma P - I)^\top \big(R + \gamma P V - V\big).$$
 
-($^\top$ es la **transpuesta**: filas por columnas.) Probemos con $\gamma = 0.9$, empezando de $V = 0$.
-"""))
+($^\top$ es la **transpuesta**: filas por columnas.) Probemos con $\gamma = 0{,}9$, empezando de $V = 0$.
+""", objetivos=["O4"]))
 cells.append(code(r"""
 g = 0.9
 A = g * P - np.eye(env.nS)                       # para escribir el error como A V + R
@@ -486,15 +486,15 @@ ax.legend(); plt.tight_layout(); plt.show()
 print("máxima diferencia final con solve:", np.abs(V_gd - V_obj).max())
 """))
 cells.append(md(r"""
-Funciona, pero es **lento**: miles de pasos para algo que `solve` hace de un saque. Y fijate en un detalle: el error de Bellman (rojo) se desploma en los primeros pasos, pero la distancia a la respuesta (azul) casi no se mueve al principio y después baja lento (la curva roja además está al cuadrado, por eso su pendiente es el doble). Que la pérdida sea chica no garantiza estar cerca: hay direcciones "casi planas" donde el gradiente empuja muy poco. ¿Por qué molestarse? Porque el gradiente sirve aunque $V$ no sea una tabla. En la clase 6 vamos a reemplazar la tabla de 60 números por una **red neuronal** $V_\theta(s)$, y el mismo error de Bellman se va a minimizar con el mismo descenso por gradiente, ajustando los pesos $\theta$ (PyTorch calcula $\nabla L$ solo).
+Funciona, pero es **lento**: miles de pasos para algo que `solve` hace de un saque. Y fijate en un detalle: el error de Bellman (rojo) se desploma en los primeros pasos, pero la distancia a la respuesta (azul) casi no se mueve al principio y después baja lento (la curva roja además está al cuadrado, por eso su pendiente es el doble). Que la pérdida sea chica no garantiza estar cerca: hay direcciones "casi planas" donde el gradiente empuja muy poco. ¿Por qué molestarse? Porque el gradiente sirve aunque $V$ no sea una tabla. En la clase 8 vamos a reemplazar la tabla de 60 números por una **red neuronal** $V_\theta(s)$, y el mismo error de Bellman se va a minimizar con el mismo descenso por gradiente, ajustando los pesos $\theta$ (PyTorch calcula $\nabla L$ solo).
 """))
 
 # ---------------------------------------------------------------- Ejercicios
 cells.append(md(r"""
 ## ✍️ Ejercicio 1 — Otro $\gamma$
 
-Cambiá `gamma_ej` (probá 0.5, 0.9, 0.999). ¿Cuánto vale $V(S)$? ¿Cuántas vueltas hacen falta para que $\|V_{k+1} - V_k\|_\infty < 10^{-8}$?
-"""))
+Cambiá `gamma_ej` (probá 0,5, 0,9 y 0,999). ¿Cuánto vale $V(S)$? ¿Cuántas vueltas hacen falta para que $\|V_{k+1} - V_k\|_\infty < 10^{-8}$?
+""", objetivos=["O4"]))
 cells.append(code(r"""
 gamma_ej = 0.9   # TODO: probá 0.5, 0.9, 0.999
 
@@ -509,7 +509,7 @@ cells.append(md(r"""
 ## ✍️ Ejercicio 2 — Otra política, otra matriz
 
 Cambiá `pi_ej`, las probabilidades de elegir ↑ → ↓ ← (tienen que sumar 1). Probá un agente que prefiere bajar y ir a la derecha, por ejemplo `[0.1, 0.4, 0.4, 0.1]`. ¿Cambia $P^\pi$? ¿Siguen sumando 1 sus filas? ¿Sube el valor de S?
-"""))
+""", objetivos=["O2"]))
 cells.append(code(r"""
 pi_ej = [0.25, 0.25, 0.25, 0.25]   # TODO: probá [0.1, 0.4, 0.4, 0.1]
 
@@ -528,9 +528,9 @@ cells.append(md(r"""
 2. Con $\gamma = 1$ la matriz $I - P^\pi$ no tiene inversa (¿por qué? pista: el vector de unos). ¿Qué significa eso para el valor de una cueva sin descuento?
 3. El gradiente del Paso 8 usa $P$, o sea, el mapa. ¿Cómo lo estimarías si solo pudieras **jugar** y anotar transiciones $(s, r, s')$?
 
-## Próxima clase
+## Próxima
 
-Clase 2: **¿qué es RL?** Ya tenemos las tres herramientas (Python, probabilidad y álgebra lineal) y vimos de reojo la ecuación de Bellman. Ahora apagamos la luz: un agente que no conoce el mapa, igual que un modelo de lenguaje que no conoce las reglas del idioma y las aprende a fuerza de ejemplos.
+La clase 1 (el marco) y después la 2: **¿qué es RL?** Ya tenemos las tres herramientas (Python, probabilidad y álgebra lineal) y vimos de reojo la ecuación de Bellman. Ahora apagamos la luz: un agente que no conoce el mapa, igual que un modelo de lenguaje que no conoce las reglas del idioma y las aprende a fuerza de ejemplos.
 
 ---
 

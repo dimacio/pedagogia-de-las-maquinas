@@ -307,7 +307,7 @@ print("Q*(cruce, ·):  " + "   ".join(f"{ACTION_NAMES[a]} {Q_estrella[cruce, a]:
 cells.append(md(r"""
 ### Paso 2 — La misma casilla, con $V$ y con $Q$
 
-A la izquierda, el cruce (5, 6) de las clases 3 a 5 con el $V^*$ de cada casilla vecina: sabemos cuánto vale cada lugar, pero no adónde lleva cada flecha (los signos de pregunta). A la derecha, la misma casilla con sus cuatro $Q^*$: un número por flecha, y elegir es mirar cuál es el mayor.
+A la izquierda, el cruce (5, 6), que seguimos desde la clase 4, con el $V^*$ de cada casilla vecina: sabemos cuánto vale cada lugar, pero no adónde lleva cada flecha (los signos de pregunta). A la derecha, la misma casilla con sus cuatro $Q^*$: un número por flecha, y elegir es mirar cuál es el mayor.
 """))
 cells.append(code(r"""
 fig, axs = plt.subplots(1, 2, figsize=(15, 6.6))

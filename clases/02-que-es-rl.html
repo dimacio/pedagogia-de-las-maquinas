@@ -98,7 +98,7 @@
     <div class="texto">
       <div class="paso">Paso 3</div>
       <h2>La política: la regla que elige</h2>
-      <p>La <b>política</b> (<i>policy</i>) es la regla que elige la acción <i>a</i> según la casilla <i>s</i> (en el paso 5 la llamamos estado). En general le da a cada acción una probabilidad π(a|s), que al azar es 1/4 para cada una de las cuatro y con flechas fijas es 1 para la flecha de la casilla y 0 para las demás. En los 300 episodios del notebook, el azar sale dentro de los 200 pasos solo el 3.7 % de las veces y las flechas salen siempre, en 20 pasos. Como el entorno y la recompensa son los mismos, lo que el agente tiene que aprender es la política.</p>
+      <p>La <b>política</b> (<i>policy</i>) es la regla que elige la acción <i>a</i> según la casilla <i>s</i> (en el paso 5 la llamamos estado). En general le da a cada acción una probabilidad π(a|s), que al azar es 1/4 para cada una de las cuatro y con flechas fijas es 1 para la flecha de la casilla y 0 para las demás. En los 300 episodios del notebook, el azar sale dentro de los 200 pasos solo el 3,7 % de las veces y las flechas salen siempre, en 20 pasos. Como el entorno y la recompensa son los mismos, lo que el agente tiene que aprender es la política.</p>
       <div class="eq">π(a | s)</div>
       <p class="nota pregunta">Si una sola flecha apuntara contra una pared, ¿qué le pasaría al agente que la sigue?</p>
     </div>
@@ -230,7 +230,7 @@
     <div class="texto">
       <div class="paso">Paso 8</div>
       <h2>La trampa de la recompensa</h2>
-      <p>Con +1/−1, la política que más cobra en el notebook es «solo sumas», con 45.3 puntos. Esa política deja al alumno con un 5 % de acierto en restas. En la <b>trampa de la recompensa</b> (<i>reward hacking</i>) el tutor optimiza lo que le pedimos, no lo que queríamos. Si se le paga por lo que aprendió el alumno, «solo sumas» cae al último lugar con 90.0 puntos y gana «alternar» con 155.1, que también es la que más enseña.</p>
+      <p>Con +1/−1, la política que más cobra en el notebook es «solo sumas», con 45,3 puntos. Esa política deja al alumno con un 5 % de acierto en restas. En la <b>trampa de la recompensa</b> (<i>reward hacking</i>) el tutor optimiza lo que le pedimos, no lo que queríamos. Si se le paga por lo que aprendió el alumno, «solo sumas» cae al último lugar con 90,0 puntos y gana «alternar» con 155,1, que también es la que más enseña.</p>
       <p class="nota pregunta">¿Un tutor real podría medir «lo que aprendió»? Si la recompensa fuera aprobar un examen, ¿cómo podría hacer trampa el tutor?</p>
     </div>
   </section>
@@ -243,6 +243,7 @@
       <p>"Aprender por refuerzo es aprender a decidir cuando nadie te dice la respuesta correcta: solo te pagan, a veces mucho después, y te pagan por lo que pediste, no por lo que querías."</p>
       <p class="nota pregunta">Pregunta para hacerle a la otra persona: si te pagaran un punto por cada respuesta correcta de tus alumnos, ¿qué ejercicios les darías?</p>
       <p><b>Ejercicio de 5 minutos:</b> en parejas, una persona hace de agente con los ojos cerrados y la otra de entorno. El agente dice una dirección; el entorno responde solo "pared" o "nada" y, al llegar a una salida imaginaria, "+1". Después de dos minutos cambian de rol y anotan en el pizarrón qué recordaba cada agente para no chocar dos veces con la misma pared. Eso es su estado.</p>
+      <p><b>Adelanto:</b> la casilla alcanza para decidir. En la clase 3 le ponemos número a cuánto pesa el futuro (γ).</p>
     </div>
   </section>
 </main>
@@ -801,7 +802,7 @@
       ctx.strokeStyle = COL.exit; ctx.beginPath(); ctx.arc(lx - 4, ly + 24, 5, 0, 7); ctx.stroke(); ctx.fillText("más aprendizaje", lx - 14, ly + 24);
       const nombre = pol === "tuya" ? `la tuya (${sl.value}% restas)` : POLS[pol].nombre;
       const origen = pol !== "tuya" ? "notebook" : "simulado en el navegador";
-      hud.innerHTML = `<span><b>${nombre}</b></span><span>recompensa <b>${elegido.G.toFixed(1)}</b></span><span>suma final <b>${Math.round(elegido.suma * 100)}%</b></span><span>resta final <b>${Math.round(elegido.resta * 100)}%</b></span><span>(${origen})</span>` +
+      hud.innerHTML = `<span><b>${nombre}</b></span><span>recompensa <b>${elegido.G.toFixed(1).replace(".", ",")}</b></span><span>suma final <b>${Math.round(elegido.suma * 100)}%</b></span><span>resta final <b>${Math.round(elegido.resta * 100)}%</b></span><span>(${origen})</span>` +
         `<span>${maxG === maxA ? '<b style="color:var(--exit)">recompensa y aprendizaje coinciden</b>' : '<b style="color:var(--ember)">la política que más cobra no es la que más enseña</b>'}</span>`;
     }
     function niceStep(x) { const p = 10 ** Math.floor(Math.log10(x)), f = x / p; return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p; }

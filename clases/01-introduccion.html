@@ -591,7 +591,7 @@
     const M = window.MODULOS || {};
     const DEF = { pagina: 30, notebook: 75 };
     const PARTES = {
-      visual: ["Antes de empezar: objetivos, tiempo y requisitos.", "Tres a cinco figuras que se tocan: ver primero, leer después.", "«Para enseñarlo»: la clase en una oración, una pregunta y un ejercicio de 5 minutos.", "Cuestionario de 5 preguntas, con 4 se aprueba.", "Actividad entre pares en GitHub Discussions, devuelta con una rúbrica."],
+      visual: ["Antes de empezar: objetivos, tiempo y requisitos.", "Varias figuras que se tocan: ver primero, leer después.", "«Para enseñarlo»: la clase en una oración, una pregunta y un ejercicio de 5 minutos.", "Cuestionario de 5 preguntas, con 4 se aprueba.", "Actividad entre pares en GitHub Discussions, devuelta con una rúbrica."],
       codigo: ["Todo lo de la vía visual.", "Un notebook por clase que corre en Colab, en CPU, sin instalar nada.", "Pasos numerados: cada uno llama a una función y muestra su gráfico.", "Al final, un ejercicio abierto para cambiar algo y mirar qué pasa."]
     };
     let via = "visual";
@@ -607,7 +607,7 @@
           return `<a href="${c.archivo}"${c.id === "1" ? ' class="aqui" aria-current="page"' : ""}><span class="id">${c.id}</span><span>${c.titulo}</span></a>`;
         }).join("");
         if (t !== "N") total += min;
-        const tot = min ? `~<b>${Math.round(min / 60 * 2) / 2}</b> h de material` : "En preparación";
+        const tot = min ? `~<b>${fmt(Math.round(min / 60 * 2) / 2).replace(",0", "")}</b> h de material` : "En preparación";
         return `<div class="trim${t === "N" ? " opt" : ""}"><h3>${n}</h3>${items}<div class="tot">${tot}</div></div>`;
       }).join("");
       $("partes").innerHTML = PARTES[via].map(p => `<li>${p}</li>`).join("");

@@ -96,7 +96,7 @@
     <div class="texto">
       <div class="paso">Paso 2</div>
       <h2>Probar a veces con ε-greedy</h2>
-      <p>Si elige siempre la flecha de mayor Q, que se llama jugar codicioso (<i>greedy</i>), el agente nunca prueba las otras ni se entera de si valían más. La receta <b>ε-greedy</b> elige en cada paso una flecha al azar con probabilidad ε, para probar (<i>exploration</i>), o la de mayor Q, para aprovechar (<i>exploitation</i>). En el notebook, con 300 partidas desde S, con ε = 0 el agente casi nunca encuentra la salida (1 de 8 semillas), con ε = 0,01 la encuentra en 5 de 8 y desde ε = 0,05 en las 8. Probar siempre tampoco es lo mejor, porque con ε = 1 la descubre más tarde que con ε = 0,5 (mediana en la partida 48 contra 36) y al final tarda 198,9 pasos por partida, contra 32,3 con ε = 0,1.</p>
+      <p>Si elige siempre la flecha de mayor Q, que se llama jugar codicioso (<i>greedy</i>), el agente nunca prueba las otras ni se entera de si valían más. La receta <b>ε-greedy</b>, como las flechas con ε = 0,7 de la clase 5, elige en cada paso una flecha al azar con probabilidad ε, para probar (<i>exploration</i>), o la de mayor Q, para aprovechar (<i>exploitation</i>). En el notebook, en 300 partidas desde S, el agente encuentra la salida en 1 de 8 semillas con ε = 0, en 5 de 8 con ε = 0,01 y en las 8 desde ε = 0,05. Probar siempre tampoco es lo mejor, porque con ε = 1 la descubre más tarde que con ε = 0,5 (mediana en la partida 48 contra 36) y al final tarda 198,9 pasos por partida, contra 32,3 con ε = 0,1.</p>
       <div class="eq">P(la mejor) = 1 − ε + ε/4</div>
       <p class="nota pregunta">Con ε = 0,1, ¿con qué probabilidad elige la mejor flecha? Ojo, que el azar también puede elegirla.</p>
     </div>
@@ -165,12 +165,12 @@
           <tbody id="tbComp"></tbody>
         </table>
       </div>
-      <p class="cap">Curvas simuladas en el navegador como en el notebook (20 000 partidas con inicio al azar, α = 0,2, una semilla). La tabla es la del notebook, con max Q(S) promediado en las últimas 2000 partidas de 5 semillas. V*(S) = 0,8262 y el valor de jugar explorando se calculan con el mapa.</p>
+      <p class="cap">Curvas simuladas en el navegador como en el notebook (20 000 partidas con inicio al azar, α = 0,2, una semilla). La tabla es la del notebook, con max Q(S) promediado en las últimas 2 000 partidas de 5 semillas. V*(S) = 0,8262 y el valor de jugar explorando se calculan con el mapa.</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 5</div>
       <h2>SARSA contra Q-learning</h2>
-      <p>Como SARSA aprende el valor de la misma política con la que juega, pruebas al azar incluidas, se dice que es <i>on-policy</i>. Q-learning, en cambio, es <i>off-policy</i>, porque aprende el valor de la mejor política mientras juega otra, la que explora. En el notebook, con 20 000 partidas, Q-learning llega a V(S) = 0,8196 con ε = 0,2 y al V* de 0,8262 con ε = 0,3 y 0,5, mientras que SARSA baja a 0,7850, 0,7534 y 0,6734, casi el valor de jugar explorando. Con ε = 0,1 los dos empatan por debajo, con 0,7545 y 0,7523, porque explorando tan poco las partidas no alcanzan y la diferencia aparece recién desde ε = 0,2.</p>
+      <p>Como SARSA aprende el valor de la misma política con la que juega, pruebas al azar incluidas, se dice que es <i>on-policy</i>. Q-learning, en cambio, es <i>off-policy</i>, porque aprende el valor de la mejor política mientras juega otra, la que explora. En el notebook, con 20 000 partidas, Q-learning llega a V(S) = 0,8196 con ε = 0,2 y al V* de 0,8262 con ε = 0,3 y 0,5, mientras que SARSA baja a 0,7850, 0,7534 y 0,6734, casi el valor de jugar explorando. Con ε = 0,1 los dos empatan por debajo, con 0,7545 y 0,7523, porque explorando tan poco las partidas no alcanzan y la diferencia aparece recién desde ε = 0,2.</p>
       <div class="eq parte"><span class="nw">SARSA: r + γQ(s′,a′)</span> <span class="nw">Q-learning: r + γ maxₐ′ Q(s′,a′)</span></div>
       <p class="nota pregunta">Si el agente va a seguir explorando siempre, cerca de un precipicio, ¿qué valor predice mejor lo que de verdad va a cobrar?</p>
     </div>
@@ -195,16 +195,16 @@
             <tr><td>0–9</td><td class="num">32</td><td class="num">0,9305</td><td class="num">41 %</td></tr>
             <tr><td>10–99</td><td class="num">18</td><td class="num">0,4130</td><td class="num">67 %</td></tr>
             <tr><td>100–999</td><td class="num">106</td><td class="num">0,5580</td><td class="num">65 %</td></tr>
-            <tr><td>1000 o más</td><td class="num">139</td><td class="num">0,0775</td><td class="num">86 %</td></tr>
+            <tr><td>1 000 o más</td><td class="num">139</td><td class="num">0,0775</td><td class="num">86 %</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="cap">Q-learning desde S con ε = 0,1 y α = 0,2, 2000 partidas simuladas en el navegador (otra semilla que el notebook). Tocá una casilla para ver sus números. La tabla es la del notebook, con las 59 casillas de 5 semillas.</p>
+      <p class="cap">Q-learning desde S con ε = 0,1 y α = 0,2, 2 000 partidas simuladas en el navegador (otra semilla que el notebook). Tocá una casilla para ver sus números. La tabla es la del notebook, con las 59 casillas de 5 semillas.</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 6</div>
       <h2>El mapa de visitas</h2>
-      <p>El <b>mapa de visitas</b> (<i>visit count</i>) cuenta cuántas veces pisó cada casilla un agente de Q-learning que jugó 2000 partidas desde S con ε = 0,1. En la semilla 0 del notebook, el 80 % de las flechas aprendidas son óptimas y 10 casillas quedaron sin pisar, entre ellas las 8 que el notebook lista con un error de 0,91 a 0,95. En las 5 semillas, el error medio es de 0,93 con menos de 10 visitas y de 0,0775 con 1000 o más. No baja siempre con las visitas, porque de 100 a 999 el error medio (0,56) supera al de 10 a 99 (0,41) por casillas que el agente pisa de paso, explorando, sin que el +1 llegue a asentarse ahí.</p>
+      <p>El <b>mapa de visitas</b> (<i>visit count</i>) cuenta cuántas veces pisó cada casilla un agente de Q-learning que jugó 2 000 partidas desde S con ε = 0,1. En la semilla 0 del notebook, el 80 % de las flechas aprendidas son óptimas y 10 casillas quedaron sin pisar, entre ellas las 8 que el notebook lista con un error de 0,91 a 0,95. En las 5 semillas, el error medio es de 0,93 con menos de 10 visitas y de 0,0775 con 1 000 o más. No baja siempre con las visitas, porque de 100 a 999 el error medio (0,56) supera al de 10 a 99 (0,41) por casillas que el agente pisa de paso, explorando, sin que el +1 llegue a asentarse ahí.</p>
       <div class="eq">error(s) = |maxₐ Q(s,a) − V*(s)|</div>
       <p class="nota pregunta">En la semilla 0 del notebook, la flecha de S quedó en ↓, el camino de 22 pasos. ¿Por qué el agente casi nunca se entera de que → era mejor?</p>
     </div>
@@ -557,7 +557,7 @@
       horizontal(g, VS[START], COL.ink, [6, 4]); horizontal(g, EXPL[eps], COL.sonar, [1.5, 3]);
       curva(g, RQ.VS, COL.lamp); curva(g, RS.VS, COL.sonar);
       g.ctx.restore();
-      hud.innerHTML = `<span>simulado, últimas 2000 partidas: Q-learning <b>${fmt(cola(RQ), 4)}</b>, SARSA <b>${fmt(cola(RS), 4)}</b></span>` +
+      hud.innerHTML = `<span>simulado, últimas 2 000 partidas: Q-learning <b>${fmt(cola(RQ), 4)}</b>, SARSA <b>${fmt(cola(RS), 4)}</b></span>` +
         `<span>con mapa: V*(S) <b>${fmt(VS[START], 4)}</b>, jugar explorando <b>${fmt(EXPL[eps], 4)}</b></span>`;
       tb.innerHTML = Object.entries(NB_COMP).map(([e, f]) => `<tr${e === eps ? ' class="sel"' : ""}><td>${coma(e)}</td>${f.map(x => `<td class="num">${x}</td>`).join("")}</tr>`).join("");
     }

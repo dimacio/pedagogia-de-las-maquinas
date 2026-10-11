@@ -28,7 +28,7 @@
   </section>
 
   <!-- 1. La cueva como vector -->
-  <section class="bloque">
+  <section class="bloque" data-objetivos="O1">
     <div class="stage">
       <div class="lienzo"><canvas id="cv1" aria-label="La grilla de la cueva desenrollada en un vector de 60 casillas; pasá el mouse por una casilla"></canvas></div>
       <div class="row"><button class="btn primary" id="b1">Enrollar</button></div>
@@ -44,7 +44,7 @@
   </section>
 
   <!-- 2. La matriz P -->
-  <section class="bloque">
+  <section class="bloque" data-objetivos="O2">
     <div class="stage">
       <div class="sub">Cueva mini: P de 11×11 (tocá una fila o una casilla)</div>
       <div class="lienzo"><canvas id="cv2a" aria-label="Matriz P de la política al azar en la cueva mini, con números"></canvas></div>
@@ -63,7 +63,7 @@
   </section>
 
   <!-- 3. Producto matriz-vector -->
-  <section class="bloque">
+  <section class="bloque" data-objetivos="O3">
     <div class="stage">
       <div class="lienzo"><canvas id="cv3" aria-label="Valor de la política al azar extendiéndose por la cueva"></canvas></div>
       <div class="legend"><span>V≈0</span><div class="bar" id="ley3"></div><span>V(salida vecina)</span></div>
@@ -74,13 +74,13 @@
       <div class="paso">Paso 3</div>
       <h2>Multiplicar es propagar</h2>
       <p>Arrancamos con <code>V = 0</code>. Cada producto <code>P·V</code> promedia el valor de las vecinas, y <code>R</code> suma lo que se gana al entrar a la salida. Tocá "multiplicar": el valor nace en la salida y avanza una casilla por vez (el color está en escala logarítmica).</p>
-      <div class="eq">V ← R + γ P V&emsp;&emsp;γ = 0.99</div>
+      <div class="eq">V ← R + γ P V&emsp;&emsp;γ = 0,99</div>
       <p class="nota pregunta">¿Cuántas multiplicaciones hacen falta para que la entrada S tenga un valor distinto de cero? Compará con el largo del camino más corto.</p>
     </div>
   </section>
 
   <!-- 4. Resolver de una vez -->
-  <section class="bloque">
+  <section class="bloque" data-objetivos="O4">
     <div class="stage">
       <div class="lienzo"><canvas id="cv4a" aria-label="Error de la iteración contra la solución exacta, en escala logarítmica, para varios gamma"></canvas></div>
       <div class="ley" id="ley4"></div>
@@ -92,12 +92,12 @@
       <h2>Resolver de una vez</h2>
       <p>La ecuación de Bellman de la política es un sistema lineal: se puede despejar <code>V</code> con eliminación gaussiana, como en el secundario pero con 60 incógnitas. El gráfico compara esa solución exacta con la iteración del paso 3: el error cae como una recta en escala logarítmica, nunca más despacio que la línea punteada de pendiente <code>log γ</code>.</p>
       <div class="eq">V = R + γPV&emsp;&emsp;⇔&emsp;&emsp;(I − γP) V = R</div>
-      <p class="nota pregunta">Con γ = 0.999, ¿conviene iterar o resolver? ¿Y si la cueva tuviera un millón de casillas?</p>
+      <p class="nota pregunta">Con γ = 0,999, ¿conviene iterar o resolver? ¿Y si la cueva tuviera un millón de casillas?</p>
     </div>
   </section>
 
   <!-- 5. Autovalores -->
-  <section class="bloque">
+  <section class="bloque" data-objetivos="O3 O4">
     <div class="stage">
       <div class="lienzo"><canvas id="cv5" aria-label="Distribución del caminante al azar sobre la cueva"></canvas></div>
       <div class="lienzo"><canvas id="cv5b" aria-label="Distancia a la distribución estacionaria en escala logarítmica"></canvas></div>
@@ -107,14 +107,14 @@
     <div class="texto">
       <div class="paso">Paso 5</div>
       <h2>El autovalor 1</h2>
-      <p>Un caminante al azar que vuelve a S cada vez que sale. Si <code>μ</code> es la probabilidad de estar en cada casilla, un paso es <code>μ ← μP</code>. Multiplicar muchas veces es el método de la potencia (<i>power method</i>): converge a la distribución estacionaria, el autovector de autovalor 1.</p>
-      <div class="eq">πP = 1·π&emsp;&emsp;P·[1, …, 1]ᵀ = [1, …, 1]ᵀ</div>
+      <p>Un caminante al azar que vuelve a S cada vez que sale. Si <code>μ</code> es la probabilidad de estar en cada casilla, un paso es <code>μ ← μP</code>. Multiplicar muchas veces es el método de la potencia (<i>power method</i>): converge a la distribución estacionaria <code>μ*</code>, el autovector de autovalor 1.</p>
+      <div class="eq">μ*P = μ*&emsp;&emsp;P·[1, …, 1]ᵀ = [1, …, 1]ᵀ</div>
       <p>El mapa de calor se parece al de las visitas del agente al azar de la nivelación 0a: es la misma cuenta, hecha con álgebra en vez de con partidas.</p>
       <p class="nota pregunta">¿Por qué ningún autovalor de P puede ser mayor que 1? (Pista: cada fila suma 1.) ¿Qué controla la velocidad con la que cae el error?</p>
     </div>
   </section>
 
-  <section class="bloque full">
+  <section class="bloque full" data-objetivos="O1 O2">
     <div class="texto">
       <div class="paso">Para enseñarlo</div>
       <h2>Contalo en una oración</h2>
@@ -134,6 +134,9 @@
   const env = Cueva.makeEnv(Cueva.MAPS.chica), mini = Cueva.makeEnv(Cueva.MAPS.mini);
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const $ = id => document.getElementById(id);
+  const coma = s => String(s).replace(".", ",");
+  const fmt = (x, d = 3) => coma(x.toFixed(d));
+  const fmtE = (x, d = 2) => coma(x.toExponential(d));
   const anchoDe = cv => Math.max(120, cv.parentElement.clientWidth);
   function ajustar(cv, w, h) {
     const dpr = window.devicePixelRatio || 1, ctx = cv.getContext("2d");
@@ -225,7 +228,7 @@
   // ---------- 2. La matriz P ----------
   const cv2a = $("cv2a"), cv2b = $("cv2b"), hud2 = $("hud2");
   let sel2 = { e: mini, s: 2 }, geoA = null, geoB = null;
-  const frac = p => ({ 0.25: "¼", 0.5: "½", 0.75: "¾", 1: "1" })[Math.round(p * 4) / 4] || p.toFixed(2);
+  const frac = p => ({ 0.25: "¼", 0.5: "½", 0.75: "¾", 1: "1" })[Math.round(p * 4) / 4] || fmt(p, 2);
   function caveEn(ctx, e, x0, y0, cell, s0, M, etiquetas) {
     for (let r = 0; r < e.H; r++) for (let c = 0; c < e.W; c++) { ctx.fillStyle = e.rows[r][c] === "#" ? col.rock2 : "#000"; ctx.fillRect(x0 + c * cell, y0 + r * cell, cell, cell); }
     const f = s0 !== null ? M[s0] : null;
@@ -272,7 +275,7 @@
   function hud2txt() {
     const e = sel2.e, s = sel2.s, M = e === mini ? SM.M : SC.M, [r, c] = e.free[s];
     const nz = [...M[s]].map((p, j) => [j, p]).filter(x => x[1] > 0).map(([j, p]) => `P[${s}, ${j}] = ${frac(p)}`).join(" · ");
-    hud2.innerHTML = `<span>${e === mini ? "mini" : "chica"}: fila <b>${s}</b> = casilla (${r}, ${c})</span><span>${nz}</span><span>suma de la fila <b>${M[s].reduce((a, b) => a + b, 0).toFixed(2)}</b></span>`;
+    hud2.innerHTML = `<span>${e === mini ? "mini" : "chica"}: fila <b>${s}</b> = casilla (${r}, ${c})</span><span>${nz}</span><span>suma de la fila <b>${fmt(M[s].reduce((a, b) => a + b, 0), 2)}</b></span>`;
   }
   function dibujar2() { dibujar2a(); dibujar2b(); hud2txt(); }
   function elegirEn(ev, cv, g, e, esMini) {
@@ -299,9 +302,9 @@
     T3.medir().fondo().paredes();
     for (let s = 0; s < env.nS; s++) if (s !== env.goal) { const [r, c] = env.free[s]; T3.casilla(r, c, t[s] < 0 ? "#07080c" : Cueva.rampa("valor", .08 + .92 * t[s])); }
     T3.salida().entrada();
-    if (T3.cell >= 26) for (let s = 0; s < env.nS; s++) if (s !== env.goal && V3[s] > 0) T3.texto(s, V3[s] >= .01 ? V3[s].toFixed(2).slice(1) : "·", t[s] > .7 ? "#0b0d12" : "rgba(232,230,223,.75)", .3);
+    if (T3.cell >= 26) for (let s = 0; s < env.nS; s++) if (s !== env.goal && V3[s] > 0) T3.texto(s, V3[s] >= .01 ? fmt(V3[s], 2) : "·", t[s] > .7 ? "#0b0d12" : "rgba(232,230,223,.75)", .3);
     const alcanzadas = V3.filter((v, s) => v > 0 && s !== env.goal).length;
-    hud3.innerHTML = `<span>iteración k = <b>${k3}</b></span><span>V(S) = <b>${V3[env.start].toExponential(2)}</b></span><span>casillas con V > 0: <b>${alcanzadas}</b>/${env.nS - 1}</span><span>‖V − V*‖∞ = <b>${normInf(V3, Vstar3).toExponential(2)}</b></span>`;
+    hud3.innerHTML = `<span>iteración k = <b>${k3}</b></span><span>V(S) = <b>${fmtE(V3[env.start])}</b></span><span>casillas con V > 0: <b>${alcanzadas}</b>/${env.nS - 1}</span><span>‖V − V exacto‖∞ = <b>${fmtE(normInf(V3, Vstar3))}</b></span>`;
   }
   const mult3 = n => { for (let i = 0; i < n; i++) { V3 = bellman(SC.PT, SC.R, V3, G3); k3++; } dibujar3(); };
   $("b3").onclick = () => mult3(1); $("b3x10").onclick = () => mult3(10);
@@ -320,7 +323,7 @@
   const cache4 = FIJOS.map(curva);
   let elegido4 = null;
   function dibujar4() {
-    const g = +$("g4").value; $("og4").textContent = g.toFixed(3);
+    const g = +$("g4").value; $("og4").textContent = fmt(g, 3);
     if (!elegido4 || elegido4.g !== g) elegido4 = curva(g);
     const series = [...cache4.map((c, i) => ({ ...c, color: COLS[i] })), { ...elegido4, color: col.lamp, ancho: 2.5 }];
     const w = anchoDe(cv4a), h = 220, ctx = ajustar(cv4a, w, h), ml = 44, mb = 24, mt = 8, pw = w - ml - 8, ph = h - mb - mt;
@@ -337,9 +340,9 @@
       ctx.globalAlpha = 1; ctx.lineWidth = s.ancho || 1.6; ctx.beginPath(); s.err.forEach((e, k) => k ? ctx.lineTo(X(k), Y(e)) : ctx.moveTo(X(k), Y(e))); ctx.stroke();
     }
     ctx.restore();
-    $("ley4").innerHTML = series.map(s => `<span><i style="background:${s.color}"></i>γ = ${s.g}</span>`).join("") + `<span>punteada: e₀·γᵏ</span>`;
+    $("ley4").innerHTML = series.map(s => `<span><i style="background:${s.color}"></i>γ = ${coma(s.g)}</span>`).join("") + `<span>punteada: e₀·γᵏ</span>`;
     const k1 = elegido4.err.findIndex(e => e < 1e-6);
-    hud4.innerHTML = `<span>γ = <b>${g.toFixed(3)}</b></span><span>gauss: <b>${elegido4.ms.toFixed(1)} ms</b></span><span>V*(S) = <b>${elegido4.Vs[env.start].toExponential(3)}</b></span><span>iteraciones hasta error &lt; 1e-6: <b>${k1 < 0 ? "más de " + K4 : k1}</b></span>`;
+    hud4.innerHTML = `<span>γ = <b>${fmt(g, 3)}</b></span><span>gauss: <b>${fmt(elegido4.ms, 1)} ms</b></span><span>V exacto(S) = <b>${fmtE(elegido4.Vs[env.start], 3)}</b></span><span>iteraciones hasta error &lt; 1e-6: <b>${k1 < 0 ? "más de " + K4 : k1}</b></span>`;
   }
   $("g4").addEventListener("input", dibujar4);
 
@@ -347,7 +350,7 @@
   const cv5 = $("cv5"), cv5b = $("cv5b"), hud5 = $("hud5"), T5 = Cueva.tablero(cv5, env, { maxCell: 40 });
   // caminante con reinicio: al llegar a la salida vuelve a S
   const PW = SC.M.map((f, s) => { if (s !== env.goal) return f; const g = new Float64Array(env.nS); g[env.start] = 1; return g; });
-  // π exacta: π (I − P) = 0, Σπ = 1  → sistema transpuesto con la última ecuación cambiada por la normalización
+  // μ* exacta: μ* (I − P) = 0, Σμ* = 1  → sistema transpuesto con la última ecuación cambiada por la normalización
   const piEst = (() => { const n = env.nS, A = [], b = new Array(n).fill(0);
     for (let i = 0; i < n; i++) A.push(Array.from({ length: n }, (_, j) => (i === j ? 1 : 0) - PW[j][i]));
     A[n - 1] = new Array(n).fill(1); b[n - 1] = 1; return gauss(A, b); })();
@@ -367,9 +370,9 @@
     ink(ctx, col.muted); ctx.textAlign = "right"; ctx.textBaseline = "middle"; for (const p of [0, -4, -8, -12]) ctx.fillText(`1e${p}`, ml - 4, Y(Math.pow(10, p)));
     ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText("iteración k", ml + pw / 2, h - 4); ctx.textAlign = "left"; ctx.fillText("0", ml, h - 4); ctx.textAlign = "right"; ctx.fillText(K5, w - 8, h - 4);
     ctx.strokeStyle = col.sonar; ctx.lineWidth = 1.6; ctx.beginPath(); err5.forEach((e, k) => k ? ctx.lineTo(X(k), Y(e)) : ctx.moveTo(X(k), Y(e))); ctx.stroke();
-    ctx.fillStyle = col.muted; ctx.textAlign = "right"; ctx.textBaseline = "top"; ctx.fillText("‖μₖ − π‖₁", w - 10, mt);
+    ctx.fillStyle = col.muted; ctx.textAlign = "right"; ctx.textBaseline = "top"; ctx.fillText("‖μₖ − μ*‖₁", w - 10, mt);
     const n = err5.length; let u = n - 1; while (u > 0 && err5[u] < 1e-9) u--; const lam2 = u > 200 ? Math.pow(err5[u] / err5[u - 100], 1 / 100) : NaN;
-    hud5.innerHTML = `<span>k = <b>${k5}</b></span><span>Σμ = <b>${mu.reduce((a, b) => a + b, 0).toFixed(3)}</b></span><span>‖μ − π‖₁ = <b>${err5[n - 1].toExponential(2)}</b></span><span>|λ₂| ≈ <b>${isNaN(lam2) ? "…" : lam2.toFixed(4)}</b></span>`;
+    hud5.innerHTML = `<span>k = <b>${k5}</b></span><span>Σμ = <b>${fmt(mu.reduce((a, b) => a + b, 0), 3)}</b></span><span>‖μ − μ*‖₁ = <b>${fmtE(err5[n - 1])}</b></span><span>|λ₂| ≈ <b>${isNaN(lam2) ? "…" : fmt(lam2, 4)}</b></span>`;
   }
   function correr5(animar) {
     cancelAnimationFrame(anim5); reiniciar5();

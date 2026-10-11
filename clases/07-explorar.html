@@ -40,7 +40,7 @@
       <div class="seg" role="group" aria-label="Impresiones de cada anuncio" id="segN">
         <button aria-pressed="false" data-n="50">50 de cada uno</button>
         <button aria-pressed="true" data-n="500">500</button>
-        <button aria-pressed="false" data-n="5000">5000</button>
+        <button aria-pressed="false" data-n="5000">5 000</button>
       </div>
       <div class="lz"><canvas id="cvAnuncios" aria-label="Cuatro barras con la tasa de clics observada de cada anuncio y su intervalo del 95 %; opcionalmente, una línea verde con la probabilidad verdadera"></canvas></div>
       <div class="row">
@@ -53,22 +53,22 @@
     <div class="texto">
       <div class="paso">Paso 1</div>
       <h2>Cuatro anuncios, un solo estado</h2>
-      <p>Una tienda tiene cuatro anuncios y muestra uno a cada persona que entra a la página. Cada anuncio recibe un clic con una probabilidad que nadie conoce, que en el notebook vale 4,0 % para A, 2,5 % para B, 5,5 % para C y 3,0 % para D. Es un bandit de varios brazos (<i>multi-armed bandit</i>), como una fila de tragamonedas en la que solo hay que elegir qué palanca tirar. En el lenguaje del curso es el problema de RL más chico, con un solo estado, cuatro acciones y partidas de un paso.</p>
+      <p>Una tienda tiene cuatro anuncios y muestra uno a cada persona que entra a la página. El anuncio a recibe un clic con una probabilidad μₐ que nadie conoce, que en el notebook vale 4,0 % para A, 2,5 % para B, 5,5 % para C y 3,0 % para D. Es un bandit de varios brazos (<i>multi-armed bandit</i>), como una fila de tragamonedas en la que solo hay que elegir qué palanca tirar. En el lenguaje del curso es el problema de RL más chico, con un solo estado, cuatro acciones y partidas de un paso.</p>
       <div class="eq">μ* = maxₐ μₐ = μ_C = 5,5 %</div>
-      <p class="nota pregunta">Con 50 impresiones de cada anuncio, ¿te animarías a decir cuál es el mejor? Probá con 500 y con 5000.</p>
+      <p class="nota pregunta">Con 50 impresiones de cada anuncio, ¿te animarías a decir cuál es el mejor? Probá con 500 y con 5 000.</p>
     </div>
   </section>
 
   <!-- B2: el arrepentimiento -->
   <section class="bloque" id="b-regret" data-objetivos="O1">
     <div class="stage">
-      <div class="lz"><canvas id="cvRegret" aria-label="Arrepentimiento acumulado a lo largo de 20&nbsp;000 impresiones para la prueba A/B fija, ε-greedy y UCB, con el promedio y una banda del 10 % al 90 % de las campañas"></canvas></div>
+      <div class="lz"><canvas id="cvRegret" aria-label="Arrepentimiento acumulado a lo largo de 20 000 impresiones para la prueba A/B fija, ε-greedy y UCB, con el promedio y una banda del 10 % al 90 % de las campañas"></canvas></div>
       <div class="chips"><span><i style="background:var(--ember)"></i>A/B fijo</span><span><i style="background:var(--lamp)"></i>ε-greedy (ε = 0,1)</span><span><i style="background:var(--sonar)"></i>UCB (c = 0,2)</span></div>
       <div class="row"><button class="btn" id="regOtra">Otras campañas</button></div>
       <div class="hud" id="hudReg"></div>
       <div class="tabla nb">
         <table>
-          <thead><tr><th>notebook, 200 campañas</th><th>regret a las 20&nbsp;000</th><th>impresiones al mejor</th></tr></thead>
+          <thead><tr><th>notebook, 200 campañas</th><th>regret a las 20 000</th><th>impresiones al mejor</th></tr></thead>
           <tbody>
             <tr><td>A/B fijo</td><td class="num">69,2</td><td class="num">81,7 %</td></tr>
             <tr><td>ε-greedy, ε = 0,1</td><td class="num">89,6</td><td class="num">75,4 %</td></tr>
@@ -76,12 +76,12 @@
           </tbody>
         </table>
       </div>
-      <p class="cap">Curvas simuladas en el navegador: 60 campañas de 20&nbsp;000 impresiones por método, con otra semilla que el notebook. La línea es el promedio y la banda va del 10 % al 90 % de las campañas. La tabla es la del notebook.</p>
+      <p class="cap">Curvas simuladas en el navegador: 60 campañas de 20 000 impresiones por método, con otra semilla que el notebook. La línea es el promedio y la banda va del 10 % al 90 % de las campañas. La tabla es la del notebook.</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 2</div>
       <h2>Cuánto perdés por probar</h2>
-      <p>El arrepentimiento (<i>regret</i>) suma los clics esperados que se pierden por no mostrar siempre el mejor anuncio. La prueba A/B fija muestra 500 veces cada anuncio antes de quedarse con el ganador, mientras que ε-greedy con ε = 0,1 sigue probando al azar para siempre. En el notebook, con 200 campañas de 20&nbsp;000 impresiones, la prueba A/B pierde 69,2 clics, ε-greedy 89,6 y UCB 36,7. UCB le da al mejor anuncio el 90,9 % de las impresiones, contra el 81,7 % de la prueba A/B y el 75,4 % de ε-greedy.</p>
+      <p>El arrepentimiento (<i>regret</i>) suma los clics esperados que se pierden por no mostrar siempre el mejor anuncio. La prueba A/B fija muestra 500 veces cada anuncio antes de quedarse con el ganador, mientras que ε-greedy con ε = 0,1 sigue probando al azar para siempre. En el notebook, con 200 campañas de 20 000 impresiones, la prueba A/B pierde 69,2 clics, ε-greedy 89,6 y UCB 36,7. UCB le da al mejor anuncio el 90,9 % de las impresiones, contra el 81,7 % de la prueba A/B y el 75,4 % de ε-greedy.</p>
       <div class="eq">regret_T = Σₜ (μ* − μ_aₜ)</div>
       <p class="nota pregunta">¿Por qué la curva de ε-greedy nunca se aplana, aunque ya sepa cuál es el mejor anuncio?</p>
     </div>
@@ -93,7 +93,7 @@
       <div class="lz"><canvas id="cvUcb" aria-label="Para cada anuncio, un punto en su promedio de clics y una barra hasta su puntaje de UCB; la estrella marca el anuncio que UCB muestra"></canvas></div>
       <div class="row">
         <button class="btn primary" id="ucb1">Una impresión más</button>
-        <button class="btn" id="ucb1000">1000 más</button>
+        <button class="btn" id="ucb1000">1 000 más</button>
         <button class="btn" id="ucbRe">Volver a t = 300</button>
       </div>
       <div class="hud" id="hudUcb"></div>
@@ -133,12 +133,12 @@
           <tbody id="tbEps"></tbody>
         </table>
       </div>
-      <p class="cap">Simulado en el navegador con una semilla: Q-learning con α = 0,2 y γ = 0,99, Q en 0 más un ruido minúsculo, partidas de hasta 300 pasos desde S y 30&nbsp;000 pasos en total. La tabla es la del notebook.</p>
+      <p class="cap">Simulado en el navegador con una semilla: Q-learning con α = 0,2 y γ = 0,99, Q en 0 más un ruido minúsculo, partidas de hasta 300 pasos desde S y 30 000 pasos en total. La tabla es la del notebook.</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 4</div>
       <h2>De los bandits a la cueva: ε-greedy no llega</h2>
-      <p>En la cueva el premio está al final de un camino, así que hasta llegar una vez a la salida todas las recompensas valen 0. Sin recompensa, ε-greedy es una caminata al azar con costumbres que no distingue una casilla pisada mil veces de una nunca vista. En la cueva grande, con 155 casillas y la salida a 44 pasos, cada explorador tiene 30&nbsp;000 pasos repartidos en partidas de 300. En el notebook, con 20 semillas, el azar puro no llega nunca y ε-greedy llega en el 5 % tanto con ε = 0,1 como con ε = 0,3, aunque con 0,3 pisa 100,3 casillas en promedio contra 63,4.</p>
+      <p>En la cueva el premio está al final de un camino, así que hasta llegar una vez a la salida todas las recompensas valen 0. Sin recompensa, ε-greedy es una caminata al azar con costumbres que no distingue una casilla pisada mil veces de una nunca vista. En la cueva grande, con 155 casillas y la salida a 44 pasos, cada explorador tiene 30 000 pasos repartidos en partidas de 300. En el notebook, con 20 semillas, el azar puro no llega nunca y ε-greedy llega en el 5 % tanto con ε = 0,1 como con ε = 0,3, aunque con 0,3 pisa 100,3 casillas en promedio contra 63,4.</p>
       <div class="eq">r = 1 al entrar a la salida, 0 si no</div>
       <p class="nota pregunta">¿Por qué subir ε de 0,1 a 0,3 hace pisar más casillas pero no llegar más seguido?</p>
     </div>
@@ -163,7 +163,7 @@
     <div class="texto">
       <div class="paso">Paso 5</div>
       <h2>Optimismo en la cueva: contar visitas</h2>
-      <p>Con valores iniciales optimistas, Q arranca en 1 en vez de 0, así que cada flecha no probada promete hasta que el agente la prueba y no encuentra nada. La exploración por conteo (<i>count-based exploration</i>) suma en cada paso una bonificación que es grande en las casillas poco visitadas. En una tabla con Q en 0, el conteo solo no alcanza, porque una flecha nunca probada vale 0 mientras los caminos conocidos ya juntaron bonificaciones. En el notebook, con 20 semillas, el conteo solo no llega nunca mientras que el optimismo llega siempre, con una mediana de 8&nbsp;666 pasos que baja a 5&nbsp;218 si se le suma el conteo.</p>
+      <p>Con valores iniciales optimistas, Q arranca en 1 en vez de 0, así que cada flecha no probada promete hasta que el agente la prueba y no encuentra nada. La exploración por conteo (<i>count-based exploration</i>) suma en cada paso una bonificación que es grande en las casillas poco visitadas. En una tabla con Q en 0, el conteo solo no alcanza, porque una flecha nunca probada vale 0 mientras los caminos conocidos ya juntaron bonificaciones. En el notebook, con 20 semillas, el conteo solo no llega nunca mientras que el optimismo llega siempre, con una mediana de 8 666 pasos que baja a 5 218 si se le suma el conteo.</p>
       <div class="eq">r_total = r + β / √N(s′)</div>
       <p class="nota pregunta">Mirá el conteo solo. ¿Por qué la bonificación empuja hacia lo nuevo recién cuando lo nunca probado vale al menos tanto como lo ya visto?</p>
     </div>
@@ -185,17 +185,17 @@
         <table>
           <thead><tr><th>notebook, 20 semillas</th><th>llegan</th><th>1.ª salida (mediana)</th></tr></thead>
           <tbody>
-            <tr class="sel"><td>volviendo por restauración</td><td class="num">20 de 20</td><td class="num">4&nbsp;620</td></tr>
-            <tr><td>volviendo con la secuencia</td><td class="num">19 de 20</td><td class="num">16&nbsp;612</td></tr>
+            <tr class="sel"><td>volviendo por restauración</td><td class="num">20 de 20</td><td class="num">4 620</td></tr>
+            <tr><td>volviendo con la secuencia</td><td class="num">19 de 20</td><td class="num">16 612</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="cap">Simulado en el navegador, volviendo por restauración del estado: la vuelta no gasta pasos. El color de cada casilla dice en qué iteración entró al archivo. La tabla es la del notebook, con el mismo presupuesto de 30&nbsp;000 pasos.</p>
+      <p class="cap">Simulado en el navegador, volviendo por restauración del estado: la vuelta no gasta pasos. El color de cada casilla dice en qué iteración entró al archivo. La tabla es la del notebook, con el mismo presupuesto de 30 000 pasos.</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 6</div>
       <h2>Go-Explore: primero volver, después explorar</h2>
-      <p>Go-Explore, pensado para juegos de Atari como <i>Montezuma's Revenge</i>, guarda un archivo de casillas visitadas con la secuencia de acciones más corta para llegar a cada una. En cada iteración elige una casilla del archivo, más seguido cuanto menos vista, vuelve a ella sin explorar y recién desde ahí explora 30 pasos al azar. Así evita las dos fallas de los métodos de curiosidad, el desapego (<i>detachment</i>) de las fronteras ya dejadas atrás y el descarrilamiento (<i>derailment</i>) al volver con una política que explora. En el notebook, volviendo por restauración del estado llega a la salida en las 20 semillas con una mediana de 4&nbsp;620 pasos, mientras que repitiendo la secuencia guardada llega en 19 de 20 con 16&nbsp;612.</p>
+      <p>Go-Explore, pensado para juegos de Atari como <i>Montezuma's Revenge</i>, guarda un archivo de casillas visitadas con la secuencia de acciones más corta para llegar a cada una. En cada iteración elige una casilla del archivo, más seguido cuanto menos vista, vuelve a ella sin explorar y recién desde ahí explora 30 pasos al azar. Así evita las dos fallas de los métodos de curiosidad, como el conteo del paso 5, el desapego (<i>detachment</i>) de las fronteras ya dejadas atrás y el descarrilamiento (<i>derailment</i>) al volver con una política que explora. En el notebook, volviendo por restauración del estado llega a la salida en las 20 semillas con una mediana de 4 620 pasos, mientras que repitiendo la secuencia guardada llega en 19 de 20 con 16 612.</p>
       <div class="eq">P(elegir casilla) ∝ 1 / √(vistas + 1)</div>
       <p class="nota pregunta">Restaurar el estado es gratis en un simulador. ¿En qué problemas reales no se puede?</p>
     </div>
@@ -219,16 +219,16 @@
       <div class="hud" id="hudPeg"></div>
       <div class="tabla nb">
         <table>
-          <thead><tr><th>notebook, 1000 intentos</th><th>llegan a la salida</th></tr></thead>
+          <thead><tr><th>notebook, 1 000 intentos</th><th>llegan a la salida</th></tr></thead>
           <tbody id="tbPeg"></tbody>
         </table>
       </div>
-      <p class="cap">La secuencia de 52 acciones es la que guardó Go-Explore en el notebook (semilla 0, sin bucles). Los intentos dibujados y el porcentaje sobre 1000 intentos están simulados en el navegador. La tabla es la del notebook.</p>
+      <p class="cap">La secuencia de 52 acciones es la que guardó Go-Explore en el notebook (semilla 0, sin bucles). Los intentos dibujados y el porcentaje sobre 1 000 intentos están simulados en el navegador. La tabla es la del notebook.</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 7</div>
       <h2>Cuando volver no es exacto</h2>
-      <p>Las acciones pegajosas (<i>sticky actions</i>) hacen que el entorno ignore con probabilidad p la acción elegida y repita la anterior, como un joystick que se traba. En el notebook, la secuencia que guardó Go-Explore, sin bucles (52 acciones), llega siempre con p = 0, en el 44,1 % de los intentos con p = 0,05, en el 17,8 % con p = 0,1 y en el 0,9 % con p = 0,25, mientras que con el piso resbaloso de la clase 4 llega en el 7,2 % con slip = 0,05. Go-Explore, si vuelve repitiendo secuencias en una cueva pegajosa, encuentra la salida en 3 de 20 semillas con p = 0,1 y en 1 de 20 con p = 0,25. Por eso Machado et al. (2018) propusieron entrenar y evaluar en Atari con acciones pegajosas a propósito, para que ninguno gane memorizando botones.</p>
+      <p>Las acciones pegajosas (<i>sticky actions</i>) hacen que el entorno ignore con probabilidad p la acción elegida y repita la anterior, como un joystick que se traba. En el notebook, la secuencia sin bucles que guardó Go-Explore (52 acciones) llega siempre con p = 0, pero solo en el 44,1 % de los intentos con p = 0,05, en el 17,8 % con p = 0,1 y en el 0,9 % con p = 0,25, mientras que con el piso resbaloso de la clase 4 llega en el 7,2 % con slip = 0,05. Go-Explore, si vuelve repitiendo secuencias en una cueva pegajosa, encuentra la salida en 3 de 20 semillas con p = 0,1 y en 1 de 20 con p = 0,25. Por eso Machado et al. (2018) propusieron entrenar y evaluar en Atari con acciones pegajosas a propósito, para que ninguno gane memorizando botones.</p>
       <div class="eq">acción real = la anterior, con prob. p</div>
       <p class="nota pregunta">Una traba en el paso 10 deja al agente una casilla corrido. ¿Qué pasa con las 42 acciones que faltan?</p>
     </div>
@@ -267,7 +267,7 @@
   const $ = id => document.getElementById(id);
   const coma = s => String(s).replace(".", ",").replace("-", "−");
   const fmt = (x, d = 3) => coma(x.toFixed(d));
-  const miles = x => String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  const miles = x => String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   const pct = (x, d = 1) => coma((100 * x).toFixed(d)) + " %";
   const marcar = (sel, attr, v) => document.querySelectorAll(sel).forEach(b => b.setAttribute("aria-pressed", b.dataset[attr] === v));
 
@@ -487,14 +487,14 @@
   // B4. ε-greedy no llega (notebook, celda 25)
   const b4 = await tarea(() => carrera({ seg: "segEps", canvas: "cvEps", hud: "hudEps", tb: "tbEps", ver: "epsVer", otra: "epsOtra", leg: "legEps", inicial: "e01", tipos: [
     { id: "azar", nombre: "al azar (ε = 1)", cfg: { eps: 1 }, nb: ["0 %", "—", "54,3"] },
-    { id: "e01", nombre: "ε-greedy, ε = 0,1", cfg: { eps: 0.1 }, nb: ["5 %", "26 687", "63,4"] },
-    { id: "e03", nombre: "ε-greedy, ε = 0,3", cfg: { eps: 0.3 }, nb: ["5 %", "25 713", "100,3"] }
+    { id: "e01", nombre: "ε-greedy, ε = 0,1", cfg: { eps: 0.1 }, nb: ["5 %", "26 687", "63,4"] },
+    { id: "e03", nombre: "ε-greedy, ε = 0,3", cfg: { eps: 0.3 }, nb: ["5 %", "25 713", "100,3"] }
   ] }));
   // B5. optimismo y conteo (notebook, celda 28)
   const b5 = await tarea(() => carrera({ seg: "segOpt", canvas: "cvOpt", hud: "hudOpt", tb: "tbOpt", ver: "optVer", otra: "optOtra", leg: "legOpt", inicial: "ambos", tipos: [
-    { id: "opt", nombre: "optimista (Q₀ = 1)", cfg: { q0: 1 }, nb: ["100 %", "8 666", "155"] },
+    { id: "opt", nombre: "optimista (Q₀ = 1)", cfg: { q0: 1 }, nb: ["100 %", "8 666", "155"] },
     { id: "conteo", nombre: "conteo solo", cfg: { beta: 0.01 }, nb: ["0 %", "—", "26,4"] },
-    { id: "ambos", nombre: "optimista + conteo", cfg: { q0: 1, beta: 0.01 }, nb: ["100 %", "5 218", "155"] }
+    { id: "ambos", nombre: "optimista + conteo", cfg: { q0: 1, beta: 0.01 }, nb: ["100 %", "5 218", "155"] }
   ] }));
 
   // =====================================================================
@@ -586,7 +586,7 @@
         ctx.strokeStyle = COL.ember; ctx.lineWidth = Math.max(2, cell * .08); ctx.beginPath(); ctx.moveTo(x - k, y - k); ctx.lineTo(x + k, y + k); ctx.moveTo(x + k, y - k); ctx.lineTo(x - k, y + k); ctx.stroke();
       }
       const llegan = intentos.filter(it => it.cam[it.cam.length - 1] === GOAL).length;
-      hud.innerHTML = `<span>simulado, ${nombrePeg(clave)}:</span><span>llegan <b>${pct(tasa)}</b> de 1000 intentos</span><span>dibujados: <b>${llegan}</b> de 20 llegan</span><span>secuencia de <b>${SEQ.length}</b> acciones</span>`;
+      hud.innerHTML = `<span>simulado, ${nombrePeg(clave)}:</span><span>llegan <b>${pct(tasa)}</b> de 1 000 intentos</span><span>dibujados: <b>${llegan}</b> de 20 llegan</span><span>secuencia de <b>${SEQ.length}</b> acciones</span>`;
       $("tbPeg").innerHTML = Object.entries(NB_PEG).map(([k, v]) => `<tr${k === clave ? ' class="sel"' : ""}><td>${nombrePeg(k)}</td><td class="num">${v}</td></tr>`).join("");
     }
     document.querySelectorAll("#segPeg button").forEach(b => b.onclick = () => { clave = b.dataset.k; marcar("#segPeg button", "k", clave); simular(); dibujar(); });

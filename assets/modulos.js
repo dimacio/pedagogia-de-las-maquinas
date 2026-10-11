@@ -332,7 +332,7 @@ window.MODULOS = {
     ],
     tiempo: { pagina: 35, notebook: 60 },
     previos: ["0a", "0b"],
-    requisitos: ["Haber jugado un rato a la cueva a ciegas en modo fácil."],
+    requisitos: ["Haber jugado un rato a la cueva a ciegas en modo fácil.", "Las nivelaciones 0a y 0b sirven para la vía con código; la vía visual no las necesita."],
     cuestionario: [
       {
         objetivo: "O1",
@@ -350,7 +350,7 @@ window.MODULOS = {
         pregunta: "En la partida al azar del notebook el agente recibió 1833 ceros seguidos y un +1 en el paso 1834. ¿Por qué una recompensa así vuelve difícil aprender?",
         opciones: [
           { texto: "Porque la suma total, 1, es demasiado chica para que el agente pueda aprender algo de ella.", explicacion: "No: la partida de las flechas también suma 1. El problema no es el tamaño del número sino cuándo llega y qué no dice." },
-          { texto: "Porque el agente al azar nunca sale de la cueva, así que nunca llega a ver un +1.", explicacion: "No: en esa partida sí salió, en el paso 1834. Con el límite de 200 pasos sale poco (3.7 % de los episodios), pero sale." },
+          { texto: "Porque el agente al azar nunca sale de la cueva, así que nunca llega a ver un +1.", explicacion: "No: en esa partida sí salió, en el paso 1834. Con el límite de 200 pasos sale poco (3,7 % de los episodios), pero sale." },
           { texto: "Porque el entorno conoce la flecha correcta de cada paso y se la muestra al agente recién al final.", explicacion: "No: en RL nadie da la flecha correcta, ni durante la partida ni al final. El +1 dice que salió, no qué convenía en cada casilla." },
           { texto: "Porque ningún número dice cuál de los 1834 pasos fue el bueno: el mérito se reparte entre todos.", explicacion: "Correcto. Mientras recibe 0, perderse y acercarse se ven igual; es una recompensa escasa y demorada." }
         ],
@@ -495,20 +495,20 @@ window.MODULOS = {
         pregunta: "En la cueva como MDP se fija la política al azar: π(a|s) = 1/4 para cada acción en cada casilla. Al evaluarla da V(S) = 0,0136, el mismo valor de la clase 3. ¿Por qué?",
         opciones: [
           { texto: "Porque con el mapa a la vista el agente elige siempre la mejor acción, y en esta cueva la mejor coincide justo con la cara que salía en el dado de la clase 3.", explicacion: "No: si eligiera la mejor acción, V(S) sería 0,8262, no 0,0136. Con la política al azar nadie elige: se promedian las cuatro acciones." },
-          { texto: "Porque con la política fija cada casilla queda con una sola distribución de destinos, P^π = Σₐ π(a|s) P(s′|s,a): un MRP; con 1/4 por acción, el dado.", explicacion: "Correcto. Un MDP con la política fija vuelve a ser una cadena con recompensa. El notebook comprueba que P^π y R^π son iguales a la P y la R del caminante de la clase 3." },
+          { texto: "Porque con la política fija cada casilla queda con una sola distribución de destinos, Pπ = Σₐ π(a|s) P(s′|s,a): un MRP; con 1/4 por acción, el dado.", explicacion: "Correcto. Un MDP con la política fija vuelve a ser una cadena con recompensa. El notebook comprueba que Pπ y Rπ son iguales a la P y la R del caminante de la clase 3." },
           { texto: "Porque las cuatro tablas P(s′|s,a) son iguales entre sí, así que da lo mismo qué acción se elija en cada casilla.", explicacion: "No: hay una tabla por acción y son distintas. Desde el cruce (5,6), ↑ choca y se queda, → va a (5,7), ↓ a (6,6) y ← a (5,5)." },
-          { texto: "Porque en la cueva R no depende de la acción; si R(s,a) cambiara con la acción, el MDP con política fija ya no sería un MRP.", explicacion: "No: R sí depende de la acción (solo la que entra a la salida cobra +1). Con la política fija, R^π(s) = Σₐ π(a|s) R(s,a) y sigue siendo un MRP." }
+          { texto: "Porque en la cueva R no depende de la acción; si R(s,a) cambiara con la acción, el MDP con política fija ya no sería un MRP.", explicacion: "No: R sí depende de la acción (solo la que entra a la salida cobra +1). Con la política fija, Rπ(s) = Σₐ π(a|s) R(s,a) y sigue siendo un MRP." }
         ],
         correcta: 1
       },
       {
         objetivo: "O2",
-        pregunta: "En el cruce (5,6), con los valores de la política al azar, Q^π de ↑, →, ↓ y ← vale 0,0763, 0,1070, 0,0623 y 0,0627, y V^π(cruce) = 0,0771. ¿Qué se lee en esos números?",
+        pregunta: "En el cruce (5,6), con los valores de la política al azar, Qπ de ↑, →, ↓ y ← vale 0,0763, 0,1070, 0,0623 y 0,0627, y Vπ(cruce) = 0,0771. ¿Qué se lee en esos números?",
         opciones: [
-          { texto: "V^π(cruce) está mal calculado: el valor de una casilla es el de su mejor acción, así que debería dar 0,1070.", explicacion: "No: quedarse con el máximo es el valor óptimo V*. Para la política al azar, V^π es el promedio de las cuatro Q, pesado con 1/4 cada una." },
-          { texto: "Para saber qué acción conviene en el cruce hay que jugar muchas partidas desde ahí con cada acción y comparar los retornos promedio.", explicacion: "No: con el mapa a la vista no hace falta jugar. Q^π(s,a) = R(s,a) + γ Σ P(s′|s,a) V^π(s′) se calcula con P, R y los valores de la política." },
+          { texto: "Vπ(cruce) está mal calculado: el valor de una casilla es el de su mejor acción, así que debería dar 0,1070.", explicacion: "No: quedarse con el máximo es el valor óptimo V*. Para la política al azar, Vπ es el promedio de las cuatro Q, pesado con 1/4 cada una." },
+          { texto: "Para saber qué acción conviene en el cruce hay que jugar muchas partidas desde ahí con cada acción y comparar los retornos promedio.", explicacion: "No: con el mapa a la vista no hace falta jugar. Qπ(s,a) = R(s,a) + γ Σ P(s′|s,a) Vπ(s′) se calcula con P, R y los valores de la política." },
           { texto: "Q(cruce, →) debería ser igual a V(5,7) = 0,1081, porque el paso que lleva de una casilla a la otra no cobra nada.", explicacion: "No: el paso no cobra nada (R = 0), pero el valor de la casilla de destino se descuenta. Q = 0 + 0,99 · 0,1081 = 0,1070." },
-          { texto: "→ es la de mayor Q y la mejora pone esa flecha; el promedio de las cuatro Q da 0,0771 porque el dado elige cada una con 1/4.", explicacion: "Correcto. Mejorar es quedarse en cada casilla con la acción de mayor Q^π. Y como V^π es el promedio de las cuatro Q, alguna tiene que estar por encima." }
+          { texto: "→ es la de mayor Q y la mejora pone esa flecha; el promedio de las cuatro Q da 0,0771 porque el dado elige cada una con 1/4.", explicacion: "Correcto. Mejorar es quedarse en cada casilla con la acción de mayor Qπ. Y como Vπ es el promedio de las cuatro Q, alguna tiene que estar por encima." }
         ],
         correcta: 3
       },
@@ -770,7 +770,7 @@ window.MODULOS = {
       },
       {
         objetivo: "O4",
-        pregunta: "Go-Explore guardó la secuencia que guardó Go-Explore sin bucles, de 52 acciones, que en la cueva determinista lleva de S a la salida. Repetida 1000 veces con acciones pegajosas, llega el 44,1 % de las veces con p = 0,05 y el 0,9 % con p = 0,25. ¿Qué se lee?",
+        pregunta: "La secuencia que guardó Go-Explore, sin bucles, de 52 acciones, lleva de S a la salida en la cueva determinista. Repetida 1000 veces con acciones pegajosas, llega el 44,1 % de las veces con p = 0,05 y el 0,9 % con p = 0,25. ¿Qué se lee?",
         opciones: [
           { texto: "Una traba hace perder un paso, pero la secuencia sigue el rumbo; con partidas más largas llegaría casi siempre.", explicacion: "No: después de una traba el agente queda corrido una casilla y el resto de la secuencia ya no corresponde al lugar donde está: choca y termina en cualquier parte. Más pasos no lo arreglan." },
           { texto: "La secuencia estaba mal guardada: una sin rodeos, como el camino más corto de 44 pasos, llegaría igual con p = 0,25.", explicacion: "No: una más corta tiene menos pasos para trabarse, pero sigue sin poder corregir una traba. El problema es que no mira dónde está." },
@@ -807,7 +807,7 @@ window.MODULOS = {
         pregunta: "En el notebook, una red sin capas ocultas con entrada one-hot (60 números en 0 salvo un 1 en la casilla) tiene 240 parámetros, tantos como números tiene la tabla Q. Entrenadas con las mismas 20 000 transiciones, la diferencia máxima entre las dos es 0. ¿Por qué?",
         opciones: [
           { texto: "Con 240 parámetros la red tiene la capacidad justa para copiar Q*, así que cualquier entrada que le diéramos terminaría en la misma tabla.", explicacion: "No: no importa cuántos parámetros hay sino a qué casillas toca cada uno. La red con coordenadas tiene 4612 y, aun con el Q* correcto de las 59 casillas, acierta la flecha en el 71 %." },
-          { texto: "Con el one-hot cada peso es de una sola casilla y flecha: un paso de gradiente toca 1 de los 240 pesos y repite la regla de Q-learning.", explicacion: "Correcto. Con la transición de (8,11) a la salida solo W[→, 58] tiene gradiente y queda en 0,50, igual que la tabla. Por eso tampoco generaliza: lo que aprende en una casilla no le dice nada a la de al lado." },
+          { texto: "Con el one-hot cada peso es de una sola casilla y flecha: un paso de gradiente toca 1 de los 240 pesos y repite la regla de Q-learning.", explicacion: "Correcto. Con la transición de (8,11) a la salida solo W[→,(8,11)] tiene gradiente y queda en 0,50, igual que la tabla. Por eso tampoco generaliza: lo que aprende en una casilla no le dice nada a la de al lado." },
           { texto: "Las dos llegan a Q* por caminos distintos: la red mueve todos sus pesos en cada paso, pero al final converge al mismo punto que la tabla.", explicacion: "No: no hay caminos distintos, son idénticas paso a paso, porque el gradiente es 0 salvo en un peso. Mover casi todos los pesos en cada paso es lo que hace la red de seis entradas." },
           { texto: "La red generaliza entre casillas vecinas y la tabla no, pero con 20 000 transiciones se visitan todas y esa ventaja deja de notarse.", explicacion: "No: la red one-hot no generaliza nada, porque cada casilla prende un número distinto y ninguna se parece a otra. Empieza a generalizar cuando la entrada son las coordenadas." }
         ],
@@ -837,7 +837,7 @@ window.MODULOS = {
       },
       {
         objetivo: "O3",
-        pregunta: "Sin trucos, la red llega a creer que una casilla vale 128,83, cuando ninguna puede pasar de 1. Con solo memoria de repetición (las últimas 10 000 transiciones, lotes al azar de 256), el Q más alto llega a 13,63 y, en la semilla 0, la política sale desde el 0 %. ¿Qué hace la memoria?",
+        pregunta: "Sin trucos, la red llega a creer que una casilla vale 128,83, cuando ninguna puede pasar de 1. Con solo memoria de repetición (las últimas 10 000 transiciones, repasadas en lotes al azar), el Q más alto llega a 13,63 y, en la semilla 0, la política sale desde el 0 %. ¿Qué hace la memoria?",
         opciones: [
           { texto: "Guarda las partidas que llegaron a la salida y las repite más seguido que las otras, para que la red aprenda primero lo que dio premio.", explicacion: "No: los lotes se toman al azar de las últimas 10 000 transiciones, sin preferir las que dieron premio. Lo que importa es que mezclan partidas distintas." },
           { texto: "Deja quieto el objetivo: como las transiciones guardadas son viejas, el objetivo que se calcula con ellas ya no cambia en cada paso.", explicacion: "No: el objetivo se sigue calculando con la red que se mueve; viejas son las transiciones, no la red. Por eso, solo con memoria, los valores se disparan al principio." },
@@ -915,7 +915,7 @@ window.MODULOS = {
       },
       {
         objetivo: "O3",
-        pregunta: "En la cueva grande, dos redes que sienten solo los bigotes y su última acción aprenden por imitación a copiar a un experto. La red común (sin memoria) sale desde 88 de las 154 casillas (57 %) y la GRU, desde las 154. ¿Qué explica la diferencia?",
+        pregunta: "En la cueva grande, dos redes que sienten solo los bigotes y su última acción aprenden por imitación a copiar a un experto. La red común (sin memoria) sale desde 88 de las 154 casillas de partida (57 %; todas menos la salida) y la GRU, desde las 154. ¿Qué explica la diferencia?",
         opciones: [
           { texto: "La GRU vio más partidas del experto; con los mismos datos, la red común también saldría desde las 154 casillas.", explicacion: "No: las dos se entrenan con las mismas partidas del experto y la misma entrada. Lo que cambia es que una lleva estado y la otra no." },
           { texto: "Con la misma lectura y la misma última acción, la red común decide siempre igual y se traba; la GRU lleva en hₜ un resumen del camino.", explicacion: "Correcto. Una sonda lineal lee la casilla real del estado de la GRU en el 8 % de los casos al arrancar, el 54 % a los 5 pasos y el 71 % a los 10: aprendió algo parecido al estado de creencia." },
@@ -1190,7 +1190,7 @@ window.MODULOS = {
     ],
     tiempo: { pagina: 35, notebook: 60 },
     previos: ["12", "9"],
-    requisitos: ["De la clase 9, que un modelo de lenguaje predice lo que sigue; de la clase 11, la línea de base y PPO.", "El notebook descarga una vez un modelo de ≈ 1 GB (Qwen2.5-0.5B-Instruct); en CPU corre más lento."],
+    requisitos: ["De la clase 9, que un modelo de lenguaje predice lo que sigue; de la clase 11, la línea de base y PPO; de la clase 12, RLHF y la penalización por alejarse de π_ref.", "El notebook descarga una vez un modelo de ≈ 1 GB (Qwen2.5-0.5B-Instruct) y es lento: en CPU tardó 7,1 min."],
     cuestionario: [
       {
         objetivo: "O1",
@@ -1230,7 +1230,7 @@ window.MODULOS = {
         pregunta: "En 17 + 25, un grupo de 8 respuestas a T = 1 da seis veces 42 y dos veces 32: recompensas 11101110. Con Aᵢ = (rᵢ − promedio) / desvío, ¿qué ventajas quedan, y qué pasa en 7 × 8 − 9, donde fallan las 8?",
         opciones: [
           { texto: "Promedio 0,750: cada 42 recibe +0,250 y cada 32 −0,750; en 7 × 8 − 9 las ocho reciben −1, el castigo más fuerte del lote.", explicacion: "No: +0,250 y −0,750 son rᵢ − promedio, falta dividir por el desvío, 0,433. Y si las 8 valen 0, ninguna está por debajo del promedio: la ventaja es 0." },
-          { texto: "Promedio 0,750 y desvío 0,433: cada 42 recibe +0,577 y cada 32 −1,732; en 7 × 8 − 9 las ventajas son 0 y esa cuenta no enseña nada.", explicacion: "Correcto. Las ventajas suman ≈ 0: unas suben y otras bajan. Sin ningún acierto no hay con qué comparar, la recompensa escasa de la clase 7." },
+          { texto: "Promedio 0,750 y desvío 0,433: cada 42 recibe +0,577 y cada 32 −1,732; en 7 × 8 − 9 las ventajas son 0 y esa cuenta no enseña nada.", explicacion: "Correcto. Las ventajas suman ≈ 0: unas suben y otras bajan. Sin ningún acierto no hay con qué comparar, la recompensa escasa de la clase 2." },
           { texto: "La ventaja es la recompensa misma: cada 42 recibe +1 y cada 32 recibe 0; en 7 × 8 − 9 las ocho reciben 0 y se descartan.", explicacion: "No: la ventaja compara cada respuesta con su grupo. Por eso un acierto vale +0,577 en 17 + 25 y ≈ +2,6 en 3 × 4 + 5, donde acierta 1 de 8." },
           { texto: "Promedio 0,750 y desvío 0,433: cada 42 recibe +0,577 y cada 32 −1,732; en 7 × 8 − 9 GRPO empuja más fuerte, porque ahí hay más para mejorar.", explicacion: "No: las ventajas de 17 + 25 están bien, pero un grupo todo mal da ventajas 0. GRPO no sabe hacia dónde empujar si ninguna respuesta salió mejor que otra." }
         ],
@@ -1238,7 +1238,7 @@ window.MODULOS = {
       },
       {
         objetivo: "O4",
-        pregunta: "En el actor-crítico de la clase 11, la línea de base la daba un crítico, una segunda red que aprende V(s). GRPO actualiza Qwen2.5-0.5B sin crítico. ¿Por qué puede hacerlo?",
+        pregunta: "En el actor-crítico de la clase 11, la línea de base la daba un crítico, una segunda tabla que aprende V(s); en un modelo de lenguaje sería una segunda red. GRPO actualiza Qwen2.5-0.5B sin crítico. ¿Por qué puede hacerlo?",
         opciones: [
           { texto: "Con recompensas verificables no hace falta línea de base: el verificador ya dice qué respuestas reforzar, y se refuerzan todas las correctas.", explicacion: "No: sin línea de base, un acierto en 8 × 7 (donde aciertan todas) empujaría igual que uno sorpresivo. La ventaja necesita saber qué se esperaba de cada pregunta." },
           { texto: "El modelo de 494 M ya trae adentro un crítico que estima V para cada texto, entrenado junto con el lenguaje antes de empezar el RL.", explicacion: "No: Qwen2.5-0.5B no trae crítico. Agregar uno del mismo tamaño llevaría los 494 M de parámetros a 988 M para entrenar y tener en memoria." },
@@ -1346,7 +1346,7 @@ window.MODULOS = {
     ],
     tiempo: { pagina: 40, notebook: 60 },
     previos: ["14", "2"],
-    requisitos: ["De la clase 14, los agentes de lenguaje; de la clase 2, el tutor tramposo que cobra por aciertos.", "El notebook descarga dos modelos (≈ 4 GB en total: Qwen2.5-0.5B-Instruct y Qwen2.5-1.5B-Instruct); en CPU tarda entre 20 y 60 minutos."],
+    requisitos: ["De la clase 14, los agentes de lenguaje; de la clase 2, el tutor tramposo que cobra por aciertos.", "El notebook descarga dos modelos (≈ 4 GB en total: Qwen2.5-0.5B-Instruct y Qwen2.5-1.5B-Instruct); y es lento: en CPU tardó 13,8 min."],
     cuestionario: [
       {
         objetivo: "O1",
@@ -1383,7 +1383,7 @@ window.MODULOS = {
       },
       {
         objetivo: "O3",
-        pregunta: "En el usuario de juguete de la sección 5, con el feed miope (γ = 0) de siempre, el empujón (el 60 % de los días decide no entrar) deja 28,6 clics en 90 días y un 9,6 % de activos al día 30; el patrón oscuro sube los clics a 57,6 pero deja activo solo el 2,6 %. ¿Qué los distingue y cuál es la salida que propone la clase?",
+        pregunta: "En el usuario de juguete de la sección 5, con el feed miope (γ = 0) de siempre, el empujón (el 60 % de los días decide no entrar) deja 28,6 clics en 90 días y un 9,6 % de activos al día 30; el patrón oscuro sube los clics a 57,6 pero deja activo el 2,6 %, contra el 9,6 % del empujón. ¿Qué los distingue y cuál es la salida que propone la clase?",
         opciones: [
           { texto: "El empujón cambia al agente y el patrón oscuro cambia el entorno; la salida es reentrenar el feed para que deje de mostrar ganchos.", explicacion: "No: ninguno de los dos toca al agente, que sigue siendo el feed miope que muestra ganchos. Los dos cambian cómo se presentan las opciones." },
           { texto: "Usan el mismo mecanismo, cambiar el entorno, pero el empujón juega a favor de quien decide y el patrón oscuro en contra; la salida es una recompensa visible y editable por quien usa el sistema.", explicacion: "Correcto. Con los pesos a la vista, si la persona le da algo de peso a su satisfacción, hasta el feed miope muestra contenido útil. Es la pregunta de la clase 1, quién elige la recompensa, hecha interfaz." },

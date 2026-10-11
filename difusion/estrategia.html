@@ -153,7 +153,7 @@
   const COL = Cueva.COL();
   const quieto = matchMedia("(prefers-reduced-motion: reduce)").matches;
   document.getElementById("gh").href = "https://github.com/" + Cueva.REPO;
-  document.getElementById("lnColab").href = `https://colab.research.google.com/github/${Cueva.REPO}/blob/main/build/v1/notebooks/08-aplicaciones.ipynb`;
+  document.getElementById("lnColab").href = `https://colab.research.google.com/github/${Cueva.REPO}/blob/${Cueva.RAMA}/build/v1/notebooks/08-aplicaciones.ipynb`;
   document.getElementById("lnNb").href = Cueva.github("build/v1/notebooks/08-aplicaciones.ipynb");
   document.getElementById("lnTextos").href = Cueva.github("difusion/textos.md");
   const $ = id => document.getElementById(id);

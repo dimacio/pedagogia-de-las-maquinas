@@ -38,7 +38,7 @@
   </section>
 
   <!-- 1. La cueva es texto -->
-  <section class="bloque">
+  <section class="bloque" data-objetivos="O1">
     <div class="stage">
       <div class="editor">
         <textarea id="ta" rows="10" cols="16" spellcheck="false" autocomplete="off" aria-label="Mapa de la cueva como texto"></textarea>
@@ -60,7 +60,7 @@ H, W = <span class="k">len</span>(mapa), <span class="k">len</span>(mapa[<span c
   </section>
 
   <!-- 2. La cueva es una matriz -->
-  <section class="bloque">
+  <section class="bloque" data-objetivos="O1 O2">
     <div class="stage">
       <div class="lienzo"><canvas id="cv2" aria-label="La cueva como matriz de ceros y unos y como dibujo; tocá una casilla"></canvas></div>
       <div class="hud" id="hud2"></div>
@@ -77,7 +77,7 @@ H, W = <span class="k">len</span>(mapa), <span class="k">len</span>(mapa[<span c
   </section>
 
   <!-- 3. Moverse es sumar -->
-  <section class="bloque">
+  <section class="bloque" data-objetivos="O3">
     <div class="stage">
       <div class="lienzo"><canvas id="cv3" tabindex="0" aria-label="El personaje en la cueva; usá las flechas para moverlo"></canvas></div>
       <div class="row" style="justify-content:space-between;align-items:end">
@@ -102,7 +102,7 @@ H, W = <span class="k">len</span>(mapa), <span class="k">len</span>(mapa[<span c
   </section>
 
   <!-- 4. La cueva es una imagen -->
-  <section class="bloque">
+  <section class="bloque" data-objetivos="O1">
     <div class="stage">
       <div class="lienzo"><canvas id="cv4" aria-label="La cueva como imagen de pixeles, ampliada, y sus tres canales"></canvas></div>
       <div class="seg" role="group" aria-label="Qué pintar">
@@ -127,7 +127,7 @@ H, W = <span class="k">len</span>(mapa), <span class="k">len</span>(mapa[<span c
   </section>
 
   <!-- 5. Un bucle es una partida -->
-  <section class="bloque">
+  <section class="bloque" data-objetivos="O4">
     <div class="stage">
       <div class="lienzo"><canvas id="cv5a" aria-label="Pasos por partida de un agente al azar"></canvas></div>
       <div class="lienzo"><canvas id="cv5b" aria-label="Mapa de calor de las casillas visitadas"></canvas></div>
@@ -152,7 +152,7 @@ H, W = <span class="k">len</span>(mapa), <span class="k">len</span>(mapa[<span c
     </div>
   </section>
 
-  <section class="bloque full">
+  <section class="bloque full" data-objetivos="O1 O3">
     <div class="texto">
       <div class="paso">Para enseñarlo</div>
       <h2>Contalo en una oración</h2>

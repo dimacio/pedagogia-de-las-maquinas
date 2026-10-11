@@ -20,7 +20,7 @@ Para quien quiera entender RL desde cero: estudiantes, docentes y profesionales 
 
 ## Cómo se cursa
 
-- **Dieciséis clases en cuatro unidades.** Cuatro clases por unidad, más una nivelación optativa. Todo es estático y está siempre disponible: no hay fechas, videos ni inscripción. A una clase por semana, el recorrido lleva un cuatrimestre, unas **16 semanas** (entre 2 y 4 horas por semana). Las clases 3 a 16 están en preparación (ver `build/PLAN-16-clases.md`).
+- **Dieciséis clases en cuatro unidades.** Cuatro clases por unidad, más una nivelación optativa. Todo es estático y está siempre disponible: no hay fechas, videos ni inscripción. A una clase por semana, el recorrido lleva un cuatrimestre, unas **16 semanas** (entre 2 y 4 horas por semana).
 - **Por dónde empezar.** Por la clase 1, que no tiene notebook, y por el juego: jugarlo en modo fácil y en difícil antes de la clase 2.
 - **Dos vías.** La *vía visual*: páginas interactivas con figuras que se tocan (ver primero, leer después) y el juego. La *vía profunda*: un notebook por clase que corre en Colab, en CPU, y escribe su propio entorno en la primera celda. Se puede hacer solo la primera o las dos.
 - **Antes de empezar.** Cada clase abre con sus objetivos, el tiempo estimado (página y notebook) y los requisitos previos.
@@ -57,7 +57,7 @@ La nivelación es el pre curso (Python, probabilidad y álgebra lineal, todo des
 ## Publicar en GitHub Pages
 
 1. Crear el repositorio (por ejemplo `rl-a-ciegas`) y subir esta carpeta.
-2. En `assets/cueva.js`, cambiar `const REPO = "USUARIO/rl-a-ciegas"` por el usuario y el repositorio. Eso arregla los enlaces a GitHub, Colab y Discussions de todas las páginas.
+2. En `assets/cueva.js`, cambiar `REPO` (hoy `dimacio/pedagogia-de-las-maquinas`) por tu usuario y repositorio. Eso arregla los enlaces a GitHub, Colab y Discussions de todas las páginas.
 3. En el repositorio: *Settings → Pages → Source: GitHub Actions*. La publicación la hace `.github/workflows/publicar.yml` al etiquetar una versión (ver `CONTRIBUTING.md`).
 4. Activar Discussions: *Settings → General → Features → Discussions*. Conviene crear una categoría por clase o una sola, «Actividades», donde los títulos llevan el prefijo `[Clase N]`.
 5. Volver a renderizar el post 12, que muestra la dirección del repositorio: `node build/render_posts.js 12` (con un servidor local en la raíz: `python3 -m http.server 8765`).

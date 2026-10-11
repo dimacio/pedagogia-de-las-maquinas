@@ -1,14 +1,14 @@
-"""Arma notebooks/00b-probabilidad.ipynb (Pre curso B — Probabilidad con el piso resbaloso)."""
+"""Arma notebooks/00b-probabilidad.ipynb (Nivelación 0b — Probabilidad con el piso resbaloso)."""
 from _nbutil import md, code, writefile_cell, save
 
 cells = []
 
 cells.append(md(r"""
-# Pre curso B — Probabilidad en el piso resbaloso
+# Nivelación 0b — Probabilidad en el piso resbaloso
 
-**RL a ciegas** · pre curso · vía profunda
+**RL a ciegas** · Nivelación 0b
 
-En el pre curso A la cueva era **determinista**: la misma acción desde la misma casilla daba siempre el mismo resultado. Hoy le ponemos **piso resbaloso**: `CaveEnv(slip=0.2)` hace que, el 20 % de las veces, el agente se desvíe hacia uno de los dos costados. Con eso aparece el azar, y con el azar la **probabilidad**: el lenguaje que usa RL para todo.
+En la nivelación 0a la cueva era **determinista**: la misma acción desde la misma casilla daba siempre el mismo resultado. Hoy le ponemos **piso resbaloso**: `CaveEnv(slip=0.2)` hace que, el 20 % de las veces, el agente se desvíe hacia uno de los dos costados. Con eso aparece el azar, y con el azar la **probabilidad**: el lenguaje que usa RL para todo.
 
 Hoy vamos a ver:
 
@@ -28,7 +28,7 @@ Hoy vamos a ver:
 cells.append(md(r"""
 ### Preparación
 
-La primera celda escribe el entorno `cave_env.py` (el mismo que armamos a mano en el pre curso A). La segunda importa lo necesario.
+La primera celda escribe el entorno `cave_env.py` (el mismo que armamos a mano en la nivelación 0a). La segunda importa lo necesario.
 """))
 cells.append(writefile_cell())
 cells.append(code(r"""
@@ -43,7 +43,7 @@ plt.rcParams["figure.dpi"] = 100
 cells.append(md(r"""
 ### Herramientas
 
-Funciones para jugar partidas, simular un solo paso, calcular la "política que conoce el mapa" (la vamos a construir en la clase 3; hoy la usamos como caja negra) y dibujar varias cuevas lado a lado. **No hace falta leerla.**
+Funciones para jugar partidas, simular un solo paso, calcular la "política que conoce el mapa" (la vamos a construir en la clase 4; hoy la usamos como caja negra) y dibujar varias cuevas lado a lado. **No hace falta leerla.**
 """))
 cells.append(code(r"""
 # @title Herramientas (plegada)
@@ -52,7 +52,7 @@ import matplotlib.patheffects as pe
 
 
 def politica_con_mapa(gamma=0.95):
-    '''La mejor flecha en cada casilla, calculada con el mapa (iteración de valores, clase 3).'''
+    '''La mejor flecha en cada casilla, calculada con el mapa (iteración de valores, clase 4).'''
     e = CaveEnv()
     V = np.zeros(e.nS)
     for _ in range(500):
@@ -144,12 +144,12 @@ cells.append(md(r"""
 
 Hacemos un **experimento aleatorio** (*random experiment*): parados en el inicio **S**, intentamos ir hacia abajo (↓) con piso resbaloso (`slip=0.2`). Hay tres resultados posibles:
 
-- no me resbalo y bajo (probabilidad 0.8);
-- me resbalo hacia la derecha y me muevo a la derecha (0.1);
-- me resbalo hacia la izquierda, choco contra la pared y me quedo en S (0.1).
+- no me resbalo y bajo (probabilidad 0,8);
+- me resbalo hacia la derecha y me muevo a la derecha (0,1);
+- me resbalo hacia la izquierda, choco contra la pared y me quedo en S (0,1).
 
 Miremos esas probabilidades pintadas sobre la cueva (el color y el número de cada casilla son $P(s' \mid s{=}S, a{=}{\downarrow})$; las casillas imposibles quedan en negro).
-"""))
+""", objetivos=["O1"]))
 cells.append(code(r"""
 env = CaveEnv(slip=0.2)
 S, ABAJO = env.start, 2
@@ -169,7 +169,7 @@ Ahora las palabras:
 - Un **evento** es un subconjunto de $\Omega$. Por ejemplo $A =$ "me muevo" $= \{$bajo, me corro a la derecha$\}$, y su **complemento** $A^c =$ "choco".
 - Una **probabilidad** le asigna a cada evento un número entre 0 y 1, con $P(\Omega) = 1$ y, para eventos que no se pisan (disjuntos), $P(A \cup B) = P(A) + P(B)$.
 
-Por eso $P(\text{me muevo}) = 0.8 + 0.1 = 0.9$ y $P(\text{choco}) = 1 - P(\text{me muevo}) = 0.1$.
+Por eso $P(\text{me muevo}) = 0{,}8 + 0{,}1 = 0{,}9$ y $P(\text{choco}) = 1 - P(\text{me muevo}) = 0{,}1$.
 """))
 
 # ---------------------------------------------------------------- Paso 2
@@ -182,7 +182,7 @@ Una **variable aleatoria** es un número que depende del resultado del experimen
 - $N$ = **cuántos pasos tardo en salir** de la cueva siguiendo una política fija.
 
 Juguemos 5 partidas con la política que conoce el mapa, con `slip=0.3`. La política es siempre la misma, pero $N$ cambia de partida en partida: es aleatoria.
-"""))
+""", objetivos=["O2"]))
 cells.append(code(r"""
 pi = politica_con_mapa()
 env3 = CaveEnv(slip=0.3)
@@ -201,10 +201,10 @@ Sin resbalones la salida está a exactamente 20 pasos. Cada resbalón agrega un 
 cells.append(md(r"""
 ## Paso 3 — PMF y simulación: las frecuencias se acercan a las probabilidades
 
-La **función de masa de probabilidad** (*probability mass function*, PMF) de una variable discreta dice cuánto vale $P(X = x)$ para cada valor $x$. Para $X$ = "dónde quedo" desde S con ↓, la PMF es la del Paso 1: $0.8, 0.1, 0.1$.
+La **función de masa de probabilidad** (*probability mass function*, PMF) de una variable discreta dice cuánto vale $P(X = x)$ para cada valor $x$. Para $X$ = "dónde quedo" desde S con ↓, la PMF es la del Paso 1: $0{,}8$, $0{,}1$ y $0{,}1$.
 
 Si no conociéramos esa PMF, podríamos **estimarla jugando**: repetir el paso muchas veces y contar. Veamos qué pasa con 10, 100, 1000 y 10000 repeticiones (barras = frecuencias observadas, puntos negros = probabilidad verdadera).
-"""))
+""", objetivos=["O1"]))
 cells.append(code(r"""
 destinos, choques = un_paso(env, S, ABAJO, n=10_000, seed=1)
 posibles = np.flatnonzero(p)
@@ -235,7 +235,7 @@ ax.set_xlabel("repeticiones n"); ax.set_ylabel("fracción de choques")
 ax.set_title("Ley de los grandes números"); ax.legend(); plt.tight_layout(); plt.show()
 """))
 cells.append(md(r"""
-Esto es la **ley de los grandes números**: el promedio de muchas repeticiones independientes se acerca al valor esperado. Es la base de todo lo que hace RL *sin modelo* (clase 4): el agente no conoce $P$, pero puede promediar lo que le pasa.
+Esto es la **ley de los grandes números**: el promedio de muchas repeticiones independientes se acerca al valor esperado. Es la base de todo lo que hace RL *sin modelo* (clases 5 y 6): el agente no conoce $P$, pero puede promediar lo que le pasa.
 """))
 
 # ---------------------------------------------------------------- Paso 4
@@ -243,7 +243,7 @@ cells.append(md(r"""
 ## Paso 4 — Esperanza y varianza: ¿cuánto tardo en salir?
 
 Volvamos a $N$, los pasos hasta salir con la política que conoce el mapa. Juguemos 2000 partidas con tres pisos distintos y miremos la distribución de $N$.
-"""))
+""", objetivos=["O2"]))
 cells.append(code(r"""
 slips = [0.0, 0.1, 0.3]
 N_por_slip = {}
@@ -278,8 +278,8 @@ for sl in slips:
 cells.append(md(r"""
 ## Paso 5 — Bernoulli y geométrica
 
-**Bernoulli.** La variable más simple: vale 1 con probabilidad $p$ y 0 con probabilidad $1 - p$. "¿Choqué en este paso?" es una Bernoulli. Su esperanza es $p$ y su varianza $p(1-p)$. Lo comprobamos con las 10000 repeticiones del Paso 3 (desde S con ↓, $p = 0.1$):
-"""))
+**Bernoulli.** La variable más simple: vale 1 con probabilidad $p$ y 0 con probabilidad $1 - p$. "¿Choqué en este paso?" es una Bernoulli. Su esperanza es $p$ y su varianza $p(1-p)$. Lo comprobamos con las 10000 repeticiones del Paso 3 (desde S con ↓, $p = 0{,}1$):
+""", objetivos=["O3"]))
 cells.append(code(r"""
 print(f"media de 'choqué':     {choques.mean():.4f}   (teoría: p = 0.1)")
 print(f"varianza de 'choqué':  {choques.var():.4f}   (teoría: p(1-p) = {0.1 * 0.9:.4f})")
@@ -309,7 +309,7 @@ axs[1].set_title(f"promedio simulado = {intentos.mean():.2f}   (teoría: 1/p = 4
 plt.tight_layout(); plt.show()
 """))
 cells.append(md(r"""
-La PMF geométrica es $P(K = k) = (1-p)^{k-1}\, p$: fallar $k-1$ veces y acertar una. Su esperanza es $1/p$. Es la matemática de la **recompensa escasa** (clase 5): si un agente al azar encuentra la salida con probabilidad $p$ pequeña por partida, va a necesitar del orden de $1/p$ partidas para verla una sola vez.
+La PMF geométrica es $P(K = k) = (1-p)^{k-1}\, p$: fallar $k-1$ veces y acertar una. Su esperanza es $1/p$. Es la matemática de la **recompensa escasa** (la nombramos en la clase 2; cómo explorar cuando escasea, en la clase 7): si un agente al azar encuentra la salida con probabilidad $p$ pequeña por partida, va a necesitar del orden de $1/p$ partidas para verla una sola vez.
 """))
 
 # ---------------------------------------------------------------- Paso 6
@@ -317,7 +317,7 @@ cells.append(md(r"""
 ## Paso 6 — Probabilidad conjunta y condicional
 
 Ahora hay **dos** cosas aleatorias: la acción $a$ (el agente elige al azar, $\pi(a) = 1/4$) y la casilla $s'$ donde termina (por el piso resbaloso). Parados en S, la tabla siguiente es la **probabilidad conjunta** $P(a, s')$: la chance de que pasen las dos cosas a la vez. Toda la tabla suma 1.
-"""))
+""", objetivos=["O4"]))
 cells.append(code(r"""
 pi_azar = np.full(4, 0.25)
 conj = pi_azar[:, None] * env.P[S]            # (4 acciones, 60 casillas)
@@ -361,7 +361,7 @@ cells.append(md(r"""
 Cambiemos el juego: el agente **tiene el mapa** pero **no sabe dónde está** (lo despertaron en una casilla cualquiera, a oscuras). Su **creencia** (*belief*) es una probabilidad sobre las casillas; al principio, todas iguales.
 
 Hace → y **choca**. ¿Dónde puede estar? Solo en casillas que tienen pared a la derecha. Veamos de izquierda a derecha: la creencia **antes** (*prior*), la **verosimilitud** (*likelihood*) $P(\text{choco} \mid s, \rightarrow)$ y la creencia **después** (*posterior*). Piso no resbaloso, por ahora.
-"""))
+""", objetivos=["O4"]))
 cells.append(code(r"""
 env0 = CaveEnv(slip=0.0)
 M0 = modelo_observacion(env0)
@@ -416,7 +416,7 @@ plot_row(env0, [creencias[t] for t in pasos_a_ver],
 cells.append(md(r"""
 Cada paño es la creencia después de $t$ pasos (más claro = más probable); el círculo celeste es la posición real y la línea azul el recorrido. Paso a paso, las casillas incompatibles con lo que el agente sintió se apagan, hasta que la creencia se concentra en el lugar correcto.
 
-Esto conecta con el juego: el jugador real tampoco ve dónde está; lo único que "siente" son los choques. En la clase 2 vamos a ver que, si el agente no conoce su posición, su **estado** ya no es la casilla sino algo como esta creencia.
+Esto conecta con el juego: el jugador real tampoco ve dónde está; lo único que "siente" son los choques. Si el agente no conoce su posición, su **estado** ya no es la casilla sino algo como esta creencia. En la clase 2 lo anticipamos y en la 9 lo vemos a fondo.
 """))
 
 # ---------------------------------------------------------------- Paso 8
@@ -430,7 +430,7 @@ De ahí sale una propiedad clave: el **supuesto de Markov**. Adónde voy depende
 $$P(s_{t+1} \mid s_t, a_t, s_{t-1}, a_{t-1}, \dots) = P(s_{t+1} \mid s_t, a_t)$$
 
 Lo comprobamos jugando: un agente al azar camina 300 mil pasos por la cueva resbalosa. Juntamos todas las veces que estuvo en la casilla (3, 4) e hizo ↑, y las separamos según **de dónde venía**. Si el pasado importara, las barras de cada grupo serían distintas.
-"""))
+""", objetivos=["O1"]))
 cells.append(code(r"""
 envm = CaveEnv(slip=0.2, seed=5, max_steps=10**9)
 rng = np.random.default_rng(5)
@@ -463,7 +463,7 @@ ax.set_ylabel("frecuencia"); ax.set_title("Desde (3, 4) con ↑: el pasado no ca
 ax.legend(fontsize=8); plt.tight_layout(); plt.show()
 """))
 cells.append(md(r"""
-Todas las barras de un mismo destino miden lo mismo (salvo ruido): **de dónde venía no importa**. La casilla actual resume todo lo necesario. Ojo: esto vale porque *nosotros* sabemos en qué casilla está el agente. Para el jugador a ciegas, que no lo sabe, la historia sí importa (clase 2).
+Todas las barras de un mismo destino miden lo mismo (salvo ruido): **de dónde venía no importa**. La casilla actual resume todo lo necesario. Ojo: esto vale porque *nosotros* sabemos en qué casilla está el agente. Para el jugador a ciegas, que no lo sabe, la historia sí importa (lo anticipa la clase 2 y lo desarrolla la 9).
 """))
 
 # ---------------------------------------------------------------- Paso 9
@@ -478,8 +478,8 @@ En la cueva la única recompensa es +1 al entrar a la salida, así que si salgo 
 
 $$\mathbb{E}[G] = \sum_{t \ge 0} \gamma^t\, \mathbb{E}[r_{t+1}] = \sum_{t \ge 0} \gamma^t\, P(\text{salgo justo en el paso } t+1).$$
 
-O sea: podemos calcular $\mathbb{E}[G]$ **sin jugar**, si sabemos con qué probabilidad salgo en cada paso. Esa probabilidad se obtiene empujando la distribución de "dónde estoy" un paso por vez con $P$ (es un producto matriz-vector: el tema del pre curso C). Comparemos con el promedio de las 2000 partidas del Paso 4.
-"""))
+O sea: podemos calcular $\mathbb{E}[G]$ **sin jugar**, si sabemos con qué probabilidad salgo en cada paso. Esa probabilidad se obtiene empujando la distribución de "dónde estoy" un paso por vez con $P$ (es un producto matriz-vector: el tema de la nivelación 0c). Comparemos con el promedio de las 2000 partidas del Paso 4.
+""", objetivos=["O2"]))
 cells.append(code(r"""
 gamma = 0.95
 
@@ -526,8 +526,8 @@ Ese número, el **retorno esperado desde una casilla siguiendo una política**, 
 cells.append(md(r"""
 ## ✍️ Ejercicio 1 — Piso más resbaloso
 
-Cambiá `slip_ej` (probá 0.5 y 0.7). ¿Cómo cambian $\mathbb{E}[N]$, el desvío y $\mathbb{E}[G]$? ¿Crece el desvío más rápido o más lento que la media?
-"""))
+Cambiá `slip_ej` (probá 0,5 y 0,7). ¿Cómo cambian $\mathbb{E}[N]$, el desvío y $\mathbb{E}[G]$? ¿Crece el desvío más rápido o más lento que la media?
+""", objetivos=["O2"]))
 cells.append(code(r"""
 slip_ej = 0.5   # TODO: probá 0.5 y 0.7
 
@@ -543,8 +543,8 @@ plt.tight_layout(); plt.show()
 cells.append(md(r"""
 ## ✍️ Ejercicio 2 — Localizarse con el piso resbaloso
 
-Cambiá `inicio_ej` (cualquier casilla libre, por ejemplo `(1, 9)` o `(7, 1)`) y `slip_loc` (probá 0.1). Con piso resbaloso el agente ya no sabe con certeza si se movió: ¿tarda más en localizarse? ¿la creencia queda más "borrosa"?
-"""))
+Cambiá `inicio_ej` (cualquier casilla libre, por ejemplo `(1, 9)` o `(7, 1)`) y `slip_loc` (probá 0,1). Con piso resbaloso el agente ya no sabe con certeza si se movió: ¿tarda más en localizarse? ¿la creencia queda más "borrosa"?
+""", objetivos=["O4"]))
 cells.append(code(r"""
 inicio_ej = (1, 9)   # TODO: probá otras casillas libres
 slip_loc = 0.0       # TODO: probá 0.1
@@ -565,7 +565,7 @@ cells.append(md(r"""
 
 ## Próxima clase
 
-Pre curso C: **álgebra lineal**. El "empujar la distribución un paso por vez" del Paso 9 es un producto de una matriz por un vector. Con una sola matriz, $P^\pi$, vamos a calcular el valor de todas las casillas a la vez, como una capa lineal de una red neuronal aplicada una y otra vez.
+Nivelación 0c: **álgebra lineal**. El "empujar la distribución un paso por vez" del Paso 9 es un producto de una matriz por un vector. Con una sola matriz, $P^\pi$, vamos a calcular el valor de todas las casillas a la vez, como una capa lineal de una red neuronal aplicada una y otra vez.
 
 ---
 

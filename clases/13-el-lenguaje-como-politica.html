@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>El lenguaje como política · RL a ciegas</title>
+<title>El modelo de lenguaje como política · RL a ciegas</title>
 <meta name="description" content="Clase 13: un modelo de lenguaje es una política que elige el próximo token. Probabilidades reales de Qwen2.5-0.5B, la respuesta como episodio, la temperatura como exploración, recompensas verificables y las ventajas de GRPO, que usa el grupo como línea de base en lugar de un crítico.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -52,7 +52,7 @@
 <main class="wrap">
   <section class="clase-head">
     <div class="eyebrow">Clase 13</div>
-    <h1>El lenguaje como <span class="g">política</span></h1>
+    <h1>El modelo de lenguaje como <span class="g">política</span></h1>
     <p class="thesis">Un asistente que escribe es un agente que elige la próxima palabra, y para ajustarlo con RL alguien tiene que poner el +1 cuando termina la respuesta.</p>
   </section>
 
@@ -186,7 +186,7 @@
     <div class="texto">
       <div class="paso">Paso 6</div>
       <h2>Sin crítico: el grupo como línea de base</h2>
-      <p>En el actor-crítico de la clase 11, la línea de base la daba un crítico (<i>critic</i>), una segunda red que aprende V(s). Para este modelo, un crítico del mismo tamaño llevaría los 494 M de parámetros a 988 M para entrenar y tener en memoria. GRPO se lo ahorra porque pregunta varias veces y usa el promedio del grupo como V(pregunta), una línea de base ruidosa que en 14 × 12 va de 0,250 a 0,750 según el grupo de 8. La actualización sigue usando el recorte de PPO, como en DeepSeek-R1-Zero (DeepSeek-AI, 2025), que se entrenó con GRPO y recompensas verificables de exactitud y de formato.</p>
+      <p>En el actor-crítico de la clase 11, la línea de base la daba un crítico (<i>critic</i>), una segunda tabla que aprende V(s); en un modelo de lenguaje tendría que ser una segunda red. Para este modelo, un crítico del mismo tamaño llevaría los 494 M de parámetros a 988 M para entrenar y tener en memoria. GRPO se lo ahorra porque pregunta varias veces y usa el promedio del grupo como V(pregunta), una línea de base ruidosa que en 14 × 12 va de 0,250 a 0,750 según el grupo de 8. La actualización sigue usando el recorte de PPO, como en DeepSeek-R1-Zero (DeepSeek-AI, 2025), que se entrenó con GRPO y recompensas verificables de exactitud y de formato.</p>
       <div class="eq parte"><span class="nw">crítico: b = V(s)</span> <span class="nw">GRPO: b = promedio del grupo</span></div>
       <p class="nota pregunta">En 8 × 7 los cinco grupos dan 1,000. ¿Para qué le sirve esa línea de base perfecta a GRPO?</p>
     </div>

@@ -90,7 +90,7 @@
     <div class="texto">
       <div class="paso">Paso 2</div>
       <h2>Subir la probabilidad de lo que salió bien</h2>
-      <p><b><i>REINFORCE</i></b> (Williams, 1992) juega una partida entera y después empuja θ para que las acciones que tomó sean más probables, en proporción al retorno G que cobró desde cada una. En el notebook, la primera partida del dado que salió tardó 161 pasos, así que desde S cobró G₀ = 0,99¹⁶⁰ = 0,2003. En S había tomado ↓ con π = 0,25 en las cuatro, de modo que con α = 1 el paso es (−0,0501; −0,0501; +0,1502; −0,0501) y π queda en (0,2369; 0,2369; 0,2894; 0,2369). Aplicada a todos los pasos de la partida, la cuenta lleva V(S) de 0,0136, el valor del dado, a 0,0974.</p>
+      <p><b><i>REINFORCE</i></b> (Williams, 1992) juega una partida entera y después empuja θ para que las acciones que tomó sean más probables, en proporción al retorno G que cobró desde cada una. El gradiente ∇ log π(a|s), que con <i>softmax</i> vale 1 − π(a|s) para la flecha tomada y −π(b|s) para cada otra flecha b, dice hacia dónde mover θ para que a sea más probable. En el notebook, la primera partida del dado que salió tardó 161 pasos (desde S cobró G₀ = 0,99¹⁶⁰ = 0,2003) y en S había tomado ↓ con π = 0,25 en las cuatro, de modo que con α = 1 el paso es (−0,0501; −0,0501; +0,1502; −0,0501) y π queda en (0,2369; 0,2369; 0,2894; 0,2369). Aplicada a todos los pasos de la partida, la cuenta lleva V(S) de 0,0136, el valor del dado, a 0,0974.</p>
       <div class="eq">θ ← θ + α G ∇ log π(a|s)</div>
       <p class="nota pregunta">Si la misma partida hubiera salido en 21 pasos, ¿el empuje en S sería más grande o más chico? ¿Y si no hubiera salido?</p>
     </div>
@@ -197,17 +197,17 @@
           <tbody>
             <tr><td>50 pasadas, sin recorte</td><td class="num">0,0047</td><td class="num">0 de 20</td></tr>
             <tr class="sel"><td>50 pasadas, con recorte</td><td class="num">0,3263</td><td class="num">18 de 20</td></tr>
-            <tr><td>una pasada de paso 10, sin recorte</td><td class="num">0,2628</td><td class="num">12 de 20</td></tr>
-            <tr><td>una pasada de paso 10, con recorte</td><td class="num">0,2628</td><td class="num">12 de 20</td></tr>
+            <tr><td>una pasada con α = 10, sin recorte</td><td class="num">0,2628</td><td class="num">12 de 20</td></tr>
+            <tr><td>una pasada con α = 10, con recorte</td><td class="num">0,2628</td><td class="num">12 de 20</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="cap">El histograma está simulado en el navegador: una política a medio aprender (REINFORCE con línea de base, 100 partidas), un lote de 10 partidas y 50 pasadas con paso 1. La semilla de esa política está elegida para que el primer dibujo se parezca al del notebook, y con el botón se ven otros lotes. El recorte actúa cuando se reusa el lote, porque en la primera pasada la razón vale 1, y por eso con una sola pasada da lo mismo con o sin él. Tampoco es un candado perfecto, ya que algunas razones se escapan de la banda, aunque en un lote del notebook la razón mediana queda en 1,043 con recorte contra 0,070 sin él. La misma idea se usa para ajustar modelos de lenguaje (clases 12 y 13).</p>
+      <p class="cap">El histograma está simulado en el navegador: una política a medio aprender (REINFORCE con línea de base, 100 partidas), un lote de 10 partidas y 50 pasadas con α = 1. La semilla de esa política está elegida para que el primer dibujo se parezca al del notebook, y con el botón se ven otros lotes. El recorte actúa cuando se reusa el lote, porque en la primera pasada la razón vale 1, y por eso con una sola pasada da lo mismo con o sin él. Tampoco es un candado perfecto, ya que algunas razones se escapan de la banda, aunque en un lote del notebook la razón mediana queda en 1,043 con recorte contra 0,070 sin él. La misma idea se usa para ajustar modelos de lenguaje (clases 12 y 13).</p>
     </div>
     <div class="texto">
       <div class="paso">Paso 6</div>
       <h2>No alejarse demasiado: PPO</h2>
-      <p>Jugar partidas cuesta, así que tienta reusar el mismo lote en muchas pasadas de gradiente, aunque después de unas pocas la política ya no es la que jugó esas partidas. PPO (<i>Proximal Policy Optimization</i>; Schulman et al., 2017) mira la razón entre la probabilidad nueva y la vieja de cada acción del lote. Con el recorte (<i>clipping</i>), una acción deja de empujar cuando su razón ya salió de [1 − ε, 1 + ε] hacia el lado que le conviene. En el notebook, desde V(S) = 0,2178 y con 50 pasadas sobre un lote de 10 partidas, sin recorte V(S) cae a 0,0047 (mejora en 0 de 20 lotes) y con recorte sube a 0,3263 (18 de 20).</p>
+      <p>Jugar partidas cuesta, así que tienta reusar el mismo lote en muchas pasadas de gradiente, aunque después de unas pocas la política ya no es la que jugó esas partidas. PPO (<i>Proximal Policy Optimization</i>; Schulman et al., 2017) mira la razón entre la probabilidad nueva y la vieja de cada acción del lote. Con el recorte (<i>clipping</i>), una acción deja de empujar cuando su razón ya salió de [1 − ε, 1 + ε] (otro ε, el ancho de la banda y no el de explorar) hacia el lado que le conviene. En el notebook, desde V(S) = 0,2178 y con 50 pasadas sobre un lote de 10 partidas, sin recorte V(S) cae a 0,0047 (mejora en 0 de 20 lotes) y con recorte sube a 0,3263 (18 de 20).</p>
       <div class="eq parte"><span class="nw sigue">razón = π<sub>nueva</sub>(a|s) / π<sub>vieja</sub>(a|s),</span> <span class="nw">recortada en [1 − ε, 1 + ε]</span></div>
       <p class="nota pregunta">Con una sola pasada sobre el lote, ¿qué hace el recorte? Pensá cuánto vale la razón al empezar.</p>
     </div>

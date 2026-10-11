@@ -99,7 +99,7 @@
     <div class="texto">
       <div class="paso">Paso 2 · el texto como cadena de Markov</div>
       <h2 id="t3">Contar no alcanza</h2>
-      <p>Un <b>n-grama</b> de letras (<i>n-gram</i>) cuenta en un corpus qué letra vino después de cada grupo de n − 1 letras y genera texto tirando un dado con esas cuentas (Shannon, 1948). Es la cadena de Markov de la clase 3 con las últimas n − 1 letras como estado, así que nunca recuerda nada más viejo. En un diario de la cueva de 5420 letras escrito para este curso, con n = 2 y n = 4 no copia nada pero inventa palabras, mientras que con n = 8 el 36 % del texto sale copiado tal cual. Sobre un tramo que la tabla no vio, el error es mínimo con n = 3 (1,93 nats por letra) y sube a 2,97 con n = 8, porque cada contexto largo se vio casi una sola vez.</p>
+      <p>Un <b>n-grama</b> de letras (<i>n-gram</i>) cuenta en un corpus qué letra vino después de cada grupo de n − 1 letras y genera texto tirando un dado con esas cuentas (Shannon, 1948). Es la cadena de Markov de la clase 3 con las últimas n − 1 letras como estado, así que nunca recuerda nada más viejo. En un diario de la cueva de 5420 letras escrito para este curso, con n = 2 y n = 4 no copia nada pero inventa palabras, mientras que con n = 8 el 36 % del texto sale copiado tal cual. Sobre un tramo que la tabla no vio, el error es mínimo con n = 3 (1,93 nats por letra de <b>entropía cruzada</b>, <i>cross-entropy</i>, que cuanto más baja, mejor predice) y sube a 2,97 con n = 8, porque cada contexto largo se vio casi una sola vez.</p>
       <div class="eq parte"><span class="nw">P(xₜ | contexto) =</span> <span class="nw">cuenta(contexto + xₜ)</span> <span class="nw">/ cuenta(contexto)</span></div>
       <p class="nota pregunta">El corpus abre paréntesis y los cierra veinte letras después. ¿Qué n necesitarías para cerrarlos bien, y cuántas veces viste cada contexto de ese largo?</p>
     </div>
@@ -118,6 +118,7 @@
       <div class="ctl">
         <label for="b4temp">Temperatura al generar <output id="o4temp">0,7</output></label>
         <input type="range" id="b4temp" min="0.1" max="1.5" step="0.1" value="0.7">
+        <span class="small muted">Temperatura baja: repite lo más probable. Alta: inventa (clase 13).</span>
       </div>
       <div class="hud" id="hud4"></div>
       <div class="row">
@@ -129,7 +130,7 @@
     <div class="texto">
       <div class="paso">Paso 3 · una red con un lazo</div>
       <h2 id="t4">Leer en orden es acumular</h2>
-      <p>Una <b>red recurrente</b> (<i>recurrent neural network</i>, RNN) lee una letra por vez y lleva un <b>estado oculto</b> (<i>hidden state</i>) hₜ de 32 números que cada letra empuja (Elman, 1990). Usa la misma tabla de 3558 pesos en todos los pasos y esta corre en tu navegador, entrenada con el mismo diario. Una red así olvida rápido lo que leyó lejos, por eso la <b>GRU</b> (<i>gated recurrent unit</i>; Cho et al., 2014) le agrega una perilla que decide cuánto conservar del estado viejo, como la <b>LSTM</b> (<i>long short-term memory</i>; Hochreiter y Schmidhuber, 1997) con más perillas. En el notebook, una GRU frenada a tiempo comete 1,76 nats por letra en texto no visto, menos que el mejor n-grama.</p>
+      <p>Una <b>red recurrente</b> (<i>recurrent neural network</i>, RNN) lee una letra por vez y lleva un <b>estado oculto</b> (<i>hidden state</i>) hₜ de 32 números que cada letra empuja (Elman, 1990). Usa la misma tabla de 3558 pesos en todos los pasos y esta corre en tu navegador, entrenada con el mismo diario. Una red así olvida rápido lo que leyó lejos (lo vas a medir en el paso 5), por eso la <b>GRU</b> (<i>gated recurrent unit</i>; Cho et al., 2014) le agrega una perilla que decide cuánto conservar del estado viejo, como la <b>LSTM</b> (<i>long short-term memory</i>; Hochreiter y Schmidhuber, 1997) con más perillas. En el notebook, una GRU frenada a tiempo comete 1,76 nats por letra en texto no visto, menos que el mejor n-grama.</p>
       <div class="eq parte"><span class="nw">hₜ = tanh(W_hh hₜ₋₁</span> <span class="nw">+ W_xh xₜ + b)</span></div>
       <p class="nota pregunta">Escribí "la pa" y después "el pa". ¿Cambia lo que espera? ¿Qué parte del texto está guardada en el estado?</p>
     </div>
@@ -155,7 +156,7 @@
     <div class="texto">
       <div class="paso">Paso 4 · de vuelta a la cueva</div>
       <h2 id="t5">Un agente con memoria</h2>
-      <p>Dos redes juegan la cueva grande sintiendo solo los bigotes y su última acción, una red común como la de la clase 8 y una <b>GRU</b> con un estado de 32 números. Las dos aprendieron por <b>imitación</b> (<i>behavior cloning</i>) a copiar a un experto que ve el mapa, porque la versión con RL, la DRQN (Hausknecht y Stone, 2015), necesita más partidas de las que entran en una clase. La red común sale solo desde 88 de las 154 casillas (57 %) porque se traba entre casillas que se sienten igual, mientras que la GRU sale desde las 154. Lo celeste es lo que una <b>sonda</b> (<i>probe</i>) lineal lee del estado de la GRU, que acierta la casilla real en el 8 % de los casos al arrancar, en el 54 % a los 5 pasos y en el 71 % a los 10.</p>
+      <p>Dos redes juegan la cueva grande sintiendo solo los bigotes y su última acción, una red común como la de la clase 8 y una <b>GRU</b> con un estado de 32 números. Las dos aprendieron por <b>imitación</b> (<i>behavior cloning</i>) a copiar a un experto que ve el mapa, porque la versión con RL, la DRQN (Hausknecht y Stone, 2015), necesita más partidas de las que entran en una clase. La red común sale solo desde 88 de las 154 casillas (todas menos la salida, 57 %) porque se traba entre casillas que se sienten igual, mientras que la GRU sale desde las 154. Lo celeste es lo que una <b>sonda</b> (<i>probe</i>) lineal lee del estado de la GRU, que acierta la casilla real en el 8 % de los casos al arrancar, en el 54 % a los 5 pasos y en el 71 % a los 10.</p>
       <div class="eq parte"><span class="nw">hₜ = GRU(hₜ₋₁,</span> <span class="nw">[bigotesₜ, aₜ₋₁])</span></div>
       <div class="aviso mide">
         <h3>Esto hoy se mide</h3>
@@ -179,7 +180,7 @@
     <div class="texto">
       <div class="paso">Paso 5 · el puente</div>
       <h2 id="t6">Un modelo de lenguaje es esto, a escala</h2>
-      <p>Un modelo de lenguaje hace lo mismo que esta red, predecir lo que sigue con un resumen de lo leído, pero con pedazos de palabra (<i>tokens</i>) y muchísimo más texto. La escala cambia mucho, de 3558 pesos en la red de letras y 4164 en el agente a 494 millones en Qwen2.5-0.5B, el modelo que usamos como política desde la clase 13. Las barras miden cuánto mueve cada letra al estado final y muestran el <b>gradiente que se desvanece</b> (<i>vanishing gradient</i>), porque en la red entrenada la primera de 42 letras pesa apenas 5,5&nbsp;·&nbsp;10⁻⁴ de lo que pesa la última. Los modelos actuales cambian el lazo por <b>atención</b> (<i>attention</i>), que en cada paso mira a la vez todas las letras anteriores, pero la pregunta sigue siendo qué viene después de lo leído.</p>
+      <p>Un modelo de lenguaje hace lo mismo que esta red, predecir lo que sigue con un resumen de lo leído, pero con pedazos de palabra (<i>tokens</i>) y muchísimo más texto. La escala cambia mucho, de 3558 pesos en la red de letras y 4164 en el agente a 494 millones en Qwen2.5-0.5B, el modelo que usamos como política desde la clase 13. Las barras miden el olvido del paso 3, cuánto mueve cada letra al estado final, que en la red entrenada cae en la primera de 42 letras a apenas 5,5&nbsp;·&nbsp;10⁻⁴ de lo que mueve la última, una caída que se llama <b>gradiente que se desvanece</b> (<i>vanishing gradient</i>). Los modelos actuales cambian el lazo por <b>atención</b> (<i>attention</i>), que en cada paso mira a la vez todas las letras anteriores, pero la pregunta sigue siendo qué viene después de lo leído.</p>
       <div class="eq">P(xₜ₊₁ | x₁, …, xₜ)</div>
       <p class="nota pregunta">Si la atención puede mirar todo, ¿qué pierde respecto de la red recurrente? Pensá en cuánto cuesta leer el paso 1000.</p>
     </div>
@@ -544,7 +545,7 @@ const PESOS = {"vocab":" \"(),.:;abcdefghijklmnopqrstuvxyzáéíóú","corpus":"
         // la cadena: cada letra le pasa el estado a la siguiente
         ctx.strokeStyle = "rgba(242,179,90,.5)"; ctx.lineWidth = 1.2; for (let i = 0; i < n - 1; i++) { const x = x0 + i * cw + cw / 2; ctx.beginPath(); ctx.moveTo(x + 4, yL + 13); ctx.lineTo(x + cw - 4, yL + 13); ctx.stroke(); }
         ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.font = `11px ${MONO}`; ctx.fillStyle = "rgba(141,147,163,.95)"; ctx.fillText("■ sin entrenar", 6, 6); ctx.fillStyle = COL.lamp; ctx.fillText("■ entrenada", 120, 6);
-        ctx.fillStyle = COL.muted; ctx.fillText("|∂h_T/∂xᵢ| / |∂h_T/∂x_T|, en escala log", 6, 18);
+        ctx.fillStyle = COL.muted; ctx.fillText("cuánto mueve cada letra al estado final (log)", 6, 18);
         const k = Math.max(0, n - 11); hud.innerHTML = `<span>última letra <b>'${FRASE[fin] === " " ? "␣" : FRASE[fin]}'</b> (${n} letras)</span><span>la primera pesa: sin entrenar <b>${fE(A[0])}</b>, entrenada <b>${fE(E[0])}</b></span>` + (n > 10 ? `<span>la de hace ${n - 1 - k} pasos: entrenada <b>${fE(E[k])}</b></span>` : "");
       } else {
         // esquema (no medido): desde la última letra, una flecha a cada letra anterior; grosor ilustrativo
