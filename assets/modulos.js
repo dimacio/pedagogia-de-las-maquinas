@@ -332,7 +332,7 @@ window.MODULOS = {
     ],
     tiempo: { pagina: 35, notebook: 60 },
     previos: ["0a", "0b"],
-    requisitos: ["Haber jugado un rato a la cueva a ciegas en modo fácil."],
+    requisitos: ["Haber jugado un rato a la cueva a ciegas en modo fácil.", "Las nivelaciones 0a y 0b sirven para la vía con código; la vía visual no las necesita."],
     cuestionario: [
       {
         objetivo: "O1",
@@ -495,20 +495,20 @@ window.MODULOS = {
         pregunta: "En la cueva como MDP se fija la política al azar: π(a|s) = 1/4 para cada acción en cada casilla. Al evaluarla da V(S) = 0,0136, el mismo valor de la clase 3. ¿Por qué?",
         opciones: [
           { texto: "Porque con el mapa a la vista el agente elige siempre la mejor acción, y en esta cueva la mejor coincide justo con la cara que salía en el dado de la clase 3.", explicacion: "No: si eligiera la mejor acción, V(S) sería 0,8262, no 0,0136. Con la política al azar nadie elige: se promedian las cuatro acciones." },
-          { texto: "Porque con la política fija cada casilla queda con una sola distribución de destinos, P^π = Σₐ π(a|s) P(s′|s,a): un MRP; con 1/4 por acción, el dado.", explicacion: "Correcto. Un MDP con la política fija vuelve a ser una cadena con recompensa. El notebook comprueba que P^π y R^π son iguales a la P y la R del caminante de la clase 3." },
+          { texto: "Porque con la política fija cada casilla queda con una sola distribución de destinos, Pπ = Σₐ π(a|s) P(s′|s,a): un MRP; con 1/4 por acción, el dado.", explicacion: "Correcto. Un MDP con la política fija vuelve a ser una cadena con recompensa. El notebook comprueba que Pπ y Rπ son iguales a la P y la R del caminante de la clase 3." },
           { texto: "Porque las cuatro tablas P(s′|s,a) son iguales entre sí, así que da lo mismo qué acción se elija en cada casilla.", explicacion: "No: hay una tabla por acción y son distintas. Desde el cruce (5,6), ↑ choca y se queda, → va a (5,7), ↓ a (6,6) y ← a (5,5)." },
-          { texto: "Porque en la cueva R no depende de la acción; si R(s,a) cambiara con la acción, el MDP con política fija ya no sería un MRP.", explicacion: "No: R sí depende de la acción (solo la que entra a la salida cobra +1). Con la política fija, R^π(s) = Σₐ π(a|s) R(s,a) y sigue siendo un MRP." }
+          { texto: "Porque en la cueva R no depende de la acción; si R(s,a) cambiara con la acción, el MDP con política fija ya no sería un MRP.", explicacion: "No: R sí depende de la acción (solo la que entra a la salida cobra +1). Con la política fija, Rπ(s) = Σₐ π(a|s) R(s,a) y sigue siendo un MRP." }
         ],
         correcta: 1
       },
       {
         objetivo: "O2",
-        pregunta: "En el cruce (5,6), con los valores de la política al azar, Q^π de ↑, →, ↓ y ← vale 0,0763, 0,1070, 0,0623 y 0,0627, y V^π(cruce) = 0,0771. ¿Qué se lee en esos números?",
+        pregunta: "En el cruce (5,6), con los valores de la política al azar, Qπ de ↑, →, ↓ y ← vale 0,0763, 0,1070, 0,0623 y 0,0627, y Vπ(cruce) = 0,0771. ¿Qué se lee en esos números?",
         opciones: [
-          { texto: "V^π(cruce) está mal calculado: el valor de una casilla es el de su mejor acción, así que debería dar 0,1070.", explicacion: "No: quedarse con el máximo es el valor óptimo V*. Para la política al azar, V^π es el promedio de las cuatro Q, pesado con 1/4 cada una." },
-          { texto: "Para saber qué acción conviene en el cruce hay que jugar muchas partidas desde ahí con cada acción y comparar los retornos promedio.", explicacion: "No: con el mapa a la vista no hace falta jugar. Q^π(s,a) = R(s,a) + γ Σ P(s′|s,a) V^π(s′) se calcula con P, R y los valores de la política." },
+          { texto: "Vπ(cruce) está mal calculado: el valor de una casilla es el de su mejor acción, así que debería dar 0,1070.", explicacion: "No: quedarse con el máximo es el valor óptimo V*. Para la política al azar, Vπ es el promedio de las cuatro Q, pesado con 1/4 cada una." },
+          { texto: "Para saber qué acción conviene en el cruce hay que jugar muchas partidas desde ahí con cada acción y comparar los retornos promedio.", explicacion: "No: con el mapa a la vista no hace falta jugar. Qπ(s,a) = R(s,a) + γ Σ P(s′|s,a) Vπ(s′) se calcula con P, R y los valores de la política." },
           { texto: "Q(cruce, →) debería ser igual a V(5,7) = 0,1081, porque el paso que lleva de una casilla a la otra no cobra nada.", explicacion: "No: el paso no cobra nada (R = 0), pero el valor de la casilla de destino se descuenta. Q = 0 + 0,99 · 0,1081 = 0,1070." },
-          { texto: "→ es la de mayor Q y la mejora pone esa flecha; el promedio de las cuatro Q da 0,0771 porque el dado elige cada una con 1/4.", explicacion: "Correcto. Mejorar es quedarse en cada casilla con la acción de mayor Q^π. Y como V^π es el promedio de las cuatro Q, alguna tiene que estar por encima." }
+          { texto: "→ es la de mayor Q y la mejora pone esa flecha; el promedio de las cuatro Q da 0,0771 porque el dado elige cada una con 1/4.", explicacion: "Correcto. Mejorar es quedarse en cada casilla con la acción de mayor Qπ. Y como Vπ es el promedio de las cuatro Q, alguna tiene que estar por encima." }
         ],
         correcta: 3
       },
@@ -770,7 +770,7 @@ window.MODULOS = {
       },
       {
         objetivo: "O4",
-        pregunta: "Go-Explore guardó la secuencia que guardó Go-Explore sin bucles, de 52 acciones, que en la cueva determinista lleva de S a la salida. Repetida 1000 veces con acciones pegajosas, llega el 44,1 % de las veces con p = 0,05 y el 0,9 % con p = 0,25. ¿Qué se lee?",
+        pregunta: "La secuencia que guardó Go-Explore, sin bucles, de 52 acciones, lleva de S a la salida en la cueva determinista. Repetida 1000 veces con acciones pegajosas, llega el 44,1 % de las veces con p = 0,05 y el 0,9 % con p = 0,25. ¿Qué se lee?",
         opciones: [
           { texto: "Una traba hace perder un paso, pero la secuencia sigue el rumbo; con partidas más largas llegaría casi siempre.", explicacion: "No: después de una traba el agente queda corrido una casilla y el resto de la secuencia ya no corresponde al lugar donde está: choca y termina en cualquier parte. Más pasos no lo arreglan." },
           { texto: "La secuencia estaba mal guardada: una sin rodeos, como el camino más corto de 44 pasos, llegaría igual con p = 0,25.", explicacion: "No: una más corta tiene menos pasos para trabarse, pero sigue sin poder corregir una traba. El problema es que no mira dónde está." },

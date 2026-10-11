@@ -351,7 +351,7 @@
     const M = window.MODULOS && window.MODULOS[id];
     const bar = document.createElement("header"); bar.className = "topbar";
     bar.innerHTML = `<div class="wrap"><a class="brand" href="../index.html">RL <span class="g">a ciegas</span></a>
-      <nav aria-label="Secciones"><a href="../clases/01-introduccion.html">Inicio</a><a href="../index.html#clases">Clases</a><a href="../juego/la-cueva-a-ciegas.html">Juego</a><a href="../difusion/estrategia.html">Difusión</a><a href="https://github.com/${REPO}">GitHub</a>
+      <nav aria-label="Secciones"><a href="../index.html">Inicio</a><a href="../index.html#clases">Clases</a><a href="../juego/la-cueva-a-ciegas.html">Juego</a><a href="../difusion/estrategia.html">Difusión</a><a href="https://github.com/${REPO}">GitHub</a>
         <a class="progreso" data-progreso href="${M ? "#cuestionario" : "../index.html#clases"}"><span class="pbar" aria-hidden="true"><i></i></span><span class="sr">Cuestionarios aprobados</span><b></b></a></nav></div>`;
     document.body.prepend(bar);
     const main = document.querySelector("main") || document.body;
@@ -371,11 +371,11 @@
     const pg = document.createElement("nav"); pg.className = "pager"; pg.setAttribute("aria-label", "Clases");
     const prev = CLASES[i - 1], next = CLASES[i + 1];
     const pronto = (c, cls, flecha) => `<span class="pronto${cls}"><span>${flecha(c.bloque + " · próximamente")}</span><b>${c.titulo}</b></span>`;
-    pg.innerHTML = (prev ? (prev.pronto ? pronto(prev, "", t => "← " + t) : `<a href="${prev.archivo}"><span>← ${prev.bloque}</span><b>${prev.titulo}</b></a>`) : `<a href="../clases/01-introduccion.html"><span>← Inicio</span><b>Por qué este curso</b></a>`) +
+    pg.innerHTML = (prev ? (prev.pronto ? pronto(prev, "", t => "← " + t) : `<a href="${prev.archivo}"><span>← ${prev.bloque}</span><b>${prev.titulo}</b></a>`) : `<a href="../index.html"><span>← Inicio</span><b>El recorrido</b></a>`) +
       (next ? (next.pronto ? pronto(next, " next", t => t + " →") : `<a class="next" href="${next.archivo}"><span>${next.bloque} →</span><b>${next.titulo}</b></a>`) : `<a class="next" href="../difusion/estrategia.html"><span>Epílogo →</span><b>Cómo se propaga este curso</b></a>`);
     main.appendChild(pg);
     const ft = document.createElement("footer"); ft.className = "site wrap";
-    ft.innerHTML = `RL a ciegas · curso libre para enseñar a las máquinas y a las personas. Basado en Stanford CS234 y Sutton &amp; Barto.`;
+    ft.innerHTML = `RL a ciegas · curso libre para enseñar a las máquinas y a las personas. Basado en Stanford CS234, CS224R y Sutton &amp; Barto.`;
     document.body.appendChild(ft);
     document.title = document.title || `${cl.titulo} · RL a ciegas`;
     addEventListener("storage", e => { if (e.key === CLAVE_PROGRESO) pintarProgreso(); });
