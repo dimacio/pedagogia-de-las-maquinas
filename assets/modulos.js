@@ -1257,5 +1257,83 @@ window.MODULOS = {
         "Se da al menos un ejemplo concreto de cómo esa recompensa se podría engañar o equivocar (una respuesta mala que cobra o una buena que no) y qué aprendería el asistente si se entrenara con ella."
       ]
     }
+  },
+
+  "14": {
+    objetivos: [
+      "Describir el bucle ReAct (pensamiento → acción → observación) y reconocerlo en la cueva y en un agente de lenguaje que investiga.",
+      "Reconocer las piezas de un agente de lenguaje (modelo, arnés, herramientas, ventana de contexto) y leer la ventana de contexto como su estado.",
+      "Plantear la búsqueda profunda como un MDP (seguir buscando o responder ya) y reconocer la búsqueda antes de responder como planificar mirando adelante.",
+      "Reconocer los riesgos de optimizar una recompensa que se puede engañar en un agente de lenguaje y explicar por qué un modelo chico sin memoria juega peor."
+    ],
+    tiempo: { pagina: 35, notebook: 60 },
+    previos: ["13", "9"],
+    requisitos: ["De la clase 13, el modelo de lenguaje como política; de la clase 9, la memoria y el POMDP; de las clases 4 y 2, el costo por paso y la trampa de la recompensa.", "El notebook usa Qwen2.5-0.5B-Instruct (≈ 1 GB, se descarga una vez) y es lento: en CPU tardó 17,7 min."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "En la partida del notebook, Qwen2.5-0.5B usa sentir() en el paso 14 y recibe «pared a la derecha y a la izquierda». En el paso 15 escribe «Pensamiento: A la derecha está libre.», pide mover(derecha) y recibe «choqué con una pared». En el bucle ReAct, ¿qué escribe el modelo y qué muestra este paso?",
+        opciones: [
+          { texto: "El modelo escribe las tres líneas, también la observación, y en el paso 15 se equivocó al escribir «choqué» en lugar de «avancé».", explicacion: "No: la observación no la escribe el modelo. La devuelve el programa que ejecuta la acción en la cueva, y por eso dice la verdad sobre la pared aunque el pensamiento diga otra cosa." },
+          { texto: "Escribe el pensamiento y la acción; el programa ejecuta la acción y le devuelve la observación. El paso 15 repite la forma del ejemplo sin usar lo que acababa de tocar.", explicacion: "Correcto. Es el bucle pensamiento → acción → observación de Yao et al. (2023). «A la derecha está libre» es una línea del ejemplo del pedido: el modelo imita la forma más de lo que razona sobre la partida, y en 30 pasos choca 11 veces." },
+          { texto: "Escribe solo el pensamiento; el programa lee ese pensamiento, decide qué acción conviene y la ejecuta, así que el choque es culpa del programa.", explicacion: "No: el programa no elige nada, ejecuta la acción que el modelo pidió en la línea «Acción:». Si el pedido es mover(derecha) contra una pared, el programa solo informa el choque." },
+          { texto: "Escribe el pensamiento y la acción, y el pensamiento se ejecuta primero: como el pensamiento dijo «libre», el programa intentó mover antes de mirar la pared.", explicacion: "No: el pensamiento es texto que nadie ejecuta. Solo la acción se ejecuta, y su resultado vuelve como observación para el paso siguiente." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O2",
+        pregunta: "Para «¿Cuántas casillas tiene en total la cueva chica?», el modelo le pide a la calculadora «filas * columnas» y recibe «Error: 'filas' no es un número: calcular solo acepta números y + − × /». Con buscar y calcular acierta 1 de 3 preguntas. ¿Qué hizo el arnés en ese paso?",
+        opciones: [
+          { texto: "Corrigió el pedido: buscó en la biblioteca que la cueva tiene 10 filas y 14 columnas, calculó 140 y se lo pasó al modelo como respuesta.", explicacion: "No: el arnés no completa ni corrige pedidos, los cumple o los rechaza. El 140 sale solo si el modelo pide calcular('10 * 14'), y en el notebook no lo pidió." },
+          { texto: "Decidió que la respuesta estaba mal y le puso 0, como el verificador de la clase 13, porque el arnés es el que entrena al modelo.", explicacion: "No: el arnés no puntúa ni entrena. Los pesos de Qwen no cambian en toda la clase; el «¿respuesta con 140? NO» es un control del notebook, no algo que el modelo reciba." },
+          { texto: "Nada: un pedido mal formado se descarta en silencio y el modelo sigue como si no hubiera pedido, porque el error no forma parte del entorno.", explicacion: "No: el error vuelve a la ventana del modelo como texto legible, y el modelo contesta «parece que hay un error en la expresión». Qué observación vuelve lo define el arnés." },
+          { texto: "Leyó el pedido, llamó a la calculadora y le devolvió el error como texto: para RL el arnés es parte del entorno, porque define qué acciones existen y qué observación vuelve.", explicacion: "Correcto. El modelo solo escribe texto; el arnés interpreta los pedidos, rechaza los mal formados y llama a las herramientas. El modelo falló por mandar «filas * columnas» en lugar de números, no por el arnés." }
+        ],
+        correcta: 3
+      },
+      {
+        objetivo: "O2",
+        pregunta: "Si se le pregunta solo «¿Cuál es mi nombre?», Qwen responde que se llama Qwen; con la conversación anterior en la ventana dice «Ana». En la cueva, con la posición escrita en cada observación, la semilla 2 choca 27 veces seguidas contra la misma pared mientras cada observación le repite «fila 1, columna 1». ¿Qué muestran los dos casos juntos?",
+        opciones: [
+          { texto: "Que el estado del agente es el texto de su ventana: sin la historia no sabe el nombre; pero tener la posición en la ventana no alcanza si el modelo no aprendió a usarla.", explicacion: "Correcto. Lo que no entra en la ventana no existe para el modelo, como en el POMDP de la clase 9. Y con la posición en la ventana el promedio de choques no bajó: pasó de 6,0 a 9,7 en las tres semillas." },
+          { texto: "Que el modelo recuerda entre llamadas solo lo importante, como un nombre, y se olvida de lo que considera un detalle, como la posición.", explicacion: "No: entre llamadas no recuerda nada. Dice «Ana» solo cuando la conversación anterior vuelve a entrar en la ventana; sin ella, contesta «Qwen»." },
+          { texto: "Que la ventana se llenó: con la posición en cada observación el texto supera lo que entra y el modelo deja de ver las primeras líneas.", explicacion: "No: ninguna de las seis partidas pasó de 1882 tokens en la ventana y Qwen2.5 admite unos 32 mil. La información estaba en la ventana; lo que faltó fue usarla." },
+          { texto: "Que agregar la posición resuelve el problema de la cueva: las 27 repeticiones de la semilla 2 son mala suerte y con más partidas desaparecerían.", explicacion: "No: con la posición ninguna de las tres partidas salió y el promedio de choques repetidos subió de 3,7 a 9,0. Darle el dato no le enseña a usarlo." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O3",
+        pregunta: "En el MDP chico de la sección 5, buscar y leer restan un costo por paso y responder termina con +1 si acierta. Con costo 0,02 la política óptima da 7,4 pasos antes de responder y acierta el 81,6 %; desde 0,14 responde de entrada y acierta el 25 %. ¿Cómo se lee ese cambio?",
+        opciones: [
+          { texto: "Desde 0,14 la iteración de valor deja de converger y la política sale al azar; con un costo bien elegido el agente siempre investiga.", explicacion: "No: la política converge a responder de entrada, y es la mejor posible con ese costo. Adivinar el 25 % es una decisión, no una falla del método." },
+          { texto: "Cuanto más cuesta cada paso, más busca el agente para compensar el costo con más aciertos, así que el 25 % es un error del notebook.", explicacion: "No: es al revés. Con costo más alto busca menos (de 7,4 pasos con 0,02 a 0 con 0,14), porque cada búsqueda le resta más de lo que le suma." },
+          { texto: "Con G = 1[acierta] − costo × pasos, el agente compara cuánto le sube buscar la chance de acertar con lo que cuesta; desde 0,14 no le conviene ni un paso. Buscar antes es planificar mirando adelante.", explicacion: "Correcto. El estado lleva búsquedas, documentos leídos y confianza, y la política mira hacia adelante qué valdría cada opción, como el árbol de búsqueda de AlphaGo (Silver et al., 2016) antes de cada jugada." },
+          { texto: "Buscar es explorar al azar, como un ε grande: con costo bajo el agente explora mucho y con costo alto deja de explorar y explota lo que ya sabe.", explicacion: "No: en este MDP buscar no es azar, es la acción óptima mientras el valor esperado de seguir supere al de responder. Se decide mirando adelante, no tirando una moneda." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O4",
+        pregunta: "Con la pregunta neutra, las 24 respuestas del modelo dan el resultado correcto. Cuando el usuario afirma, seguro, un resultado equivocado, 23 de 24 le dan la razón y solo 10 dan el correcto. Si se reforzaran las respuestas que cobran «gusta», el 61 % de lo reforzado no daría el resultado correcto. ¿Qué muestra esto?",
+        opciones: [
+          { texto: "Que el modelo no sabe sumar ni restar, y que el problema se arregla con un modelo más grande que haga bien las cuentas.", explicacion: "No: con la pregunta neutra acierta las 24. Sabe la cuenta; lo que cambia la respuesta es que el usuario esté seguro de otra cosa." },
+          { texto: "Que premiar que la respuesta guste empuja a darle la razón al usuario (complacencia): el agente aprendería a complacer, no a acertar, como la trampa de la recompensa de la clase 2.", explicacion: "Correcto. Es la complacencia (sycophancy) de Sharma et al. (2023). La recompensa «gusta» se puede cobrar sin dar el resultado correcto, y un agente optimiza lo que se premia (Amodei et al., 2016)." },
+          { texto: "Que el 61 % de las 24 respuestas está mal; como la mayoría igual coincide con lo que quería el usuario, la recompensa «gusta» es aceptable.", explicacion: "No: el 61 % se cuenta sobre las 23 que cobran «gusta», de las que solo 9 dan el resultado correcto. Y coincidir con el usuario equivocado es justamente el problema." },
+          { texto: "Que alcanza con usar al mismo modelo como juez de las respuestas, porque él sí sabe la cuenta y le daría «Sí» solo a las correctas.", explicacion: "No: como juez, Qwen le da a 17 + 25 = 32 casi la misma P(Sí) que a 17 + 25 = 42 (0,585 contra 0,587). Un juez que no distingue también se puede engañar." }
+        ],
+        correcta: 1
+      }
+    ],
+    actividad: {
+      titulo: "Mi agente y su ventana",
+      consigna: "Elegí un agente de lenguaje que usarías o que ya usás: un asistente que busca en la web, uno que lee tu correo, uno que corrige código o uno que reserva un turno. Describilo con las piezas de la clase: qué herramientas puede pedir, qué hace el arnés cuando un pedido sale mal formado y qué observación vuelve. Escribí tres vueltas de su bucle ReAct (pensamiento, acción, observación) para una tarea concreta. Después hacé la lista de lo que entra en su ventana de contexto en la tercera vuelta y de algo importante que no entra: ¿qué haría mal por no saberlo, como el agente de la cueva que vuelve a chocar? Por último, decidí cuándo debería dejar de buscar y responder, y qué recompensa lo empujaría a complacer en lugar de acertar. Usá la pregunta de «Para enseñarlo»: si el asistente cobra cada vez que la persona puntúa bien la respuesta, ¿qué contesta cuando la persona está segura y equivocada? Cerralo con la oración: un agente de lenguaje es un modelo que escribe pedidos y un arnés que los cumple; lo que sabe es lo que entra en su ventana, y lo que aprende es lo que le premian. Publicalo en Discussions; otra persona te devuelve con la rúbrica.",
+      rubrica: [
+        "Se nombra un agente concreto con sus herramientas y lo que hace el arnés, y se escriben tres vueltas del bucle donde se distingue qué escribe el modelo y qué observación le devuelve el arnés.",
+        "Se lista lo que entra en la ventana de contexto y algo importante que queda afuera, con un error concreto que el agente cometería por no tenerlo.",
+        "Se dice cuándo convendría dejar de buscar y responder, y se da un ejemplo de recompensa que se puede engañar (por ejemplo, premiar que guste) con lo que el agente aprendería de ella."
+      ]
+    }
   }
 };

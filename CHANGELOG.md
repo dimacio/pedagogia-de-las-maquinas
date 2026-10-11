@@ -32,6 +32,7 @@ Formato: una sección por versión (SemVer sobre el curso, ver `fabrica/CONVENCI
 - Clase 11 (nueva): políticas con softmax, REINFORCE como imitación ponderada, línea de base, actor-crítico, recorte de PPO.
 - Clase 12 (nueva): preferencias, Bradley-Terry, recompensa aprendida, RLHF con penalización, sobreoptimización, DPO.
 - Clase 13: el modelo de lenguaje como política (token, temperatura, verificador, ventajas de GRPO), notebook lento con Qwen2.5-0.5B.
+- Clase 14: agentes de lenguaje (ReAct en la cueva, el mismo bucle buscando información, arnés y herramientas, la ventana de contexto como estado, cuándo responder como MDP, complacencia), notebook lento con Qwen2.5-0.5B.
 
 ### Aviso
 - El progreso de los cuestionarios guardado en el navegador vuelve a cero (los ids cambian de significado).
