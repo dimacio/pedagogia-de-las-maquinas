@@ -1,1074 +1,841 @@
-"""Arma notebooks/11-agentes-aplicados.ipynb (Clase 11 — Agentes aplicados: enseñar y difundir)."""
-from _nbutil import md, code, save
+"""Arma notebooks/11-policy-gradient.ipynb (Clase 11 — Policy gradient y actor-crítico: reforzar lo que salió bien). Spine: specs/11.md.
+
+Aprender la política directamente: preferencias θ(s, a) y softmax -> REINFORCE con una actualización a mano -> REINFORCE como
+imitación ponderada (contra clonar) -> línea de base (varianza del gradiente y curvas, varias semillas) -> actor-crítico con el δ
+de la clase 5 -> PPO: la razón π_nueva/π_vieja recortada en un paso grande.
+(El builder viejo de la clase 11, «agentes aplicados», está archivado en build/v1/builders/build_nb11.py y vuelve en la clase 15.)
+"""
+from _nbutil import md, code, writefile_cell, save
 
 cells = []
 
 cells.append(md(r"""
-# Clase 11 — Agentes aplicados: enseñar y difundir
+# Clase 11 — Policy gradient y actor-crítico: reforzar lo que salió bien
 
-**RL a ciegas** · MOOC libre de aprendizaje por refuerzo · vía profunda
+**RL a ciegas** · curso de aprendizaje por refuerzo (*reinforcement learning*, RL) · vía profunda
 
-> Un agente de marketing y un agente tutor resuelven el mismo problema: **sostener la atención de alguien**. La diferencia es **a favor de quién juega la recompensa**, y quién puede verla y cambiarla.
+Basado en Williams (1992, REINFORCE), en Sutton & Barto, cap. 13 (13.1–13.5: gradiente de política, REINFORCE, línea de base y actor-crítico), en Schulman et al. (2017, PPO) y en Stanford CS234 (Brunskill), clases 5 y 6, y CS224R, clases 3 a 5.
 
-Esta clase muestra cómo se produce y se difunde el propio MOOC con agentes: el curso enseña el sistema que lo produce.
+**La pregunta de hoy:** si en vez de aprender cuánto vale cada casilla aprendieras directamente qué tan seguido ir para cada lado, ¿cómo sabrías para dónde mover esas probabilidades?
 
-1. **Dos agentes, un problema**: el agente de difusión y el tutor como dos MDP con la misma forma.
-2. **La fábrica de contenido**: un pipeline multiagente con **modelos de lenguaje reales y chicos** que lee la bibliografía del curso y propone posts.
-3. **El tutor como agente**: elige la próxima pregunta; recompensa = acierto vs. recompensa = mejora.
-4. **Persuasión a favor del usuario**: una pausa antes del feed cambia el entorno, no el agente.
+En las clases 5 y 6 el agente aprendía **valores** ($V$, $Q$) y de ahí sacaba las flechas. Hoy aprende **las flechas mismas**, como probabilidades: una política estocástica $\pi(a \mid s)$ como la de la clase 2, pero con perillas que se pueden mover. Y la forma de moverlas se parece mucho a imitar (clase 10): hacer más probable lo que se hizo en las partidas que salieron bien. Vamos a ver:
 
-> **Tiempo y recursos.** Este es el único notebook del curso que descarga modelos (≈ 4 GB en total). En Colab con GPU T4 (gratis) corre en 2–3 minutos; en CPU, entre 5 y 10. Las respuestas de modelos tan chicos son flojas: **eso es parte de la lección** (por eso existen el evaluador y el humano en el bucle).
+1. **Preferencias y softmax**: cuatro números por casilla que se vuelven probabilidades.
+2. **REINFORCE**: una actualización a mano, con números, y las flechas que se engrosan.
+3. **REINFORCE como imitación ponderada**: clonar todo, clonar lo exitoso y pesar por el retorno.
+4. **La línea de base**: cuánto tiembla el gradiente con y sin, y qué pasa con el aprendizaje.
+5. **Actor-crítico**: un crítico que aprende $V$ con el $\delta$ de la clase 5 y un actor que aprende con él.
+6. **PPO**: qué pasa con un paso grande sin recorte y con recorte.
+
+Y un ejercicio: cambiar $\alpha$, la línea de base y el recorte.
+
+> Cómo usar este notebook: ejecutar las celdas en orden (Colab: *Entorno de ejecución → Ejecutar todas*). Tarda alrededor de un minuto.
 """))
 
 cells.append(md(r"""
 ## Preparación
 
-### ¿Hay GPU?
-
-Los modelos de lenguaje corren mucho más rápido en una GPU. En Colab: menú **Entorno de ejecución → Cambiar tipo de entorno de ejecución → GPU T4**, y volver a ejecutar desde acá.
+La primera celda escribe el archivo `cave_env.py` con **la cueva** de todo el curso. Así el notebook funciona solo, también en Colab. No hace falta leerla.
 """))
-cells.append(code(r"""
-import importlib, subprocess, sys
-for paquete in ["transformers", "accelerate"]:          # en Colab ya vienen; por las dudas
-    if importlib.util.find_spec(paquete) is None:
-        subprocess.run([sys.executable, "-m", "pip", "install", "-q", paquete], check=True)
+cells.append(writefile_cell())
 
-import torch
-if torch.cuda.is_available():
-    DEVICE = "cuda"
-    print(f"✓ GPU disponible: {torch.cuda.get_device_name(0)}. Los modelos van a correr rápido.")
-else:
-    DEVICE = "cpu"
-    print("⚠ No hay GPU: el notebook corre igual, pero más lento (5–10 min).\n"
-          "  En Colab conviene: Entorno de ejecución → Cambiar tipo de entorno de ejecución → GPU T4.")
-"""))
 cells.append(md(r"""
-### Los modelos
-
-- **Generador** (curador + redactor): `Qwen/Qwen2.5-0.5B-Instruct`, un modelo abierto de 500 millones de parámetros. Se descarga sin cuenta ni token.
-- **Evaluador**: `Qwen/Qwen2.5-1.5B-Instruct`, **otro tamaño de la misma familia** (1500 millones). Generar y evaluar con el mismo modelo mide autocomplacencia, no calidad. ¿Por qué no un modelo chico de otra familia? Probamos evaluadores de menos de 1000 millones de parámetros (SmolLM2-360M, Qwen2.5-0.5B, Qwen3-0.6B) y **no distinguían** un post correcto de uno malo a propósito; lo van a poder comprobar en el ejercicio del Paso 4. Compartir familia tiene un costo: los dos modelos se entrenaron con datos y recetas parecidas, y pueden compartir sesgos. Por eso la tesis de referencia del pipeline (Villanueva, 2026, en la sección 2) usa modelos de **proveedores distintos** para generar y evaluar; acá elegimos lo que corre gratis en Colab.
+Importamos la cueva y las bibliotecas de siempre, y fijamos una semilla. Las convenciones son las de las clases 3 a 6: **+1 al entrar a la salida**, la salida es absorbente y vale 0 (ahí ya no queda nada por cobrar), el primer paso no se descuenta y $\gamma = 0{,}99$. Las partidas **empiezan siempre en S** y duran como mucho 200 pasos, como en el juego: así cada curva mide lo que de verdad importa (salir desde S) y el aprendizaje entra en unos segundos.
 """))
 cells.append(code(r"""
-MODELO_GENERADOR = "Qwen/Qwen2.5-0.5B-Instruct"
-MODELO_EVALUADOR = "Qwen/Qwen2.5-1.5B-Instruct"      # otro tamaño de la misma familia: tiene que ser distinto del generador
-
-import os, re, json, time, textwrap, warnings
 import numpy as np
 import matplotlib.pyplot as plt
-import pandas as pd
+from cave_env import CaveEnv, ACTION_NAMES
 
 SEMILLA = 0
-np.random.seed(SEMILLA); torch.manual_seed(SEMILLA)
-T0 = time.time()
+np.random.seed(SEMILLA)
+GAMMA = 0.99
+env = CaveEnv(max_steps=200)
 """))
+
 cells.append(md(r"""
-**Herramientas** (celda plegada): cargar modelos, los tres agentes del pipeline, el alumno simulado, el feed de la clase 9 y las funciones de dibujo. No hace falta leerla, solo ejecutarla.
+La celda siguiente define las **herramientas** (softmax, jugar, REINFORCE, actor-crítico, la imitación ponderada, el paso de PPO y los dibujos). Está plegada: no hace falta leerla, solo ejecutarla.
+
+Una aclaración importante: las funciones que **aprenden** solo juegan con `env.reset` y `env.step`, como un jugador en la cueva a oscuras. El mapa (`env.P`, `env.R`) lo usan solo `iteracion_de_valor` (la respuesta correcta $V^*$, como en la clase 4), `valor_de` (cuánto vale de verdad la política aprendida) y `gradiente_exacto` (para medir el ruido en la sección 4). Son nuestras reglas para medir; el agente nunca las ve.
 """))
 cells.append(code(r'''
 # @title Herramientas (no hace falta leer esto)
 # Herramientas: no hace falta leer esto
-import gc
-from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
-from matplotlib.colors import ListedColormap
-from transformers import pipeline
-from transformers.utils import logging as hf_logging
-hf_logging.set_verbosity_error(); hf_logging.disable_progress_bar()
-warnings.filterwarnings("ignore")
-os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+import math, random
+import matplotlib.patheffects as pe
 
 COLORES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
 plt.rcParams.update({
     "figure.dpi": 100, "axes.spines.top": False, "axes.spines.right": False,
-    "axes.grid": True, "grid.color": "#e6e6e6", "grid.linewidth": 0.8, "axes.axisbelow": True,
-    "axes.edgecolor": "#888888", "axes.titlesize": 12, "font.size": 10.5, "lines.linewidth": 2,
+    "axes.grid": True, "grid.color": "#e6e6e6", "grid.linewidth": 0.8,
+    "axes.edgecolor": "#888888", "axes.titlesize": 12, "font.size": 10.5,
+    "lines.linewidth": 2, "axes.axisbelow": True,
 })
-
-
-def corto(txt, n=110):
-    txt = " ".join(str(txt).split())
-    return txt if len(txt) <= n else txt[: n - 1] + "…"
-
-
-# ================= modelos =================
-def _ram_gb():
-    try:
-        import psutil
-        return psutil.virtual_memory().total / 1e9
-    except Exception:
-        return 8.0
-
-
-def cargar_generador(nombre):
-    dtype = torch.float16 if DEVICE == "cuda" else torch.float32
-    t = time.time()
-    p = pipeline("text-generation", model=nombre, dtype=dtype, device=DEVICE)
-    print(f"✓ Generador: {nombre}  (cargado en {time.time() - t:.0f} s)")
-    return p, nombre
-
-
-def cargar_evaluador(nombre, generador_usado):
-    if nombre == generador_usado:
-        raise ValueError("El evaluador tiene que ser un modelo distinto del generador.")
-    if DEVICE == "cuda":
-        dtype = torch.float16
-    else:   # en CPU: float32 si hay memoria (Colab tiene ~12 GB); si no, bfloat16 (más lento, la mitad de memoria)
-        dtype = torch.float32 if _ram_gb() >= 11 else torch.bfloat16
-    t = time.time()
-    p = pipeline("text-generation", model=nombre, dtype=dtype, device=DEVICE)
-    print(f"✓ Evaluador: {nombre}  ({str(dtype).replace('torch.', '')}, cargado en {time.time() - t:.0f} s)")
-    return p
-
-
-def liberar(*objs):
-    for o in objs:
-        del o
-    gc.collect()
-    if DEVICE == "cuda":
-        torch.cuda.empty_cache()
-
-
-def chat(pipe, texto, max_new_tokens, muestrear=False, semilla=0):
-    """Un turno de chat (texto) o una conversación (lista de mensajes). Sin rol 'system': algunas plantillas no lo aceptan."""
-    kw = dict(max_new_tokens=max_new_tokens, do_sample=muestrear)
-    if muestrear:
-        torch.manual_seed(semilla); kw.update(temperature=0.7, top_p=0.9)
-    else:
-        kw.update(temperature=None, top_p=None, top_k=None)
-    msgs = [{"role": "user", "content": texto}] if isinstance(texto, str) else texto
-    out = pipe(msgs, **kw)
-    return out[0]["generated_text"][-1]["content"].strip()
-
-
-# ================= parser tolerante =================
-def parsear_json(txt):
-    """Intenta sacar un dict de una respuesta 'casi JSON'. Devuelve (dict o None, cómo lo logró)."""
-    txt = txt.replace("```json", "```").strip()
-    m = re.search(r"\{.*\}", txt, re.S)
-    cand = m.group(0) if m else txt
-    for intento, f in [("JSON válido", lambda s: s),
-                       ("JSON reparado", lambda s: re.sub(r",\s*([\]}])", r"\1", s.replace("“", '"').replace("”", '"'))),
-                       ("JSON reparado (comillas simples)", lambda s: re.sub(r",\s*([\]}])", r"\1", s.replace("'", '"')))]:
-        try:
-            d = json.loads(f(cand))
-            if isinstance(d, dict):
-                return d, intento
-        except Exception:
-            pass
-    # último recurso: una lista de strings entre comillas después de "ideas"
-    m = re.search(r"ideas\W*\[(.*?)(\]|$)", txt, re.S | re.I)
-    if m:
-        items = re.findall(r'"([^"]{10,})"', m.group(1))
-        if items:
-            return {"ideas": items}, "rescatado con expresiones regulares"
-    items = [re.sub(r"^\s*(?:[-*•]|\d+[.)])\s*", "", l).strip() for l in txt.splitlines()
-             if re.match(r"^\s*(?:[-*•]|\d+[.)])\s+\S", l)]
-    if items:
-        return {"ideas": items}, "rescatado de una lista con viñetas"
-    return None, "no se pudo leer"
-
-
-def solape(idea, texto):
-    """Fracción de las palabras largas de la idea que aparecen en el fragmento (comparando las 5 primeras letras)."""
-    pal = lambda x: [w[:5] for w in re.findall(r"\w+", x.lower()) if len(w) >= 5]
-    a, b = pal(idea), set(pal(texto))
-    return sum(w in b for w in a) / max(len(a), 1)
-
-
-def ideas_validas(d, texto, minimo=0.4):
-    """Valida: strings de largo razonable y apoyados en el fragmento (si no, el modelo está inventando)."""
-    if not d or not isinstance(d.get("ideas"), list):
-        return [], 0
-    cand = [i.strip() for i in d["ideas"] if isinstance(i, str) and 15 <= len(i.strip()) <= 400]
-    ok = [corto(i, 220) for i in cand if solape(i, texto) >= minimo]
-    return ok[:3], len(cand) - len(ok)
-
-
-# ================= agentes del pipeline =================
-PROMPT_CURADOR = (
-    "Este es un fragmento de un curso de aprendizaje por refuerzo.\n\nFRAGMENTO:\n{texto}\n\n"
-    "Escribí las 2 afirmaciones centrales del fragmento, cada una en una oración corta en castellano. "
-    "Solo lo que el fragmento afirma: no des consejos de estudio.\n"
-    'Respondé SOLO con JSON: {{"ideas": ["primera afirmación", "segunda afirmación"]}}')
-PROMPT_CURADOR_ESTRICTO = (
-    "Tu respuesta anterior no era JSON válido. Leé el fragmento y respondé ÚNICAMENTE con un objeto JSON, "
-    'sin texto antes ni después: {{"ideas": ["...", "..."]}}\n\nFRAGMENTO:\n{texto}')
-
-INSTRUCCION_GENERADOR = (
-    "Escribí material educativo breve en castellano para un curso de aprendizaje por refuerzo, con cuatro secciones: "
-    "POST (2 o 3 oraciones fieles a la fuente), PREGUNTA (de práctica), RESPUESTA (corta) y FICHA (concepto: definición).\n\n"
-    "FUENTE:\n{texto}\n\nIDEA A ENSEÑAR: {idea}")
-# Un ejemplo resuelto (few-shot) sobre OTRO tema, como turno previo de la conversación: los modelos chicos copian la forma.
-EJEMPLO_GENERADOR = [
-    {"role": "user", "content": INSTRUCCION_GENERADOR.format(
-        texto="El factor de descuento γ, entre 0 y 1, pesa las recompensas futuras. Con γ = 0 el agente solo mira la "
-              "recompensa inmediata; con γ cerca de 1 tiene en cuenta el largo plazo.",
-        idea="γ decide cuánto importa el futuro.")},
-    {"role": "assistant", "content":
-        "POST: El factor de descuento γ decide cuánto le importa el futuro al agente. Con γ = 0 solo mira la recompensa "
-        "de ahora; con γ cerca de 1 planea a largo plazo.\nPREGUNTA: Si γ = 0, ¿qué recompensas tiene en cuenta el agente?\n"
-        "RESPUESTA: Solo la recompensa inmediata.\nFICHA: Factor de descuento (γ): número entre 0 y 1 que pesa las recompensas futuras."},
-]
-
-ETIQUETAS = ["post", "pregunta", "respuesta", "ficha"]
-
-
-def parsear_secciones(txt):
-    patron = r"(?im)^[\s*#>_-]*(post|pregunta|respuesta|ficha)[\s*_]*[:：][\s*_]*"
-    partes = re.split(patron, txt)
-    sec = {}
-    for i in range(1, len(partes) - 1, 2):
-        k = partes[i].lower(); v = partes[i + 1].strip().strip("*").strip()
-        if k not in sec and v:
-            sec[k] = v
-    return sec
-
-
-def curar(estado, gen):
-    t = time.time(); estado["intentos_curador"] = []
-    for k in range(3):
-        prompt = (PROMPT_CURADOR if k == 0 else PROMPT_CURADOR_ESTRICTO).format(texto=estado["fuente"]["texto"])
-        crudo = chat(gen, prompt, max_new_tokens=110, muestrear=k > 0, semilla=k)
-        d, como = parsear_json(crudo)
-        ideas, inventadas = ideas_validas(d, estado["fuente"]["texto"])
-        if inventadas:
-            como += f"; {inventadas} descartada(s) por no apoyarse en el fragmento"
-        estado["intentos_curador"].append({"crudo": crudo, "lectura": como, "ideas_validas": len(ideas)})
-        if ideas:
-            estado["ideas"] = ideas
-            break
-    else:
-        estado["ideas"] = []
-    estado["t_curador"] = time.time() - t
-    return estado
-
-
-def generar(estado, gen):
-    t = time.time(); estado["intentos_generador"] = 0
-    if not estado.get("ideas"):
-        estado["borrador"] = None; return estado
-    for k in range(2):
-        pedido = {"role": "user", "content": INSTRUCCION_GENERADOR.format(texto=estado["fuente"]["texto"], idea=estado["ideas"][0])}
-        crudo = chat(gen, EJEMPLO_GENERADOR + [pedido], max_new_tokens=170, muestrear=k > 0, semilla=10 + k)
-        sec = parsear_secciones(crudo)
-        estado["intentos_generador"] += 1
-        if all(e in sec for e in ETIQUETAS):
-            break
-    estado["borrador"] = {e: sec.get(e, "") for e in ETIQUETAS}
-    estado["borrador_crudo"] = crudo
-    estado["t_generador"] = time.time() - t
-    return estado
-
-
-def texto_borrador(b):
-    return "\n".join(f"{e.upper()}: {b.get(e, '') or '(falta)'}" for e in ETIQUETAS)
-
-
-CRITERIOS = {
-    "fidelidad": "¿Dice lo mismo que la fuente, sin errores ni inventos?",
-    "claridad": "¿Se entiende fácil?",
-    "enganche": "¿Dan ganas de leerlo?",
-    "formato": "¿Tiene las cuatro partes (POST, PREGUNTA, RESPUESTA, FICHA) bien hechas?",
-    "aprendizaje": "¿Ayuda a un alumno a aprender la idea?",
-}
-UMBRAL = 6
-
-
-def puntuar(evaluador, fuente, texto):
-    """Rúbrica de 5 criterios, una pregunta por criterio. No le pedimos al modelo que escriba los números
-    (los modelos chicos copian el ejemplo): leemos la probabilidad que le da a cada dígito 1..9 como respuesta.
-    Puntaje = valor esperado, reescalado a 1..10. La parte común del pedido (fuente + texto) se procesa una sola vez."""
-    import copy
-    tok, model = evaluador.tokenizer, evaluador.model
-    cabeza = f"Sos un revisor exigente de material educativo.\n\nFUENTE:\n{fuente}\n\nTEXTO A REVISAR:\n{texto}\n\n"
-    marca = "<<<CRITERIO>>>"
-    plantilla = tok.apply_chat_template([{"role": "user", "content": cabeza + marca}], add_generation_prompt=True, tokenize=False)
-    antes, despues = plantilla.split(marca)
-    digitos = [tok.encode(str(d), add_special_tokens=False)[0] for d in range(1, 10)]
-    ids = lambda x: tok(x, add_special_tokens=False, return_tensors="pt")["input_ids"].to(model.device)
-    puntajes = {}
-    with torch.no_grad():
-        comun = model(input_ids=ids(antes), use_cache=True).past_key_values
-        for c, q in CRITERIOS.items():
-            sufijo = f"Criterio — {c}: {q}\nPuntuá de 1 (muy mal) a 9 (excelente). Respondé solo con el número." + despues
-            out = model(input_ids=ids(sufijo), past_key_values=copy.deepcopy(comun), use_cache=True)
-            p = torch.softmax(out.logits[0, -1].float()[digitos], 0).cpu().numpy()
-            puntajes[c] = round(float(1 + ((p * np.arange(1, 10)).sum() - 1) * 9 / 8), 1)
-    return puntajes, json.dumps(puntajes, ensure_ascii=False)
-
-
-def evaluar(estado, evaluador):
-    t = time.time()
-    if not estado.get("borrador"):
-        estado["puntajes"] = None; return estado
-    estado["puntajes"], estado["json_evaluador"] = puntuar(evaluador, estado["fuente"]["texto"],
-                                                           texto_borrador(estado["borrador"]))
-    estado["promedio"] = round(float(np.mean(list(estado["puntajes"].values()))), 1)
-    bajos = [k for k, v in estado["puntajes"].items() if v < UMBRAL]
-    estado["advertencia"] = (f"⚠ promedio {estado['promedio']} < {UMBRAL}" if estado["promedio"] < UMBRAL else "") + \
-                            (f"  (bajo {UMBRAL}: {', '.join(bajos)})" if bajos else "")
-    estado["t_evaluador"] = time.time() - t
-    return estado
-
-
-def traza(estado, completa=True):
-    """Muestra el estado compartido: las claves que ya se llenaron."""
-    w = 108
-    print(f"┌─ estado['{estado['id']}'] " + "─" * 70)
-    def linea(k, v):
-        for j, l in enumerate(textwrap.wrap(str(v), w) or [""]):
-            print(f"│ {k if j == 0 else '':14s} {l}")
-    f = estado["fuente"]
-    linea("fuente", f"{f['tema']} · nivel {f['nivel']} · {f['origen']}")
-    if completa:
-        linea("", corto(f["texto"], 2 * w))
-    if "intentos_curador" in estado:
-        for n, it in enumerate(estado["intentos_curador"], 1):
-            linea(f"curador #{n}", f"[{it['lectura']}; ideas válidas: {it['ideas_validas']}] " +
-                  (corto(it["crudo"], 2 * w) if completa else ""))
-        for n, i in enumerate(estado.get("ideas", []), 1):
-            linea("idea " + str(n), i)
-    if estado.get("borrador"):
-        linea("generador", f"{estado['intentos_generador']} intento(s)")
-        for e in ETIQUETAS:
-            linea("  " + e, estado["borrador"][e] or "(falta)")
-    if estado.get("puntajes"):
-        linea("evaluador", " · ".join(f"{k} {v}" for k, v in estado["puntajes"].items()) + f"  → promedio {estado['promedio']}")
-        if completa:
-            linea("  JSON", estado["json_evaluador"])
-        if estado.get("advertencia"):
-            linea("advertencia", estado["advertencia"])
-    for k in ["decision", "publicacion"]:
-        if k in estado:
-            linea(k, estado[k])
-    print("└" + "─" * 90)
-
-
-# ================= dibujos: MDP y pipeline =================
-def _caja(ax, x, y, texto, color, w=2.3, h=0.9, fs=10.5):
-    ax.add_patch(FancyBboxPatch((x - w / 2, y - h / 2), w, h, boxstyle="round,pad=0.08", fc=color, ec="none", alpha=0.95))
-    ax.text(x, y, texto, ha="center", va="center", color="white", fontsize=fs, weight="bold")
-
-
-def _flecha(ax, p, q, texto="", curva=0.25, shrink=30, fs=9.5):
-    ax.add_patch(FancyArrowPatch(p, q, arrowstyle="-|>", mutation_scale=16, color="#555", lw=1.6,
-                                 connectionstyle=f"arc3,rad={curva}", shrinkA=shrink, shrinkB=shrink))
-    if texto:
-        mx, my = (p[0] + q[0]) / 2, (p[1] + q[1]) / 2
-        ax.text(mx, my, texto, ha="center", va="center", fontsize=fs, color="#333", bbox=dict(fc="white", ec="none", pad=1))
-
-
-def dibujar_dos_agentes():
-    fig, axs = plt.subplots(1, 2, figsize=(14, 5.4))
-    datos = [("Agente de difusión", COLORES[1], "qué post publicar\n(tema, formato, hora)",
-              "estado: qué se publicó y\ncómo respondió la audiencia\n\nrecompensa: guardados\n+ compartidos"),
-             ("Agente tutor", COLORES[0], "qué pregunta hacer\n(tema, dificultad)",
-              "estado: nivel estimado\ndel alumno\n\nrecompensa: ¿acertó?\no ¿mejoró?")]
-    for ax, (tit, col, acc, obs) in zip(axs, datos):
-        _caja(ax, 0, 2.2, tit, col, w=2.8)
-        _caja(ax, 0, -2.2, "una persona\n(su atención)", COLORES[2], w=2.8)
-        _flecha(ax, (0.25, 1.7), (0.25, -1.7), "", curva=-0.6)
-        _flecha(ax, (-0.25, -1.7), (-0.25, 1.7), "", curva=-0.6)
-        ax.text(1.35, 0, "acción:\n" + acc, ha="left", va="center", fontsize=10, color="#333")
-        ax.text(-1.35, 0, obs, ha="right", va="center", fontsize=10, color="#333")
-        ax.set_title(tit, fontsize=13)
-        ax.set_xlim(-5, 5); ax.set_ylim(-3.2, 3.4); ax.set_aspect("equal"); ax.axis("off")
-    plt.suptitle("La misma forma: observar a una persona, actuar sobre su atención, recibir una recompensa", y=0.98)
-    plt.tight_layout(); plt.show()
-
-
-def dibujar_pipeline():
-    fig, ax = plt.subplots(figsize=(15, 4.6))
-    pos = {"bib": (0, 1), "cur": (3, 1), "gen": (6, 1), "eva": (6, -0.9), "hum": (9, 1), "pub": (12, 1)}
-    _caja(ax, *pos["bib"], "bibliografía\n(S&B, CS234,\nclases)", "#777", w=2.2, h=1.1)
-    _caja(ax, *pos["cur"], "curador\n(ideas enseñables)", COLORES[6], w=2.3, h=1.0)
-    _caja(ax, *pos["gen"], "generador\npost · pregunta · ficha", COLORES[0], w=2.5, h=1.0)
-    _caja(ax, *pos["eva"], "evaluador\n(OTRO modelo, rúbrica)", COLORES[1], w=2.5, h=1.0)
-    _caja(ax, *pos["hum"], "humano\n(decide)", COLORES[3], w=2.0, h=1.0)
-    _caja(ax, *pos["pub"], "publicador +\nanalítica (simulado)", COLORES[2], w=2.4, h=1.0)
-    _flecha(ax, pos["bib"], pos["cur"], "fragmento", curva=0, shrink=48)
-    _flecha(ax, pos["cur"], pos["gen"], "ideas (JSON)", curva=0, shrink=48)
-    _flecha(ax, (6.3, 0.5), (6.3, -0.5), "", curva=-0.4, shrink=2)
-    _flecha(ax, (5.7, -0.5), (5.7, 0.5), "", curva=-0.4, shrink=2)
-    ax.text(7.55, 0.0, "puntajes 1–10\n< 6: advierte", fontsize=9.5, color="#333", va="center")
-    _flecha(ax, pos["gen"], pos["hum"], "borrador +\nadvertencia", curva=0, shrink=55)
-    _flecha(ax, pos["hum"], pos["pub"], "aprobado", curva=0, shrink=48)
-    _flecha(ax, (12, 1.6), (3, 1.6), "", curva=0.25, shrink=5)
-    ax.text(7.5, 2.85, "métricas: qué funcionó (vuelve al curador)", ha="center", fontsize=9.5, color="#333",
-            bbox=dict(fc="white", ec="none", pad=1))
-    ax.add_patch(FancyBboxPatch((-1.1, -2.35), 14.4, 0.6, boxstyle="round,pad=0.05", fc="#f1f1f1", ec="#bbb"))
-    ax.text(6.1, -2.05, "estado compartido (un dict que cada agente va llenando): fuente → ideas → borrador → puntajes → decisión → publicación",
-            ha="center", va="center", fontsize=10, color="#333")
-    ax.set_xlim(-1.3, 13.5); ax.set_ylim(-2.6, 3.4); ax.axis("off")
-    ax.set_title("La fábrica de contenido (pipeline de Villanueva, 2026, con la bibliografía como fuente)", fontsize=13)
-    plt.tight_layout(); plt.show()
-
-
-def grafico_rubrica(estados, control=None):
-    filas = [e for e in estados if e.get("puntajes")]
-    nombres = [f"{e['id']} · {e['fuente']['tema']}" for e in filas]
-    M = np.array([[e["puntajes"][c] for c in CRITERIOS] for e in filas])
-    if control is not None:
-        nombres.append("CONTROL · malo a propósito"); M = np.vstack([M, [control[c] for c in CRITERIOS]])
-    prom = M.mean(1)
-    fig, axs = plt.subplots(1, 2, figsize=(15, 0.62 * len(nombres) + 1.8), gridspec_kw={"width_ratios": [1.6, 1]})
-    ax = axs[0]
-    ax.imshow(M, cmap="RdYlGn", vmin=1, vmax=10, aspect="auto")
-    for i in range(M.shape[0]):
-        for j in range(M.shape[1]):
-            ax.text(j, i, f"{M[i, j]:.1f}", ha="center", va="center", fontsize=10.5, weight="bold" if M[i, j] < UMBRAL else None)
-    ax.set_xticks(range(len(CRITERIOS))); ax.set_xticklabels(list(CRITERIOS))
-    ax.set_yticks(range(len(nombres))); ax.set_yticklabels(nombres); ax.grid(False)
-    ax.set_title("Rúbrica del evaluador (1–10; en negrita, bajo el umbral)")
-    ax = axs[1]
-    cols = [COLORES[2] if p >= UMBRAL else COLORES[7] for p in prom]
-    if control is not None:
-        cols[-1] = "#999"
-    bars = ax.barh(range(len(nombres)), prom, color=cols)
-    ax.bar_label(bars, fmt="%.1f", padding=3)
-    ax.axvline(UMBRAL, color="k", ls="--", lw=1.2)
-    ax.text(UMBRAL + 0.08, len(nombres) - 0.6, f"umbral {UMBRAL}", fontsize=9.5, va="bottom")
-    ax.set_yticks(range(len(nombres))); ax.set_yticklabels([]); ax.invert_yaxis(); axs[0].invert_yaxis()
-    ax.set_xlim(1, 10); ax.set_title("Promedio"); ax.grid(axis="y", visible=False)
-    axs[0].set_ylim(len(nombres) - 0.5, -0.5); ax.set_ylim(len(nombres) - 0.5, -0.5)
-    plt.tight_layout(); plt.show()
-
-
-# ================= 3. tutor =================
-DIFICULTADES = [1, 2, 3]                         # fácil, media, difícil
-NOMBRE_DIF = {1: "fácil", 2: "media", 3: "difícil"}
-GANANCIA = 0.12                                  # cuánto puede subir el nivel por pregunta, como máximo
-
-
-def p_acierto(theta, d):
-    """Prob. de acertar una pregunta de dificultad d con nivel theta (modelo logístico, tipo teoría de respuesta al ítem)."""
-    return 1 / (1 + np.exp(-2.2 * (theta - d + 0.6)))
-
-
-def ganancia_esperada(theta, d):
-    """Se aprende más con preguntas ni tan fáciles ni tan difíciles: máximo cuando p(acierto) ≈ 0.5."""
-    p = p_acierto(theta, d)
-    return GANANCIA * 4 * p * (1 - p)
-
-
-def mostrar_alumno():
-    th = np.linspace(0, 3.5, 200)
-    fig, axs = plt.subplots(1, 2, figsize=(14, 3.9))
-    for k, d in enumerate(DIFICULTADES):
-        axs[0].plot(th, 100 * p_acierto(th, d), color=COLORES[k], label=f"pregunta {NOMBRE_DIF[d]}")
-        axs[1].plot(th, ganancia_esperada(th, d), color=COLORES[k], label=f"pregunta {NOMBRE_DIF[d]}")
-    axs[0].set_ylabel("% de acierto"); axs[0].set_title("Lo que ve un tutor que premia aciertos")
-    axs[1].set_ylabel("cuánto sube el nivel (esperado)"); axs[1].set_title("Lo que ve un tutor que premia la mejora")
-    for ax in axs:
-        ax.set_xlabel("nivel del alumno θ (oculto)"); ax.legend(frameon=False)
-    plt.tight_layout(); plt.show()
-
-
-def contexto(theta):
-    return int(np.clip(np.floor(theta), 0, 3))    # nivel 0..3 (en la vida real se estima)
-
-
-def paso_alumno(theta, d, rng):
-    p = p_acierto(theta, d)
-    acierto = rng.random() < p
-    mejora = ganancia_esperada(theta, d) * rng.uniform(0.5, 1.5)
-    return acierto, mejora, min(theta + mejora, 4.0)
-
-
-def entrenar_tutor(recompensa, alumnos=300, preguntas=30, eps=0.1, alfa=0.1, seed=0):
-    """Bandit contextual (un MDP con γ = 0): Q[nivel, dificultad], ε-greedy, paso constante.
-    recompensa: "acierto", "mejora" o un número w (w × acierto + (1 − w) × mejora)."""
-    w = {"acierto": 1.0, "mejora": 0.0}.get(recompensa, recompensa)
-    rng = np.random.default_rng(seed)
-    Q = np.full((4, 3), 1.5)                       # optimista: prueba todo al principio
-    for _ in range(alumnos):
-        th = rng.uniform(0, 0.5)
-        for _ in range(preguntas):
-            c = contexto(th)
-            a = rng.integers(3) if rng.random() < eps else int(Q[c].argmax())
-            ac, me, th = paso_alumno(th, DIFICULTADES[a], rng)
-            r = w * float(ac) + (1 - w) * me / GANANCIA
-            Q[c, a] += alfa * (r - Q[c, a])
-    return Q
-
-
-def mapas_tutor(Qs):
-    fig, axs = plt.subplots(1, len(Qs), figsize=(6.2 * len(Qs), 3.6))
-    for ax, (nombre, Q) in zip(axs, Qs.items()):
-        pi = Q.argmax(1); sin_datos = np.all(Q == 1.5, axis=1)
-        ax.imshow((Q - Q.min(1, keepdims=True)) / (np.ptp(Q, 1, keepdims=True) + 1e-9), cmap="Blues", aspect="auto", vmin=0, vmax=1.3)
-        for c in range(4):
-            for a in range(3):
-                if sin_datos[c]:
-                    ax.text(a, c, "—", ha="center", va="center", color="#999"); continue
-                ax.text(a, c, f"{Q[c, a]:.2f}" + ("  ◀" if a == pi[c] else ""), ha="center", va="center",
-                        fontsize=10.5, weight="bold" if a == pi[c] else None)
-        ax.set_xticks(range(3)); ax.set_xticklabels([NOMBRE_DIF[d] for d in DIFICULTADES])
-        ax.set_yticks(range(4)); ax.set_yticklabels([f"nivel {c}" + ("\n(nunca llegó)" if sin_datos[c] else "") for c in range(4)])
-        ax.set_xlabel("dificultad de la próxima pregunta"); ax.grid(False)
-        ax.set_title(f"Tutor con {nombre}\nQ aprendida (◀ = lo que elige)")
-    plt.tight_layout(); plt.show()
-
-
-def simular_tutor(Q, alumnos=1000, preguntas=40, seed=1, al_azar=False):
-    rng = np.random.default_rng(seed)
-    TH = np.zeros((alumnos, preguntas + 1)); AC = np.zeros((alumnos, preguntas)); D = np.zeros((alumnos, preguntas), int)
-    for i in range(alumnos):
-        th = rng.uniform(0, 0.5); TH[i, 0] = th
-        for t in range(preguntas):
-            a = rng.integers(3) if al_azar else int(Q[contexto(th)].argmax())
-            ac, _, th = paso_alumno(th, DIFICULTADES[a], rng)
-            TH[i, t + 1], AC[i, t], D[i, t] = th, ac, a
-    return TH, AC, D
-
-
-def comparar_tutores(Qs):
-    res = {n: simular_tutor(Q) for n, Q in Qs.items()}
-    res["al azar (referencia)"] = simular_tutor(None, al_azar=True)
-    cols = {list(res)[0]: COLORES[1], list(res)[1]: COLORES[0], "al azar (referencia)": "#999"}
-    fig, axs = plt.subplots(1, 3, figsize=(17, 4.2))
-    for n, (TH, AC, D) in res.items():
-        axs[0].plot(TH.mean(0), color=cols[n], label=n)
-        axs[1].plot(100 * np.convolve(AC.mean(0), np.ones(5) / 5, mode="valid"), color=cols[n], label=n)
-    axs[0].set_title("Nivel medio del alumno"); axs[0].set_xlabel("pregunta n.º"); axs[0].set_ylabel("θ")
-    axs[1].set_title("% de aciertos (media móvil de 5)"); axs[1].set_xlabel("pregunta n.º")
-    for ax in axs[:2]:
-        ax.legend(frameon=False)
-    nombres = list(res); x = np.arange(len(nombres))
-    for k, d in enumerate(DIFICULTADES):
-        frac = [100 * (res[n][2] == k).mean() for n in nombres]
-        axs[2].bar(x, frac, bottom=[sum(100 * (res[n][2] == j).mean() for j in range(k)) for n in nombres],
-                   color=COLORES[k], width=0.55, label=NOMBRE_DIF[d])
-    axs[2].set_xticks(x); axs[2].set_xticklabels([n.replace(" (", "\n(") for n in nombres])
-    axs[2].set_title("Qué preguntas dio (% del total)")
-    axs[2].legend(frameon=False, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.0))
-    axs[2].grid(axis="x", visible=False); axs[2].set_ylim(0, 112)
-    plt.tight_layout(); plt.show()
-    for n, (TH, AC, D) in res.items():
-        print(f"{n:24s} aciertos: {100 * AC.mean():4.1f}%  ·  nivel final medio: {TH[:, -1].mean():.2f}  "
-              f"(empezaron en {TH[:, 0].mean():.2f})")
-    return res
-
-
-def sesion_ejemplo(Q, banco, preguntas=8, seed=7):
-    rng = np.random.default_rng(seed); th = 0.3
-    for t in range(preguntas):
-        c = contexto(th); a = int(Q[c].argmax()); d = DIFICULTADES[a]
-        cand = banco[banco.dificultad == d]
-        fila = cand.iloc[rng.integers(len(cand))]
-        ac, me, th2 = paso_alumno(th, d, rng)
-        print(f"{t + 1}. nivel {c} → pregunta {NOMBRE_DIF[d]:7s} [{fila.origen:13s}] {corto(fila.pregunta, 70)}")
-        print(f"   {'acierta' if ac else 'falla  '} · nivel {th:.2f} → {th2:.2f}")
-        th = th2
-
-
-# ================= 4. feed de la clase 9 + pausa =================
-NSAT, SAT_INICIAL, P_CAMBIO = 11, 5, 0.6
-CLICS = np.array([6.0, 3.0])                 # clics por sesión: [gancho, útil]
-TIPOS = ["gancho", "útil"]
-
-
-def p_volver(sat):
-    return 0.75 + 0.24 * np.asarray(sat) / (NSAT - 1)
-
-
-def value_iteration(P, R, gamma, tol=1e-10):
-    V = np.zeros(P.shape[0])
-    for _ in range(100000):
-        Q = R + gamma * P @ V
-        V_nuevo = Q.max(1)
+COL_SIN, COL_CON, COL_AC, COL_GRIS = COLORES[1], COLORES[0], COLORES[2], "#777777"
+DESP = [(-1, 0), (0, 1), (1, 0), (0, -1)]          # (fila, columna) de ↑ → ↓ ←
+
+
+# ---------- la respuesta correcta y el valor de una política (esto SÍ usa el mapa) ----------
+def iteracion_de_valor(env, gamma, tol=1e-12):
+    """Clase 4: V(s) <- max_a [R(s,a) + γ Σ P(s'|s,a) V(s')]."""
+    V = np.zeros(env.nS)
+    while True:
+        V_nuevo = (env.R + gamma * env.P @ V).max(axis=1)
         if np.max(np.abs(V_nuevo - V)) < tol:
-            break
+            return V_nuevo
         V = V_nuevo
-    return V_nuevo, Q.argmax(1), Q
 
 
-def feed_mdp(R_por_sat=None):
-    nS = NSAT + 1; FUERA = NSAT
-    P = np.zeros((nS, 2, nS)); R = np.zeros((nS, 2))
-    for s in range(NSAT):
-        for a in range(2):
-            R[s, a] = CLICS[a] if R_por_sat is None else R_por_sat(s, a)
-            paso = -1 if a == 0 else +1
-            for s2, p in [(int(np.clip(s + paso, 0, NSAT - 1)), P_CAMBIO), (s, 1 - P_CAMBIO)]:
-                P[s, a, s2] += p * p_volver(s2)
-                P[s, a, FUERA] += p * (1 - p_volver(s2))
-    P[FUERA, :, FUERA] = 1
-    return P, R
+def softmax(theta):
+    """π(a|s) = e^θ(s,a) / Σ_b e^θ(s,b), casilla por casilla (fila por fila)."""
+    theta = np.asarray(theta, dtype=float)
+    z = np.exp(theta - theta.max(axis=-1, keepdims=True))
+    return z / z.sum(axis=-1, keepdims=True)
 
 
-def simular_feed(pi, pausa=0.0, n=5000, dias=90, seed=0):
-    """pausa = prob. de que, después de la pausa, el usuario decida no abrir el feed ese día.
-    Ese día no hay clics y la satisfacción se recupera (sube un nivel con prob. P_CAMBIO, como con contenido útil)."""
-    rng = np.random.default_rng(seed)
-    s = np.full(n, SAT_INICIAL); activo = np.ones(n, bool)
-    activos, clics, sat = [], [], []
-    for _ in range(dias):
-        abre = activo & (rng.random(n) >= pausa)
-        a = pi[s]
-        c = np.where(abre, rng.poisson(CLICS[a]), 0)
-        activos.append(activo.mean()); clics.append(c.mean()); sat.append(s[activo].mean() if activo.mean() >= 0.02 else np.nan)
-        cambia = rng.random(n) < P_CAMBIO
-        mov_abre = np.where(cambia, np.where(a == 0, -1, 1), 0)
-        mov_no = (rng.random(n) < P_CAMBIO).astype(int)
-        s = np.clip(s + np.where(abre, mov_abre, mov_no), 0, NSAT - 1)
-        activo &= rng.random(n) < p_volver(s)
-    return np.array(activos), np.array(clics), np.array(sat)
+def valor_de(env, theta, gamma=0.99):
+    """V^π con el mapa (clases 3 y 4): V = (I − γ P^π)^(-1) R^π. Sin tope de pasos."""
+    pi = softmax(theta)
+    Ppi = np.einsum("sa,sat->st", pi, env.P); Rpi = (pi * env.R).sum(axis=1)
+    return np.linalg.solve(np.eye(env.nS) - gamma * Ppi, Rpi)
 
 
-def comparar_pausa(escenarios, dias=90):
-    fig, axs = plt.subplots(1, 3, figsize=(17, 4.2))
-    cols = [COLORES[1], COLORES[3], COLORES[4], COLORES[0]]
-    for k, (nombre, (pi, pausa)) in enumerate(escenarios.items()):
-        act, cl, sat = simular_feed(pi, pausa, dias=dias)
-        axs[0].plot(100 * act, color=cols[k], label=nombre)
-        axs[1].plot(sat, color=cols[k], label=nombre)
-        axs[2].plot(np.cumsum(cl), color=cols[k], label=nombre)
-        print(f"{nombre:36s} activos el día 30: {100 * act[30]:5.1f}% · satisfacción media el día 10: {sat[10]:4.1f} · "
-              f"clics en {dias} días: {cl.sum():5.1f}")
-    axs[0].set_title("% de usuarios que siguen volviendo"); axs[1].set_title("Satisfacción media (de los que siguen;\nse corta cuando quedan menos del 2%)")
-    axs[2].set_title("Clics acumulados por usuario")
-    for ax in axs:
-        ax.set_xlabel("día"); ax.legend(frameon=False, fontsize=9.5)
-    axs[1].set_ylim(0, 10)
-    plt.tight_layout(); plt.show()
+def gradiente_exacto(env, theta, gamma=0.99):
+    """Hacia dónde apunta, en promedio, el gradiente que estima REINFORCE desde S (calculado con el mapa):
+    Σ_s visitas(s) Σ_a π(a|s) [Q^π(s,a) − V^π(s)] (1[a] − π(·|s))."""
+    pi = softmax(theta)
+    Ppi = np.einsum("sa,sat->st", pi, env.P); Rpi = (pi * env.R).sum(axis=1)
+    V = np.linalg.solve(np.eye(env.nS) - gamma * Ppi, Rpi)
+    Q = env.R + gamma * env.P @ V
+    Pq = Ppi.copy(); Pq[env.goal] = 0
+    mu = np.zeros(env.nS); mu[env.start] = 1
+    visitas = np.linalg.solve(np.eye(env.nS) - Pq.T, mu); visitas[env.goal] = 0
+    return visitas[:, None] * pi * (Q - V[:, None]), V
 
 
-def politica_con_mi_recompensa(peso_clics, peso_satisfaccion, gammas=(0, 0.95)):
-    """Recompensa elegida por el usuario: peso_clics × clics (normalizados) + peso_satisfaccion × cambio esperado de satisfacción."""
-    def R(s, a):
-        paso = -1 if a == 0 else 1
-        d_sat = P_CAMBIO * (np.clip(s + paso, 0, NSAT - 1) - s)
-        return peso_clics * CLICS[a] / CLICS.max() + peso_satisfaccion * d_sat
-    P, Rm = feed_mdp(R)
-    g = np.array([value_iteration(P, Rm, gm)[1][:NSAT] for gm in gammas])
-    fig, ax = plt.subplots(figsize=(11, 0.55 * len(gammas) + 1.5))
-    ax.imshow(g, cmap=ListedColormap([COLORES[1], COLORES[0]]), vmin=0, vmax=1, aspect="auto")
-    for i in range(len(gammas)):
-        for j in range(NSAT):
-            ax.text(j, i, TIPOS[int(g[i, j])], ha="center", va="center", color="white", fontsize=9.5, weight="bold")
-    ax.set_yticks(range(len(gammas))); ax.set_yticklabels([f"γ = {gm:g}" for gm in gammas])
-    ax.set_xticks(range(NSAT)); ax.set_xlabel("satisfacción del usuario"); ax.grid(False)
-    ax.set_title(f"Mi recompensa = {peso_clics:g} × clics + {peso_satisfaccion:g} × satisfacción → qué me muestra el feed")
-    plt.tight_layout(); plt.show()
+def pasos_de(v, gamma=0.99):
+    """Si el único premio es el +1 al entrar, V = γ^(n−1): un camino de n pasos."""
+    return 1 + np.log(v) / np.log(gamma)
 
 
-# ================= dopamina = error de TD =================
-def td_dopamina(T=20, clave=5, premio=15, ensayos=200, alfa=0.2, gamma=1.0):
-    """TD(0) con un estado por instante desde la clave (luz). Antes de la clave V = 0 (no se sabe cuándo llega)."""
-    V = np.zeros(T + 1)
-    def delta(V, r_en):
-        d = np.zeros(T)
-        for t in range(T):
-            r = 1.0 if t + 1 == r_en else 0.0      # el premio llega al entrar al instante r_en
-            v_t = V[t] if t >= clave else 0.0
-            v_sig = V[t + 1] if t + 1 >= clave else 0.0
-            d[t] = r + gamma * v_sig - v_t
-        return d
-    deltas = {"antes de aprender (ensayo 1)": delta(V, premio)}
-    for _ in range(ensayos):
-        for t in range(clave, T):
-            r = 1.0 if t + 1 == premio else 0.0
-            V[t] += alfa * (r + gamma * V[t + 1] - V[t])
-    deltas["después de aprender"] = delta(V, premio)
-    deltas["aprendido, pero el premio no llega"] = delta(V, -1)
-    fig, axs = plt.subplots(1, 3, figsize=(16, 3.4), sharey=True)
-    for ax, (n, d), col in zip(axs, deltas.items(), [COLORES[6], COLORES[0], COLORES[7]]):
-        ax.bar(np.arange(1, T + 1), d, color=col, width=0.8)     # δ se dibuja en el instante al que se llega
-        ax.axvline(clave - 0.5, color="#999", ls=":"); ax.axvline(premio - 0.5, color="#999", ls=":")
-        ax.text(clave - 0.4, 1.05, "luz", color="#666"); ax.text(premio - 0.4, 1.05, "jugo", color="#666")
-        ax.set_title(n); ax.set_xlabel("tiempo (pasos)"); ax.axhline(0, color="#888", lw=1)
-        ax.set_xticks(range(0, T + 1, 5))
-    axs[0].set_ylabel("error de TD  δ"); axs[0].set_ylim(-1.2, 1.25)
-    plt.tight_layout(); plt.show()
-'''.lstrip("\n"), herramientas=True))
+# ---------- jugar: lo único que tiene el agente ----------
+def elegir(fila, rng):
+    """Sortea una acción con probabilidades softmax(fila)."""
+    m = max(fila); e = [math.exp(x - m) for x in fila]
+    u = rng.random() * sum(e); a, acum = 0, e[0]
+    while u > acum and a < 3:
+        a += 1; acum += e[a]
+    return a
+
+
+def jugar(env, theta, rng):
+    """Una partida desde S (como mucho env.max_steps pasos). Devuelve la lista de experiencias (s, a, r, s')."""
+    th = theta.tolist() if isinstance(theta, np.ndarray) else theta
+    s = env.reset(); partida = []
+    while True:
+        a = elegir(th[s], rng)
+        s2, r, fin, info = env.step(a)
+        partida.append((s, a, r, s2))
+        s = s2
+        if fin:
+            return partida
+
+
+def salio(partida, env):
+    return partida[-1][3] == env.goal
+
+
+def camino_de(partida):
+    return [partida[0][0]] + [x[3] for x in partida]
+
+
+def retornos(partida, gamma=0.99):
+    """G_t de cada paso, de atrás para adelante: G_t = r_t + γ G_{t+1}."""
+    G, out = 0.0, []
+    for s, a, r, s2 in reversed(partida):
+        G = r + gamma * G
+        out.append(G)
+    return out[::-1]
+
+
+def gradiente_partida(theta, partida, base=None, gamma=0.99):
+    """Lo que una partida le pide a θ: Σ_t (G_t − b(s_t)) (1[a_t] − π(·|s_t)). base=None: sin línea de base."""
+    pi = softmax(theta); g = np.zeros_like(pi)
+    S = np.array([x[0] for x in partida]); A = np.array([x[1] for x in partida])
+    peso = np.array(retornos(partida, gamma)) - (0.0 if base is None else np.asarray(base)[S])
+    empuje = -pi[S]; empuje[np.arange(len(S)), A] += 1          # ∇ log π(a|s) = 1[a] − π(·|s), un renglón por paso
+    np.add.at(g, S, peso[:, None] * empuje)
+    return g
+
+
+# ---------- aprender ----------
+def reinforce(env, alfa, n_partidas, semilla, lote=10, linea_base=False, alfa_v=0.1, gamma=0.99, fotos=()):
+    """REINFORCE: juega un lote de partidas con la política actual, suma lo que pide cada una y mueve θ:
+        θ <- θ + α · promedio del lote de Σ_t (G_t − b(s_t)) (1[a_t] − π(·|s_t))
+    linea_base=True: b(s) = retorno promedio desde s (se actualiza con b(s) += α_v (G − b(s)) después de cada lote).
+    Devuelve θ, b, V^π(S) después de cada lote (con el mapa, para medir), pasos y salida de cada partida, y fotos de θ."""
+    rng = random.Random(semilla)
+    theta = np.zeros((env.nS, env.nA)); b = np.zeros(env.nS)
+    VS, pasos, exito, snap = [], [], [], {0: theta.copy()} if 0 in fotos else {}
+    for k in range(n_partidas // lote):
+        partidas = [jugar(env, theta, rng) for _ in range(lote)]
+        g = sum(gradiente_partida(theta, p, b if linea_base else None, gamma) for p in partidas) / lote
+        theta = theta + alfa * g
+        for p in partidas:
+            pasos.append(len(p)); exito.append(salio(p, env))
+            for (s, a, r, s2), G in zip(p, retornos(p, gamma)):
+                b[s] += alfa_v * (G - b[s])
+        VS.append(valor_de(env, theta, gamma)[env.start])
+        if (k + 1) * lote in fotos:
+            snap[(k + 1) * lote] = theta.copy()
+    return {"theta": theta, "b": b, "VS": np.array(VS), "pasos": np.array(pasos), "exito": np.array(exito), "fotos": snap}
+
+
+def actor_critico(env, alfa, alfa_v, n_partidas, semilla, gamma=0.99, cada=10):
+    """Actor-crítico de un paso. Después de CADA paso (s, a, r, s'):
+        δ = r + γ V(s') − V(s)        (el error de la clase 5; V(salida) = 0)
+        crítico: V(s) += α_v δ        (TD(0), clase 5)
+        actor:   θ(s,·) += α δ (1[a] − π(·|s))
+    Devuelve θ, V del crítico, V^π(S) cada 'cada' partidas (con el mapa, para medir), pasos y salida de cada partida."""
+    rng = random.Random(semilla)
+    th = [[0.0] * env.nA for _ in range(env.nS)]; V = [0.0] * env.nS
+    VS, pasos, exito = [], [], []
+    for k in range(n_partidas):
+        s = env.reset()
+        while True:
+            fila = th[s]; a = elegir(fila, rng)
+            s2, r, fin, info = env.step(a)
+            delta = r + (0.0 if s2 == env.goal else gamma * V[s2]) - V[s]
+            V[s] += alfa_v * delta
+            m = max(fila); e = [math.exp(x - m) for x in fila]; z = sum(e)
+            for c in range(env.nA):
+                fila[c] += alfa * delta * ((c == a) - e[c] / z)
+            s = s2
+            if fin:
+                break
+        pasos.append(env.t); exito.append(info["reached_goal"])
+        if (k + 1) % cada == 0:
+            VS.append(valor_de(env, np.array(th), gamma)[env.start])
+    return {"theta": np.array(th), "V": np.array(V), "VS": np.array(VS), "pasos": np.array(pasos), "exito": np.array(exito)}
+
+
+def imitar(env, partidas, peso, gamma=0.99):
+    """Imitación por conteo (clase 10): π(a|s) = (peso de las veces que se hizo a en s) / (peso de las veces que se estuvo en s).
+    peso="todas": cada paso pesa 1 (clonar todo); "exitosas": pesa 1 si la partida salió, 0 si no;
+    "G": cada paso pesa su retorno G_t (lo que pide REINFORCE). Casillas sin datos: las 4 flechas iguales."""
+    C = np.zeros((env.nS, env.nA))
+    for p in partidas:
+        S = [x[0] for x in p]; A = [x[1] for x in p]
+        if peso == "todas":
+            w = np.ones(len(p))
+        elif peso == "exitosas":
+            w = np.full(len(p), float(salio(p, env)))
+        else:
+            w = np.array(retornos(p, gamma))
+        np.add.at(C, (S, A), w)
+    n = C.sum(axis=1, keepdims=True)
+    pi = np.where(n > 0, C / np.maximum(n, 1e-300), 0.25)
+    return np.log(np.maximum(pi, 1e-12))                # θ = log π: softmax(θ) devuelve π
+
+
+def ppo_actualizar(theta_vieja, base, lote, lr, pasadas, eps=None, gamma=0.99):
+    """Una actualización 'grande': muchas pasadas de gradiente sobre el MISMO lote, con la ventaja A = G_t − b(s_t).
+    Cada pasada sube Σ razón·A, con razón = π_nueva(a|s) / π_vieja(a|s).
+    eps=None: sin recorte. Con eps: una muestra deja de empujar cuando su razón salió de [1 − ε, 1 + ε]
+    hacia el lado que le conviene (es lo que hace el mínimo con la razón recortada de PPO).
+    Devuelve θ nueva y la razón final de cada muestra."""
+    S, A, ADV = [], [], []
+    for p in lote:
+        for (s, a, r, s2), G in zip(p, retornos(p, gamma)):
+            S.append(s); A.append(a); ADV.append(G - base[s])
+    S, A, ADV = np.array(S), np.array(A), np.array(ADV)
+    pi_vieja = softmax(theta_vieja)[S, A]
+    theta = theta_vieja.copy(); n = len(S)
+    for _ in range(pasadas):
+        pi = softmax(theta); razon = pi[S, A] / pi_vieja
+        activa = np.ones(n, bool) if eps is None else ~(((ADV > 0) & (razon > 1 + eps)) | ((ADV < 0) & (razon < 1 - eps)))
+        w = np.where(activa, razon * ADV, 0.0) / len(lote)
+        empuje = -pi[S]; empuje[np.arange(n), A] += 1
+        g = np.zeros_like(theta); np.add.at(g, S, w[:, None] * empuje)
+        theta = theta + lr * g
+    return theta, softmax(theta)[S, A] / pi_vieja
+
+
+def primera_vez(VS, umbral, cada=10):
+    """Partidas jugadas hasta que V^π(S) llegó al umbral por primera vez (None si nunca)."""
+    i = np.flatnonzero(np.asarray(VS) >= umbral)
+    return int((i[0] + 1) * cada) if i.size else None
+
+
+# ---------- dibujos ----------
+def plot_cave(env, values=None, path=None, ax=None, title=None, cmap="magma", clim=None, mark=None):
+    """env.plot + escala de color elegible (calculada sin la salida) y círculos opcionales."""
+    ax = env.plot(values=values, path=path, ax=ax, title=title, cmap=cmap)
+    if values is not None:
+        if clim is None:
+            v = np.asarray(values, dtype=float)[np.arange(env.nS) != env.goal]
+            clim = (v.min(), v.max()) if v.max() - v.min() > 1e-12 else (v.max() - 1, v.max())
+        ax.images[-1].set_clim(*clim)
+    for t in ax.texts:
+        t.set_path_effects([pe.withStroke(linewidth=2.5, foreground="black")])
+    if mark is not None:
+        for m in np.atleast_1d(mark):
+            r, c = env.free[int(m)]
+            ax.plot(c, r, "o", mfc="none", mec="#00e5ff", mew=2.5, ms=15)
+    return ax
+
+
+def plot_flechas(env, theta, ax, values=None, title=None, clim=(0, 0.83), casillas=None, color="#00e5ff"):
+    """Las flechas de la cueva como probabilidades: en cada casilla, cuatro flechas con grosor y largo según π(a|s)."""
+    pi = softmax(theta)
+    plot_cave(env, values=values, ax=ax, title=title, clim=clim if values is not None else None)
+    ax.texts[-1].set_text("")                                  # sacamos la S para que se vean las flechas
+    for s, (r, c) in enumerate(env.free):
+        if s == env.goal or (casillas is not None and s not in casillas):
+            continue
+        for a, (dr, dc) in enumerate(DESP):
+            p = pi[s, a]
+            if p < 0.04:
+                continue
+            L = 0.14 + 0.34 * p
+            ax.arrow(c, r, dc * L, dr * L, width=0.02 + 0.16 * p, head_width=0.08 + 0.26 * p, head_length=0.06 + 0.12 * p,
+                     length_includes_head=True, color=color, alpha=0.95, lw=0)
+    sr, sc = env.free[env.start]
+    ax.plot(sc, sr, "s", mfc="none", mec="w", mew=1.5, ms=17)
+    return ax
+
+
+def banda(ax, x, y, color, label, ls="-"):
+    """Promedio sobre semillas y banda de ± 1 desvío."""
+    m, sd = y.mean(0), y.std(0)
+    ax.plot(x, m, color=color, label=label, ls=ls)
+    ax.fill_between(x, m - sd, m + sd, color=color, alpha=0.15, lw=0)
+''', herramientas=True))
 
 cells.append(md(r"""
-Cargamos el generador (la primera vez se descarga, ≈ 1 GB).
+La respuesta correcta, como en la clase 4: $V^*$ por iteración de valor, con el mapa. Y, para tener una vara de abajo, cuánto vale tirar el dado (las cuatro flechas iguales).
 """))
 cells.append(code(r"""
-gen, GENERADOR_USADO = cargar_generador(MODELO_GENERADOR)
+V_estrella = iteracion_de_valor(env, GAMMA)
+V_dado = valor_de(env, np.zeros((env.nS, env.nA)), GAMMA)
+print(f"V*(S)            = {V_estrella[env.start]:.4f}   (un camino de {pasos_de(V_estrella[env.start]):.0f} pasos)")
+print(f"V(S) con el dado = {V_dado[env.start]:.4f}")
 """))
 
-# ---------------------------------------------------------------- 1
+# ======================================================================= 1
 cells.append(md(r"""
-## 1. Dos agentes, un problema
+## 1. Preferencias y softmax
 
-En la clase 8 vimos un **bandit de marketing** (qué anuncio mostrar) y un **tutor** como MDP (qué ejercicio dar). En la clase 9, un feed que optimiza clics. Pongamos los dos agentes de esta clase uno al lado del otro.
+En la clase 2 la política era una tabla de probabilidades $\pi(a \mid s)$. Para poder **moverla** de a poco, no guardamos las probabilidades directamente: guardamos **cuatro preferencias** por casilla, $\theta(s, a)$, una por flecha, que pueden ser cualquier número. La función **softmax** las vuelve probabilidades:
+
+$$\pi(a \mid s) = \frac{e^{\theta(s,a)}}{\sum_b e^{\theta(s,b)}}$$
+
+Más preferencia, más probabilidad; todas positivas y suman 1. Con todas las preferencias iguales, las cuatro flechas valen 1/4: el dado.
+
+### Paso 1 — Las probabilidades de una casilla, con $\theta$ dados
+
+Tomamos la casilla S y le damos preferencias a mano: $\theta(S, \cdot) = (\uparrow -1,\ \rightarrow 1,\ \downarrow 0{,}5,\ \leftarrow -1)$. Hacemos la cuenta paso a paso.
+""", objetivos=["O1"]))
+cells.append(code(r"""
+theta_S = np.array([-1.0, 1.0, 0.5, -1.0])
+e = np.exp(theta_S)
+pi_S = e / e.sum()
+print("θ(S, ·)      = " + "   ".join(f"{ACTION_NAMES[a]} {theta_S[a]:+.2f}" for a in range(4)))
+print("e^θ          = " + "   ".join(f"{ACTION_NAMES[a]} {e[a]:.4f}" for a in range(4)) + f"     suma = {e.sum():.4f}")
+print("π(·|S)       = " + "   ".join(f"{ACTION_NAMES[a]} {pi_S[a]:.4f}" for a in range(4)) + f"     suma = {pi_S.sum():.4f}")
+print(f"\nla misma cuenta con la herramienta: {np.round(softmax(theta_S), 4)}")
+print(f"si sumamos 5 a las cuatro preferencias, no cambia nada: {np.round(softmax(theta_S + 5), 4)}")
+"""))
+cells.append(md(r"""
+La derecha, con la preferencia más alta, se lleva un poco más de la mitad; las dos paredes, con $-1$, se reparten menos del 10 %. Lo que importa son las **diferencias** entre preferencias, no su valor absoluto.
+
+### Paso 2 — Por qué se puede optimizar directamente
+
+Si multiplicamos las preferencias por un número cada vez más grande, la política pasa suavemente del dado a casi siempre lo mismo. Ninguna probabilidad salta: cada pequeño cambio en $\theta$ da un pequeño cambio en $\pi$. Eso es lo que permite **subir la cuesta** con gradientes, como al entrenar una red: no hace falta pasar por $Q$ ni por un máximo que salta de una flecha a otra (*policy-based*, basado en la política).
 """))
 cells.append(code(r"""
-dibujar_dos_agentes()
+escalas = np.linspace(0, 4, 81)
+P_esc = np.array([softmax(k * theta_S) for k in escalas])
+fig, ax = plt.subplots(figsize=(9, 3.8))
+for a in range(4):
+    ax.plot(escalas, P_esc[:, a], color=COLORES[a], label=f"π({ACTION_NAMES[a]} | S)")
+ax.set_xlabel("k (preferencias multiplicadas por k)"); ax.set_ylabel("probabilidad")
+ax.set_title("softmax(k · θ): del dado (k = 0) a casi determinista, sin saltos"); ax.legend(frameon=False, ncol=4)
+plt.tight_layout(); plt.show()
+for k in [0, 1, 2, 4]:
+    print(f"k = {k}:  " + "   ".join(f"{ACTION_NAMES[a]} {softmax(k * theta_S)[a]:.3f}" for a in range(4)))
 """))
 cells.append(md(r"""
-| | Agente de difusión | Agente tutor |
-|---|---|---|
-| **Estado** | qué se publicó, cómo respondió la audiencia | nivel (estimado) del alumno |
-| **Acción** | qué post publicar | qué pregunta hacer |
-| **Recompensa** | guardados, compartidos | acierto… o **mejora** |
-| **Entorno** | una persona y su atención | una persona y su atención |
+### Paso 3 — La cueva entera con flechas que son probabilidades
 
-Los dos **manipulan la atención**: eligen qué poner delante de alguien para que haga algo. No hay un agente "bueno" y uno "malo" por la forma: la diferencia está en **qué recompensa optimizan** y en **quién puede verla y cambiarla**. Las tres secciones que siguen son esa frase en código.
-"""))
-
-# ---------------------------------------------------------------- 2
-cells.append(md(r"""
-## 2. La fábrica de contenido
-
-Villanueva (2026, trabajo final de la CEIA, LSE-FIUBA: *Sistema multiagente para la generación automatizada de contenido en redes sociales usando inteligencia artificial*) arma un pipeline de agentes: **detector-curador → generador-evaluador → publicador-analítico**, con un **estado compartido** y un **humano en el bucle** opcional. Lo adaptamos a un curso con un cambio clave: la fuente no son tendencias (RSS, Reddit) sino la **bibliografía del curso**.
+Este va a ser el dibujo de toda la clase: en cada casilla, cuatro flechas, **más gruesas y más largas cuanto más probables**. A la izquierda, $\theta = 0$ en todas las casillas (el dado: cuatro flechas iguales en todas partes, incluso contra las paredes). A la derecha, la política con las preferencias de recién en S y $\theta = 0$ en el resto.
 """))
 cells.append(code(r"""
-dibujar_pipeline()
+theta_0 = np.zeros((env.nS, env.nA))
+theta_1 = theta_0.copy(); theta_1[env.start] = theta_S
+fig, axs = plt.subplots(1, 2, figsize=(15, 5.4))
+plot_flechas(env, theta_0, axs[0], title="θ = 0: el dado en todas las casillas")
+plot_flechas(env, theta_1, axs[1], title="θ(S) = (−1, 1, 0.5, −1): S prefiere la derecha")
+plt.tight_layout(); plt.show()
+print(f"V(S) de la izquierda = {valor_de(env, theta_0)[env.start]:.4f}   V(S) de la derecha = {valor_de(env, theta_1)[env.start]:.4f}")
 """))
 cells.append(md(r"""
-Cada agente es un **modelo de lenguaje con una instrucción distinta** (un *prompt*). No se entrenan acá: el "aprendizaje" de este pipeline está en la flecha de arriba (las métricas que vuelven al curador), que en la sección 3 reemplazamos por un bandit.
+Cambiar una sola casilla ya mueve un poco el valor de S, pero muy poco: el dado sigue mandando en las otras 58. Aprender es encontrar las 60 × 4 = 240 preferencias que hacen que las flechas gruesas lleven a la salida. La pregunta es **para dónde mover cada una**.
+"""))
 
-### Paso 1 — La bibliografía como fuente
+# ======================================================================= 2
+cells.append(md(r"""
+## 2. REINFORCE: subir la probabilidad de lo que salió bien
 
-Cinco fragmentos **cortos, escritos para este curso**, que resumen ideas de las clases. No son citas textuales: cada uno indica de qué sección viene la idea. Cada fragmento tiene un **nivel** (1 = básico, 3 = avanzado) que después usa el tutor. Pueden agregar los suyos.
+La idea de REINFORCE (Williams, 1992) entra en una línea: después de una partida, **empujar $\theta$ para que las acciones que se tomaron sean más probables, en proporción al retorno $G$** que vino después. Para cada paso $(s_t, a_t)$ de la partida:
+
+$$\theta(s_t, \cdot) \leftarrow \theta(s_t, \cdot) + \alpha\, G_t\, \nabla \log \pi(a_t \mid s_t)$$
+
+Con softmax, la dirección de empuje es muy simple: $\nabla \log \pi(a \mid s) = \mathbf{1}[a] - \pi(\cdot \mid s)$. Sube la preferencia de la acción tomada (en $1 - \pi(a \mid s)$) y baja la de las otras (en su propia probabilidad). Si la partida no llegó a la salida, $G = 0$ y no se mueve nada.
+
+### Paso 1 — Una partida que salió
+
+Jugamos con el dado desde S hasta encontrar una partida que llegue a la salida en menos de 200 pasos.
+""", objetivos=["O2"]))
+cells.append(code(r"""
+rng = random.Random(4)
+intentos = 0
+while True:
+    intentos += 1
+    partida = jugar(env, theta_0, rng)
+    if salio(partida, env):
+        break
+Gs = retornos(partida)
+fig, ax = plt.subplots(figsize=(7.5, 5))
+plot_cave(env, path=camino_de(partida), ax=ax, title=f"La primera partida que salió: {len(partida)} pasos")
+plt.tight_layout(); plt.show()
+print(f"intentos hasta la primera que salió: {intentos}   pasos: {len(partida)}   G desde S = 0.99^{len(partida) - 1} = {Gs[0]:.4f}")
+print(f"veces que pasó por S en esta partida: {sum(1 for x in partida if x[0] == env.start)}")
+"""))
+cells.append(md(r"""
+### Paso 2 — Una actualización a mano
+
+Tomamos solo el **primer paso** de esa partida: en S, con $\theta(S, \cdot) = 0$ (el dado), el agente eligió una acción $a$, y lo que cobró desde ahí hasta el final fue $G_0$. Con $\alpha = 1$:
+
+1. $\pi(\cdot \mid S)$ con $\theta = 0$.
+2. La dirección de empuje: $\mathbf{1}[a] - \pi(\cdot \mid S)$.
+3. El paso: $\alpha\, G_0\, (\mathbf{1}[a] - \pi)$.
+4. Las preferencias nuevas y sus probabilidades.
 """))
 cells.append(code(r"""
-FUENTES = [
-    {"id": "F1", "tema": "recompensa", "nivel": 1,
-     "origen": "Sutton y Barto, 2.ª ed., sec. 3.2 · CS234 clase 1 · clase 2",
-     "texto": "La recompensa es la única forma de decirle al agente qué queremos, no cómo lograrlo. Si premiamos "
-              "algo que solo se parece a lo que queremos, el agente lo explota: un tutor premiado por aciertos aprende "
-              "a dar solo preguntas fáciles. A eso se le llama reward hacking."},
-    {"id": "F2", "tema": "exploración", "nivel": 1,
-     "origen": "Sutton y Barto, 2.ª ed., sec. 2.2–2.3 · clase 5",
-     "texto": "Un agente que siempre elige la acción que hoy parece mejor puede quedarse para siempre con una opción "
-              "mediocre. La estrategia ε-greedy elige la mejor acción casi siempre, pero con probabilidad ε elige una "
-              "al azar: así sigue probando opciones que todavía no conoce bien."},
-    {"id": "F3", "tema": "Bellman", "nivel": 2,
-     "origen": "Sutton y Barto, 2.ª ed., sec. 3.5 · CS234 clase 2 · clase 3",
-     "texto": "El valor de un estado es la recompensa que se recibe ahora más el valor descontado del estado al que se "
-              "llega. Esa relación, la ecuación de Bellman, permite calcular los valores de a poco: se aplica una y otra "
-              "vez hasta que los números dejan de cambiar."},
-    {"id": "F4", "tema": "error de TD", "nivel": 2,
-     "origen": "Sutton y Barto, 2.ª ed., sec. 6.1 y cap. 15 · clase 4",
-     "texto": "El aprendizaje por diferencias temporales no espera al final del episodio: después de cada paso compara "
-              "lo que esperaba con lo que recibió más lo que espera ahora. Esa diferencia es el error de TD, y el valor "
-              "se corrige un poco en esa dirección."},
-    {"id": "F5", "tema": "importance sampling", "nivel": 3,
-     "origen": "Sutton y Barto, 2.ª ed., sec. 5.5 · clase 9",
-     "texto": "Para evaluar una política nueva con partidas jugadas por otra, cada partida se repesa por el cociente "
-              "entre la probabilidad de sus acciones bajo la política nueva y bajo la vieja. Es un estimador sin sesgo, "
-              "pero si las políticas son muy distintas o las partidas muy largas, los pesos se vuelven extremos y la "
-              "varianza explota."},
-]
-pd.set_option("display.max_colwidth", 90)
-pd.DataFrame(FUENTES)[["id", "tema", "nivel", "origen"]]
+ALFA_MANO = 1.0
+s0, a0, r0, s1 = partida[0]
+th_viejo = theta_0[s0].copy()
+pi_viejo = softmax(th_viejo)
+empuje = -pi_viejo.copy(); empuje[a0] += 1
+paso = ALFA_MANO * Gs[0] * empuje
+th_nuevo = th_viejo + paso
+pi_nuevo = softmax(th_nuevo)
+fmt = lambda v, f="{:+.4f}": "   ".join(f"{ACTION_NAMES[a]} " + f.format(v[a]) for a in range(4))
+print(f"casilla S = {env.free[s0]},  acción tomada a = {ACTION_NAMES[a0]},  G_0 = {Gs[0]:.4f},  α = {ALFA_MANO}")
+print(f"   1. π(·|S) con θ = 0       : {fmt(pi_viejo, '{:.4f}')}")
+print(f"   2. 1[a] − π               : {fmt(empuje)}")
+print(f"   3. α · G · (1[a] − π)     : {fmt(paso)}")
+print(f"   4. θ(S, ·) nuevo          : {fmt(th_nuevo)}")
+print(f"      π(·|S) nuevo           : {fmt(pi_nuevo, '{:.4f}')}")
+print(f"\nπ({ACTION_NAMES[a0]} | S): {pi_viejo[a0]:.4f} -> {pi_nuevo[a0]:.4f}")
 """))
 cells.append(md(r"""
-### Paso 2 — El curador extrae ideas enseñables (salida JSON)
+La acción que se tomó pasó de 0,25 a un poco más; las otras tres bajaron lo mismo entre las tres. El empuje es chico porque $G_0$ es chico: la partida tardó mucho, y el $+1$ llegó muy descontado. Una partida más corta habría empujado más.
 
-Le pedimos al generador que devuelva **solo JSON** con dos ideas. Los modelos chicos a veces agregan texto, olvidan una comilla o devuelven una lista con viñetas. Por eso:
+### Paso 3 — Toda la partida, y después muchas
 
-1. un **parser tolerante** intenta leer la respuesta (JSON válido → JSON reparado → rescate con expresiones regulares);
-2. si igual no hay ideas válidas, **reintenta** con un pedido más estricto (hasta 3 veces).
-
-Todo queda anotado en el **estado compartido**: un `dict` por fragmento que cada agente va llenando. Mostramos la traza completa del primero.
+REINFORCE hace esa misma cuenta en **cada paso** de la partida (todas las visitas a cada casilla) y suma. A la izquierda, las flechas antes; en el medio, después de esta única partida (con $\alpha = 1$): se engrosan a lo largo del camino que salió. A la derecha, después de 300 partidas de REINFORCE, en lotes de 10 partidas por actualización y $\alpha = 3$; el color es el valor verdadero de cada casilla con esa política.
 """))
 cells.append(code(r"""
-t = time.time()
-ESTADOS = [{"id": f["id"], "fuente": f} for f in FUENTES]
-for estado in ESTADOS:
-    curar(estado, gen)
-print(f"Curador: {len(ESTADOS)} fragmentos en {time.time() - t:.0f} s\n")
-traza(ESTADOS[0])
+theta_una = theta_0 + ALFA_MANO * gradiente_partida(theta_0, partida)
+rf_corto = reinforce(env, alfa=3.0, n_partidas=300, semilla=0, fotos=(300,))
+casillas_camino = set(camino_de(partida))
+
+fig, axs = plt.subplots(1, 3, figsize=(21, 5.4))
+plot_flechas(env, theta_0, axs[0], casillas=casillas_camino, title="Antes: θ = 0 (camino de la partida)")
+plot_flechas(env, theta_una, axs[1], casillas=casillas_camino, title="Después de 1 partida que salió")
+plot_flechas(env, rf_corto["theta"], axs[2], values=valor_de(env, rf_corto["theta"]),
+             title="Después de 300 partidas (color: V de esa política)")
+plt.tight_layout(); plt.show()
+
+pi_una = softmax(theta_una)
+print(f"π(·|S) después de 1 partida: {fmt(pi_una[env.start], '{:.4f}')}")
+print(f"mayor probabilidad en una casilla del camino después de 1 partida: {pi_una[list(casillas_camino)].max():.4f}")
+print(f"V(S): dado = {V_dado[env.start]:.4f}   tras 1 partida = {valor_de(env, theta_una)[env.start]:.4f}   "
+      f"tras 300 partidas = {rf_corto['VS'][-1]:.4f}   V* = {V_estrella[env.start]:.4f}")
+print(f"partidas que salieron: primeras 50 = {rf_corto['exito'][:50].mean():.0%}   últimas 50 = {rf_corto['exito'][-50:].mean():.0%}")
 """))
 cells.append(md(r"""
-`curador #1` muestra la respuesta **cruda** del modelo y cómo la leyó el parser. Resumen de los cinco:
+Una sola partida mueve poco, pero en la dirección del camino que funcionó: las flechas del camino se engrosan y $V(S)$ pasa de 0,014 a casi 0,1. Con 300 partidas el agente ya sale en todas las partidas (al principio salía en el 2 %), pero todavía da rodeos: $V(S) \approx 0{,}43$ equivale a un camino de unos 85 pasos, contra los 20 del más corto. Afinar lleva más partidas (sección 4). Nadie le dijo al agente cuánto vale cada casilla: solo hizo más probable lo que venía antes de cobrar.
+"""))
+
+# ======================================================================= 3
+cells.append(md(r"""
+## 3. REINFORCE como imitación ponderada
+
+En la clase 10 imitábamos: mirar qué hizo alguien en cada casilla y copiar esas frecuencias (clonar el comportamiento, *behavior cloning*). REINFORCE se parece mucho: también hace más probable lo que se hizo. La diferencia es **cuánto pesa cada paso**:
+
+- Si $G$ fuera 1 siempre, REINFORCE sería clonar todo lo que se jugó.
+- Con $G$ de verdad, una partida que no salió pesa 0, y una que salió rápido pesa más que una que salió tarde.
+
+Para verlo sin esperar a que REINFORCE dé muchos pasitos, saltamos directo a adonde apuntan: jugamos 2000 partidas con el dado desde S y **contamos** qué hizo en cada casilla, con tres pesos distintos. (REINFORCE da pasitos en la dirección de la tercera.)
+
+1. **Clonar todas** las partidas: cada paso pesa 1.
+2. **Clonar las exitosas**: pesa 1 si la partida salió, 0 si no.
+3. **Pesar por $G$**: cada paso pesa su retorno $G_t$.
+""", objetivos=["O2"]))
+cells.append(code(r"""
+rng = random.Random(10)
+partidas_dado = [jugar(env, theta_0, rng) for _ in range(2000)]
+ok = np.array([salio(p, env) for p in partidas_dado])
+largos_ok = np.array([len(p) for p in partidas_dado])[ok]
+theta_im = {peso: imitar(env, partidas_dado, peso) for peso in ["todas", "exitosas", "G"]}
+V_im = {peso: valor_de(env, th) for peso, th in theta_im.items()}
+NOMBRE_IM = {"todas": "clonar todas", "exitosas": "clonar las exitosas", "G": "pesar por G"}
+
+print(f"partidas del dado que salieron: {ok.sum()} de 2000 ({ok.mean():.1%});  pasos de las que salieron: "
+      f"mediana {np.median(largos_ok):.0f}, mín. {largos_ok.min()}, máx. {largos_ok.max()}")
+print(f"\n{'política':22s} {'V(S)':>8s} {'V medio (59 casillas)':>22s}")
+ng = np.arange(env.nS) != env.goal
+print(f"{'el dado (los datos)':22s} {V_dado[env.start]:>8.4f} {V_dado[ng].mean():>22.4f}")
+for peso in theta_im:
+    print(f"{NOMBRE_IM[peso]:22s} {V_im[peso][env.start]:>8.4f} {V_im[peso][ng].mean():>22.4f}")
+print(f"{'V* (la mejor)':22s} {V_estrella[env.start]:>8.4f} {V_estrella[ng].mean():>22.4f}")
+"""))
+cells.append(md(r"""
+Clonar todo devuelve el dado: copiamos a un jugador que tira el dado y sale un jugador que tira el dado. Quedarse solo con las exitosas ya mejora mucho, y pesar por $G$ mejora un poco más, porque dentro de las exitosas favorece lo que llevó a salir antes. Las dos últimas son mucho mejores que el jugador del que aprendieron: **imitar ponderando permite superar al que se imita**.
+
+Veamos las flechas de las dos últimas, con el valor de cada casilla de fondo.
 """))
 cells.append(code(r"""
-for e in ESTADOS:
-    lecturas = " → ".join(it["lectura"] for it in e["intentos_curador"])
-    print(f"{e['id']} {e['fuente']['tema']:20s} intentos: {len(e['intentos_curador'])} ({lecturas}) · ideas: {len(e['ideas'])}")
-    for i in e["ideas"]:
-        print(f"      · {corto(i, 120)}")
+fig, axs = plt.subplots(1, 3, figsize=(21, 5.4))
+for ax, peso in zip(axs, ["todas", "exitosas", "G"]):
+    plot_flechas(env, theta_im[peso], ax, values=V_im[peso], title=f"{NOMBRE_IM[peso]}: V(S) = {V_im[peso][env.start]:.3f}")
+plt.tight_layout(); plt.show()
 """))
 cells.append(md(r"""
-Miren las ideas con ojo crítico:
-
-- un modelo de este tamaño muchas veces **copia una oración del fragmento** en vez de reformularla. Para un curador eso no es grave (copiar es fiel a la fuente);
-- lo grave es que **invente**. La validación descarta las ideas cuyas palabras casi no aparecen en el fragmento (lo indica la traza: "descartada(s) por no apoyarse en el fragmento"). Pero compara **palabras, no significado**: en nuestra corrida (CPU, generador Qwen2.5-0.5B) dejó pasar "reward hacking es un método para mejorar el rendimiento del agente", que usa las palabras del fragmento y dice lo contrario. Validar el formato es fácil; validar el contenido, no.
-
-### Paso 3 — El generador escribe post + pregunta + respuesta + ficha
-
-Para cada fragmento, el generador toma la **primera** idea y escribe las cuatro piezas, cada una con su etiqueta. Si falta alguna, reintenta una vez.
+Con un solo lote de datos del dado no se llega lejos: en muchas casillas las flechas siguen casi parejas, porque las partidas exitosas del dado también daban vueltas por todos lados. Lo que hace REINFORCE es **repetir**: imita ponderado, juega con la política nueva (que sale más seguido y más rápido), vuelve a imitar ponderado. Lo probamos con tres rondas de 2000 partidas, pesando por $G$.
 """))
 cells.append(code(r"""
-t = time.time()
-for estado in ESTADOS:
-    generar(estado, gen)
-print(f"Generador: {len(ESTADOS)} borradores en {time.time() - t:.0f} s\n")
-for e in ESTADOS:
-    traza(e, completa=False)
+rng = random.Random(11)
+theta_r = theta_0.copy()
+print(f"ronda 0 (el dado): V(S) = {valor_de(env, theta_r)[env.start]:.4f}")
+for ronda in range(1, 4):
+    datos = [jugar(env, theta_r, rng) for _ in range(2000)]
+    exito_r = np.mean([salio(p, env) for p in datos])
+    theta_r = imitar(env, datos, "G")
+    print(f"ronda {ronda}: con los datos de la ronda anterior (salieron {exito_r:.0%}) -> V(S) = {valor_de(env, theta_r)[env.start]:.4f}")
+print(f"V*(S) = {V_estrella[env.start]:.4f}")
 """))
 cells.append(md(r"""
-Gracias al **ejemplo resuelto** que va como turno previo de la conversación (sobre otro tema: el factor de descuento), el modelo respeta las cuatro etiquetas. Sin ese ejemplo, en nuestras pruebas escribía cualquier cosa ("¡Claro! Aquí tienes…").
+Cada ronda imita a un jugador mejor que el de la ronda anterior, porque el jugador es él mismo, ya mejorado. Esa es la diferencia con la clase 10: allá los datos eran de otro y quedaban fijos; acá el agente **genera sus propios datos** y los pesa por cómo salieron.
+"""))
 
-Lean los borradores antes de seguir. ¿Alguno dice algo que **no** está en la fuente? ¿La pregunta se puede contestar con la respuesta que dio? Anoten su propio puntaje mental: en el paso siguiente lo comparamos con el del evaluador. (En nuestra corrida: varios posts copian la fuente casi palabra por palabra, y el de error de TD afirma algo que el fragmento no dice.)
+# ======================================================================= 4
+cells.append(md(r"""
+## 4. La línea de base: mucho menos ruido
 
-### Paso 4 — El evaluador es otro modelo
+Cuando la política ya sale casi siempre, todas las partidas traen $G > 0$ y REINFORCE empuja **para arriba todo lo que hizo**, incluidos los rodeos. Lo que distingue una partida buena de una mala es solo cuánto más alto fue su $G$, y esa diferencia queda tapada por el empuje común. La solución es restar una **línea de base** (*baseline*) $b(s)$, el retorno que se espera desde esa casilla:
 
-Antes de cargar el evaluador liberamos el generador si hay poca memoria (los borradores ya quedaron en el estado).
+$$\theta(s_t, \cdot) \leftarrow \theta(s_t, \cdot) + \alpha\, \big(G_t - b(s_t)\big)\, \nabla \log \pi(a_t \mid s_t)$$
 
-**Cómo puntúa.** La rúbrica tiene 5 criterios (fidelidad a la fuente, claridad, enganche, formato, utilidad para aprender). Si a un modelo chico le pedimos "respondé en JSON con un puntaje por criterio", suele **copiar los números del ejemplo** (todo 7) o poner 9 a todo. Entonces le hacemos **una pregunta por criterio** ("puntuá de 1 a 9, respondé solo con el número") y, en vez de dejarlo escribir, leemos **la probabilidad que le asigna a cada número**: el puntaje es el valor esperado, reescalado a 1–10. Con eso armamos nosotros el JSON del evaluador, que siempre es válido.
+Ahora sube lo que salió **mejor que lo esperado** y baja lo que salió peor. En promedio no cambia hacia dónde apunta el gradiente, porque $\sum_a \pi(a \mid s)\, (\mathbf{1}[a] - \pi) = 0$: restar lo mismo a todas las acciones de una casilla no empuja hacia ninguna.
 
-**Control.** Para saber si el evaluador sirve, le damos también un post **malo a propósito** (dice algo falso y es puro *clickbait*). Si lo puntúa igual que a los demás, el evaluador no está midiendo nada.
+### Paso 1 — Cuánto tiembla el gradiente
+
+Tomamos una política a medio aprender (REINFORCE sin línea de base, 100 partidas) y le pedimos su gradiente a 3000 partidas sueltas, sin aprender: cada partida da un gradiente distinto. Lo calculamos **sin** línea de base y **con** $b(s) = V^\pi(s)$, el retorno promedio verdadero desde cada casilla (lo calculamos con el mapa, solo para medir bien). Y comparamos con el gradiente verdadero (también con el mapa).
+""", objetivos=["O3"]))
+cells.append(code(r"""
+theta_medio = reinforce(env, alfa=3.0, n_partidas=100, semilla=0)["theta"]
+g_true, V_medio = gradiente_exacto(env, theta_medio)
+rng = random.Random(20)
+N_GRAD = 3000
+g_sin, g_con = [], []
+for _ in range(N_GRAD):
+    p = jugar(env, theta_medio, rng)
+    g_sin.append(gradiente_partida(theta_medio, p)); g_con.append(gradiente_partida(theta_medio, p, base=V_medio))
+g_sin, g_con = np.array(g_sin), np.array(g_con)
+
+def varianza(gs):
+    return float(((gs - gs.mean(0)) ** 2).sum(axis=(1, 2)).mean())
+
+def coseno(x, y):
+    return float((x * y).sum() / (np.linalg.norm(x) * np.linalg.norm(y) + 1e-300))
+
+var_sin, var_con = varianza(g_sin), varianza(g_con)
+print(f"política a medio aprender: V(S) = {V_medio[env.start]:.4f}")
+print(f"varianza del gradiente de UNA partida:  sin línea de base = {var_sin:.2f}   con = {var_con:.2f}   "
+      f"({var_sin / var_con:.0f} veces menos)")
+for nombre, gs in [("sin", g_sin), ("con", g_con)]:
+    lotes10 = np.mean([coseno(gs[i:i + 10].mean(0), g_true) for i in range(0, N_GRAD, 10)])
+    print(f"   {nombre}: coseno con el gradiente verdadero  promedio de {N_GRAD} = {coseno(gs.mean(0), g_true):.3f}   "
+          f"un lote de 10 (promedio) = {lotes10:.3f}")
+"""))
+cells.append(md(r"""
+El coseno mide si dos flechas en el espacio de las 240 preferencias apuntan para el mismo lado (1 = igual, 0 = perpendiculares). Veámoslo a medida que se juntan partidas: el coseno entre el promedio de las primeras $n$ partidas y el gradiente verdadero.
 """))
 cells.append(code(r"""
-if DEVICE == "cpu" and _ram_gb() < 11:
-    liberar(gen); gen = None
-    print("(poca memoria: generador liberado)")
-evaluador = cargar_evaluador(MODELO_EVALUADOR, GENERADOR_USADO)
-
-t = time.time()
-for estado in ESTADOS:
-    evaluar(estado, evaluador)
-CONTROL = ("POST: 🔥🔥 ¡¡No te pierdas este curso increíble!! Link en la bio 🔥🔥 El valor de un estado es la cantidad "
-           "de pasos que faltan para ganar.\nPREGUNTA: ¿Te gustó?\nRESPUESTA: Sí.\nFICHA: compartí.")
-control, _ = puntuar(evaluador, FUENTES[2]["texto"], CONTROL)
-print(f"Evaluador: {len(ESTADOS)} borradores + 1 control en {time.time() - t:.0f} s\n")
-traza(ESTADOS[0])
-grafico_rubrica(ESTADOS, control)
+ns = np.unique(np.round(np.logspace(0, np.log10(N_GRAD), 40)).astype(int))
+cs_sin = [coseno(g_sin[:n].mean(0), g_true) for n in ns]
+cs_con = [coseno(g_con[:n].mean(0), g_true) for n in ns]
+fig, axs = plt.subplots(1, 2, figsize=(14, 4.2))
+norm_sin = np.sqrt(((g_sin - g_sin.mean(0)) ** 2).sum(axis=(1, 2)))
+norm_con = np.sqrt(((g_con - g_con.mean(0)) ** 2).sum(axis=(1, 2)))
+axs[0].hist(norm_sin, bins=40, color=COL_SIN, alpha=0.7, label="sin línea de base")
+axs[0].hist(norm_con, bins=40, color=COL_CON, alpha=0.7, label="con línea de base")
+axs[0].set_xlabel("distancia de cada gradiente a su promedio"); axs[0].set_ylabel("partidas")
+axs[0].set_title("El temblor de una partida suelta"); axs[0].legend(frameon=False)
+axs[1].plot(ns, cs_sin, color=COL_SIN, label="sin línea de base"); axs[1].plot(ns, cs_con, color=COL_CON, label="con línea de base")
+axs[1].axhline(1, color=COL_GRIS, ls=":", lw=1); axs[1].set_xscale("log")
+axs[1].set_xlabel("partidas promediadas (escala log)"); axs[1].set_ylabel("coseno con el gradiente verdadero")
+axs[1].set_title("Los dos apuntan al mismo lado; uno llega mucho antes"); axs[1].legend(frameon=False)
+plt.tight_layout(); plt.show()
+for n in [10, 100, 1000, N_GRAD]:
+    i = int(np.argmin(np.abs(ns - n)))
+    print(f"promediando {ns[i]:5d} partidas:  coseno sin = {cs_sin[i]:.3f}   con = {cs_con[i]:.3f}")
 """))
 cells.append(md(r"""
-Cómo leer el gráfico:
+Las dos versiones apuntan, en promedio, al mismo lado: las dos curvas suben hacia 1. Pero con línea de base el temblor de cada partida es varias veces más chico, y con unas 100 partidas apunta casi tan bien como sin línea de base con unas 1000.
 
-- La **fila gris de abajo** es el control. Si el evaluador funciona, tiene que quedar **claramente por debajo** de los borradores. En nuestra corrida quedó en 4.7 de promedio, contra 5.8 a 7.9 de los borradores: el evaluador **sí detecta lo groseramente malo**. Con evaluadores de menos de 1000 millones de parámetros, en nuestras pruebas, no lo detectaba.
-- Entre borradores parecidos es **grueso**, y se equivoca para los dos lados. En nuestra corrida marcó bajo el umbral el post de *recompensa* (fidelidad 4.6), que copia la fuente casi textual (lo flojo es la pregunta), y le puso 7.7 de fidelidad al de *error de TD*, que dice algo que la fuente no dice. Comparen con su puntaje mental del paso 3.
-- Por eso el umbral 6 **advierte, no bloquea**, y la decisión final es de una persona.
+### Paso 2 — ¿Y el aprendizaje?
 
-### ✍️ Ejercicio
-
-Cambien el evaluador por uno chico (`"HuggingFaceTB/SmolLM2-360M-Instruct"`) y vuelvan a puntuar el mejor borrador y el control. ¿Los distingue? (Tarda unos segundos más en descargar.)
+Ahora aprendemos de verdad, con la línea de base que puede tener el agente: el **retorno promedio desde cada casilla**, aprendido con lo que juega ($b(s) \mathrel{+}= 0{,}1\,(G - b(s))$, como el Monte Carlo con $\alpha$ fijo de la clase 5). REINFORCE en lotes de 10 partidas, 1000 partidas, 8 semillas, con $\alpha = 3$ y con $\alpha = 10$. Decimos que **aprendió** cuando el valor verdadero de su política en S llega a 0,75 (más del 90 % de $V^*$).
 """))
 cells.append(code(r"""
-# TODO: cambiar EVALUADOR_EJ por "HuggingFaceTB/SmolLM2-360M-Instruct" y ejecutar
-EVALUADOR_EJ = MODELO_EVALUADOR
-ev_ej = evaluador if EVALUADOR_EJ == MODELO_EVALUADOR else cargar_evaluador(EVALUADOR_EJ, GENERADOR_USADO)
-mejor = max([e for e in ESTADOS if e.get("puntajes")], key=lambda e: e["promedio"])
-p_mejor, _ = puntuar(ev_ej, mejor["fuente"]["texto"], texto_borrador(mejor["borrador"]))
-p_ctrl, _ = puntuar(ev_ej, FUENTES[2]["texto"], CONTROL)
-print(f"{EVALUADOR_EJ}\n  mejor borrador ({mejor['id']}): promedio {np.mean(list(p_mejor.values())):.1f}  {p_mejor}"
-      f"\n  control malo:           promedio {np.mean(list(p_ctrl.values())):.1f}  {p_ctrl}")
+SEMILLAS = range(8)
+N_PART = 1000
+UMBRAL = 0.75
+curvas = {}
+for alfa in [3.0, 10.0]:
+    for lb in [False, True]:
+        curvas[(alfa, lb)] = [reinforce(env, alfa, N_PART, sem, linea_base=lb) for sem in SEMILLAS]
+
+x = np.arange(1, N_PART // 10 + 1) * 10
+fig, axs = plt.subplots(1, 2, figsize=(15, 4.4), sharey=True)
+for ax, alfa in zip(axs, [3.0, 10.0]):
+    for lb, col, nom in [(False, COL_SIN, "sin línea de base"), (True, COL_CON, "con línea de base")]:
+        banda(ax, x, np.array([c["VS"] for c in curvas[(alfa, lb)]]), col, nom)
+    ax.axhline(V_estrella[env.start], color=COL_GRIS, ls=":", lw=1.5, label="V*(S)")
+    ax.set_title(f"REINFORCE, α = {alfa:g} (8 semillas)"); ax.set_xlabel("partidas jugadas")
+axs[0].set_ylabel("V(S) de la política (con el mapa)"); axs[0].legend(frameon=False, loc="lower right")
+plt.tight_layout(); plt.show()
+
+print(f"{'':28s} {'aprendió (V(S) ≥ 0,75) en':>27s} {'V(S) a las 200':>15s} {'V(S) final':>18s}")
+for (alfa, lb), cs in curvas.items():
+    pv = [primera_vez(c["VS"], UMBRAL) for c in cs]
+    nunca = sum(v is None for v in pv); pv_ok = [v for v in pv if v is not None]
+    txt = (f"mediana {np.median(pv_ok):.0f} partidas" if pv_ok else "—") + (f", {nunca} nunca" if nunca else "")
+    v200 = np.array([c["VS"][19] for c in cs]); vf = np.array([c["VS"][-1] for c in cs])
+    print(f"α = {alfa:<4g} {'con' if lb else 'sin'} línea de base     {txt:>27s} {v200.mean():>8.3f} ± {v200.std():.3f} "
+          f"{vf.mean():>10.4f} ± {vf.std():.4f}")
+print("α = 10 sin línea de base, V(S) final de cada semilla:", [round(float(c["VS"][-1]), 3) for c in curvas[(10.0, False)]])
+print(f"V*(S) = {V_estrella[env.start]:.4f}")
 """))
 cells.append(md(r"""
-### Paso 5 — Selección, advertencia y decisión humana
+Con $\alpha = 3$ las dos versiones terminan cerca y llegan a 0,75 en una cantidad de partidas parecida, pero la de línea de base sube más parejo: a las 200 partidas va más arriba y las semillas se parecen mucho más entre sí (la banda es más angosta), mientras que la otra tiembla de lote a lote. Con $\alpha = 10$ la diferencia es de otro orden: sin línea de base, el empuje de todas las partidas es tan grande que la política se vuelve casi determinista antes de tiempo, y casi todas las semillas terminan trabadas lejos de la salida (algunas llegaron a 0,75 y después se derrumbaron); con línea de base, el mismo $\alpha$ aprende rápido y bien en las 8. Menos temblor significa que se puede **dar pasos más grandes** sin romper nada.
 
-El sistema **sugiere**: publicar esta semana los `CUPO` borradores con mejor promedio que superen el umbral, y dejar el resto como borrador. Lo que esté bajo el umbral lleva una **advertencia**, pero una persona puede aprobarlo igual (o rechazar algo que el evaluador aprobó): para eso está `DECISION_HUMANA`.
+> Ojo con una sutileza de esta cueva: como el único premio es el $+1$ de la salida, una partida que no sale da $G = 0$ y sin línea de base no empuja nada. Por eso, con $\alpha = 3$, la versión sin línea de base también llega a 0,75 (mediana 430 partidas, contra 485 con línea de base): en esta cueva la ventaja de la línea de base no es aprender con pasos chicos, sino poder dar pasos grandes como $\alpha = 10$ sin romper nada.
+"""))
 
-✍️ En nuestra corrida el sistema sugiere publicar el post de *error de TD* (que tiene un error) y deja afuera el de *Bellman* (correcto) solo por el cupo. Prueben `DECISION_HUMANA = {"F4": "rechazar", "F3": "publicar"}` (o lo que ustedes decidan después de leer los borradores) y vuelvan a ejecutar esta celda y la siguiente.
+# ======================================================================= 5
+cells.append(md(r"""
+## 5. Actor-crítico: un mapa de $V$ que juzga
+
+REINFORCE tiene que esperar al final de la partida para saber $G$. En la clase 5 vimos cómo no esperar: TD(0) corrige $V$ en cada paso con el error
+
+$$\delta = r + \gamma V(s') - V(s)$$
+
+El **actor-crítico** usa dos tablas. El **crítico** aprende $V$ con TD(0), exactamente como en la clase 5. El **actor** son las preferencias $\theta$, y en vez de $G - b(s)$ usa $\delta$ como **ventaja** (*advantage*): «este paso salió mejor (o peor) de lo que el crítico esperaba».
+
+$$\text{crítico: } V(s) \mathrel{+}= \alpha_V\, \delta \qquad\quad \text{actor: } \theta(s, \cdot) \mathrel{+}= \alpha\, \delta\, \big(\mathbf{1}[a] - \pi(\cdot \mid s)\big)$$
+
+### Paso 1 — Actor-crítico contra REINFORCE
+
+Las mismas 8 semillas y 1000 partidas desde S. Actor-crítico con $\alpha = 10$ y $\alpha_V = 0{,}5$, actualizando en cada paso; REINFORCE en lotes de 10 partidas con $\alpha = 10$ y línea de base, y sin línea de base con $\alpha = 3$ (el mejor de los dos que probamos para él).
+""", objetivos=["O3"]))
+cells.append(code(r"""
+ALFA_AC, ALFA_V = 10.0, 0.5
+corr_ac = [actor_critico(env, ALFA_AC, ALFA_V, N_PART, sem) for sem in SEMILLAS]
+metodos = [("REINFORCE sin línea de base (α = 3)", curvas[(3.0, False)], COL_SIN),
+           ("REINFORCE con línea de base (α = 10)", curvas[(10.0, True)], COL_CON),
+           (f"actor-crítico (α = {ALFA_AC:g}, α_V = {ALFA_V})", corr_ac, COL_AC)]
+
+fig, ax = plt.subplots(figsize=(10, 4.4))
+for nom, cs, col in metodos:
+    banda(ax, x, np.array([c["VS"] for c in cs]), col, nom)
+ax.axhline(V_estrella[env.start], color=COL_GRIS, ls=":", lw=1.5, label="V*(S)")
+ax.set_xlabel("partidas jugadas"); ax.set_ylabel("V(S) de la política (con el mapa)")
+ax.set_title("Tres formas de mover las flechas (8 semillas)"); ax.legend(frameon=False, loc="lower right")
+plt.tight_layout(); plt.show()
+
+print(f"{'método':42s} {'aprendió en (mediana, mín–máx)':>32s} {'V(S) final':>18s} {'pasos (últimas 100)':>20s}")
+for nom, cs, col in metodos:
+    pv = [primera_vez(c["VS"], UMBRAL) for c in cs]; pv_ok = [v for v in pv if v is not None]
+    nunca = sum(v is None for v in pv)
+    txt = f"{np.median(pv_ok):.0f} ({min(pv_ok)}–{max(pv_ok)})" + (f", {nunca} nunca" if nunca else "")
+    vf = np.array([c["VS"][-1] for c in cs]); pas = np.mean([c["pasos"][-100:].mean() for c in cs])
+    print(f"{nom:42s} {txt:>32s} {vf.mean():>10.4f} ± {vf.std():.4f} {pas:>20.1f}")
+print(f"{'V*(S)':42s} {'':>32s} {V_estrella[env.start]:>10.4f}  (camino más corto: {pasos_de(V_estrella[env.start]):.0f} pasos)")
+"""))
+cells.append(md(r"""
+El actor-crítico empieza más lento: al principio el crítico no sabe nada ($V = 0$ en todas partes), así que $\delta$ es 0 salvo en el último paso antes de la salida, y el valor tiene que viajar hacia atrás de a una casilla, como en TD de la clase 5. Cuando el crítico ya sabe algo, el actor aprende en cada paso y termina con la política más cerca de $V^*$ de las tres.
+
+### Paso 2 — El crítico y el actor al final
+
+A la izquierda, el mapa de $V$ que aprendió el crítico (semilla 0); en el medio, el valor verdadero de la política del actor, con sus flechas; a la derecha, $V^*$.
 """))
 cells.append(code(r"""
-CUPO = 3
-DECISION_HUMANA = {}      # por ejemplo {"F2": "publicar", "F3": "rechazar"}; vacío = aceptar la sugerencia
+ac0 = corr_ac[0]
+V_actor = valor_de(env, ac0["theta"])
+fig, axs = plt.subplots(1, 3, figsize=(21, 5.4))
+plot_cave(env, values=ac0["V"], ax=axs[0], clim=(0, 1), title="El crítico: V aprendido por TD")
+plot_flechas(env, ac0["theta"], axs[1], values=V_actor, clim=(0, 1), title="El actor: sus flechas y su V verdadero")
+plot_cave(env, values=V_estrella, ax=axs[2], clim=(0, 1), title="V* (clase 4)")
+plt.tight_layout(); plt.show()
 
-orden = sorted([e for e in ESTADOS if e.get("puntajes")], key=lambda e: -e["promedio"])
-sugeridos = [e["id"] for e in orden if e["promedio"] >= UMBRAL][:CUPO]
-for e in ESTADOS:
-    sugerencia = "publicar" if e["id"] in sugeridos else "borrador"
-    final = DECISION_HUMANA.get(e["id"], sugerencia)
-    e["decision"] = f"sistema sugiere '{sugerencia}' → humano: '{final}'" + \
-                    (" (cambió la sugerencia)" if final != sugerencia else "")
-    e["_final"] = final
-    print(f"{e['id']} · promedio {e.get('promedio', '—')} · {e['decision']}  {e.get('advertencia', '')}")
+ng = np.arange(env.nS) != env.goal
+pi_ac = softmax(ac0["theta"])
+print(f"V(S): crítico = {ac0['V'][env.start]:.4f}   verdadero del actor = {V_actor[env.start]:.4f}   V* = {V_estrella[env.start]:.4f}")
+print(f"π(·|S) del actor: {fmt(pi_ac[env.start], '{:.3f}')}")
+print(f"casillas donde el crítico está a menos de 0,05 del valor verdadero del actor: "
+      f"{np.mean(np.abs(ac0['V'] - V_actor)[ng] < 0.05):.0%}")
 """))
 cells.append(md(r"""
-### Paso 6 — Publicación simulada y registro
+El crítico acierta sobre el camino que usa el actor y se equivoca lejos de él, como el mapa de visitas de la clase 6: solo sabe de donde pasa. Al actor no le importa, porque por esas casillas casi no pasa.
+"""))
 
-No publicamos nada de verdad (*dry run*). El publicador anota cada pieza en un **registro**: esa tabla es lo que, en un sistema real, se cruzaría con las métricas (guardados, compartidos) para cerrar el bucle de la flecha de arriba del diagrama. Las métricas de abajo son **inventadas** (las sortea un simulador simple), solo para mostrar la forma del registro.
+# ======================================================================= 6
+cells.append(md(r"""
+## 6. PPO: no alejarse demasiado de la política anterior
+
+Jugar partidas cuesta. Sería tentador jugar un lote y **reutilizarlo muchas veces**: dar muchas pasadas de gradiente sobre las mismas partidas, en vez de un pasito. El problema es que, después de unas pasadas, la política ya no es la que jugó esas partidas, y seguir empujando con esos datos puede llevarla muy lejos, adonde nadie miró.
+
+PPO (*Proximal Policy Optimization*, Schulman et al., 2017) mira, para cada paso del lote, la **razón** entre la probabilidad nueva y la vieja de la acción que se tomó:
+
+$$\text{razón} = \frac{\pi_{\text{nueva}}(a \mid s)}{\pi_{\text{vieja}}(a \mid s)}$$
+
+y la **recorta** en $[1 - \varepsilon,\ 1 + \varepsilon]$ (con $\varepsilon = 0{,}2$ es entre 0,8 y 1,2): cuando una acción buena ya se volvió 20 % más probable que antes, ese paso deja de empujar; lo mismo cuando una acción mala ya bajó 20 %. No vamos a derivarlo, solo a verlo funcionar.
+
+### Paso 1 — La figura del recorte
+
+Lo que PPO sube para un paso del lote es $\min(\text{razón} \cdot A,\ \text{recorte}(\text{razón}) \cdot A)$, con $A$ la ventaja. Para una acción con ventaja positiva, subir la razón paga hasta $1 + \varepsilon$ y después ya no paga más; con ventaja negativa, bajarla paga hasta $1 - \varepsilon$.
+""", objetivos=["O4"]))
+cells.append(code(r"""
+EPS = 0.2
+r_ = np.linspace(0, 2, 401)
+fig, axs = plt.subplots(1, 2, figsize=(13, 3.8), sharey=False)
+for ax, A, tit in [(axs[0], 1.0, "ventaja A > 0 (salió mejor que lo esperado)"), (axs[1], -1.0, "ventaja A < 0 (salió peor)")]:
+    ax.axvspan(1 - EPS, 1 + EPS, color=COL_AC, alpha=0.12, lw=0)
+    ax.plot(r_, r_ * A, color=COL_GRIS, ls="--", label="sin recorte: razón · A")
+    ax.plot(r_, np.minimum(r_ * A, np.clip(r_, 1 - EPS, 1 + EPS) * A), color=COL_CON, label="PPO: con recorte")
+    ax.axvline(1, color=COL_GRIS, lw=0.8, ls=":")
+    ax.set_xlabel("razón π_nueva / π_vieja"); ax.set_title(tit)
+axs[0].set_ylabel("lo que se sube (por paso del lote)"); axs[0].legend(frameon=False, loc="upper left")
+plt.tight_layout(); plt.show()
+print(f"ε = {EPS}: la banda verde es la razón entre {1 - EPS:.1f} y {1 + EPS:.1f}")
+"""))
+cells.append(md(r"""
+### Paso 2 — Un paso grande, sin recorte y con recorte
+
+Tomamos una política a medio aprender (REINFORCE con línea de base, 100 partidas) con su línea de base $b(s)$. Jugamos **un lote de 10 partidas** y le damos **50 pasadas** de gradiente con un paso de 1, con la ventaja $A = G_t - b(s_t)$. Una vez sin recorte y una vez con $\varepsilon = 0{,}2$. Repetimos con 20 lotes distintos y medimos el valor verdadero de S antes y después. Como control, también damos **una sola pasada** con un paso de 10.
 """))
 cells.append(code(r"""
-rng_pub = np.random.default_rng(SEMILLA)
-registro = []
-for k, e in enumerate(ESTADOS):
-    publicado = e["_final"] == "publicar"
-    e["publicacion"] = f"publicado (simulado) el día {k + 1}" if publicado else "no publicado"
-    registro.append({"id": e["id"], "tema": e["fuente"]["tema"], "estado": e["publicacion"],
-                     "promedio": e.get("promedio"), "advertencia": e.get("advertencia") or "—",
-                     "post": corto((e.get("borrador") or {}).get("post", ""), 60),
-                     "guardados (simulado)": int(rng_pub.poisson(8)) if publicado else None,
-                     "compartidos (simulado)": int(rng_pub.poisson(3)) if publicado else None})
-traza(ESTADOS[0], completa=False)
-pd.DataFrame(registro)
+base_ppo = reinforce(env, alfa=3.0, n_partidas=100, semilla=0, linea_base=True)
+theta_v, b_v = base_ppo["theta"], base_ppo["b"]
+V_antes = valor_de(env, theta_v)[env.start]
+res_ppo = {}
+for nombre, lr, pasadas, eps in [("sin recorte, 50 pasadas", 1.0, 50, None), ("con recorte, 50 pasadas", 1.0, 50, EPS),
+                                 ("una pasada, paso 10 (sin recorte)", 10.0, 1, None), ("una pasada, paso 10 (con recorte)", 10.0, 1, EPS)]:
+    fila = []
+    for k in range(20):
+        rng = random.Random(100 + k)
+        lote = [jugar(env, theta_v, rng) for _ in range(10)]
+        th_n, razon = ppo_actualizar(theta_v, b_v, lote, lr, pasadas, eps)
+        fila.append((valor_de(env, th_n)[env.start], np.mean((razon >= 1 - EPS - 1e-9) & (razon <= 1 + EPS + 1e-9)), razon))
+    res_ppo[nombre] = fila
+
+print(f"política de partida: V(S) = {V_antes:.4f}")
+print(f"{'actualización':36s} {'V(S) después: media [mín, máx]':>32s} {'mejoró':>8s} {'razones en [0,8; 1,2]':>22s}")
+for nombre, fila in res_ppo.items():
+    v = np.array([f[0] for f in fila]); banda_ = np.mean([f[1] for f in fila])
+    print(f"{nombre:36s} {v.mean():>12.4f} [{v.min():.4f}, {v.max():.4f}] {np.sum(v > V_antes):>5d}/20 {banda_:>21.0%}")
 """))
 cells.append(md(r"""
-El estado del primer fragmento quedó **completo**: fuente → ideas → borrador → puntajes → decisión → publicación. Cada agente leyó lo que dejó el anterior y agregó lo suyo; eso es todo lo que hace falta para coordinar un sistema multiagente simple.
+Sin recorte, 50 pasadas sobre el mismo lote **arruinan** la política: con 10 partidas de datos, el gradiente se cree demasiado lo que vio, empuja algunas acciones hasta probabilidad casi 1 y otras casi 0, y el valor de S se desploma. Con recorte, las mismas 50 pasadas mejoran la política casi siempre: cada paso del lote deja de empujar cuando su acción ya cambió lo suficiente. Con una sola pasada, el recorte no hace nada (en la primera pasada la razón es exactamente 1): **el recorte importa cuando se reutiliza un lote**, que es justamente lo que PPO quiere poder hacer.
 
-> **Lo que este pipeline no es.** Ningún agente acá aprende: son modelos fijos con instrucciones. Se vuelve RL cuando el registro de métricas decide **qué publicar después**, con un bandit como el de la clase 8. Y ahí aparece la pregunta de esta clase: ¿la recompensa son los compartidos o que alguien aprenda?
-"""))
-
-# ---------------------------------------------------------------- 3
-cells.append(md(r"""
-## 3. El tutor como agente
-
-### Paso 1 — El banco de preguntas
-
-Juntamos las preguntas que generó la fábrica **que el evaluador no marcó en fidelidad** (fidelidad ≥ 6, con signo de pregunta y con respuesta) y completamos con preguntas **escritas a mano**, marcadas como tales, hasta tener al menos 3 por nivel de dificultad. La dificultad de una pregunta generada es el nivel de su fragmento.
+Para ver dónde quedaron las razones, el histograma de un lote (en escala log). El recorte no es un candado: algunas razones se salen igual de la banda, porque en esta cueva varios pasos comparten la misma casilla y lo que empuja uno mueve también a los otros. Pero la mitad queda dentro de la banda y la mediana, cerca de 1; sin recorte, casi ninguna.
 """))
 cells.append(code(r"""
-A_MANO = [  # (dificultad, pregunta, respuesta)
-    (1, "¿Qué recibe el agente después de cada acción, además de la nueva observación?", "Una recompensa."),
-    (1, "En ε-greedy con ε = 0.1, ¿qué fracción de las veces se elige una acción al azar?", "El 10%."),
-    (1, "¿Por qué un tutor premiado por aciertos termina dando solo preguntas fáciles?", "Porque así maximiza la recompensa sin que el alumno aprenda (reward hacking)."),
-    (2, "Si γ = 0.9, la recompensa es 1 y el estado siguiente vale 5, ¿cuánto vale el estado?", "1 + 0.9 × 5 = 5.5."),
-    (2, "¿Qué compara el error de TD?", "Lo esperado con la recompensa recibida más el valor del estado siguiente."),
-    (2, "¿Por qué value iteration se repite hasta que los valores dejan de cambiar?", "Porque cada pasada aplica Bellman y los valores convergen al punto fijo."),
-    (3, "¿Por qué la varianza de importance sampling crece con el largo de la partida?", "Porque el peso es un producto de un cociente por paso."),
-    (3, "¿Qué gana WIS frente a IS y qué pierde?", "Gana estabilidad (menos varianza) y pierde el no tener sesgo."),
-    (3, "¿Qué es el cambio de distribución en RL offline?", "Que la política aprendida va a estados o acciones que no aparecen en los datos."),
-]
-filas = []
-for e in ESTADOS:
-    b = e.get("borrador") or {}
-    fiel = (e.get("puntajes") or {}).get("fidelidad", 0) >= UMBRAL
-    if fiel and "?" in b.get("pregunta", "") and len(b.get("pregunta", "")) >= 15 and b.get("respuesta"):
-        filas.append({"dificultad": e["fuente"]["nivel"], "pregunta": b["pregunta"], "respuesta": b["respuesta"],
-                      "origen": "generada", "fuente": e["id"]})
-n_gen = len(filas)
-for d, p, r in A_MANO:                       # completar hasta 3 por nivel con preguntas escritas a mano
-    if sum(f["dificultad"] == d for f in filas) < 3:
-        filas.append({"dificultad": d, "pregunta": p, "respuesta": r, "origen": "escrita a mano", "fuente": "—"})
-banco = pd.DataFrame(filas).sort_values(["dificultad", "origen"]).reset_index(drop=True)
-print(f"Preguntas generadas que pasaron el filtro: {n_gen} de {len(ESTADOS)} · banco total: {len(banco)} "
-      f"({(banco.origen == 'escrita a mano').sum()} escritas a mano)")
-print(banco.groupby(["dificultad", "origen"]).size().unstack(fill_value=0))
-banco[["dificultad", "origen", "fuente", "pregunta", "respuesta"]]
+bins = np.logspace(-4, 2, 61)
+fig, ax = plt.subplots(figsize=(10, 4))
+ax.axvspan(1 - EPS, 1 + EPS, color=COL_AC, alpha=0.15, lw=0, label="[1 − ε, 1 + ε]")
+ax.hist(res_ppo["sin recorte, 50 pasadas"][0][2], bins=bins, color=COL_SIN, alpha=0.7, label="sin recorte")
+ax.hist(res_ppo["con recorte, 50 pasadas"][0][2], bins=bins, color=COL_CON, alpha=0.7, label="con recorte")
+ax.set_xscale("log"); ax.set_xlabel("razón π_nueva / π_vieja de cada paso del lote (escala log)"); ax.set_ylabel("pasos")
+ax.set_title("Un lote, 50 pasadas: dónde quedaron las razones"); ax.legend(frameon=False)
+plt.tight_layout(); plt.show()
+for nombre in ["sin recorte, 50 pasadas", "con recorte, 50 pasadas"]:
+    rz = res_ppo[nombre][0][2]
+    print(f"{nombre}: razón mediana = {np.median(rz):.3f}   mín. = {rz.min():.4f}   máx. = {rz.max():.2f}   V(S) = {res_ppo[nombre][0][0]:.4f}")
 """))
 cells.append(md(r"""
-### Paso 2 — Un alumno simulado
+Esta idea, no alejarse demasiado de la política que generó los datos, es la que se usa para ajustar modelos de lenguaje con RL: lo vamos a ver en las clases 12 y 13.
+"""))
 
-El tutor no ve el **nivel** del alumno (θ). Lo que pasa cuando le da una pregunta de cierta dificultad:
+# ======================================================================= Ejercicio
+cells.append(md(r"""
+## ✍️ Ejercicio — Cambien $\alpha$, la línea de base y el recorte
 
-- la probabilidad de **acertar** baja con la dificultad (izquierda);
-- lo que **aprende** es máximo cuando la pregunta no es ni muy fácil ni muy difícil (derecha): con una pregunta que seguro acierta, no aprende casi nada.
+La primera celda corre REINFORCE en lotes de 10 partidas con 4 semillas; la segunda da el paso grande de PPO sobre 20 lotes. Cambien los valores y ejecuten.
 
-Los números son **inventados**; la forma (aprender más en el borde de lo que uno sabe) es una idea clásica de la educación.
+Antes de ejecutar, **predigan**: con $\alpha = 30$, ¿quién aguanta, con o sin línea de base? Si suben $\varepsilon$ a 1, ¿el paso grande se parece más al de con recorte o al de sin recorte? ¿Y con $\varepsilon = 0{,}05$?
+""", objetivos=["O3", "O4"]))
+cells.append(code(r"""
+alfa_ej = 10.0           # TODO: probá 1, 3, 30
+linea_base_ej = True     # TODO: probá False
+
+cs_ej = [reinforce(env, alfa_ej, 600, sem, linea_base=linea_base_ej) for sem in range(4)]
+xe = np.arange(1, 61) * 10
+fig, ax = plt.subplots(figsize=(9, 3.8))
+banda(ax, xe, np.array([c["VS"] for c in cs_ej]), COL_CON if linea_base_ej else COL_SIN,
+      f"α = {alfa_ej:g}, {'con' if linea_base_ej else 'sin'} línea de base")
+ax.axhline(V_estrella[env.start], color=COL_GRIS, ls=":", lw=1.5, label="V*(S)")
+ax.set_xlabel("partidas jugadas"); ax.set_ylabel("V(S)"); ax.legend(frameon=False, loc="lower right")
+plt.tight_layout(); plt.show()
+print("V(S) final de cada semilla:", [round(float(c["VS"][-1]), 4) for c in cs_ej], f"  V* = {V_estrella[env.start]:.4f}")
+print("aprendió (V(S) ≥ 0,75) en:", [primera_vez(c["VS"], UMBRAL) for c in cs_ej])
 """))
 cells.append(code(r"""
-mostrar_alumno()
+eps_ej = 0.2             # TODO: probá 0.05, 0.5, 1.0, o None (sin recorte)
+pasadas_ej = 50          # TODO: probá 5, 200
+
+v_ej = []
+for k in range(20):
+    rng = random.Random(100 + k)
+    lote = [jugar(env, theta_v, rng) for _ in range(10)]
+    v_ej.append(valor_de(env, ppo_actualizar(theta_v, b_v, lote, 1.0, pasadas_ej, eps_ej)[0])[env.start])
+v_ej = np.array(v_ej)
+print(f"ε = {eps_ej}, {pasadas_ej} pasadas: V(S) antes = {V_antes:.4f}   después: media {v_ej.mean():.4f}, "
+      f"mín. {v_ej.min():.4f}, máx. {v_ej.max():.4f}   mejoró en {np.sum(v_ej > V_antes)} de 20 lotes")
 """))
 cells.append(md(r"""
-### Paso 3 — Dos tutores, dos recompensas
+**Lo que encontramos** (¿qué $\alpha$ rompe a cada versión? ¿qué $\varepsilon$ deja de proteger? ¿qué pasa con pocas y con muchas pasadas?):
 
-El tutor es un **bandit contextual** (un MDP con γ = 0): el contexto es el nivel del alumno redondeado (0 a 3) y las acciones son las tres dificultades. Aprende una tabla $Q[\text{nivel}, \text{dificultad}]$ con ε-greedy (ε = 0.1) y paso constante, igual que en las clases 5 y 8, practicando con 300 alumnos simulados de 30 preguntas cada uno.
-
-- **Recompensa = acierto**: 1 si acierta, 0 si no.
-- **Recompensa = mejora**: cuánto subió su nivel con esa pregunta.
-
-> Simplificación honesta: acá el tutor **ve** el nivel y la mejora porque el alumno es simulado. Un tutor real los **estima** (con pruebas antes/después o modelos como *knowledge tracing*); es el problema de "historia vs. estado" de la clase 2.
-"""))
-cells.append(code(r"""
-Q_tutor = {"recompensa = acierto": entrenar_tutor("acierto"), "recompensa = mejora": entrenar_tutor("mejora")}
-mapas_tutor(Q_tutor)
-"""))
-cells.append(md(r"""
-El tutor premiado por **aciertos** elige "fácil" en todos los niveles a los que llegó (sus alumnos nunca alcanzaron el nivel 3, por eso esa fila está vacía): es el *reward hacking* de la clase 2, ahora aprendido de los datos. El premiado por **mejora** sube la dificultad a medida que el alumno sube de nivel: fácil → media → difícil. Veamos qué le pasa a 1000 alumnos nuevos con cada uno.
-"""))
-cells.append(code(r"""
-res_tutor = comparar_tutores(Q_tutor)
-"""))
-cells.append(md(r"""
-El tutor de aciertos logra **87% de aciertos** y el de mejora **68%**. Pero después de 40 preguntas los alumnos del primero llegan a nivel **2.0** y los del segundo a **3.7**; el tutor de aciertos es peor incluso que elegir al azar (2.7). Si un tablero mostrara solo **% de aciertos**, el tutor de aciertos parecería el mejor. Es la misma trampa que el feed miope de la clase 9: la métrica que se ve fácil (clics, aciertos) no es la que importa (que vuelva, que aprenda).
-
-Una sesión de ejemplo con el tutor de mejora, usando el banco de preguntas (se indica si cada pregunta la generó el modelo o la escribimos a mano):
-"""))
-cells.append(code(r"""
-sesion_ejemplo(Q_tutor["recompensa = mejora"], banco)
-"""))
-cells.append(md(r"""
-### ✍️ Ejercicio
-
-Una plataforma premia una mezcla: `PESO_ACIERTO × acierto + (1 − PESO_ACIERTO) × mejora`. Prueben `PESO_ACIERTO = 0.3`, `0.6` y `0.9`. ¿Desde qué peso el tutor vuelve a dar solo preguntas fáciles?
-"""))
-cells.append(code(r"""
-# TODO: cambiar PESO_ACIERTO y volver a ejecutar
-PESO_ACIERTO = 0.3
-Q_mezcla = entrenar_tutor(PESO_ACIERTO)
-TH, AC, D = simular_tutor(Q_mezcla)
-print(f"PESO_ACIERTO = {PESO_ACIERTO}: aciertos {100 * AC.mean():.1f}% · nivel final {TH[:, -1].mean():.2f} · "
-      f"preguntas fáciles {100 * (D == 0).mean():.0f}%")
+-
 """))
 
-# ---------------------------------------------------------------- 4
-cells.append(md(r"""
-## 4. Persuasión a favor del usuario
-
-**Nudges y patrones oscuros.** Un *nudge* (Thaler y Sunstein, 2008) es un cambio en cómo se presentan las opciones que empuja hacia una decisión sin prohibir ninguna (la fruta a la altura de los ojos). Un **patrón oscuro** (*dark pattern*; Brignull acuñó el término en 2010) usa el mismo mecanismo en contra de quien decide: la casilla de suscripción premarcada, el botón de cancelar escondido, el *scroll* infinito.
-
-Contra el *doomscrolling* hay proyectos que meten una **pausa** o **fricción** antes de abrir una red social (por ejemplo, la app *one sec*, estudiada por Grüning et al., PNAS 2023). En lenguaje de RL: **no cambian el agente** (el feed sigue optimizando lo mismo), **cambian el entorno**.
-
-### Paso 1 — El feed miope de la clase 9, con y sin pausa
-
-Volvemos al usuario de juguete de la clase 9 (satisfacción oculta 0–10; gancho = 6 clics y baja la satisfacción, útil = 3 clics y la sube). Agregamos una pausa antes de abrir: con probabilidad `PAUSA` el usuario decide no entrar ese día, y ese día su satisfacción se recupera un poco. **Supuesto inventado** para la simulación.
-"""))
-cells.append(code(r"""
-P_feed, R_feed = feed_mdp()
-pi_miope = value_iteration(P_feed, R_feed, 0)[1][:NSAT]          # γ = 0: siempre gancho
-pi_largo = value_iteration(P_feed, R_feed, 0.95)[1][:NSAT]
-print("Política miope (γ = 0):     ", " ".join(TIPOS[a] for a in pi_miope))
-comparar_pausa({"miope, sin pausa": (pi_miope, 0.0),
-                "miope, con pausa (30% no abre)": (pi_miope, 0.3),
-                "miope, con pausa (60% no abre)": (pi_miope, 0.6),
-                "largo plazo (γ = 0.95), sin pausa": (pi_largo, 0.0)})
-"""))
-cells.append(md(r"""
-El agente es **exactamente el mismo** (siempre gancho); lo que cambió es el entorno:
-
-- la pausa **frena la caída de la satisfacción** (el día 10: 0.3 sin pausa, 3.5 con 30% y 6.8 con 60%) y los usuarios tardan más en irse (con 60%, el día 30 queda el 9.6% contra 0%);
-- a la plataforma le cuesta poco: de 31.6 clics por usuario a 27–29 en 90 días;
-- pero **no alcanza**: mientras el agente siga optimizando el clic de hoy, el usuario termina yéndose igual. La política de largo plazo, sin ninguna pausa, conserva al 35% el día 30 y junta 4 veces más clics.
-
-Con estos supuestos inventados, la fricción es un parche útil para la persona, no una solución: el problema está en la recompensa.
-
-**Tensión honesta.** La pausa también es una manipulación: alguien decidió por el usuario que entrar menos era mejor. Incluso la manipulación bienintencionada choca con la **autonomía**.
-
-### Paso 2 — La recompensa visible y editable
-
-La salida coherente con este curso (educación problematizadora, cuidado de sí): que **la propia persona elija qué cuenta como progreso**. Supongamos que el feed le deja al usuario escribir su recompensa: cuánto pesan los clics y cuánto su satisfacción. Con una recompensa así, **hasta un agente miope (γ = 0)** hace lo que el usuario quiere.
-"""))
-cells.append(code(r"""
-# ✍️ Ejercicio: elijan su recompensa (prueben 1 y 0, 1 y 1, 0.2 y 1)
-PESO_CLICS = 1.0
-PESO_SATISFACCION = 1.0
-politica_con_mi_recompensa(PESO_CLICS, PESO_SATISFACCION)
-"""))
-cells.append(md(r"""
-Con `PESO_SATISFACCION = 0` vuelve el gancho para γ = 0; con un peso a la satisfacción, el contenido útil aparece incluso sin mirar el futuro (salvo en el nivel 10, donde la satisfacción ya no puede subir). **Elegir la propia recompensa** reemplaza buena parte de la planificación a largo plazo que en la clase 9 hacía falta para no "quemar" al usuario.
-
-### Paso 3 — Puente: la dopamina como error de TD
-
-Schultz, Dayan y Montague (1997) mostraron que las neuronas de dopamina de un mono se comportan como el **error de TD** de la clase 4: al principio responden al premio (un jugo); cuando aprenden que una luz lo anuncia, responden a la luz y ya no al jugo; y si el jugo no llega, su actividad **baja** justo cuando debía llegar. Lo reproducimos con TD(0).
-"""))
-cells.append(code(r"""
-td_dopamina()
-"""))
-cells.append(md(r"""
-$$\delta_t = r_{t+1} + \gamma V(s_{t+1}) - V(s_t)$$
-
-Las tres barras son δ: positivo en el premio inesperado, positivo en la luz cuando ya anuncia el premio, negativo cuando el premio esperado no llega. Por eso se habla de "loop de dopamina" en las redes sociales: la recompensa **variable** (a veces hay algo bueno en el feed, a veces no) mantiene vivo el error de predicción. Es una **metáfora útil**, no un diagnóstico: la evidencia sobre "adicción" a las redes sociales todavía está en debate.
-"""))
-
-# ---------------------------------------------------------------- cierre
+# ======================================================================= Cierre
 cells.append(md(r"""
 ## Preguntas para pensar
 
-1. El evaluador de la fábrica es otro modelo de lenguaje. ¿Qué pasaría si, además, el generador se entrenara con RL para **maximizar el puntaje del evaluador**? (Pista: RLHF y el *reward hacking* de la clase 8.)
-2. El tutor de mejora necesita **medir** la mejora, y medirla requiere preguntas (que el alumno puede acertar o no). ¿Cómo se estima la mejora sin volver a premiar aciertos?
-3. ¿Quién debería poder ver y cambiar la recompensa del agente de difusión de este curso: el docente, los alumnos, el público? ¿Qué cambia en cada caso?
+1. En la sección 3, imitar ponderando superó al jugador del que aprendía. ¿Por qué clonar a un experto, sin pesos, no puede superarlo nunca? ¿Qué haría falta para que sí?
+2. La línea de base convierte «esto salió bien» en «esto salió mejor de lo que esperaba». Piensen un ejemplo de la vida (un examen, un partido) en el que un buen resultado no debería reforzar nada, porque era lo esperado.
+3. El actor-crítico depende de que el crítico sepa algo. ¿Qué pasaría si el crítico estuviera muy equivocado en una zona de la cueva por la que el actor tiene que pasar?
 
-## Epílogo: cómo se propaga este curso
+## Próxima clase
 
-Este MOOC se produce con una fábrica como la de la sección 2 (con una persona que decide qué se publica) y se difunde como un bandit: cada post es una acción. Pero la recompensa que nos importa **no es el compartido** sino que alguien aprenda y **se lo enseñe a otra persona**. Por eso el curso está pensado para enseñar a enseñar: cada clase tiene una sección *Para enseñarlo*, y la vía sin código existe para que se pueda explicar sin una computadora.
-
-Una propuesta para cerrar, fuera del notebook: elijan una idea del registro (o una que les haya costado), enséñensela a alguien en cinco minutos y anoten **qué preguntó**. Esa pregunta es la observación más valiosa que puede recibir este agente.
-
-Próxima clase, la 12 y última: **cierre**, con el proyecto final y cómo se propaga este curso.
+Hasta acá la recompensa venía dada: $+1$ al entrar a la salida. ¿Y si nadie sabe escribirla, pero sí puede decir cuál de dos trayectos prefiere? En la clase 12, **aprender la recompensa**: de comparaciones a un mapa de recompensa, y de ahí a cómo se ajustan los modelos de lenguaje con preferencias de personas (RLHF y DPO).
 """))
 
-cells.append(code(r"""
-print(f"Tiempo total del notebook: {(time.time() - T0) / 60:.1f} min · generador: {GENERADOR_USADO} · evaluador: {MODELO_EVALUADOR}")
-"""))
-
-save(cells, "11-agentes-aplicados.ipynb", lento=True)
+save(cells, "11-policy-gradient.ipynb")

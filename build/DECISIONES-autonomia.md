@@ -25,3 +25,4 @@ Formato: `fecha · clase · decisión — por qué — qué cuesta si está mal`
 - 2026-10-10 · 9 · Clase 9 producida en un worktree y mergeada antes que la 8 (la 8 tarda por su notebook con torch); el orden de entradas en modulos.js y CHANGELOG se acomoda al mergear la 8 — ahorra tiempo — ninguno funcional.
 - 2026-10-10 · 9 · Diferido: el olvido medido con el gradiente quedó en B5 (spine: B3); B5 junta escala, olvido y atención — sugerencia del revisor, no bloquea — revisar en la pasada de alumno cero.
 - 2026-10-10 · 10 · Spine de la clase 10 escrito por el orquestador (PLAN §3 + CS224R 02 y 07 + CS234 L7); issue #5 asignado a la clase 15 — ver arriba — ninguno.
+- 2026-10-10 · 11 · Spine de la clase 11 escrito por el orquestador (PLAN §3 + CS234 L5–L6 + CS224R 03–05); ajustado al notebook: la línea de base baja el temblor ~5 veces y su ventaja es admitir pasos más grandes, no aprender antes; el recorte de PPO actúa al reusar el lote — reglas 5 y 7 — ninguno.
