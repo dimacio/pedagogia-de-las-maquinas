@@ -1257,5 +1257,83 @@ window.MODULOS = {
         "Se da al menos un ejemplo concreto de cómo esa recompensa se podría engañar o equivocar (una respuesta mala que cobra o una buena que no) y qué aprendería el asistente si se entrenara con ella."
       ]
     }
+  },
+
+  "15": {
+    objetivos: [
+      "Plantear un agente de difusión y un agente tutor como dos MDP con la misma forma y distinta recompensa.",
+      "Describir el circuito curador → generador → evaluador → publicador con una persona en el medio, y explicar por qué el evaluador tiene que ser otro modelo.",
+      "Distinguir un empujón (nudge) de un patrón oscuro y proponer una recompensa visible y editable por quien aprende.",
+      "Distinguir alinear a un agente con lo que la persona pide, con lo que hace y con lo que le conviene."
+    ],
+    tiempo: { pagina: 40, notebook: 60 },
+    previos: ["14", "2"],
+    requisitos: ["De la clase 14, los agentes de lenguaje; de la clase 2, el tutor tramposo que cobra por aciertos.", "El notebook descarga dos modelos (≈ 4 GB en total: Qwen2.5-0.5B-Instruct y Qwen2.5-1.5B-Instruct); en CPU tarda entre 20 y 60 minutos."],
+    cuestionario: [
+      {
+        objetivo: "O1",
+        pregunta: "En el notebook, con 2000 personas simuladas, el agente de difusión junta 19,7 interacciones por persona y solo un 3,6 % termina dominando el tema; el tutor junta 2,8 y llega al 49,3 %. ¿Qué separa a los dos agentes?",
+        opciones: [
+          { texto: "Las transiciones: la persona reacciona distinto a cada agente, y por eso uno la retiene y el otro la deja ir.", explicacion: "No: los dos usan los mismos estados, las mismas acciones y las mismas transiciones P. Si la persona respondiera distinto, no serían el mismo MDP." },
+          { texto: "Que el de difusión quedó mal entrenado: elige «entretener» siempre por un error, y con más entrenamiento aprendería a enseñar.", explicacion: "No: «entretener siempre» es la política óptima para lo que cobra. Hace bien su trabajo; el problema es qué trabajo se le pidió." },
+          { texto: "Solo la recompensa: el mismo MDP paga la interacción a uno y el aprendizaje al otro, y cada uno hace lo mejor para lo que cobra.", explicacion: "Correcto. Es lo que muestran las dos cuevas con el mismo mapa: una paga la casilla brillante y la otra la salida. Con r = w · interacción + (1 − w) · aprendizaje, cambiar w cambia el agente." },
+          { texto: "Que el tutor retiene mejor a la gente: se le va menos de la mitad y por eso termina con más personas que dominan el tema.", explicacion: "No: con el tutor se va el 50,7 %, más de la mitad. Cuando enseña bien, la persona deja de necesitarlo, y eso para el tutor no es un fracaso." }
+        ],
+        correcta: 2
+      },
+      {
+        objetivo: "O2",
+        pregunta: "En la corrida del notebook, el post de F4 dice lo contrario de la fuente, el evaluador le puso 7,4 y el sistema sugirió publicarlo. ¿Cómo está armado el circuito de la fábrica y dónde se lo puede frenar?",
+        opciones: [
+          { texto: "El curador elige qué contar, el generador redacta, el evaluador puntúa y una persona decide antes del publicador; esa persona es el último freno.", explicacion: "Correcto. Cada agente deja lo suyo en un estado compartido que lee el siguiente. Si se apaga a la persona, F4 sale publicado con su 7,4 y nadie se da cuenta." },
+          { texto: "El evaluador puntúa la fuente, el curador elige las mejor puntuadas, el generador redacta y el publicador publica; la persona revisa después.", explicacion: "No: el evaluador puntúa los borradores del generador, no la fuente. Y la persona decide antes de publicar; revisar después ya no frena nada." },
+          { texto: "El generador redacta, el curador corrige lo que está mal y el publicador publica lo que supera el umbral; con el curador alcanza, no hace falta persona.", explicacion: "No: el curador va primero y elige qué ideas contar, no corrige borradores. Y F4 superaba el umbral, así que sin persona se publicaba." },
+          { texto: "Curador, generador y evaluador son un solo modelo que se revisa a sí mismo, y el publicador manda todo lo que ese modelo aprueba.", explicacion: "No: el evaluador es otro modelo (Qwen2.5-1.5B), justamente para no revisarse a sí mismo. Y antes del publicador decide una persona." }
+        ],
+        correcta: 0
+      },
+      {
+        objetivo: "O2",
+        pregunta: "Con la misma rúbrica de cinco criterios, el generador (Qwen2.5-0.5B) puntúa sus borradores con 2,7 de media y el control malo a propósito también con 2,7. El evaluador distinto (Qwen2.5-1.5B) da 7,1 a los borradores y 5,0 al control, pero aprueba con 7,4 el post de F4. ¿Por qué el evaluador tiene que ser otro modelo?",
+        opciones: [
+          { texto: "Porque el generador se premia a sí mismo: se pone notas altas a todo, y un evaluador externo las baja a su lugar.", explicacion: "No: en esta corrida el generador no se premió, puntuó todo bajo. El problema no fue la nota alta sino que no separó nada: 2,7 contra 2,7." },
+          { texto: "Porque el modelo más grande no se equivoca: con una separación de 2,1 ya se puede sacar a la persona del circuito.", explicacion: "No: el evaluador distinto aprobó con 7,4 el post de F4, que dice lo contrario de la fuente. Separó lo groseramente malo, pero la persona sigue haciendo falta." },
+          { texto: "Porque usa una rúbrica más exigente que la del generador, y con la misma rúbrica los dos jueces darían lo mismo.", explicacion: "No: los dos usan la misma rúbrica de cinco criterios. Lo que cambia es quién la aplica." },
+          { texto: "Porque quien se juzga a sí mismo lo hace con los mismos puntos ciegos con que escribió: el generador no distinguió nada (separación 0,0) y el otro separó lo grosero (2,1).", explicacion: "Correcto. Separación = media(borradores) − control. Otro modelo tiene otros puntos ciegos, no ninguno: por eso el 7,4 a F4 y la persona antes de publicar." }
+        ],
+        correcta: 3
+      },
+      {
+        objetivo: "O3",
+        pregunta: "En el usuario de juguete de la sección 5, con el feed miope (γ = 0) de siempre, el empujón (el 60 % de los días decide no entrar) deja 28,6 clics en 90 días y un 9,6 % de activos al día 30; el patrón oscuro sube los clics a 57,6 pero deja activo solo el 2,6 %. ¿Qué los distingue y cuál es la salida que propone la clase?",
+        opciones: [
+          { texto: "El empujón cambia al agente y el patrón oscuro cambia el entorno; la salida es reentrenar el feed para que deje de mostrar ganchos.", explicacion: "No: ninguno de los dos toca al agente, que sigue siendo el feed miope que muestra ganchos. Los dos cambian cómo se presentan las opciones." },
+          { texto: "Usan el mismo mecanismo, cambiar el entorno, pero el empujón juega a favor de quien decide y el patrón oscuro en contra; la salida es una recompensa visible y editable por quien usa el sistema.", explicacion: "Correcto. Con los pesos a la vista, si la persona le da algo de peso a su satisfacción, hasta el feed miope muestra contenido útil. Es la pregunta de la clase 1, quién elige la recompensa, hecha interfaz." },
+          { texto: "El patrón oscuro es mejor para el usuario porque casi duplica los clics; la salida es que la plataforma ajuste mejor los pesos sin mostrarlos.", explicacion: "No: los clics los cobra la plataforma; al día 30 queda activo el 2,6 % y la satisfacción no sube. Y con pesos escondidos, quien aprende no elige qué cuenta." },
+          { texto: "El empujón no decide nada por la persona, a diferencia del patrón oscuro; la salida es prohibir cualquier cambio del entorno.", explicacion: "No: la pausa también decide por la persona, y por eso la clase pregunta quién debería elegir cuánto dura. La salida no es prohibir sino que la persona vea y edite la recompensa." }
+        ],
+        correcta: 1
+      },
+      {
+        objetivo: "O4",
+        pregunta: "Lucía pidió un curso de programación. Con el mismo agente y las mismas transiciones, tres recompensas dan tres políticas: una muestra siempre el curso (aprendizaje 36,3), otra siempre videos cortos (83,2 % de noches con clic, aprendizaje 0) y otra sugiere cortar cuando está cansada y el curso cuando está descansada (44,4). ¿Qué alineación es cada una?",
+        opciones: [
+          { texto: "El curso siempre es alinear con lo que le conviene; los videos, con lo que pide; y cortar cuando está cansada, con lo que hace.", explicacion: "No: el curso siempre es exactamente lo que pidió. Los videos salen de lo que hace, su registro de clics, y sugerir cortar no aparece ni en lo que pide ni en lo que hace." },
+          { texto: "Las tres son la misma alineación con distinto γ: el agente que mira más lejos sugiere cortar y el más miope muestra videos.", explicacion: "No: lo que cambia es la recompensa, no el descuento. Cada una responde de otra forma a qué quiere decir «lo que quiere Lucía»." },
+          { texto: "El curso siempre es lo que pide; los videos, lo que hace (sus preferencias reveladas, como un feed); y cortar cuando está cansada, lo que le conviene, que alguien tiene que decidir.", explicacion: "Correcto. Lo que le conviene es la que más enseña, 44,4 contra 36,3 y 0, pero no sale sola de los datos: alguien escribió que cansada le conviene cortar." },
+          { texto: "Los videos son lo que le conviene, porque el registro de 3000 noches muestra lo que de verdad elige; el curso es lo que pide y cortar es lo que hace.", explicacion: "No: lo que elige en el registro son sus preferencias reveladas, lo que hace, y es lo que optimiza un feed. Con eso el aprendizaje es 0." }
+        ],
+        correcta: 2
+      }
+    ],
+    actividad: {
+      titulo: "La app que cobraría por otra cosa",
+      consigna: "Elegí una app que uses todos los días: una red social, un juego, una plataforma de videos, una app para aprender idiomas, el mapa del celular. Escribí qué creés que cobra hoy, como el agente de difusión que cobra la interacción, y qué hace por eso. Proponé otra recompensa y decí con qué la alineás: con lo que pedís, con lo que hacés o con lo que te conviene, y quién escribiría eso. Después buscá cómo te podría hacer trampa con tu recompensa nueva, como el tutor que cobra aciertos y solo da preguntas fáciles. Decidí qué parte de esa recompensa tendrías que poder ver y editar vos, y si agregarías un empujón a tu favor, como una pausa, sin que se vuelva un patrón oscuro. Usá la pregunta de «Para enseñarlo»: ¿qué app te gustaría que cobrara por otra cosa? Cerralo con la oración: dos agentes con el mismo molde hacen cosas opuestas si cobran por cosas distintas; antes de usar uno, preguntá a favor de quién juega su recompensa. Publicalo en Discussions; otra persona te devuelve con la rúbrica.",
+      rubrica: [
+        "Se nombra una app concreta, se dice qué cobra hoy y qué hace por eso, y se propone otra recompensa diciendo con qué la alinea (lo que la persona pide, hace o le conviene) y quién la escribe.",
+        "Se describe un caso concreto de cómo la recompensa nueva podría hacer trampa, algo que cobra sin servirle a la persona, como el tutor que da solo preguntas fáciles.",
+        "Se dice qué parte de la recompensa vería y editaría quien usa la app, y si se propone un empujón, se explica por qué juega a favor de la persona y no es un patrón oscuro."
+      ]
+    }
   }
 };
